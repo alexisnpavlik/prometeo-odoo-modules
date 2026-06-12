@@ -1,0 +1,100 @@
+from odoo import _, api, fields, models
+
+
+class l10nLatamAccountPaymentCheck(models.Model):
+    _inherit = "l10n_latam.check"
+
+    name = fields.Char(tracking=True)
+    issuer_vat = fields.Char(tracking=True)
+    payment_date = fields.Date(tracking=True)
+    bank_id = fields.Many2one(tracking=True)
+
+    check_add_debit_button = fields.Boolean(related="original_journal_id.check_add_debit_button", readonly=True)
+    first_operation = fields.Many2one(
+        "account.payment",
+        compute="_compute_first_operation",
+        store=True,
+        readonly=True,
+    )
+
+    date = fields.Date(related="first_operation.date")
+    memo = fields.Char(related="payment_id.memo")
+    company_id = fields.Many2one(
+        compute="_compute_company_id", store=True, compute_sudo=True, comodel_name="res.company"
+    )
+    operation_ids = fields.Many2many(check_company=False)
+    payment_state = fields.Selection(
+        related="payment_id.state",
+        readonly=True,
+    )
+    user_can_write = fields.Boolean(
+        compute="_compute_user_can_write",
+    )
+
+    def _compute_user_can_write(self):
+        for rec in self:
+            rec.user_can_write = rec.env.user.has_group("account.group_account_user")
+
+    @api.depends("operation_ids.state", "payment_id.state")
+    def _compute_company_id(self):
+        for rec in self:
+            last_operation = rec._get_last_operation() or rec.payment_id
+            rec.company_id = last_operation.company_id
+
+    @api.depends("operation_ids.state", "payment_id.state")
+    def _compute_first_operation(self):
+        for rec in self:
+            all_operations = rec.payment_id + rec.operation_ids
+            valid_ops = all_operations.filtered(lambda x: x.state in ["in_process", "paid"])
+            sorted_ops = valid_ops.sorted(key=lambda payment: (payment.date, payment._origin.id))
+            rec.first_operation = sorted_ops[:1].id or False
+
+    def button_open_check_operations(self):
+        action = super(l10nLatamAccountPaymentCheck, self.sudo()).button_open_check_operations()
+        self.ensure_one()
+        operations = self.operation_ids.sorted(lambda r: r.l10n_latam_move_check_ids_operation_date, reverse=True)
+        operations = (operations + self.payment_id).filtered(
+            lambda x: x.state not in ["draft", "canceled"] and x.company_id == self.company_id
+        )
+        action = {
+            "name": _("Check Operations"),
+            "type": "ir.actions.act_window",
+            "res_model": "account.payment",
+            "views": [
+                (self.env.ref("l10n_latam_check.view_account_third_party_check_operations_tree").id, "list"),
+                (False, "form"),
+            ],
+            "context": {"create": False},
+            "domain": [("id", "in", operations.ids)],
+        }
+        return action
+
+    def _get_last_operation(self):
+        super()._get_last_operation()
+        self.ensure_one()
+        return (
+            (self.payment_id + self.operation_ids)
+            .filtered(lambda x: x.state not in ["draft", "canceled"] and x.l10n_latam_move_check_ids_operation_date)
+            .sorted(key=lambda payment: (payment.l10n_latam_move_check_ids_operation_date))[-1:]
+        )
+
+    @api.depends("payment_method_line_id.code", "payment_id.partner_id")
+    def _compute_bank_id(self):
+        payment_method_change = self._origin.payment_method_line_id != self.payment_method_line_id
+        partner_id_change = self._origin.payment_id.partner_id != self.payment_id.partner_id
+        if payment_method_change or partner_id_change:
+            super()._compute_bank_id()
+
+    @api.depends("payment_method_line_id.code", "payment_id.partner_id")
+    def _compute_issuer_vat(self):
+        payment_method_change = self._origin.payment_method_line_id != self.payment_method_line_id
+        partner_id_change = self._origin.payment_id.partner_id != self.payment_id.partner_id
+        if payment_method_change or partner_id_change:
+            super()._compute_issuer_vat()
+
+    def _compute_issue_state(self):
+        super()._compute_issue_state()
+        for rec in self:
+            account = rec.outstanding_line_id.account_id
+            if account and not account.reconcile:
+                rec.issue_state = "debited"
