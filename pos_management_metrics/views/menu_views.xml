@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acción de Cliente OWL para levantar el Dashboard -->
+    <record id="action_pos_management_metrics" model="ir.actions.client">
+        <field name="name">Métricas Gerenciales</field>
+        <field name="tag">pos_management_metrics.dashboard</field>
+    </record>
+
+    <!-- Menú Principal en la Barra Superior -->
+    <menuitem id="menu_pos_management_metrics_root"
+              name="Métricas Gerenciales"
+              action="action_pos_management_metrics"
+              groups="pos_management_metrics.group_pos_metrics_user"
+              web_icon="pos_management_metrics,static/description/icon.png"
+              sequence="50"/>
+</odoo>

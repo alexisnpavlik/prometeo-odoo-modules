@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+
+    <!--
+        ImageZoomField: envuelve ImageField estándar y agrega botón lupa.
+        La lupa aparece al hacer hover. t-on-click.stop evita que el clic
+        en la lupa propague al ImageField (que abriría el diálogo de carga).
+    -->
+    <t t-name="product_image_zoom.ImageZoomField">
+        <div class="o_field_image_zoom">
+            <ImageField t-props="props"/>
+            <div class="o_zoom_overlay" t-on-click.stop="openZoom">
+                <i class="fa fa-search-plus o_zoom_icon"/>
+            </div>
+        </div>
+    </t>
+
+    <!--
+        ImageZoomDialog: modal con la imagen en alta resolución.
+        props.close es inyectado por el dialog service de Odoo.
+    -->
+    <t t-name="product_image_zoom.ImageZoomDialog">
+        <Dialog title="''" size="'xl'">
+            <div class="d-flex align-items-center justify-content-center p-2">
+                <img
+                    t-att-src="props.src"
+                    alt="Imagen del producto"
+                    style="max-width: 90vw; max-height: 82vh; object-fit: contain;"
+                />
+            </div>
+        </Dialog>
+    </t>
+
+</templates>

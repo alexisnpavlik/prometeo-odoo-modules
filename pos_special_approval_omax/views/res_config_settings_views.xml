@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_pos_manager_validation" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.pos.manager.validation</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//block[@id='product_and_category_block']" position="after">
+                
+                <block id="pos_manager_validation_block" title="POS Manager Validation">
+                    
+                    <!-- Enable Manager Validation -->
+                    <setting help="Enable manager validation for POS operations.">
+                        <field name="manager_validation"/>
+                        <div class="content-group mt16" invisible="not manager_validation">
+                            <label for="manager_ids"/>
+                            <field name="manager_ids" widget="many2many_tags"/>
+                        </div>
+                    </setting>
+
+                    <!-- Validation Type -->
+                    <setting string="Validation Type" help="Select which type of validation to use." invisible="not manager_validation">
+                        <field name="validation_type"/>
+                        <div class="mt8" invisible="validation_type not in ['all', 'password', 'pin_password', 'password_barcode']">
+                            <field name="virtual_keyboard" class="oe_inline"/>
+                            <label for="virtual_keyboard"/>
+                        </div>
+                    </setting>
+
+                    <!-- One Time Password -->
+                    <setting string="One Time Password for Order" help="Enter the password once for an order, and it won't prompt for the password again for that order from the same person." invisible="not manager_validation">
+                        <field name="one_time_password"/>
+                    </setting>
+
+                    <!-- Validation Triggers -->
+                    <setting string="Add Product To Order" help="Validation During Add Product in to the Order." invisible="not manager_validation">
+                        <field name="validate_add_product_to_order"/>
+                    </setting>
+
+                    <setting string="Order Line Deletion" help="Validation During Order Line Deletion." invisible="not manager_validation">
+                        <field name="validate_order_line_deletion"/>
+                    </setting>
+
+                    <setting string="Order Deletion" help="Validation During Order Deletion." invisible="not manager_validation">
+                        <field name="validate_order_deletion"/>
+                    </setting>
+
+                    <setting string="Apply Discount" help="Validation During Applying Discount." invisible="not manager_validation">
+                        <field name="validate_apply_discount"/>
+                    </setting>
+                    
+                    <setting string="Global Discount" help="Validation During Global Discount." invisible="not manager_validation">
+                        <field name="validate_global_discount"/>
+                    </setting>
+
+                    <setting string="Price Change" help="Validation During Price Change." invisible="not manager_validation">
+                        <field name="validate_price_change"/>
+                    </setting>
+
+                    <setting string="Quantity Change" help="Validation During Quantity Change." invisible="not manager_validation">
+                        <field name="validate_quantity_change"/>
+                    </setting>
+
+                    <setting string="Payment" help="Validation During Payment." invisible="not manager_validation">
+                        <field name="validate_payment"/>
+                    </setting>
+
+                    <setting string="Refund" help="Validation During Refund." invisible="not manager_validation">
+                        <field name="validate_refund"/>
+                    </setting>
+
+                    <!-- Cash Move Validation -->
+                    <setting string="Cash Move" help="Validation During Cash out or Cash in." invisible="not manager_validation">
+                        <field name="validate_cash_move"/>
+                    </setting>
+
+                    <!-- Close Session Validation -->
+                    <setting string="Close Session" help="Validation During POS Session Close." invisible="not manager_validation">
+                        <field name="validate_close_session"/>
+                    </setting>
+                    
+                    <!-- Payment Method Validation -->
+                    <setting string="Validate Payment Methods" help="Validation on Payment Methods." invisible="not manager_validation">
+                        <field name="validate_payment_methods"/>
+                        <div class="content-group mt16" invisible="not validate_payment_methods">
+                            <field name="validated_payment_method_ids" widget="many2many_tags"/>
+                        </div>
+                    </setting>
+
+                </block>
+                
+            </xpath>
+        </field>
+    </record>
+</odoo>

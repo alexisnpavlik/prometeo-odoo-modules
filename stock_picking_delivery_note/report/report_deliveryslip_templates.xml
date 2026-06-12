@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_delivery_document_inherit_notes" inherit_id="stock.report_delivery_document">
+        <!-- Inserts the note before the signature block (which is defined by the div with t-if/t-else for o.signature) -->
+        <xpath expr="//div[@t-if='not o.signature']" position="before">
+            <div t-if="o.note and not is_html_empty(o.note)" class="mt-4" style="page-break-inside: avoid; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 15px; background-color: #f8f9fa; margin-bottom: 20px;">
+                <h6 class="text-muted mb-2" style="font-size: 0.95rem; font-weight: bold; border-bottom: 1px solid #e9ecef; padding-bottom: 5px; color: #495057;">
+                    Notas / Observaciones
+                </h6>
+                <div t-field="o.note" style="font-size: 0.9rem; color: #495057; line-height: 1.5;"/>
+            </div>
+        </xpath>
+    </template>
+</odoo>

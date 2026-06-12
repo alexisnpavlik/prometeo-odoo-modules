@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!--
+        Hereda el formulario de product.template y cambia el widget
+        de image_1920 a image_zoom. Solo modifica el atributo widget;
+        los demás atributos (class, options) se preservan.
+    -->
+    <record id="product_template_form_image_zoom" model="ir.ui.view">
+        <field name="name">product.template.form.image.zoom</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='image_1920']" position="attributes">
+                <attribute name="widget">image_zoom</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

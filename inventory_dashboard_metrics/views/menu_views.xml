@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acción de Cliente OWL para levantar el Dashboard de Inventario -->
+    <record id="action_inventory_dashboard_metrics" model="ir.actions.client">
+        <field name="name">Métricas de Inventario</field>
+        <field name="tag">inventory_dashboard_metrics.dashboard</field>
+    </record>
+
+    <!-- Menú Principal en la Barra Superior -->
+    <menuitem id="menu_inventory_dashboard_metrics_root"
+              name="Métricas de Inventario"
+              action="action_inventory_dashboard_metrics"
+              groups="inventory_dashboard_metrics.group_inventory_metrics_user"
+              web_icon="inventory_dashboard_metrics,static/description/icon.png"
+              sequence="51"/>
+</odoo>

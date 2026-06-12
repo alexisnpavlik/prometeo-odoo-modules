@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_global_discount_button.ControlButtons" t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+        
+        <!-- Reemplazar el botón de nota interna en la pantalla principal con el botón de descuento global -->
+        <xpath expr="//t[@t-if='!props.showRemainingButtons || (ui.isSmall and props.showRemainingButtons)']/OrderlineNoteButton" position="replace">
+            <button t-if="pos.config.module_pos_discount and pos.config.discount_product_id"
+                class="js_discount position-relative d-flex align-items-center justify-content-center gap-1"
+                t-att-class="buttonClass"
+                t-on-click="() => this.clickDiscount()">
+                <i class="fa fa-tag me-1"/>
+                <span>Descuento</span>
+                <span t-if="currentDiscountPercent > 0" 
+                      class="badge rounded-pill bg-danger text-white ms-1 px-2 py-0.5 fw-bold"
+                      style="font-size: 0.8rem; box-shadow: 0 0 8px rgba(220,53,69,0.8); border: 1px solid rgba(255,255,255,0.4); animation: pulse 2s infinite;">
+                    <t t-esc="currentDiscountPercent"/>%
+                </span>
+            </button>
+        </xpath>
+
+        <!-- Eliminar el botón de descuento duplicado en la ventana emergente de acciones -->
+        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/button[contains(@class, 'js_discount')]" position="replace"/>
+
+    </t>
+</templates>

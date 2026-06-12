@@ -1,0 +1,204 @@
+.virtual-keyboard {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid #dee2e6;
+}
+
+.keyboard-header {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 15px;
+    backdrop-filter: blur(10px);
+}
+
+.keyboard-status .badge {
+    font-size: 0.75rem;
+    padding: 0.5em 0.75em;
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.keyboard-container {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+}
+
+.keyboard-key {
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 8px !important;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1.5px solid transparent;
+}
+
+.keyboard-key:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: #007bff;
+}
+
+.keyboard-key:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.keyboard-key.active {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Special Key Styles */
+.space-key {
+    min-width: 120px;
+    border-radius: 20px !important;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+
+.backspace-key, .clear-key {
+    min-width: 60px;
+    font-size: 1.1rem;
+}
+
+.enter-key {
+    min-width: 70px;
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    border: none;
+}
+
+.enter-key:hover {
+    background: linear-gradient(135deg, #1e7e34, #155724);
+}
+
+.shift-key, .caps-key {
+    min-width: 50px;
+    position: relative;
+}
+
+.shift-key.active, .caps-key.active {
+    background: linear-gradient(135deg, #17a2b8, #117a8b);
+    color: white;
+    box-shadow: 0 0 0 2px rgba(23, 162, 184, 0.25);
+}
+
+.layout-key {
+    min-width: 45px;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+/* Row specific spacing */
+.keyboard-row {
+    gap: 4px;
+}
+
+.keyboard-bottom-row {
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .keyboard-key {
+        min-width: 35px;
+        min-height: 35px;
+        font-size: 0.9rem;
+    }
+    
+    .space-key {
+        min-width: 100px;
+    }
+    
+    .virtual-keyboard {
+        padding: 15px;
+    }
+}
+
+/* Key press animation */
+@keyframes keypress {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+.keyboard-key:active {
+    animation: keypress 0.1s ease;
+}
+
+/* Accessibility improvements */
+.keyboard-key:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* Enhanced button states */
+.btn-outline-primary.keyboard-key {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: #007bff;
+    color: #007bff;
+}
+
+.btn-outline-primary.keyboard-key:hover {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+}
+
+.btn-warning.keyboard-key {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    border: none;
+    color: #212529;
+}
+
+.btn-warning.keyboard-key:hover {
+    background: linear-gradient(135deg, #e0a800, #d39e00);
+}
+
+.btn-secondary.keyboard-key {
+    background: linear-gradient(135deg, #6c757d, #545b62);
+    border: none;
+}
+
+.btn-secondary.keyboard-key:hover {
+    background: linear-gradient(135deg, #545b62, #495057);
+}
+
+.numberpad-key {
+    min-width: 60px;
+    min-height: 50px;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.zero-key {
+    min-width: 60px;
+}
+
+.full-width {
+    min-width: 190px;
+}
+
+.numberpad-row {
+    gap: 8px;
+}
+
+.numberpad-key.btn-outline-primary {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #007bff;
+    color: #007bff;
+    font-weight: 700;
+}
+
+.numberpad-key.btn-outline-primary:hover {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    transform: translateY(-1px);
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pos_config_kanban_print_last_session" model="ir.ui.view">
+        <field name="name">pos.config.kanban.print.last.session</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_config_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='card_left']" position="inside">
+                <button t-if="record.last_session_closing_date.value"
+                        class="btn btn-secondary mt-2 ms-2"
+                        name="action_print_last_closed_session"
+                        type="object"
+                        title="Imprimir reporte de la última sesión cerrada">
+                    <i class="fa fa-print me-1" role="img" aria-label="Imprimir"/>Última sesión
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="point_of_sale.sale_details_report" model="ir.actions.report">
+        <field name="print_report_name">(object.config_id.name + ' - ' + (object.stop_at.strftime('%d-%m-%Y') if object.stop_at else object.start_at.strftime('%d-%m-%Y') if object.start_at else '')) if 'config_id' in object._fields else 'Detalles de Ventas'</field>
+    </record>
+
+</odoo>

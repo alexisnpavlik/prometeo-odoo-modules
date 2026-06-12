@@ -1,0 +1,992 @@
+/* -------------------------------------------------------------
+   Sistema de Variables y Paleta de Colores Premium
+   ------------------------------------------------------------- */
+.pos-dashboard-wrap {
+    --bg-base: #090d16;
+    --bg-surface: rgba(20, 28, 45, 0.45);
+    --bg-card: rgba(30, 41, 59, 0.5);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(59, 130, 246, 0.2);
+
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --color-green: #10b981;
+    --color-green-glow: rgba(16, 185, 129, 0.2);
+    --color-blue: #3b82f6;
+    --color-blue-glow: rgba(59, 130, 246, 0.2);
+    --color-purple: #8b5cf6;
+    --color-purple-glow: rgba(139, 92, 246, 0.2);
+    --color-amber: #f59e0b;
+    --color-amber-glow: rgba(245, 158, 11, 0.2);
+    --color-red: #ef4444;
+    --color-red-glow: rgba(239, 68, 68, 0.2);
+
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --shadow-premium: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+    display: flex;
+    height: 100%;
+    width: 100%;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    position: relative;
+    background-image:
+        radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
+    background-attachment: local;
+}
+
+/* --- Tema Claro (Day Mode) --- */
+.pos-dashboard-wrap.theme-light {
+    --bg-base: #f8fafc;
+    --bg-surface: rgba(255, 255, 255, 0.65);
+    --bg-card: rgba(255, 255, 255, 0.75);
+    --border-color: rgba(15, 23, 42, 0.08);
+    --border-glow: rgba(59, 130, 246, 0.15);
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+
+    --shadow-premium: 0 8px 32px 0 rgba(15, 23, 42, 0.08);
+
+    background-image:
+        radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.04) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.04) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.02) 0px, transparent 50%);
+}
+
+.pos-dashboard-wrap.theme-light select option {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+.pos-dashboard-wrap.theme-light select,
+.pos-dashboard-wrap.theme-light input[type="text"] {
+    background: rgba(255, 255, 255, 0.8);
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+.pos-dashboard-wrap.theme-light select:focus,
+.pos-dashboard-wrap.theme-light input[type="text"]:focus {
+    border-color: var(--color-blue);
+    background: #ffffff;
+    box-shadow: 0 0 8px var(--color-blue-glow);
+}
+
+.pos-dashboard-wrap.theme-light .btn-secondary {
+    background: rgba(15, 23, 42, 0.03);
+    color: #0f172a;
+}
+.pos-dashboard-wrap.theme-light .btn-secondary:hover {
+    background: rgba(15, 23, 42, 0.07);
+}
+
+.pos-dashboard-wrap.theme-light .brand-text h2 {
+    background: linear-gradient(135deg, #0f172a 30%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pos-dashboard-wrap.theme-light .main-header h1 {
+    background: linear-gradient(135deg, #0f172a 40%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pos-dashboard-wrap.theme-light .sync-status {
+    background: rgba(15, 23, 42, 0.03);
+}
+
+.pos-dashboard-wrap.theme-light .kpi-value {
+    color: #0f172a;
+}
+
+.pos-dashboard-wrap.theme-light .table-responsive {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.pos-dashboard-wrap.theme-light .data-table th {
+    background: rgba(15, 23, 42, 0.02);
+}
+
+.pos-dashboard-wrap.theme-light .data-table tbody tr:hover {
+    background: rgba(15, 23, 42, 0.02);
+}
+
+/* Scroll personalizado */
+.pos-dashboard-wrap ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.pos-dashboard-wrap ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+.pos-dashboard-wrap ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+.pos-dashboard-wrap ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Sidebar de Filtros (Glassmorphic) */
+.pos-dashboard-wrap .sidebar {
+    width: 300px;
+    min-width: 300px;
+    background: var(--bg-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-right: 1px solid var(--border-color);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    z-index: 10;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.pos-dashboard-wrap .brand-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--color-blue);
+    filter: drop-shadow(0 0 6px var(--color-blue-glow));
+}
+
+.pos-dashboard-wrap .brand-text h2 {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin: 0;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #fff 30%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pos-dashboard-wrap .brand-text span {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+.pos-dashboard-wrap .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pos-dashboard-wrap .sidebar-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.75px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    margin: 0;
+}
+
+.pos-dashboard-wrap .select-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.pos-dashboard-wrap .select-wrapper::after {
+    content: "";
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.pos-dashboard-wrap select,
+.pos-dashboard-wrap input[type="text"] {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    transition: var(--transition-smooth);
+    appearance: none;
+}
+
+.pos-dashboard-wrap select option {
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
+.pos-dashboard-wrap select:focus,
+.pos-dashboard-wrap input[type="text"]:focus {
+    border-color: var(--color-blue);
+    box-shadow: 0 0 8px var(--color-blue-glow);
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.pos-dashboard-wrap .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pos-dashboard-wrap .input-group label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.pos-dashboard-wrap .sidebar-footer {
+    margin-top: auto;
+    padding-top: 16px;
+}
+
+/* Main Content Area */
+.pos-dashboard-wrap .main-content {
+    flex: 1;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* Header */
+.pos-dashboard-wrap .main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-dashboard-wrap .main-header h1 {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin: 0;
+    background: linear-gradient(135deg, #fff 40%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pos-dashboard-wrap .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.pos-dashboard-wrap .sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.pos-dashboard-wrap .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.pos-dashboard-wrap .status-dot.green {
+    background-color: var(--color-green);
+    box-shadow: 0 0 6px var(--color-green);
+}
+
+.pos-dashboard-wrap .status-dot.anim-spin {
+    background-color: var(--color-amber);
+    box-shadow: 0 0 6px var(--color-amber);
+    animation: odoopulse 1.5s infinite alternate;
+}
+
+@keyframes odoopulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    100% { transform: scale(1.2); opacity: 1; }
+}
+
+.pos-dashboard-wrap .status-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Contenido de Paneles */
+.pos-dashboard-wrap .tab-content {
+    position: relative;
+    width: 100%;
+}
+
+.pos-dashboard-wrap .tab-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+}
+
+/* Tarjetas KPI Brillantes */
+.pos-dashboard-wrap .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.pos-dashboard-wrap .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.pos-dashboard-wrap .kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.pos-dashboard-wrap .kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.pos-dashboard-wrap .kpi-card.green:hover {
+    box-shadow: 0 8px 24px -8px var(--color-green-glow);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.pos-dashboard-wrap .kpi-card.blue:hover {
+    box-shadow: 0 8px 24px -8px var(--color-blue-glow);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.pos-dashboard-wrap .kpi-card.purple:hover {
+    box-shadow: 0 8px 24px -8px var(--color-purple-glow);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.pos-dashboard-wrap .kpi-card.amber:hover {
+    box-shadow: 0 8px 24px -8px var(--color-amber-glow);
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
+.pos-dashboard-wrap .kpi-card.red:hover {
+    box-shadow: 0 8px 24px -8px var(--color-red-glow);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.pos-dashboard-wrap .kpi-card-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pos-dashboard-wrap .kpi-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-dashboard-wrap .kpi-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pos-dashboard-wrap .kpi-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+}
+
+.pos-dashboard-wrap .green .kpi-icon {
+    color: var(--color-green);
+    background: var(--color-green-glow);
+}
+
+.pos-dashboard-wrap .blue .kpi-icon {
+    color: var(--color-blue);
+    background: var(--color-blue-glow);
+}
+
+.pos-dashboard-wrap .purple .kpi-icon {
+    color: var(--color-purple);
+    background: var(--color-purple-glow);
+}
+
+.pos-dashboard-wrap .amber .kpi-icon {
+    color: var(--color-amber);
+    background: var(--color-amber-glow);
+}
+
+.pos-dashboard-wrap .red .kpi-icon {
+    color: var(--color-red);
+    background: var(--color-red-glow);
+}
+
+.pos-dashboard-wrap .kpi-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pos-dashboard-wrap .kpi-value {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #fff;
+}
+
+.pos-dashboard-wrap .kpi-footer {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+}
+
+.pos-dashboard-wrap .kpi-subtext {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.pos-dashboard-wrap .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.pos-dashboard-wrap .single-chart-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+/* Tooltip Informativo de Gráficos */
+.pos-dashboard-wrap .info-tooltip-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pos-dashboard-wrap .info-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.5;
+    cursor: help;
+    transition: var(--transition-smooth);
+    color: var(--color-blue);
+}
+
+.pos-dashboard-wrap .info-tooltip-wrapper:hover .info-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.pos-dashboard-wrap .info-tooltip-text {
+    visibility: hidden;
+    width: 280px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #94a3b8;
+    text-align: left;
+    border-radius: 8px;
+    padding: 12px 14px;
+    position: absolute;
+    z-index: 100;
+    right: 0;
+    top: 26px;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    transform: translateY(10px);
+    box-shadow: var(--shadow-premium);
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+.pos-dashboard-wrap .info-tooltip-wrapper:hover .info-tooltip-text {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Posición del tooltip según alineación de la tarjeta */
+.pos-dashboard-wrap .info-tooltip-wrapper.tooltip-left .info-tooltip-text {
+    left: 0;
+    right: auto;
+}
+
+/* Light Theme overrides for Info Tooltip */
+.pos-dashboard-wrap.theme-light .info-tooltip-text {
+    background: rgba(255, 255, 255, 0.98);
+    color: #475569;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1);
+}
+
+
+.pos-dashboard-wrap .glass-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-premium);
+    backdrop-filter: blur(10px);
+    overflow: visible;
+}
+
+.pos-dashboard-wrap .glass-panel.padded {
+    padding: 20px;
+}
+
+.pos-dashboard-wrap .chart-container {
+    display: flex;
+    flex-direction: column;
+    height: 320px;
+}
+
+.pos-dashboard-wrap .chart-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-dashboard-wrap .chart-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.pos-dashboard-wrap .chart-body {
+    flex: 1;
+    padding: 16px;
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.pos-dashboard-wrap .flex-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Tablas Estilizadas y Buscadores */
+.pos-dashboard-wrap .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.pos-dashboard-wrap .section-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.pos-dashboard-wrap .search-box input {
+    width: 160px;
+    padding: 6px 12px;
+}
+
+.pos-dashboard-wrap .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.3);
+}
+
+.pos-dashboard-wrap .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+}
+
+.pos-dashboard-wrap .data-table th {
+    background: rgba(255, 255, 255, 0.02);
+    padding: 12px 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pos-dashboard-wrap .data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.pos-dashboard-wrap .data-table tbody tr {
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.pos-dashboard-wrap .data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.pos-dashboard-wrap .text-muted {
+    color: var(--text-muted) !important;
+}
+
+.pos-dashboard-wrap .text-center {
+    text-align: center;
+}
+
+/* Componentes: Botones Estilizados */
+.pos-dashboard-wrap .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: var(--transition-smooth);
+    outline: none;
+}
+
+.pos-dashboard-wrap .btn-primary {
+    background: linear-gradient(135deg, var(--color-blue) 0%, var(--color-purple) 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px var(--color-blue-glow);
+}
+
+.pos-dashboard-wrap .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.pos-dashboard-wrap .btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.pos-dashboard-wrap .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pos-dashboard-wrap .btn-icon-only {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+}
+
+.pos-dashboard-wrap .btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Efectos de Giro de Carga */
+.pos-dashboard-wrap .icon-spin-target.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Desings */
+@media (max-width: 992px) {
+    .pos-dashboard-wrap {
+        flex-direction: column;
+        position: relative;
+        height: auto;
+        min-height: 100%;
+        overflow-y: auto;
+    }
+    
+    .pos-dashboard-wrap .sidebar {
+        width: 100%;
+        min-width: 100%;
+        height: auto;
+        max-height: none;
+        overflow-y: visible;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        position: relative;
+        padding: 20px;
+    }
+    
+    .pos-dashboard-wrap .main-content {
+        max-width: 100%;
+        padding: 20px;
+        height: auto;
+        overflow-y: visible;
+    }
+    
+    .pos-dashboard-wrap .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* -------------------------------------------------------------
+   Estilos específicos de Inventario y Badges de Stock
+   ------------------------------------------------------------- */
+.pos-dashboard-wrap .margin-progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.pos-dashboard-wrap .margin-progress-container {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.pos-dashboard-wrap.theme-light .margin-progress-container {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+.pos-dashboard-wrap .margin-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pos-dashboard-wrap .margin-progress-bar.medium {
+    background: #3b82f6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+.pos-dashboard-wrap .stock-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 32px;
+}
+
+.pos-dashboard-wrap .stock-badge.rotura {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    animation: stockout-pulse 2s infinite;
+}
+
+.pos-dashboard-wrap .stock-badge.critico {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: #f59e0b !important;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+}
+
+@keyframes stockout-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+/* -------------------------------------------------------------
+   Heatmap de Cobertura de Stock por Sucursal
+   ------------------------------------------------------------- */
+.pos-dashboard-wrap .heatmap-table {
+    table-layout: auto;
+    width: 100%;
+}
+
+.pos-dashboard-wrap .heatmap-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    transition: var(--transition-smooth);
+    user-select: none;
+    cursor: default;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Modo Oscuro (Dark Mode) - Estilos Premium Glassmorphic */
+.pos-dashboard-wrap .cobertura-critica {
+    background: rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    box-shadow: inset 0 0 8px rgba(239, 68, 68, 0.15);
+}
+.pos-dashboard-wrap .cobertura-critica:hover {
+    background: rgba(239, 68, 68, 0.35);
+    transform: scale(1.04);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.pos-dashboard-wrap .cobertura-baja {
+    background: rgba(245, 158, 11, 0.25);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    box-shadow: inset 0 0 8px rgba(245, 158, 11, 0.15);
+}
+.pos-dashboard-wrap .cobertura-baja:hover {
+    background: rgba(245, 158, 11, 0.35);
+    transform: scale(1.04);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.pos-dashboard-wrap .cobertura-media {
+    background: rgba(253, 224, 71, 0.18);
+    color: #fde047;
+    border: 1px solid rgba(253, 224, 71, 0.35);
+    box-shadow: inset 0 0 8px rgba(253, 224, 71, 0.1);
+}
+.pos-dashboard-wrap .cobertura-media:hover {
+    background: rgba(253, 224, 71, 0.28);
+    transform: scale(1.04);
+    box-shadow: 0 0 12px rgba(253, 224, 71, 0.35);
+}
+
+.pos-dashboard-wrap .cobertura-alta {
+    background: rgba(16, 185, 129, 0.25);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    box-shadow: inset 0 0 8px rgba(16, 185, 129, 0.15);
+}
+.pos-dashboard-wrap .cobertura-alta:hover {
+    background: rgba(16, 185, 129, 0.35);
+    transform: scale(1.04);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.pos-dashboard-wrap .cobertura-sin-venta {
+    background: rgba(255, 255, 255, 0.05);
+    color: #64748b;
+    border: 1px solid var(--border-color);
+}
+.pos-dashboard-wrap .cobertura-sin-venta:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    transform: scale(1.04);
+}
+
+/* Modo Claro (Light Mode) - Adaptación Legible y Sofisticada */
+.pos-dashboard-wrap.theme-light .cobertura-critica {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    box-shadow: inset 0 0 6px rgba(239, 68, 68, 0.05);
+}
+.pos-dashboard-wrap.theme-light .cobertura-critica:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.pos-dashboard-wrap.theme-light .cobertura-baja {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    box-shadow: inset 0 0 6px rgba(245, 158, 11, 0.05);
+}
+.pos-dashboard-wrap.theme-light .cobertura-baja:hover {
+    background: rgba(245, 158, 11, 0.2);
+}
+
+.pos-dashboard-wrap.theme-light .cobertura-media {
+    background: rgba(234, 179, 8, 0.1);
+    color: #b45309; /* Marrón/ocre oscuro para legibilidad sobre fondo claro */
+    border: 1px solid rgba(234, 179, 8, 0.25);
+    box-shadow: inset 0 0 6px rgba(234, 179, 8, 0.05);
+}
+.pos-dashboard-wrap.theme-light .cobertura-media:hover {
+    background: rgba(234, 179, 8, 0.18);
+}
+
+.pos-dashboard-wrap.theme-light .cobertura-alta {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    box-shadow: inset 0 0 6px rgba(16, 185, 129, 0.05);
+}
+.pos-dashboard-wrap.theme-light .cobertura-alta:hover {
+    background: rgba(16, 185, 129, 0.2);
+}
+
+.pos-dashboard-wrap.theme-light .cobertura-sin-venta {
+    background: rgba(15, 23, 42, 0.04);
+    color: #64748b;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.pos-dashboard-wrap.theme-light .cobertura-sin-venta:hover {
+    background: rgba(15, 23, 42, 0.07);
+    color: #475569;
+}
+

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_inventory_metrics_user" model="res.groups">
+        <field name="name">Acceso a Métricas de Inventario</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Permite acceder al menú de Métricas de Inventario y visualizar el dashboard avanzado de existencias, rotación y stock crítico.</field>
+    </record>
+</odoo>

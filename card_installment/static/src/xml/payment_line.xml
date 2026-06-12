@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Override payment line display to show custom name for installment surcharges (selected lines) -->
+    <t t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension">
+        <xpath expr="//span[hasclass('payment-name')]" position="replace">
+            <span class="payment-name">
+                <t t-if="line.installment_name">
+                    <t t-esc="line.installment_name"/>
+                </t>
+                <t t-else="">
+                    <t t-esc="line.payment_method_id.name"/>
+                </t>
+            </span>
+        </xpath>
+    </t>
+
+    <!-- Override payment line display for unselected lines -->
+    <t t-inherit="point_of_sale.PaymentScreenPaymentLines" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('paymentline')][not(hasclass('selected'))]//div[hasclass('payment-infos')]/t[@t-esc='line.payment_method_id.name']" position="replace">
+            <t t-if="line.installment_name">
+                <t t-esc="line.installment_name"/>
+            </t>
+            <t t-else="">
+                <t t-esc="line.payment_method_id.name"/>
+            </t>
+        </xpath>
+    </t>
+
+    <!-- Override receipt payment lines to show custom name for installment surcharges -->
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('paymentlines')]/t[@t-esc='line.name']" position="replace">
+            <t t-if="line.installment_name">
+                <t t-esc="line.installment_name"/>
+            </t>
+            <t t-else="">
+                <t t-esc="line.name"/>
+            </t>
+        </xpath>
+    </t>
+
+</templates>

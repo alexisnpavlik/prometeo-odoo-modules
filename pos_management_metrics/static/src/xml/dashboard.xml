@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_management_metrics.DashboardTemplate">
+        <div t-att-class="'pos-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+            <!-- Sidebar de Filtros (Glassmorphic) -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Management Metrics</h2>
+                        <span>Metrics Hub</span>
+                    </div>
+                </div>
+                
+                <!-- Rango de Fechas Predefinido -->
+                <div class="sidebar-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="preset-dates">
+                        <button t-att-class="'btn-preset ' + (state.preset === 'today' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('today')">Hoy</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'yesterday' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('yesterday')">Ayer</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('7days')">Últimos 7 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('30days')">Últimos 30 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '60days' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('60days')">Últimos 60 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('90days')">Últimos 90 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'all' ? 'active' : '')" 
+                                t-on-click="() => this.onPresetClick('all')">Todo</button>
+                    </div>
+                    
+                    <div class="custom-date-inputs">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="date" t-att-value="state.startDate" t-on-change="onStartDateChange"/>
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="date" t-att-value="state.endDate" t-on-change="onEndDateChange"/>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtros Avanzados -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+                    
+                    <div class="input-group">
+                        <label>Punto de Venta (Caja)</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.pos">
+                                <option value="all">Todas las cajas</option>
+                                <t t-foreach="filtersData.pos_configs" t-as="pos" t-key="pos">
+                                    <option t-att-value="pos"><t t-esc="pos"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    
+                    <div class="input-group">
+                        <label>Empresa</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.company">
+                                <option value="all">Todas las empresas</option>
+                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
+                                    <option t-att-value="company"><t t-esc="company"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Categoría</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.category" t-on-change="onCategoryChange">
+                                <option value="all">Todas las categorías</option>
+                                <t t-foreach="filtersData.categories" t-as="cat" t-key="cat">
+                                    <option t-att-value="cat"><t t-esc="cat"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Producto</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.product">
+                                <option value="all">Todos los productos</option>
+                                <t t-foreach="currentProductsList" t-as="prod" t-key="prod">
+                                    <option t-att-value="prod"><t t-esc="prod"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-footer" style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
+                        <span>Aplicar</span>
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </aside>
+            
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- Header -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <h1>Dashboard de Ventas POS</h1>
+                    </div>
+                    
+                    <div class="header-right">
+                        <!-- Botón de Alternancia de Tema Día/Noche -->
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime">Cargando...</span>
+                        </div>
+                        
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="() => this.refreshData(true)" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+                
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'general' ? 'active' : '')" 
+                            t-on-click="() => this.switchTab('general')">Panel General</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'profitability' ? 'active' : '')" 
+                            t-on-click="() => this.switchTab('profitability')">Márgenes</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'sessions' ? 'active' : '')" 
+                            t-on-click="() => this.switchTab('sessions')">Auditoría de Cajas</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'transactions' ? 'active' : '')" 
+                            t-on-click="() => this.switchTab('transactions')">Transacciones</button>
+                </nav>
+                
+                <!-- Tab Content Wrapper -->
+                <div class="tab-content">
+                    
+                    <!-- TAB: GENERAL -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'general' ? 'active' : '')">
+                        <!-- KPI Cards Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Ingresos Totales (Con IVA)</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.total_revenue)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Sin IVA: <t t-esc="formatCurrency(metricsData.kpis.total_revenue_net)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Transacciones</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="14 2 14 8 20 8"></polyline>
+                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                <polyline points="10 9 9 9 8 9"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.total_orders.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Estado: Listo</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Venta Promedio por Orden</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="9" cy="21" r="1"></circle>
+                                                <circle cx="20" cy="21" r="1"></circle>
+                                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.ticket_average)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Por orden de venta</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.cash_difference &lt; 0 ? 'red' : (metricsData.kpis.cash_difference &gt; 0 ? 'green' : 'purple'))">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Arqueo Acumulado</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                                                <line x1="12" y1="10" x2="12" y2="10"></line>
+                                                <circle cx="12" cy="14" r="2"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.cash_difference)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">
+                                            <t t-if="metricsData.kpis.cash_difference &lt; 0">Faltante neto en cajas</t>
+                                            <t t-elif="metricsData.kpis.cash_difference &gt; 0">Sobrante neto en cajas</t>
+                                            <t t-else="">Cajas cuadradas perfectas</t>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Charts Grid -->
+                        <div class="charts-grid">
+                            <!-- Temporal Trend -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Evolución Temporal de Ventas</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="badge" t-esc="metricsData.charts.sales_trend.timeframe || 'Diario'">Diario</span>
+                                        <!-- Info Icon with Premium CSS Tooltip -->
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text">
+                                                Muestra los ingresos diarios o por hora acumulados para cada empresa durante el período seleccionado. Ayuda a identificar patrones de crecimiento y comportamiento general de facturación.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-sales-trend"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Payment Methods -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Métodos de Pago</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra la participación porcentual de cada método de pago sobre el total facturado. Permite entender qué medios de cobro son los más populares y utilizados por los clientes.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-payment-methods"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Top Products -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Top 10 Productos Más Vendidos</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra el ranking de los 10 productos con mayor nivel de facturación en el período de análisis, facilitando el control de los productos estrella o de alta rotación.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-top-products"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Top Categories -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Ventas por Categoría</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra la distribución total de ventas agrupadas por categoría de producto, ayudando a analizar qué segmentos o departamentos de la tienda generan más ingresos.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-top-categories"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Weekday activity -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Ventas por Día de la Semana</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra el volumen acumulado de ventas para cada día de la semana. Ideal para identificar qué días registran mayor afluencia comercial para optimizar personal y recursos.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-sales-by-weekday"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Hourly distribution -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Distribución Horaria</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Representa la distribución horaria acumulada de las ventas, permitiendo detectar de forma precisa los picos de facturación a lo largo del día y las horas de mayor actividad.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-sales-by-hour"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- TAB: SESSIONS (ARQUEOS) -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'sessions' ? 'active' : '')">
+                        <div class="glass-panel" style="margin-bottom: 20px;">
+                            <div class="chart-header" style="position: relative;">
+                                <h3>Distribución Horaria de Aperturas y Cierres de Caja</h3>
+                                <div class="info-tooltip-wrapper tooltip-right">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                    <div class="info-tooltip-text">
+                                        Analiza las horas exactas en las que los cajeros abren y cierran las sesiones de punto de venta, permitiendo controlar la puntualidad y los tiempos de arqueo.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-body" style="height: 280px;">
+                                <canvas id="chart-session-hours"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Auditoría de Sesiones y Cierre de Cajas</h2>
+                                    <p class="subtitle">Análisis detallado de balances, retiros y descuadres para cada sesión</p>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sesión ID</th>
+                                            <th>Caja (Punto de Venta)</th>
+                                            <th>Apertura / Cierre</th>
+                                            <th>Abierta por</th>
+                                            <th>Efectivo Apertura</th>
+                                            <th>Efectivo Esperado</th>
+                                            <th>Efectivo Contado</th>
+                                            <th>Diferencia</th>
+                                            <th>Total Vendido</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="sessionsData.length === 0">
+                                            <tr>
+                                                <td colspan="10" class="text-center text-muted">No se encontraron sesiones registradas en este período.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="sessionsData" t-as="s" t-key="s.sesion_id">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;">
+                                                    <t t-esc="s.sesion_id"/> <span style="font-size:11px;color:var(--text-muted);font-weight:500;">(<t t-esc="s.sesion"/>)</span>
+                                                </td>
+                                                <td><t t-esc="s.punto_venta"/></td>
+                                                <td>
+                                                    <div style="font-size:12px;font-weight:600;">A: <t t-esc="formatDatetime(s.apertura)"/></div>
+                                                    <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">C: <t t-esc="formatDatetime(s.cierre)"/></div>
+                                                </td>
+                                                <td><t t-esc="s.abierta_por || 'Sistema'"/></td>
+                                                <td><t t-esc="formatCurrency(s.efectivo_apertura)"/></td>
+                                                <td><t t-esc="formatCurrency(s.efectivo_esperado)"/></td>
+                                                <td><t t-esc="formatCurrency(s.efectivo_contado)"/></td>
+                                                <td>
+                                                    <t t-if="s.estado_sesion !== 'closed'">
+                                                        <span class="text-muted">—</span>
+                                                    </t>
+                                                    <t t-elif="s.diferencia_caja &lt; 0">
+                                                        <span class="diff-negative"><t t-esc="formatCurrency(s.diferencia_caja)"/></span>
+                                                    </t>
+                                                    <t t-elif="s.diferencia_caja &gt; 0">
+                                                        <span class="diff-positive">+<t t-esc="formatCurrency(s.diferencia_caja)"/></span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <span class="diff-neutral">$0,00</span>
+                                                    </t>
+                                                </td>
+                                                <td style="font-weight: 600; color:#fff;"><t t-esc="formatCurrency(s.total_vendido)"/></td>
+                                                <td>
+                                                    <span t-att-class="'status-pill ' + s.estado_sesion">
+                                                        <t t-if="s.estado_sesion === 'closed'">Cerrada</t>
+                                                        <t t-elif="s.estado_sesion === 'opened'">Abierta</t>
+                                                        <t t-else="">En Cierre</t>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- TAB: TRANSACTIONS -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'transactions' ? 'active' : '')">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Detalle de Ventas e Historial</h2>
+                                    <p class="subtitle">Auditoría línea por línea de las órdenes registradas</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Buscar orden, producto, cliente..." t-on-input="onSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nro. Orden</th>
+                                            <th>Fecha / Hora</th>
+                                            <th>Caja</th>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th>Cant.</th>
+                                            <th>Precio Unit.</th>
+                                            <th>Subtotal Con IVA</th>
+                                            <th>Cliente</th>
+                                            <th>Cajero</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="transactionsData.sales.length === 0">
+                                            <tr>
+                                                <td colspan="10" class="text-center text-muted">No se encontraron transacciones registradas.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="transactionsData.sales" t-as="t" t-key="t.orden_id + '-' + t.producto">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="t.numero_orden"/></td>
+                                                <td><t t-esc="t.fecha"/></td>
+                                                <td><t t-esc="t.punto_venta"/></td>
+                                                <td><t t-esc="t.producto"/></td>
+                                                <td><t t-esc="t.categoria || 'Sin Categoría'"/></td>
+                                                <td><t t-esc="t.cantidad"/></td>
+                                                <td><t t-esc="formatCurrency(t.precio_unitario)"/></td>
+                                                <td style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(t.subtotal_con_iva)"/></td>
+                                                <td><t t-esc="t.cliente || 'Consumidor Final'"/></td>
+                                                <td><t t-esc="t.cajero"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="state.page"/> de <t t-esc="transactionsData.pages"/> (Total: <t t-esc="transactionsData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= transactionsData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: VENTAS Y RENTABILIDAD -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'profitability' ? 'active' : '')">
+                        <!-- KPI Grid -->
+                        <div class="kpi-grid">
+                            <!-- Card 1: Utilidad Bruta -->
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Utilidad Bruta (Margen $)</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.profitability.gross_profit)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Costo total de venta: <t t-esc="formatCurrency(metricsData.profitability.total_cost)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Margen Promedio % -->
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Porcentaje de Margen Bruto</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="19" y1="5" x2="5" y2="19"></line>
+                                                <circle cx="6.5" cy="6.5" r="2.5"></circle>
+                                                <circle cx="17.5" cy="17.5" r="2.5"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.profitability.margin_percent"/>%</div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Ganancia por peso neto vendido</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Ticket e Items Promedio -->
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Ticket e Items por Venta</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="9" cy="21" r="1"></circle>
+                                                <circle cx="20" cy="21" r="1"></circle>
+                                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.profitability.unidades_por_ticket"/> uds</div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Ticket promedio: <t t-esc="formatCurrency(metricsData.kpis.ticket_average)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 4: Crecimiento Temporal -->
+                            <div class="kpi-card shadow-glow orange">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Crecimiento de Venta Neta</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                                <polyline points="17 6 23 6 23 12"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="growth-indicators">
+                                        <div class="growth-item">
+                                            <span class="growth-label">MoM:</span>
+                                            <span t-att-class="'growth-badge ' + (metricsData.profitability.mom_growth_revenue &gt;= 0 ? 'up' : 'down')">
+                                                <t t-if="metricsData.profitability.mom_growth_revenue &gt;= 0">▲ <t t-esc="metricsData.profitability.mom_growth_revenue"/>%</t>
+                                                <t t-else="">▼ <t t-esc="Math.abs(metricsData.profitability.mom_growth_revenue)"/>%</t>
+                                            </span>
+                                        </div>
+                                        <div class="growth-item">
+                                            <span class="growth-label">YoY:</span>
+                                            <span t-att-class="'growth-badge ' + (metricsData.profitability.yoy_growth_revenue &gt;= 0 ? 'up' : 'down')">
+                                                <t t-if="metricsData.profitability.yoy_growth_revenue &gt;= 0">▲ <t t-esc="metricsData.profitability.yoy_growth_revenue"/>%</t>
+                                                <t t-else="">▼ <t t-esc="Math.abs(metricsData.profitability.yoy_growth_revenue)"/>%</t>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Comparativo con períodos anteriores</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Side-by-Side widgets: Top Rentables vs Fugas de Rentabilidad -->
+                        <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); margin-bottom: 20px;">
+                            <!-- Top 5 Rentables -->
+                            <div class="chart-container glass-panel padded" style="height: auto;">
+                                <div class="chart-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                                    <h3 class="flex-align-center" style="gap: 8px; display: flex; align-items: center; margin: 0;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="width: 20px; height: 20px;">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                        </svg>
+                                        Top 5 Productos con Mayor Margen ($)
+                                    </h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra los 5 productos que han generado la mayor utilidad bruta acumulada en pesos durante el período. Son tus productos más rentables en términos absolutos.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rank-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                                    <t t-if="metricsData.profitability.top_profitable.length === 0">
+                                        <div class="text-center text-muted padded">No hay datos suficientes para rankear productos.</div>
+                                    </t>
+                                    <t t-foreach="metricsData.profitability.top_profitable" t-as="item" t-key="'top-prof-' + item.producto">
+                                        <div class="rank-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255, 255, 255, 0.03); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                            <div class="rank-name-box" style="display: flex; align-items: center; gap: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                                                <span class="rank-number badge-green" style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;"><t t-esc="item_index + 1"/></span>
+                                                <span class="rank-name" style="font-weight: 500;" t-esc="item.producto"/>
+                                            </div>
+                                            <div class="rank-value-box" style="display: flex; flex-direction: column; align-items: flex-end;">
+                                                <span class="rank-profit" style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(item.gross_profit)"/></span>
+                                                <span class="rank-meta-percent text-green" style="font-size: 11px; color: #10b981;"><t t-esc="item.margin_percent"/>% marg.</span>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Fugas de Rentabilidad (Margen más bajo/negativo) -->
+                            <div class="chart-container glass-panel padded" style="height: auto;">
+                                <div class="chart-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                                    <h3 class="flex-align-center" style="gap: 8px; display: flex; align-items: center; margin: 0;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4899" stroke-width="2.5" style="width: 20px; height: 20px;">
+                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        Fugas de Rentabilidad (Margen Crítico o Negativo)
+                                    </h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Detecta de forma proactiva los productos que se están vendiendo con margen de ganancia negativo (pérdidas) debido a costos de compra más altos que el precio de venta.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="rank-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                                    <t t-if="metricsData.profitability.bottom_profitable.length === 0">
+                                        <div class="text-center text-muted padded">Sin alertas de margen crítico en este período.</div>
+                                    </t>
+                                    <t t-foreach="metricsData.profitability.bottom_profitable" t-as="item" t-key="'bot-prof-' + item.producto">
+                                        <div class="rank-item warning-hover" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255, 255, 255, 0.03); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                                            <div class="rank-name-box" style="display: flex; align-items: center; gap: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+                                                <span class="rank-number badge-red" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;"><t t-esc="item_index + 1"/></span>
+                                                <span class="rank-name" style="font-weight: 500;" t-esc="item.producto"/>
+                                            </div>
+                                            <div class="rank-value-box" style="display: flex; flex-direction: column; align-items: flex-end;">
+                                                <span class="rank-profit text-red" style="font-weight: 600; color: #ef4444;"><t t-esc="formatCurrency(item.gross_profit)"/></span>
+                                                <span t-att-class="'rank-meta-percent ' + (item.margin_percent &lt; 0 ? 'text-red font-bold' : 'text-orange')" style="font-size: 11px;">
+                                                    <t t-esc="item.margin_percent"/>% marg.
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Product Profitability Table -->
+                        <div class="glass-panel padded" style="margin-bottom: 20px;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div>
+                                    <h2>Análisis de Margen por Producto</h2>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Desglose exhaustivo de ingresos netos, costos estimados y porcentaje de margen</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Filtrar producto..." t-att-value="state.profitabilitySearch" t-on-input="onProfitabilitySearchInput" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 6px 12px; color: #fff; outline: none; font-size: 13px;"/>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th class="text-right" style="text-align: right;">Ventas (Con IVA)</th>
+                                            <th class="text-right" style="text-align: right;">Costo Total</th>
+                                            <th class="text-right" style="text-align: right;">Utilidad Bruta</th>
+                                            <th>% Margen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="filteredProductMargins.length === 0">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">No se encontraron productos registrados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="filteredProductMargins" t-as="p" t-key="p.producto">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="p.producto"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.net_revenue)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.total_cost)"/></td>
+                                                <td class="text-right" style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(p.gross_profit)"/></td>
+                                                <td>
+                                                    <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
+                                                        <div class="margin-progress-container" style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 100px;">
+                                                            <div t-att-class="'margin-progress-bar ' + (p.margin_percent &lt; 0 ? 'negative' : (p.margin_percent &gt; 50 ? 'high' : 'medium'))"
+                                                                 t-attf-style="width: {{Math.max(0, Math.min(100, p.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
+                                                        </div>
+                                                        <span t-att-class="'margin-percent-text ' + (p.margin_percent &lt; 0 ? 'text-red font-bold' : '')" style="font-size: 12px; font-weight: 600; width: 45px; text-align: right;">
+                                                            <t t-esc="p.margin_percent"/>%
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Category Profitability Table -->
+                        <div class="glass-panel padded">
+                            <div class="section-header" style="margin-bottom: 20px;">
+                                <div>
+                                    <h2>Análisis de Margen por Categoría</h2>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Evaluación de la rentabilidad promedio agrupada por categorías de producto</p>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Categoría</th>
+                                            <th class="text-right" style="text-align: right;">Ventas (Con IVA)</th>
+                                            <th class="text-right" style="text-align: right;">Costo Total</th>
+                                            <th class="text-right" style="text-align: right;">Utilidad Bruta</th>
+                                            <th>% Margen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="metricsData.profitability.category_margins.length === 0">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">No se encontraron categorías registradas.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="metricsData.profitability.category_margins" t-as="c" t-key="c.categoria">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="c.categoria"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.net_revenue)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.total_cost)"/></td>
+                                                <td class="text-right" style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(c.gross_profit)"/></td>
+                                                <td>
+                                                    <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
+                                                        <div class="margin-progress-container" style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 100px;">
+                                                            <div t-att-class="'margin-progress-bar ' + (c.margin_percent &lt; 0 ? 'negative' : (c.margin_percent &gt; 50 ? 'high' : 'medium'))"
+                                                                 t-attf-style="width: {{Math.max(0, Math.min(100, c.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
+                                                        </div>
+                                                        <span t-att-class="'margin-percent-text ' + (c.margin_percent &lt; 0 ? 'text-red font-bold' : '')" style="font-size: 12px; font-weight: 600; width: 45px; text-align: right;">
+                                                            <t t-esc="c.margin_percent"/>%
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>

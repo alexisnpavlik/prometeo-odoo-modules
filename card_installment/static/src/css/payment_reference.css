@@ -1,0 +1,30 @@
+.payment-reference-container {
+    transition: all 0.3s ease;
+}
+.payment-reference-container .input-group {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.payment-reference-container .input-group:focus-within {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+.payment-reference-container input.form-control {
+    border: none !important;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.75rem;
+}
+.payment-reference-container input.form-control:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+.payment-reference-container .input-group-text {
+    border: none !important;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    padding-left: 0.9rem;
+    padding-right: 0.6rem;
+}

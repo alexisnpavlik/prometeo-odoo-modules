@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_custom_popup.InfoPopup">
+        <Dialog title.translate="Cuotas">
+            <div class="modal-body custom-form-view">
+                <!-- ✅ ESTA PARTE DEBE IR FUERA DEL FORM -->
+                <div class="mt-4">
+                    <h5>Seleccione Cuota:</h5>
+
+                    <t t-if="state.installments.length == 0">
+                        <p>No Cuotas Disponibles.</p>
+                    </t>
+                    <t t-foreach="state.installments" t-as="inst" t-key="inst.id">
+                        <div class="border rounded p-2 mb-2 d-flex align-items-center">
+
+                            <input type="radio"
+                            name="installment_option"
+                            t-on-click="this.chooseInstallment"
+                            t-att-value="inst.id" />
+
+                            <div class="ms-3">
+                                <strong><t t-esc="inst.name"/></strong>
+                                <div>Importe: <t t-esc="inst.amount"/></div>
+                                <div>Cargo: <t t-esc="inst.fee"/></div>
+                            </div>
+                            
+                        </div>
+                    </t>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary o-default-button" t-on-click="confirm">Ok</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

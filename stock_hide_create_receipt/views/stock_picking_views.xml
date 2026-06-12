@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 1. Sobreescribir la accion estatica de Recepciones para agregar create: False al contexto -->
+    <record id="stock.action_picking_tree_incoming" model="ir.actions.act_window">
+        <field name="context">{'contact_display': 'partner_address', 'restricted_picking_type_code': 'incoming', 'search_default_reception': 1, 'create': False}</field>
+    </record>
+
+    <!-- 2. Ocultar el boton 'Nuevo' en el menu desplegable de la tarjeta del dashboard si es recepcion -->
+    <record id="stock_picking_type_kanban_no_create_receipt" model="ir.ui.view">
+        <field name="name">stock.picking.type.kanban.no.create.receipt</field>
+        <field name="model">stock.picking.type</field>
+        <field name="inherit_id" ref="stock.stock_picking_type_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='kanban_menu_section']/h5/a" position="attributes">
+                <attribute name="invisible">code == 'incoming'</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

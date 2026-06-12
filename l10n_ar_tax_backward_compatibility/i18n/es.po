@@ -1,0 +1,100 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* l10n_ar_tax_backward_compatibility
+# 
+# Translators:
+# Juan José Scarafía <scarafia.juanjose@gmail.com>, 2025
+# 
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-03 05:06+0000\n"
+"PO-Revision-Date: 2025-03-17 19:44+0000\n"
+"Last-Translator: Juan José Scarafía <scarafia.juanjose@gmail.com>, 2025\n"
+"Language-Team: Spanish (https://app.transifex.com/adhoc/teams/46451/es/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Language: es\n"
+"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__accumulated_amount
+msgid "Accumulated Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__automatic
+msgid "Automatic"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__computed_withholding_amount
+msgid "Computed Withholding Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__withholdable_advanced_amount
+msgid "Importe a cuenta sujeto a retencion"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__withholdable_invoiced_amount
+msgid "Importe imputado sujeto a retencion"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_account_payment__is_backward_withholding_payment
+msgid "Is Backward Withholding Payment"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__withholding_non_taxable_amount
+msgid "Non-taxable Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__withholding_non_taxable_minimum
+msgid "Non-taxable Minimum"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model,name:l10n_ar_tax_backward_compatibility.model_l10n_ar_payment_withholding
+msgid "Payment withholding lines"
+msgstr "Líneas de pago de retención"
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model,name:l10n_ar_tax_backward_compatibility.model_account_payment
+msgid "Payments"
+msgstr "Pagos"
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__period_withholding_amount
+msgid "Period Withholding Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__previous_withholding_amount
+msgid "Previous Withholding Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__regime_code
+msgid "Regime Code"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__regime_tax_id
+msgid "Regime Tax"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__total_amount
+msgid "Total Amount"
+msgstr ""
+
+#. module: l10n_ar_tax_backward_compatibility
+#: model:ir.model.fields,field_description:l10n_ar_tax_backward_compatibility.field_l10n_ar_payment_withholding__withholdable_base_amount
+msgid "Withholdable Base Amount"
+msgstr ""

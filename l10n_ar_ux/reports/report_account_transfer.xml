@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_account_transfer_document" primary="True" inherit_id="account_internal_transfer.report_account_transfer_document" >
+        <h3 position="replace"/>
+        <t t-set="o" position="after">
+            <t t-set="custom_header" t-value="'l10n_ar.custom_header'"/>
+            <t t-set="report_date" t-value="o.date"/>
+            <t t-set="report_number" t-value="o.name"/>
+            <t t-set="report_name" t-value="'REPORTE DE TRANSFERENCIA'"/>
+            <t t-set="header_address" t-value="o.company_id.partner_id"/>
+
+            <t t-set="custom_footer">
+                <div class="row">
+                    <div name="footer_left_column" class="col-8">
+                        Nombre y Apellido Firmante:
+                        <br/>Cargo:
+                    </div>
+                    <div name="footer_right_column" class="col-4">
+                        Firma Responsable
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_account_transfer">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-set="lang" t-value="o.partner_id.lang"/>
+                <t t-call="l10n_ar_ux.report_account_transfer_document" t-lang="lang"/>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_account_transfer" model="ir.actions.report">
+        <field name="name">Reporte de Transferencia</field>
+        <field name="model">account.payment</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">l10n_ar_ux.report_account_transfer</field>
+        <field name="report_file">l10n_ar_ux.report_account_transfer</field>
+        <field name="print_report_name">'Reporte de transferencia'</field>
+    </record>
+
+</odoo>

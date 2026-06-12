@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_daily_sales_reports_wizard_readonly,pos.daily.sales.reports.wizard vendedor restringido,point_of_sale.model_pos_daily_sales_reports_wizard,group_pos_user_readonly,1,1,1,0
+access_pos_make_payment_readonly,pos.make.payment vendedor restringido,point_of_sale.model_pos_make_payment,group_pos_user_readonly,1,1,1,0
+access_account_payment_readonly,account.payment lectura vendedor restringido,account.model_account_payment,group_pos_user_readonly,1,0,0,0
