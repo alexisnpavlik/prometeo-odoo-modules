@@ -40,13 +40,13 @@
                     </div>
                     
                     <div class="input-group mb-3">
-                        <input type="text" 
-                               class="form-control form-control-lg text-center" 
+                        <input type="password"
+                               class="form-control form-control-lg text-center"
                                placeholder="Scan or enter barcode here..."
                                t-model="state.barcode"
                                t-on-input="onBarcodeInput"
                                t-ref="barcodeInput"
-                               autocomplete="off" />
+                               autocomplete="new-password" />
                     </div>
                     <div class="text-center mb-3">
                         <button class="btn btn-outline-primary me-2" 

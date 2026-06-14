@@ -42,6 +42,7 @@ export class ValidationService {
             'cash_move': pos.config.validate_cash_move,
             'payment_method': pos.config.validate_payment_methods,
             'global_discount': pos.config.validate_global_discount,
+            'open_session': pos.config.validate_open_session,
             'close_session': pos.config.validate_close_session,
         };
 

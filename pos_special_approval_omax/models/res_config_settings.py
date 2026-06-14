@@ -68,6 +68,7 @@ class PosConfig(models.Model):
     )
 
     validate_cash_move = fields.Boolean(string='Cash Move (Cash In/Out)')
+    validate_open_session = fields.Boolean(string='Open Session')
     validate_close_session = fields.Boolean(string='Close Session')
 
 
@@ -91,4 +92,5 @@ class ResConfigSettings(models.TransientModel):
     validated_payment_method_ids = fields.Many2many(related='pos_config_id.validated_payment_method_ids', readonly=False)
     validate_cash_move = fields.Boolean(related='pos_config_id.validate_cash_move', readonly=False)
     validate_global_discount = fields.Boolean(related='pos_config_id.validate_global_discount', readonly=False)
+    validate_open_session = fields.Boolean(related='pos_config_id.validate_open_session', readonly=False)
     validate_close_session = fields.Boolean(related='pos_config_id.validate_close_session', readonly=False)

@@ -75,6 +75,11 @@
                         <field name="validate_cash_move"/>
                     </setting>
 
+                    <!-- Open Session Validation -->
+                    <setting string="Open Session" help="Validation During POS Session Opening." invisible="not manager_validation">
+                        <field name="validate_open_session"/>
+                    </setting>
+
                     <!-- Close Session Validation -->
                     <setting string="Close Session" help="Validation During POS Session Close." invisible="not manager_validation">
                         <field name="validate_close_session"/>
