@@ -5,7 +5,7 @@
     <record id="view_template_property_form_inherit_pos_stock_readonly" model="ir.ui.view">
         <field name="name">product.template.stock.form.inherit.pos.stock.readonly</field>
         <field name="model">product.template</field>
-        <field name="inherit_id" ref="stock.product_template_form_view_procurement_button"/>
+        <field name="inherit_id" ref="stock.product_template_only_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//button[@name='action_open_quants']" position="attributes">
                 <attribute name="groups">stock.group_stock_user,pos_user_stock_readonly.group_pos_user_stock_readonly</attribute>
