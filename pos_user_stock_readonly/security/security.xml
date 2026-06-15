@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ===================== Grupo ===================== -->
+
+    <record id="group_pos_user_stock_readonly" model="res.groups">
+        <field name="name">Vendedor POS sin edición de productos/stock (con visualización de stock)</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Opera POS y ventas con catálogo, inventario y listas de precios en solo lectura, permitiendo visualizar stock pero bloqueando la edición de productos, ajustes de inventario o modificación de tarifas.</field>
+        <field name="implied_ids" eval="[
+            (4, ref('point_of_sale.group_pos_user')),
+            (4, ref('sales_team.group_sale_salesman')),
+        ]"/>
+    </record>
+
+    <!--
+        Reglas restrictivas: aplican solo al grupo nuevo y bloquean
+        write/create/unlink (la lectura queda libre para que el POS
+        cargue productos y tarifas, y en este módulo también stock.quant). 
+        Las reglas "bypass" con dominio siempre verdadero se adjuntan a los 
+        grupos de Inventario, Gerente de Ventas y Administrador: como las reglas 
+        de grupo se combinan con OR, un usuario que tenga ambos grupos conserva
+        acceso completo y los usuarios sin el grupo nuevo no se ven
+        afectados.
+    -->
+
+    <!-- ===================== Productos ===================== -->
+
+    <record id="rule_product_template_stock_readonly" model="ir.rule">
+        <field name="name">Vendedor POS restringido con stock: productos solo lectura (plantillas)</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pos_user_stock_readonly'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_template_stock_full_access" model="ir.rule">
+        <field name="name">Inventario/Admin (con stock): edición completa de productos (plantillas)</field>
+        <field name="model_id" ref="product.model_product_template"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[
+            (4, ref('stock.group_stock_user')),
+            (4, ref('sales_team.group_sale_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_product_stock_readonly" model="ir.rule">
+        <field name="name">Vendedor POS restringido con stock: productos solo lectura (variantes)</field>
+        <field name="model_id" ref="product.model_product_product"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pos_user_stock_readonly'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_product_stock_full_access" model="ir.rule">
+        <field name="name">Inventario/Admin (con stock): edición completa de productos (variantes)</field>
+        <field name="model_id" ref="product.model_product_product"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[
+            (4, ref('stock.group_stock_user')),
+            (4, ref('sales_team.group_sale_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- ===================== Inventario ===================== -->
+
+    <record id="rule_stock_quant_stock_readonly" model="ir.rule">
+        <field name="name">Vendedor POS restringido con stock: sin ajustes de inventario</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pos_user_stock_readonly'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_stock_quant_stock_full_access" model="ir.rule">
+        <field name="name">Inventario/Admin (con stock): ajustes de inventario completos</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[
+            (4, ref('stock.group_stock_user')),
+            (4, ref('base.group_system')),
+        ]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- ===================== Listas de precios ===================== -->
+
+    <record id="rule_product_pricelist_stock_readonly" model="ir.rule">
+        <field name="name">Vendedor POS restringido con stock: listas de precios solo lectura</field>
+        <field name="model_id" ref="product.model_product_pricelist"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pos_user_stock_readonly'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_pricelist_stock_full_access" model="ir.rule">
+        <field name="name">Gerente de Ventas/Admin (con stock): edición completa de listas de precios</field>
+        <field name="model_id" ref="product.model_product_pricelist"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[
+            (4, ref('sales_team.group_sale_manager')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_pricelist_item_stock_readonly" model="ir.rule">
+        <field name="name">Vendedor POS restringido con stock: reglas de precios solo lectura</field>
+        <field name="model_id" ref="product.model_product_pricelist_item"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pos_user_stock_readonly'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_product_pricelist_item_stock_full_access" model="ir.rule">
+        <field name="name">Gerente de Ventas/Admin (con stock): edición completa de reglas de precios</field>
+        <field name="model_id" ref="product.model_product_pricelist_item"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[
+            (4, ref('sales_team.group_sale_manager')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+</odoo>

@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_daily_sales_reports_wizard_stock_readonly,pos.daily.sales.reports.wizard vendedor restringido con stock,point_of_sale.model_pos_daily_sales_reports_wizard,group_pos_user_stock_readonly,1,1,1,0
+access_pos_make_payment_stock_readonly,pos.make.payment vendedor restringido con stock,point_of_sale.model_pos_make_payment,group_pos_user_stock_readonly,1,1,1,0
+access_account_payment_stock_readonly,account.payment lectura vendedor restringido con stock,account.model_account_payment,group_pos_user_stock_readonly,1,0,0,0
+access_stock_quant_stock_readonly,stock.quant lectura vendedor restringido con stock,stock.model_stock_quant,group_pos_user_stock_readonly,1,0,0,0
