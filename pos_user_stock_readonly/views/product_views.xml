@@ -12,7 +12,7 @@
                         name="action_open_quants"
                         class="oe_stat_button"
                         icon="fa-cubes"
-                        invisible="type != 'product'"
+                        invisible="not is_storable"
                         groups="pos_user_stock_readonly.group_pos_user_stock_readonly">
                     <div class="o_field_widget o_stat_info">
                         <field name="qty_available" widget="statinfo" string="A mano"/>
@@ -33,7 +33,7 @@
                         name="action_open_quants"
                         class="oe_stat_button"
                         icon="fa-cubes"
-                        invisible="type != 'product'"
+                        invisible="not is_storable"
                         groups="pos_user_stock_readonly.group_pos_user_stock_readonly">
                     <div class="o_field_widget o_stat_info">
                         <field name="qty_available" widget="statinfo" string="A mano"/>
