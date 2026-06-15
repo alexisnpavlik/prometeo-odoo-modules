@@ -19,8 +19,6 @@ patch(PosOrder.prototype, {
     },
 
     remove_paymentline(paymentline) {
-        console.log("🗑️ remove_paymentline en PosOrder:", paymentline);
-
         const isCardOrInstallment = paymentline.payment_method_id?.card_id || paymentline.is_installment;
 
         if (isCardOrInstallment) {
@@ -44,7 +42,6 @@ patch(PosOrder.prototype, {
                     (pl) => pl.is_installment && pl.payment_method_id?.id === paymentline.payment_method_id?.id
                 );
                 if (installmentLine) {
-                    console.log("🗑️ Eliminando también la línea de recargo asociada desde remove_paymentline:", installmentLine);
                     this.remove_paymentline(installmentLine);
                 }
             }

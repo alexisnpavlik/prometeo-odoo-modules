@@ -40,16 +40,8 @@ class AccountCardInstallment(models.Model):
     @api.constrains("divisor")
     def _check_divisor(self):
         for record in self:
-            if record.divisor < 0:
-                raise ValidationError(_("Divisor cannot be negative"))
-
-    def get_fees(self, amount):
-        self.ensure_one()
-        return amount * self.surcharge_coefficient - amount
-
-    def get_real_total(self, amount):
-        self.ensure_one()
-        return amount * self.surcharge_coefficient
+            if record.divisor < 1:
+                raise ValidationError(_("Divisor must be greater than 0"))
 
     def card_installment_tree(self, amount_total):
         tree = {}
@@ -63,34 +55,32 @@ class AccountCardInstallment(models.Model):
     def map_installment_values(self, amount_total):
         self.ensure_one()
 
-        # Convertir coeficiente a Decimal
+        cents = Decimal("0.01")
+
+        # Coeficiente con la precisión real del campo (5 decimales), no truncado a 2
         coefficient = Decimal(str(self.surcharge_coefficient)).quantize(
-            Decimal("0.01"),
+            Decimal("0.00001"),
             rounding=ROUND_HALF_UP
         )
 
-        # Convertir monto total a Decimal
-        amount_total_d = Decimal(str(amount_total)).quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP
-        )
-
-        # Convertir divisor
+        amount_total_d = Decimal(str(amount_total)).quantize(cents, rounding=ROUND_HALF_UP)
         divisor_d = Decimal(str(self.divisor)) if self.divisor else Decimal("0")
 
-        # Calcular monto total con el coeficiente
-        amount = amount_total_d * coefficient
+        # Total con el recargo financiero aplicado
+        amount = (amount_total_d * coefficient).quantize(cents, rounding=ROUND_HALF_UP)
 
-        # Calcular cuota
+        # Reintegro/descuento: porcentaje sobre el total ya incluído el recargo
+        discount_pct = Decimal(str(self.bank_discount or 0))
+        discount = (amount * discount_pct / Decimal("100")).quantize(cents, rounding=ROUND_HALF_UP)
+
+        # Total a cobrar realmente (recargo - reintegro)
+        final_amount = amount - discount
+
+        # La cuota se calcula sobre lo que efectivamente paga el cliente
         if divisor_d > 0:
-            installment_amount_d = (amount / divisor_d).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP
-            )
+            installment_amount_d = (final_amount / divisor_d).quantize(cents, rounding=ROUND_HALF_UP)
         else:
             installment_amount_d = Decimal("0.00")
-
-        # ¡OJO! Convertir a float SOLO si lo necesitas para mostrar
         installment_amount = float(installment_amount_d)
 
         return {
@@ -100,10 +90,12 @@ class AccountCardInstallment(models.Model):
             "coefficient": float(coefficient),
             "bank_discount": self.bank_discount,
             "divisor": self.divisor,
-            "base_amount": float(amount_total_d),    # evitar float original
-            "amount": float(amount),                 # convertir Decimal → float
-            "fee": float(amount - amount_total_d),   # evitar Decimal - float
+            "base_amount": float(amount_total_d),    # total neto sin recargo
+            "amount": float(amount),                 # total con recargo financiero
+            "fee": float(amount - amount_total_d),   # cargo financiero
+            "discount": float(discount),             # reintegro aplicado
+            "final_amount": float(final_amount),     # total a cobrar (recargo - reintegro)
             "description": _("%s installment of %.2f (total %.2f)")
-            % (self.divisor, installment_amount, float(amount)),
+            % (self.divisor, installment_amount, float(final_amount)),
         }
 

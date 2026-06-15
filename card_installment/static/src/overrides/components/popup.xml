@@ -20,8 +20,11 @@
 
                             <div class="ms-3">
                                 <strong><t t-esc="inst.name"/></strong>
-                                <div>Importe: <t t-esc="inst.amount"/></div>
                                 <div>Cargo: <t t-esc="inst.fee"/></div>
+                                <t t-if="inst.discount &gt; 0">
+                                    <div>Reintegro: -<t t-esc="inst.discount"/></div>
+                                </t>
+                                <div>Total a cobrar: <t t-esc="inst.final_amount"/></div>
                             </div>
                             
                         </div>

@@ -2,6 +2,7 @@
 
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { patch } from "@web/core/utils/patch";
+import { _t } from "@web/core/l10n/translation";
 
 patch(PaymentScreen.prototype, {
 
@@ -16,7 +17,10 @@ patch(PaymentScreen.prototype, {
                 const orderlines = order.get_orderlines() || [];
                 const hasInstallmentSelected = orderlines.some(line => line && line.original_price);
                 if (!hasInstallmentSelected) {
-                    alert("⚠️ Por favor, seleccione las cuotas antes de validar la orden.");
+                    this.env.services.notification.add(
+                        _t("Por favor, seleccione las cuotas antes de validar la orden."),
+                        { type: "warning" }
+                    );
                     return -1;
                 }
             }

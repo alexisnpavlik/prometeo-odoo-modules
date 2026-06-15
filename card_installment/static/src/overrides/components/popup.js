@@ -3,6 +3,9 @@
 import { Dialog } from "@web/core/dialog/dialog";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { Component, useState } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
+import { _t } from "@web/core/l10n/translation";
+import { surchargeMultiplier, surchargedUnitPrice } from "@card_installment/js/installment_math";
 
 export class InfoPopup extends Component {
     static template = "pos_custom_popup.InfoPopup";
@@ -10,6 +13,7 @@ export class InfoPopup extends Component {
 
     setup() {
         this.pos = usePos();
+        this.notification = useService("notification");
 
         this.state = useState({
             installments: this.props.installments || [],
@@ -18,147 +22,89 @@ export class InfoPopup extends Component {
     }
 
     chooseInstallment(event) {
-        let selectedId = parseInt(event.target.value);
-        console.log("Installment selected:", selectedId);
-        let selectedObject = this.props.installments.find(
+        const selectedId = parseInt(event.target.value);
+        this.state.selected_installment = this.props.installments.find(
             (inst) => inst.id === selectedId
         );
-        console.log("Installment selected:", selectedObject);
-        this.state.selected_installment = selectedObject;
     }
 
     confirm() {
-
-        debugger;
-
-        if (!this.state.selected_installment) {
-            alert("Seleccione una cuota");
-            return -1;
+        const value = this.state.selected_installment;
+        if (!value) {
+            this.notification.add(_t("Seleccione una cuota"), { type: "warning" });
+            return;
         }
 
-        //console.log("Confirming with installment:", this.state.selected_installment);
-
-        const installmentsall = this.props.allInstallments;
         const order = this.env.services.pos.get_order();
-        const paymentline = this.props.paymentline; // solo para obtener el método
+        const paymentline = this.props.paymentline; // línea de pago base de la tarjeta
         const paymentMethod = paymentline.payment_method_id;
-
         const lines = order.get_orderlines();
 
-        // 🔹 Si ya existe una línea de pago de recargo/cuota previa, la eliminamos para no duplicar
+        // 1) Quitar una posible línea de recargo previa para no duplicar
         const existingInstallmentLine = (order.payment_ids || []).find(
             (pl) => pl.is_installment && pl.payment_method_id?.id === paymentMethod.id
         );
         if (existingInstallmentLine) {
-            console.log("🗑️ Eliminando línea de recargo previa antes de aplicar la nueva:", existingInstallmentLine);
             order.remove_paymentline(existingInstallmentLine);
         }
 
-        // 🔹 Guardar información de las cuotas en la línea de pago base de la tarjeta (propiedad no-imprimible)
-        const installment_qty = this.state.selected_installment.installment || this.state.selected_installment.divisor || 1;
-        if (paymentline) {
-            paymentline.selected_installment_qty = installment_qty;
-        }
-
-        //console.log("lines ", lines)
-        //console.log("lines quantity", lines.length)
-        let counter = 0
-        let totalQty = 0
-
-        lines.forEach(lineI => {totalQty += lineI.qty});
-
-        console.log("Amount total:", totalQty);
-
-        const original_order_total = order.get_total_with_tax();
-        const value = this.state.selected_installment;
-        const target_order_total = original_order_total + parseFloat(value.fee);
-        let installmentPaymentLine = null;
-
-        lines.forEach(lineI => {
-
-            const value_origin = installmentsall[lineI.id][paymentMethod.card_id]
-                .installments
-                .find(inst => inst.id === this.state.selected_installment.id);
-
-            if (!value) {
-                return;
+        // 2) Restaurar precios originales antes de recalcular (idempotente al re-elegir plan)
+        lines.forEach((line) => {
+            if (line.original_unit_price !== undefined) {
+                line.set_unit_price(line.original_unit_price);
             }
-
-            console.log("installment ", value_origin)
-
-            var coef = value_origin.base_amount / (value_origin.base_amount * (totalQty));
-
-            console.log("coef ", coef)
-            console.log("value base amount ", value.base_amount)
-            console.log("value_origin base amount ", value_origin.base_amount)
-
-            if(value.base_amount < order.amount_total)
-            {
-                var fee_prop = parseFloat(value.fee) * coef;
-            }
-            else
-            {
-                var fee_prop = (value_origin.coefficient - 1) * value_origin.base_amount;
-            }
-
-
-            const amount = parseFloat(value.fee) //* lineI.qty;
-
-            //console.log("Adding payment line amount:", amount);
-
-            // 🔹 Crear una nueva línea de pago
-            if(amount > 0 && counter < 1)
-            {
-                const newPaymentLine = order.add_paymentline(paymentMethod);
-
-                if (newPaymentLine) {
-                    newPaymentLine.set_amount(amount);
-                    newPaymentLine.is_installment = true;
-                    console.log("🔍 installment_qty final:", installment_qty);
-                    newPaymentLine.installment_qty = installment_qty;
-                    newPaymentLine.installment_name = `Recargo por ${installment_qty} cuotas`;
-                    installmentPaymentLine = newPaymentLine;
-                }
-            }
-            
-            // Guardar el precio original antes de modificarlo
-            if (!lineI.original_unit_price) {
-                lineI.original_unit_price = lineI.get_unit_price();
-            }
-            // ajustar el precio unitario con el recargo de cuotas
-            lineI.set_unit_price(value_origin.base_amount + fee_prop);
-
-            // Re-establecer lineI.original_price para que pase la validación de cuotas
-            if (!lineI.original_price) {
-                lineI.original_price = lineI.original_unit_price;
-            }
-
-            counter++;
-            
         });
 
-        // 🔹 Ajustar diferencia por redondeo
-        const activeLines = lines.filter(l => l.qty > 0);
-        if (activeLines.length > 0) {
+        // 3) Total neto (ya con descuentos de línea e impuestos, sin recargo)
+        const net_total = order.get_total_with_tax();
+
+        // 4) Multiplicador combinado: recargo financiero y reintegro
+        const multiplier = surchargeMultiplier(value.coefficient, value.bank_discount);
+
+        // Total objetivo: lo que mostró el popup (server) o, si faltara, neto * multiplicador
+        const target_total =
+            value.final_amount !== undefined && value.final_amount !== null
+                ? value.final_amount
+                : net_total * multiplier;
+
+        // Cantidad de cuotas a informar
+        const installment_qty = value.installment || value.divisor || 1;
+        paymentline.selected_installment_qty = installment_qty;
+
+        // 5) Aplicar el recargo/descuento de forma proporcional por línea.
+        //    Escalar el precio unitario conserva descuentos y cantidades de cada línea
+        //    y deja en 0 las líneas de precio 0 (sin división → sin NaN).
+        lines.forEach((line) => {
+            if (line.original_unit_price === undefined) {
+                line.original_unit_price = line.get_unit_price();
+            }
+            line.set_unit_price(surchargedUnitPrice(line.original_unit_price, multiplier));
+            // marca usada por la validación de cuotas
+            if (line.original_price === undefined) {
+                line.original_price = line.original_unit_price;
+            }
+        });
+
+        // 6) Ajuste fino por redondeo (la suma de líneas redondeadas puede diferir por centavos)
+        const activeLines = lines.filter((l) => l.qty > 0);
+        if (activeLines.length > 0 && Math.abs(order.get_total_with_tax() - target_total) > 0.001) {
             const lastLine = activeLines[activeLines.length - 1];
             let iterations = 0;
-            const maxIterations = 100;
-            let prev_total = order.get_total_with_tax();
-
-            while (Math.abs(order.get_total_with_tax() - target_order_total) > 0.001 && iterations < maxIterations) {
-                let diff = target_order_total - order.get_total_with_tax();
-                let current_unit_price = lastLine.get_unit_price();
-                
-                let step = diff / lastLine.qty;
+            let prev_total = null;
+            while (
+                Math.abs(order.get_total_with_tax() - target_total) > 0.001 &&
+                iterations < 100
+            ) {
+                const diff = target_total - order.get_total_with_tax();
+                const current_unit_price = lastLine.get_unit_price();
+                const step = diff / lastLine.qty;
                 if (Math.abs(step) < 0.0001) {
                     break;
                 }
-                
                 lastLine.set_unit_price(current_unit_price + step);
-                
                 let new_total = order.get_total_with_tax();
                 if (new_total === prev_total) {
-                    // Si no hubo cambio (debido a redondeo estricto), forzar un paso de 0.01
+                    // Sin cambio por redondeo estricto: forzar un paso de 1 centavo
                     lastLine.set_unit_price(current_unit_price + (diff > 0 ? 0.01 : -0.01));
                     new_total = order.get_total_with_tax();
                     if (new_total === prev_total) {
@@ -168,28 +114,26 @@ export class InfoPopup extends Component {
                 prev_total = new_total;
                 iterations++;
             }
-            console.log(`🔧 Ajuste por redondeo completado en ${iterations} iteraciones. Total final:`, order.get_total_with_tax());
         }
 
-        // 🔹 Ajustar diferencia final en la línea de pago de recargo/cuotas para coincidir perfectamente
-        if (installmentPaymentLine) {
-            const allPaymentLines = order.payment_ids || [];
-            let otherPaymentsSum = 0;
-            allPaymentLines.forEach(pl => {
-                if (pl !== installmentPaymentLine) {
-                    otherPaymentsSum += pl.amount;
-                }
-            });
-            
-            const final_surcharge_amount = order.get_total_with_tax() - otherPaymentsSum;
-            console.log("🔧 Ajustando línea de recargo de:", installmentPaymentLine.amount, "a:", final_surcharge_amount);
-            installmentPaymentLine.set_amount(final_surcharge_amount);
+        // 7) Línea de pago que representa el recargo financiero (diferencia con los otros pagos).
+        //    Se ajusta para que la suma de pagos coincida exactamente con el total.
+        const surcharge = target_total - net_total;
+        if (Math.abs(surcharge) > 0.001) {
+            const newPaymentLine = order.add_paymentline(paymentMethod);
+            if (newPaymentLine) {
+                newPaymentLine.is_installment = true;
+                newPaymentLine.installment_qty = installment_qty;
+                newPaymentLine.installment_name = _t("Recargo por %s cuotas", installment_qty);
+
+                const otherPaymentsSum = (order.payment_ids || [])
+                    .filter((pl) => pl !== newPaymentLine)
+                    .reduce((sum, pl) => sum + pl.amount, 0);
+                newPaymentLine.set_amount(order.get_total_with_tax() - otherPaymentsSum);
+            }
         }
 
-        this.props.getPayload({
-            installment: this.state.selected_installment,
-        });
-
+        this.props.getPayload({ installment: value });
         this.props.close();
     }
 }
