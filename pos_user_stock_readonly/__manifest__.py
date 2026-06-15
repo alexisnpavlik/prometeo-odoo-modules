@@ -28,6 +28,7 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "views/product_views.xml",
     ],
     "installable": True,
     "auto_install": False,
