@@ -2,13 +2,22 @@
 # For copyright and license notices, see __manifest__.py file in module root
 # directory
 ##############################################################################
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class AccountCard(models.Model):
     _name = "account.card"
     _description = "Credit Card"
+    _inherit = ["pos.load.mixin"]
     _check_company_auto = True
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return ["id", "name", "company_id", "active"]
+
+    @api.model
+    def _get_pos_load_domain(self, config_id):
+        return [("company_id", "=", config_id.company_id.id)]
 
     name = fields.Char(
         "name",

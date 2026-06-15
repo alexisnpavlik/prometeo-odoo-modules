@@ -10,6 +10,15 @@ from decimal import Decimal, ROUND_HALF_UP
 class AccountCardInstallment(models.Model):
     _name = "account.card.installment"
     _description = "amount to add for collection in installments"
+    _inherit = ["pos.load.mixin"]
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return ["id", "card_id", "name", "divisor", "installment", "surcharge_coefficient", "bank_discount", "active"]
+
+    @api.model
+    def _get_pos_load_domain(self, config_id):
+        return [("card_id.company_id", "=", config_id.company_id.id)]
 
     card_id = fields.Many2one(
         "account.card",
@@ -42,6 +51,18 @@ class AccountCardInstallment(models.Model):
         for record in self:
             if record.divisor < 1:
                 raise ValidationError(_("Divisor must be greater than 0"))
+
+    @api.constrains("surcharge_coefficient")
+    def _check_surcharge_coefficient(self):
+        for record in self:
+            if record.surcharge_coefficient < 0:
+                raise ValidationError(_("Surcharge coefficient cannot be negative"))
+
+    @api.constrains("bank_discount")
+    def _check_bank_discount(self):
+        for record in self:
+            if record.bank_discount < 0 or record.bank_discount > 100:
+                raise ValidationError(_("Bank discount must be between 0 and 100"))
 
     def card_installment_tree(self, amount_total):
         tree = {}

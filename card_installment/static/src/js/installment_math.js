@@ -50,3 +50,45 @@ export function surchargedUnitPrice(originalUnitPrice, multiplier) {
     }
     return price * m;
 }
+
+/**
+ * Computes all fee, discount, final amount, and installment details for an installment plan.
+ * Replicates the logic of map_installment_values from account.card.installment backend model.
+ *
+ * @param {object} installment the installment plan data from POS cache
+ * @param {number} amountTotal net total of the order
+ * @returns {object} calculated values rounded to 2 decimal places
+ */
+export function calculateInstallmentValues(installment, amountTotal) {
+    const surchargeCoefficient = Number(installment.surcharge_coefficient || 1.0);
+    const divisor = Number(installment.divisor || 1);
+    const bankDiscount = Number(installment.bank_discount || 0);
+
+    const roundTo = (num, decimals = 2) => {
+        const factor = Math.pow(10, decimals);
+        return Math.round((num + Number.EPSILON) * factor) / factor;
+    };
+
+    const coefficient = roundTo(surchargeCoefficient, 5);
+    const amountTotalR = roundTo(amountTotal, 2);
+    const amount = roundTo(amountTotalR * coefficient, 2);
+    const discount = roundTo((amount * bankDiscount) / 100, 2);
+    const finalAmount = roundTo(amount - discount, 2);
+    const installmentAmount = divisor > 0 ? roundTo(finalAmount / divisor, 2) : 0;
+
+    return {
+        id: installment.id,
+        name: installment.name,
+        installment: installment.installment,
+        coefficient: coefficient,
+        bank_discount: bankDiscount,
+        divisor: divisor,
+        base_amount: amountTotalR,
+        amount: amount,
+        fee: roundTo(amount - amountTotalR, 2),
+        discount: discount,
+        final_amount: finalAmount,
+        installment_amount: installmentAmount,
+    };
+}
+

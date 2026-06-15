@@ -42,6 +42,7 @@
 								<field name="divisor" optional="show"/>
 								<field name="surcharge_coefficient"/>
 								<field name="bank_discount" optional="hide"/>
+								<field name="active" optional="hide"/>
 							</list>
 						</field>
 					</group>

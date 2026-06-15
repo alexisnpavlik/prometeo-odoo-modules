@@ -6,12 +6,22 @@ import { useService } from "@web/core/utils/hooks";
 import { InfoPopup } from "@card_installment/overrides/components/popup";
 import { makeAwaitable } from "@point_of_sale/app/store/make_awaitable_dialog";
 import { _t } from "@web/core/l10n/translation";
+import { onWillUnmount } from "@odoo/owl";
+import { calculateInstallmentValues } from "@card_installment/js/installment_math";
 
 patch(PaymentScreen.prototype, {
     setup() {
         super.setup();
         this.orm = useService("orm");
         this.notification = useService("notification");
+        onWillUnmount(() => {
+            if (this.currentOrder && !this.currentOrder.finalized) {
+                const installmentLine = (this.currentOrder.payment_ids || []).find(pl => pl.is_installment);
+                if (installmentLine) {
+                    this.currentOrder.remove_paymentline(installmentLine);
+                }
+            }
+        });
     },
 
     /**
@@ -65,25 +75,51 @@ patch(PaymentScreen.prototype, {
         const order = this.env.services.pos.get_order();
         const net_total = this._getInstallmentNetTotal(order);
 
-        const installments = await this.env.services.pos.getInstallments(
-            paymentMethod.card_id,
-            net_total
-        );
-        const cardData = installments[paymentMethod.card_id];
+        // Fetch installments from cache first (fully offline-compatible)
+        let cardInstallments = [];
+        const posStore = this.pos || this.env.services.pos;
+        const models = posStore.models || posStore.data?.models;
+        if (models && models["account.card.installment"]) {
+            const all = models["account.card.installment"].getAll() || [];
+            cardInstallments = all.filter(
+                (inst) => inst.active && (Array.isArray(inst.card_id) ? inst.card_id[0] : inst.card_id) === paymentMethod.card_id
+            ).map(inst => calculateInstallmentValues(inst, net_total));
+        }
+
+        // Fallback to RPC if local cache is empty / not loaded
+        if (cardInstallments.length === 0) {
+            try {
+                const installments = await this.env.services.pos.getInstallments(
+                    paymentMethod.card_id,
+                    net_total
+                );
+                const cardData = installments[paymentMethod.card_id];
+                cardInstallments = cardData ? cardData.installments : [];
+            } catch (err) {
+                console.error("Error fetching installments via RPC:", err);
+                this.notification.add(
+                    _t("Error al conectar con el servidor para obtener las cuotas."),
+                    { type: "danger" }
+                );
+                return;
+            }
+        }
 
         await makeAwaitable(this.dialog, InfoPopup, {
             order: order,
             paymentline: paymentline,
-            installments: cardData ? cardData.installments : [],
+            installments: cardInstallments,
             getPayload: () => {},
         });
     },
 
     async addNewPaymentLine(paymentMethod) {
-        const card_id = await this.env.services.pos.getCardID(paymentMethod.id);
+        // En Odoo 18, card_id ya viene precargado en el frontend en el modelo pos.payment.method.
+        // No es necesario realizar la llamada getCardID mediante RPC.
+        const card_id = paymentMethod.card_id;
 
         // Bloquear si ya existe un pago con tarjeta de crédito
-        if (card_id.card_id !== false) {
+        if (card_id) {
             const order = this.env.services.pos.get_order();
             const existingCardLine = (order.payment_ids || []).find(
                 (pl) => pl.payment_method_id?.card_id
@@ -97,7 +133,6 @@ patch(PaymentScreen.prototype, {
                 );
                 return;
             }
-            paymentMethod.card_id = card_id.card_id;
         }
 
         await super.addNewPaymentLine(paymentMethod);

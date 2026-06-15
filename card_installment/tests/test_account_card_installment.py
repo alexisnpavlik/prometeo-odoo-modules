@@ -175,3 +175,24 @@ class TestAccountCardInstallment(TransactionCase):
         inst = self._make_installment(divisor=3)
         with self.assertRaises(ValidationError):
             inst.divisor = 0
+
+    @mute_logger("odoo.sql_db")
+    def test_surcharge_coefficient_negative_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._make_installment(surcharge_coefficient=-0.05)
+
+    @mute_logger("odoo.sql_db")
+    def test_surcharge_coefficient_negative_write_rejected(self):
+        inst = self._make_installment(surcharge_coefficient=1.05)
+        with self.assertRaises(ValidationError):
+            inst.surcharge_coefficient = -0.1
+
+    @mute_logger("odoo.sql_db")
+    def test_bank_discount_negative_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._make_installment(bank_discount=-5.0)
+
+    @mute_logger("odoo.sql_db")
+    def test_bank_discount_over_100_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._make_installment(bank_discount=105.0)

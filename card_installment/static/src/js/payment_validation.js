@@ -14,14 +14,38 @@ patch(PaymentScreen.prototype, {
                 (pl) => pl.payment_method_id && pl.payment_method_id.card_id
             );
             if (hasCardPayment) {
-                const orderlines = order.get_orderlines() || [];
-                const hasInstallmentSelected = orderlines.some(line => line && line.original_price);
-                if (!hasInstallmentSelected) {
-                    this.env.services.notification.add(
-                        _t("Por favor, seleccione las cuotas antes de validar la orden."),
-                        { type: "warning" }
-                    );
-                    return -1;
+                const cardPaymentLine = (order.payment_ids || []).find(
+                    (pl) => pl.payment_method_id && pl.payment_method_id.card_id
+                );
+                const cardId = cardPaymentLine?.payment_method_id?.card_id;
+
+                let needsInstallment = false;
+                if (cardId) {
+                    const posStore = this.pos || this.env?.services?.pos;
+                    const models = posStore?.models || posStore?.data?.models;
+                    if (models && models["account.card.installment"]) {
+                        const allInstallments = models["account.card.installment"].getAll() || [];
+                        const hasPlans = allInstallments.some(
+                            (inst) => inst.active && (Array.isArray(inst.card_id) ? inst.card_id[0] : inst.card_id) === cardId
+                        );
+                        if (hasPlans) {
+                            needsInstallment = true;
+                        }
+                    } else {
+                        needsInstallment = true;
+                    }
+                }
+
+                if (needsInstallment) {
+                    const orderlines = order.get_orderlines() || [];
+                    const hasInstallmentSelected = orderlines.some(line => line && line.original_price);
+                    if (!hasInstallmentSelected) {
+                        this.env.services.notification.add(
+                            _t("Por favor, seleccione las cuotas antes de validar la orden."),
+                            { type: "warning" }
+                        );
+                        return -1;
+                    }
                 }
             }
         }
