@@ -29,7 +29,7 @@
                     </setting>
 
                     <!-- Barcode Scanner Only -->
-                    <setting string="Barcode Scanner Only" help="In the barcode validation popup, block manual typing and pasting; only accept a physical barcode scanner (detected by keystroke timing). Disable to allow manual entry." invisible="not manager_validation or validation_type not in ['all', 'barcode', 'pin_barcode', 'password_barcode']">
+                    <setting string="Barcode Scanner Only" help="In the barcode validation popup, block manual typing and pasting; only accept a physical barcode scanner (detected by keystroke timing). Disable to allow manual entry." invisible="not manager_validation">
                         <field name="enforce_barcode_scanner"/>
                     </setting>
 

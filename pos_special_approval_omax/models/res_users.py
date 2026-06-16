@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 
 
 class ResUsers(models.Model):
@@ -27,7 +27,7 @@ class ResUsers(models.Model):
     def _check_pos_pin(self):
         for user in self:
             if user.pos_pin and not user.pos_pin.isdigit():
-                raise models.ValidationError('POS PIN must contain only numbers.')
+                raise models.ValidationError(_('POS PIN must contain only numbers.'))
     
     @api.model
     def validate_pos_credentials(self, user_id, barcode=None, password=None, pin=None):
