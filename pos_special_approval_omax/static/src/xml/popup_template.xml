@@ -40,10 +40,12 @@
                     </div>
 
                     <div class="input-group mb-3">
-                        <input type="password" readonly="readonly"
+                        <input type="password"
+                               t-att-readonly="scannerOnly ? 'readonly' : false"
                                class="form-control form-control-lg text-center"
                                placeholder="Escaneá el código de barras..."
-                               t-att-value="state.barcode ? '•'.repeat(state.barcode.length) : ''"
+                               t-att-value="scannerOnly ? maskedBarcode : undefined"
+                               t-on-input="onBarcodeInput"
                                t-ref="barcodeInput"
                                t-on-paste="blockEvent"
                                t-on-drop="blockEvent"
