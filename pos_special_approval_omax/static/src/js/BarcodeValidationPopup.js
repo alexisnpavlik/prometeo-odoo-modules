@@ -55,7 +55,7 @@ export class BarcodeValidationPopup extends Component {
      * tecleo manual y el pegado; solo se acepta un lector físico (detección por timing).
      */
     get scannerOnly() {
-        return this.pos.config.enforce_barcode_scanner !== false;
+        return this.pos.config.enforce_barcode_scanner === true;
     }
 
     get maskedBarcode() {

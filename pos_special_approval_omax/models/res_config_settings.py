@@ -39,7 +39,7 @@ class PosConfig(models.Model):
     # Barcode validation hardening
     enforce_barcode_scanner = fields.Boolean(
         string='Barcode Scanner Only',
-        default=True,
+        default=False,
         help='In the barcode validation popup, block manual typing and pasting; '
              'only accept input from a physical barcode scanner (detected by '
              'keystroke timing). Disable to allow manual entry.'
