@@ -44,7 +44,7 @@
                                t-att-readonly="scannerOnly ? 'readonly' : undefined"
                                class="form-control form-control-lg text-center"
                                placeholder="Escaneá el código de barras..."
-                               t-att-value="scannerOnly ? maskedBarcode : undefined"
+                               t-att-value="scannerOnly ? maskedBarcode : state.barcode"
                                t-on-input="onBarcodeInput"
                                t-ref="barcodeInput"
                                t-on-paste="blockEvent"
