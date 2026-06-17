@@ -41,7 +41,7 @@
 
                     <div class="input-group mb-3">
                         <input type="password"
-                               t-att-readonly="scannerOnly ? 'readonly' : false"
+                               t-att-readonly="scannerOnly ? 'readonly' : undefined"
                                class="form-control form-control-lg text-center"
                                placeholder="Escaneá el código de barras..."
                                t-att-value="scannerOnly ? maskedBarcode : undefined"
