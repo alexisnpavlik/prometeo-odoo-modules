@@ -36,6 +36,15 @@ class PosConfig(models.Model):
         help='Show virtual keyboard when password input is required'
     )
 
+    # Barcode validation hardening
+    enforce_barcode_scanner = fields.Boolean(
+        string='Barcode Scanner Only',
+        default=False,
+        help='In the barcode validation popup, block manual typing and pasting; '
+             'only accept input from a physical barcode scanner (detected by '
+             'keystroke timing). Disable to allow manual entry.'
+    )
+
     # Manager selection
     manager_ids = fields.Many2many(
         'res.users',
@@ -80,6 +89,7 @@ class ResConfigSettings(models.TransientModel):
     one_time_password = fields.Boolean(related='pos_config_id.one_time_password', readonly=False)
     validation_type = fields.Selection(related='pos_config_id.validation_type', readonly=False)
     virtual_keyboard = fields.Boolean(related='pos_config_id.virtual_keyboard', readonly=False)
+    enforce_barcode_scanner = fields.Boolean(related='pos_config_id.enforce_barcode_scanner', readonly=False)
     manager_ids = fields.Many2many(related='pos_config_id.manager_ids', readonly=False)
     validate_order_line_deletion = fields.Boolean(related='pos_config_id.validate_order_line_deletion', readonly=False)
     validate_order_deletion = fields.Boolean(related='pos_config_id.validate_order_deletion', readonly=False)

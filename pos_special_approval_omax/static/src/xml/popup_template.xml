@@ -35,19 +35,25 @@
                 <div class="validation-content mb-2">
                     <div class="text-center mb-4">
                         <i class="fa fa-barcode fa-3x text-primary mb-3"></i>
-                        <h4>Scan or Enter Barcode</h4>
+                        <h4>Escaneá el código de barras</h4>
                         <p class="text-muted">Please scan your manager barcode</p>
                     </div>
-                    
+
                     <div class="input-group mb-3">
                         <input type="password"
+                               t-att-readonly="scannerOnly ? 'readonly' : false"
                                class="form-control form-control-lg text-center"
-                               placeholder="Scan or enter barcode here..."
-                               t-model="state.barcode"
+                               placeholder="Escaneá el código de barras..."
+                               t-att-value="scannerOnly ? maskedBarcode : undefined"
                                t-on-input="onBarcodeInput"
                                t-ref="barcodeInput"
+                               t-on-paste="blockEvent"
+                               t-on-drop="blockEvent"
+                               t-on-cut="blockEvent"
+                               t-on-contextmenu="blockEvent"
                                autocomplete="new-password" />
                     </div>
+                    <p t-if="state.warning" class="text-danger text-center small mb-2" t-esc="state.warning"/>
                     <div class="text-center mb-3">
                         <button class="btn btn-outline-primary me-2" 
                             decoration-success="state.isScanning"
