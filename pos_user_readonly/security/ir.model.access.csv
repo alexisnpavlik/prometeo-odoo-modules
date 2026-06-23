@@ -2,3 +2,17 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_pos_daily_sales_reports_wizard_readonly,pos.daily.sales.reports.wizard vendedor restringido,point_of_sale.model_pos_daily_sales_reports_wizard,group_pos_user_readonly,1,1,1,0
 access_pos_make_payment_readonly,pos.make.payment vendedor restringido,point_of_sale.model_pos_make_payment,group_pos_user_readonly,1,1,1,0
 access_account_payment_readonly,account.payment lectura vendedor restringido,account.model_account_payment,group_pos_user_readonly,1,0,0,0
+access_stock_picking_pos_transfer,stock.picking transferencias vendedor restringido,stock.model_stock_picking,group_pos_user_readonly,1,1,1,0
+access_stock_move_pos_transfer,stock.move transferencias vendedor restringido,stock.model_stock_move,group_pos_user_readonly,1,1,1,1
+access_stock_move_line_pos_transfer,stock.move.line transferencias vendedor restringido,stock.model_stock_move_line,group_pos_user_readonly,1,1,1,1
+access_stock_picking_type_pos_transfer,stock.picking.type lectura vendedor restringido,stock.model_stock_picking_type,group_pos_user_readonly,1,0,0,0
+access_stock_location_pos_transfer,stock.location lectura vendedor restringido,stock.model_stock_location,group_pos_user_readonly,1,0,0,0
+access_stock_warehouse_pos_transfer,stock.warehouse lectura vendedor restringido,stock.model_stock_warehouse,group_pos_user_readonly,1,0,0,0
+access_stock_quant_pos_transfer,stock.quant lectura vendedor restringido,stock.model_stock_quant,group_pos_user_readonly,1,0,0,0
+access_stock_lot_pos_transfer,stock.lot transferencias vendedor restringido,stock.model_stock_lot,group_pos_user_readonly,1,1,1,0
+access_procurement_group_pos_transfer,procurement.group transferencias vendedor restringido,stock.model_procurement_group,group_pos_user_readonly,1,1,1,0
+access_stock_backorder_confirmation_pos_transfer,stock.backorder.confirmation vendedor restringido,stock.model_stock_backorder_confirmation,group_pos_user_readonly,1,1,1,1
+access_stock_backorder_confirmation_line_pos_transfer,stock.backorder.confirmation.line vendedor restringido,stock.model_stock_backorder_confirmation_line,group_pos_user_readonly,1,1,1,1
+access_stock_quant_package_pos_transfer,stock.quant.package transferencias vendedor restringido,stock.model_stock_quant_package,group_pos_user_readonly,1,1,1,1
+access_stock_package_level_pos_transfer,stock.package.level transferencias vendedor restringido,stock.model_stock_package_level,group_pos_user_readonly,1,1,1,1
+access_stock_package_type_pos_transfer,stock.package.type lectura vendedor restringido,stock.model_stock_package_type,group_pos_user_readonly,1,0,0,0

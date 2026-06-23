@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Vistas curadas de transferencias internas (recepciones/entregas)
+        para el vendedor POS restringido. No se otorga stock.group_stock_user
+        (eso reactivaría las reglas bypass del módulo y anularía el bloqueo
+        de productos/inventario/tarifas), por lo que la app Inventario sigue
+        oculta. En su lugar se expone un menú propio con acciones acotadas a
+        los pickings entrantes y salientes, visibles solo para este grupo.
+    -->
+
+    <!-- ===================== Vista del picking ===================== -->
+
+    <!--
+        Los botones de cabecera del picking (Validar, Verificar disponibilidad,
+        Anular reserva) están restringidos con groups="stock.group_stock_user".
+        Como no otorgamos ese grupo, se exponen también al grupo restringido.
+        La validación funciona sin el grupo porque Odoo escribe los stock.quant
+        con sudo internamente durante el procesamiento de movimientos.
+    -->
+    <record id="view_picking_form_pos_transfer" model="ir.ui.view">
+        <field name="name">stock.picking.form.pos.transfer</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='button_validate']" position="attributes">
+                <attribute name="groups">stock.group_stock_user,pos_user_readonly.group_pos_user_readonly</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ===================== Acciones ===================== -->
+
+    <record id="action_pos_transfer_incoming" model="ir.actions.act_window">
+        <field name="name">Recepciones</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('picking_type_code', '=', 'incoming')]</field>
+        <field name="context">{'default_picking_type_code': 'incoming', 'restricted_picking_type_code': 'incoming', 'contact_display': 'partner_address'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No hay recepciones registradas</p>
+            <p>Registra aquí las recepciones de las transferencias intercompañía.</p>
+        </field>
+    </record>
+
+    <record id="action_pos_transfer_outgoing" model="ir.actions.act_window">
+        <field name="name">Entregas</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('picking_type_code', '=', 'outgoing')]</field>
+        <field name="context">{'default_picking_type_code': 'outgoing', 'restricted_picking_type_code': 'outgoing', 'contact_display': 'partner_address'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No hay entregas registradas</p>
+            <p>Registra aquí las entregas de las transferencias intercompañía.</p>
+        </field>
+    </record>
+
+    <!-- ===================== Menús ===================== -->
+
+    <menuitem id="menu_pos_transfer_root"
+              name="Transferencias"
+              sequence="55"
+              groups="pos_user_readonly.group_pos_user_readonly"/>
+
+    <menuitem id="menu_pos_transfer_incoming"
+              name="Recepciones"
+              parent="menu_pos_transfer_root"
+              action="action_pos_transfer_incoming"
+              sequence="10"
+              groups="pos_user_readonly.group_pos_user_readonly"/>
+
+    <menuitem id="menu_pos_transfer_outgoing"
+              name="Entregas"
+              parent="menu_pos_transfer_root"
+              action="action_pos_transfer_outgoing"
+              sequence="20"
+              groups="pos_user_readonly.group_pos_user_readonly"/>
+
+</odoo>
