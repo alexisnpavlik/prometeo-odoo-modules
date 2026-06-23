@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Vendedor sin edición de productos/stock",
-    "version": "18.0.1.4.0",
+    "version": "18.0.1.5.0",
     "category": "Point of Sale",
     "summary": "Grupo de seguridad para vendedores POS sin permisos de edición de productos, inventario ni listas de precios",
     "description": """
@@ -18,6 +18,13 @@
         los pickings se validan con sudo. Los usuarios con grupos de Inventario,
         Gerente de Ventas o Administrador no se ven afectados por las reglas,
         incluso si además tienen este grupo asignado. Compatible con multi-compañía.
+
+        Además, este grupo habilita las transferencias intercompañía operadas
+        mediante recepciones y entregas: se otorga acceso granular a los pickings
+        (stock.picking/move/move.line) y un menú propio "Transferencias" con las
+        vistas de Recepciones y Entregas. No se otorga el grupo de Inventario,
+        por lo que el bloqueo de catálogo, ajustes de inventario y tarifas se
+        mantiene intacto.
     """,
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
@@ -26,6 +33,7 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "views/stock_transfer_menus.xml",
     ],
     "installable": True,
     "auto_install": False,
