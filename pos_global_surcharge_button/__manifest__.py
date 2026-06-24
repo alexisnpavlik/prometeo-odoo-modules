@@ -17,6 +17,12 @@
         "data/surcharge_product.xml",
         "views/res_config_settings_views.xml",
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_global_surcharge_button/static/src/js/control_buttons_patch.js",
+            "pos_global_surcharge_button/static/src/xml/control_buttons.xml",
+        ],
+    },
     "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
