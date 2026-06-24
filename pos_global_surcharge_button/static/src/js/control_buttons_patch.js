@@ -20,6 +20,9 @@ patch(ControlButtons.prototype, {
      *  excluyendo la línea de recargo y la de descuento global. */
     _getSurchargeBase() {
         const order = this.pos.get_order();
+        if (!order) {
+            return 0;
+        }
         const product = this.pos.config.surcharge_product_id;
         const discountProduct = this.pos.config.discount_product_id;
         const baseLines = order.get_orderlines().filter(
