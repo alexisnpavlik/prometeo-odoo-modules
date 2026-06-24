@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_global_surcharge_button.ControlButtons" t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+
+        <!-- Agregar el botón Recargo inmediatamente después del de Descuento global -->
+        <xpath expr="//button[contains(@class, 'js_discount')]" position="after">
+            <button t-if="pos.config.enable_surcharge and pos.config.surcharge_product_id"
+                class="js_surcharge position-relative d-flex align-items-center justify-content-center gap-1"
+                t-att-class="buttonClass"
+                t-on-click="() => this.clickSurcharge()">
+                <i class="fa fa-arrow-up me-1"/>
+                <span>Recargo</span>
+                <span t-if="currentSurchargePercent > 0"
+                      class="badge rounded-pill bg-success text-white ms-1 px-2 py-1 fw-bold"
+                      style="font-size: 0.8rem; box-shadow: 0 0 8px rgba(25,135,84,0.8); border: 1px solid rgba(255,255,255,0.4);">
+                    <t t-esc="currentSurchargePercent"/>%
+                </span>
+            </button>
+        </xpath>
+
+    </t>
+</templates>
