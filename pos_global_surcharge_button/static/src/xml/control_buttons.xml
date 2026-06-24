@@ -4,7 +4,7 @@
 
         <!-- Agregar el botón Recargo inmediatamente después del de Descuento global -->
         <xpath expr="//button[contains(@class, 'js_discount')]" position="after">
-            <button t-if="pos.config.surcharge_product_id"
+            <button t-if="pos.config.enable_surcharge and pos.config.surcharge_product_id"
                 class="js_surcharge position-relative d-flex align-items-center justify-content-center gap-1"
                 t-att-class="buttonClass"
                 t-on-click="() => this.clickSurcharge()">
