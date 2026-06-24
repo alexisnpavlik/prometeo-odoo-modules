@@ -15,6 +15,7 @@
     "depends": ["point_of_sale", "pos_discount", "pos_global_discount_button"],
     "data": [
         "data/surcharge_product.xml",
+        "views/res_config_settings_views.xml",
     ],
     "post_init_hook": "post_init_hook",
     "installable": True,
