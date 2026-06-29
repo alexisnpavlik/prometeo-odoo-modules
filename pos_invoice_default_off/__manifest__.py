@@ -12,6 +12,7 @@
         "point_of_sale._assets_pos": [
             "pos_invoice_default_off/static/src/js/pos_order_patch.js",
             "pos_invoice_default_off/static/src/js/payment_screen_patch.js",
+            "pos_invoice_default_off/static/src/xml/payment_screen_buttons.xml",
         ],
     },
     "installable": True,
