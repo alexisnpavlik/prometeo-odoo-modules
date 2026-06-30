@@ -34,6 +34,16 @@ patch(ControlButtons.prototype, {
         return order.calculate_base_amount(baseLines);
     },
 
+    /** True si el pedido tiene alguna línea con cantidad negativa
+     *  (devolución/reembolso). En ese caso el recargo queda bloqueado. */
+    get hasNegativeLine() {
+        const order = this.pos.get_order();
+        if (!order) {
+            return false;
+        }
+        return order.get_orderlines().some((line) => line.get_quantity() < 0);
+    },
+
     /** Porcentaje de recargo actualmente aplicado, para el badge. */
     get currentSurchargePercent() {
         const surchargeLines = this._getSurchargeLines();
@@ -54,7 +64,7 @@ patch(ControlButtons.prototype, {
     async clickSurcharge() {
         const order = this.pos.get_order();
         const product = this.pos.config.surcharge_product_id;
-        if (!order || !product) {
+        if (!order || !product || this.hasNegativeLine) {
             return;
         }
         const existing = this._getSurchargeLines();

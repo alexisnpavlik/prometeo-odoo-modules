@@ -7,6 +7,7 @@
             <button t-if="pos.config.enable_surcharge and pos.config.surcharge_product_id"
                 class="js_surcharge position-relative d-flex align-items-center justify-content-center gap-1"
                 t-att-class="buttonClass"
+                t-att-disabled="hasNegativeLine"
                 t-on-click="() => this.clickSurcharge()">
                 <i class="fa fa-arrow-up me-1"/>
                 <span>Recargo</span>
