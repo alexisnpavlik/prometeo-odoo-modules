@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="purchase_order_form_auto_update_cost" model="ir.ui.view">
+        <field name="name">purchase.order.form.auto.update.cost</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Renombra "Precio unitario" -> "Precio de costo" en la lista -->
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="attributes">
+                <attribute name="string">Precio de costo</attribute>
+            </xpath>
+
+            <!-- Nuevo campo "Precio de venta" en la lista, tras el precio de costo -->
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
+                <field name="price_sale" readonly="qty_invoiced != 0"/>
+            </xpath>
+
+            <!-- Mismo cambio en el formulario de la línea -->
+            <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="attributes">
+                <attribute name="string">Precio de costo</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
+                <field name="price_sale"/>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
