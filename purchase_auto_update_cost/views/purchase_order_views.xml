@@ -7,14 +7,15 @@
         <field name="inherit_id" ref="purchase.purchase_order_form"/>
         <field name="arch" type="xml">
 
-            <!-- Renombra "Precio unitario" -> "Precio de costo" en la lista -->
+            <!-- Renombra "Precio unitario" -> "Precio de costo" y ensancha para que no se corte -->
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="attributes">
                 <attribute name="string">Precio de costo</attribute>
+                <attribute name="width">130px</attribute>
             </xpath>
 
             <!-- Nuevo campo "Precio de venta" en la lista, tras el precio de costo -->
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
-                <field name="price_sale" readonly="qty_invoiced != 0"/>
+                <field name="price_sale" width="130px" readonly="qty_invoiced != 0"/>
             </xpath>
 
             <!-- Mismo cambio en el formulario de la línea -->
