@@ -7,7 +7,7 @@ class PosConfig(models.Model):
 
     pricelist_enforce = fields.Boolean(
         string="Forzar precio de lista al cobrar",
-        default=True,
+        default=False,
         help="Antes de cobrar, re-aplica el precio de la lista a las líneas que "
              "quedaron a precio público, corrigiendo el bug intermitente del POS. "
              "Solo actúa sobre reglas de precio fijo con valor mayor a 0.",
