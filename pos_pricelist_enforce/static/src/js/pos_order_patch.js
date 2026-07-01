@@ -44,6 +44,12 @@ patch(PosOrder.prototype, {
             if (line.get_quantity() < 0 || line.refunded_orderline_id) {
                 continue;
             }
+            // No tocar: líneas cuyo precio gestiona card_installment (recargo por
+            // cuotas). Marca sus líneas con original_unit_price; si lo pisáramos,
+            // borraríamos el recargo. Si el módulo no está instalado, es undefined.
+            if (line.original_unit_price) {
+                continue;
+            }
 
             const qty = line.get_quantity();
             const rule = product.getPricelistRule(pricelist, qty);
