@@ -7,7 +7,7 @@
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
     "depends": ["purchase"],
-    "data": [],
+    "data": ["views/purchase_order_views.xml"],
     "installable": True,
     "auto_install": False,
     "application": False,
