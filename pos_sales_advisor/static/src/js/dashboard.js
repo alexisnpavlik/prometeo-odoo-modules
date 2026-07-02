@@ -329,7 +329,7 @@ class PosSalesAdvisorDashboard extends Component {
             labels: share.labels,
             datasets: [{
                 data: share.values,
-                backgroundColor: palette.map((c) => c.border),
+                backgroundColor: share.labels.map((_, i) => palette[i % palette.length].border),
                 borderWidth: 0,
             }],
         }, {
