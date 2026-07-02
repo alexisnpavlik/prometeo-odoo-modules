@@ -93,7 +93,10 @@ class PosSalesAdvisorController(http.Controller):
         cr = request.env.cr
         allowed_companies = tuple(request.env.companies.ids)
 
-        cr.execute("SELECT name FROM pos_sales_advisor ORDER BY name")
+        cr.execute(
+            "SELECT name FROM pos_sales_advisor WHERE company_id IS NULL OR company_id IN %s ORDER BY name",
+            [allowed_companies],
+        )
         advisors = [r[0] for r in cr.fetchall()]
 
         cr.execute("SELECT name FROM pos_config WHERE company_id IN %s ORDER BY name", [allowed_companies])
