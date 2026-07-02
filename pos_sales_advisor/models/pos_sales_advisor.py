@@ -10,6 +10,9 @@ class PosSalesAdvisor(models.Model):
     _inherit = ["pos.load.mixin"]
     _description = "Asesor de Venta POS"
     _order = "name"
+    _sql_constraints = [
+        ("name_uniq", "unique(name)", "Ya existe un asesor de venta con este nombre."),
+    ]
 
     name = fields.Char(string="Nombre", required=True)
     active = fields.Boolean(string="Activo", default=True)
