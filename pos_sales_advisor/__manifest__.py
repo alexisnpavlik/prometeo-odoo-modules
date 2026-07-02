@@ -20,6 +20,13 @@
         "views/pos_order_views.xml",
         "views/res_config_settings_views.xml",
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_sales_advisor/static/src/js/payment_screen_patch.js",
+            "pos_sales_advisor/static/src/js/ticket_screen_patch.js",
+            "pos_sales_advisor/static/src/xml/advisor_button.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,

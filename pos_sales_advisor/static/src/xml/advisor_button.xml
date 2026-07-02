@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Botón de selección de asesor + badge flotante (mismo patrón que card_installment) -->
+    <t t-inherit="point_of_sale.PaymentScreenButtons" t-inherit-mode="extension">
+        <xpath expr="//div[contains(@class, 'payment-buttons')]" position="inside">
+
+            <button class="button btn btn-light btn-lg lh-lg" id="button_sales_advisor"
+                    t-on-click="() => this.onClickSalesAdvisor()">
+                <i class="fa fa-user me-2"/>
+                Asesor de Venta
+            </button>
+
+            <!-- Indicador visual flotante del asesor seleccionado -->
+            <div class="advisor-selected-badge position-absolute bottom-0 end-0 m-3 p-3 rounded-3 shadow-lg d-flex align-items-center bg-white border border-2"
+                 t-att-class="currentOrderAdvisor ? 'border-success' : (pos.config.require_sales_advisor ? 'border-warning' : 'border-secondary')"
+                 style="z-index: 1000; min-width: 240px; pointer-events: none;">
+                <div class="me-3 rounded-circle d-flex align-items-center justify-content-center"
+                     t-att-class="currentOrderAdvisor ? 'bg-success text-white' : (pos.config.require_sales_advisor ? 'bg-warning text-dark' : 'bg-secondary text-white')"
+                     style="width: 40px; height: 40px; font-size: 1.2rem;">
+                    <i t-att-class="currentOrderAdvisor ? 'fa fa-check-circle' : 'fa fa-user'"/>
+                </div>
+                <div>
+                    <div class="text-muted small fw-bold" style="font-size: 0.75rem;">ASESOR DE VENTA</div>
+                    <div class="fw-bold"
+                         t-att-class="currentOrderAdvisor ? 'text-success' : (pos.config.require_sales_advisor ? 'text-warning' : 'text-muted')"
+                         style="font-size: 1rem;">
+                        <t t-if="currentOrderAdvisor" t-esc="currentOrderAdvisor.name"/>
+                        <t t-else="">Sin seleccionar</t>
+                    </div>
+                </div>
+            </div>
+
+        </xpath>
+    </t>
+
+</templates>
