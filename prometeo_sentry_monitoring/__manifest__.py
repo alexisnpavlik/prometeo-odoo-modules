@@ -13,7 +13,7 @@
           `prometeo_sentry_monitoring.sentry_dsn`.
     """,
     'author': 'Prometeo',
-    'website': 'https://prometeo.io',
+    'website': 'https://www.prometeo.com.ar/',
     'license': 'AGPL-3',
     'depends': [
         'point_of_sale',
@@ -34,5 +34,5 @@
     },
     'installable': True,
     'auto_install': False,
-    'application': False,
+    'application': True,
 }
