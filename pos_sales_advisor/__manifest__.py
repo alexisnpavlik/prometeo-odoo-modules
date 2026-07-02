@@ -17,6 +17,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/pos_sales_advisor_views.xml",
+        "views/res_config_settings_views.xml",
     ],
     "installable": True,
     "auto_install": False,
