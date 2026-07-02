@@ -56,13 +56,19 @@ Extensiones para mejorar la velocidad de atención, la seguridad y el control de
 
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
+| **Card installment** | [`card_installment`](./card_installment) | Gestión de coeficientes de cuotas y recargos con tarjetas en los métodos de pago del POS. |
+| **POS Close Draft Invoices** | [`pos_close_with_draft_invoices`](./pos_close_with_draft_invoices) | Permite cerrar la sesión de POS aunque queden facturas en borrador vinculadas a las órdenes. |
 | **POS Global Discount** | [`pos_global_discount_button`](./pos_global_discount_button) | Agrega un botón configurable para aplicar descuentos a todo el pedido de forma ágil. |
+| **POS Global Surcharge** | [`pos_global_surcharge_button`](./pos_global_surcharge_button) | Agrega un botón 'Recargo' en el POS para aplicar/quitar un porcentaje de recargo global. |
 | **POS Invoice Default Off** | [`pos_invoice_default_off`](./pos_invoice_default_off) | Desmarca por defecto la opción de solicitar factura al cobrar, acelerando el flujo de tickets. |
 | **POS Management Metrics** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard y reportes con indicadores clave sobre ventas y arqueos de caja. |
-| **POS Product Pack** | [`pos_product_pack`](./pos_product_pack) | Habilita la venta de productos compuestos (combos/packs) de forma integrada. |
-| **POS Readonly User** | [`pos_user_readonly`](./pos_user_readonly) | Permite restringir el POS a un modo de solo visualización para ciertos perfiles de cajero. |
+| **POS Pricelist Enforce** | [`pos_pricelist_enforce`](./pos_pricelist_enforce) | Corrige el bug del POS que deja líneas a precio público en vez de aplicar la lista de precios fija. |
 | **POS Print Last Session** | [`pos_print_last_session`](./pos_print_last_session) | Permite imprimir el reporte de cierre de caja correspondiente a la sesión anterior. |
+| **POS Product Pack** | [`pos_product_pack`](./pos_product_pack) | Habilita la venta de productos compuestos (combos/packs) de forma integrada. |
+| **POS Sales Advisors** | [`pos_sales_advisor`](./pos_sales_advisor) | Trackeo de asesores de venta: selección en pantalla de pago, registro en la orden y dashboard OWL de métricas. |
 | **POS Special Approval** | [`pos_special_approval_omax`](./pos_special_approval_omax) | Requiere la autorización de un supervisor para aplicar acciones críticas (devoluciones, descuentos). |
+| **POS Readonly User** | [`pos_user_readonly`](./pos_user_readonly) | Permite restringir el POS a un modo de solo visualización para ciertos perfiles de cajero. |
+| **POS Stock Readonly** | [`pos_user_stock_readonly`](./pos_user_stock_readonly) | Grupo de seguridad para cajeros sin permisos de edición de catálogo/stock, pero con visualización de stock. |
 
 ### 3. Contabilidad & Finanzas
 
@@ -82,9 +88,13 @@ Operaciones automatizadas y visibilidad logística integrada en tiempo real.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Actualización de Costos** | [`purchase_auto_update_cost`](./purchase_auto_update_cost) | Actualiza el costo de adquisición del producto de forma automática al recibir la compra. |
-| **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
+| **Hide Create Receipt** | [`stock_hide_create_receipt`](./stock_hide_create_receipt) | Oculta los botones de creación manual de nuevas recepciones en el flujo de almacén. |
 | **Intercompany Sales/Stock** | `purchase_sale_*_inter_company` | Genera de forma automática órdenes espejo y transferencias de stock entre empresas vinculadas. |
 | **Métricas de Inventario** | [`inventory_dashboard_metrics`](./inventory_dashboard_metrics) | KPIs de rotación, stock mínimo, valorización y estado general del inventario. |
+| **Product Default Settings** | [`product_default_settings`](./product_default_settings) | Valores por defecto y configuraciones automáticas para productos (disponibilidad en POS, etc.). |
+| **Product Image Zoom** | [`product_image_zoom`](./product_image_zoom) | Amplía la imagen del producto al hacer clic en su ficha en el backend. |
+| **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
+| **Stock Picking Auto Qty** | [`stock_picking_auto_qty`](./stock_picking_auto_qty) | Auto-completa la cantidad hecha con la cantidad demandada en albaranes de salida para permitir la disponibilidad. |
 
 ### 5. Interfaz de Usuario & Base (Web)
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_pos_sales_advisor_dashboard" model="ir.actions.client">
+        <field name="name">Métricas de Asesores</field>
+        <field name="tag">pos_sales_advisor.dashboard</field>
+    </record>
+
+    <menuitem id="menu_pos_sales_advisor_dashboard_root"
+              name="Métricas de Asesores"
+              action="action_pos_sales_advisor_dashboard"
+              groups="pos_sales_advisor.group_pos_advisor_metrics"
+              web_icon="pos_sales_advisor,static/description/icon.png"
+              sequence="51"/>
+</odoo>
