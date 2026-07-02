@@ -86,6 +86,36 @@ class PosSalesAdvisorController(http.Controller):
             })
         return rows
 
+    def _get_sales_rows(self, where, params, tz, limit=None, offset=0):
+        """Ventas individuales atribuidas a un asesor, más recientes primero."""
+        cr = request.env.cr
+        query = f"""
+            SELECT to_char(po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s, 'YYYY-MM-DD HH24:MI') AS fecha,
+                   po.pos_reference AS orden,
+                   psa.name AS asesor,
+                   COALESCE(rp.name, '') AS cliente,
+                   po.amount_total AS total
+            {self._base_from()}
+            LEFT JOIN res_partner rp ON rp.id = po.partner_id
+            WHERE {where} AND po.sales_advisor_id IS NOT NULL
+            ORDER BY po.date_order DESC
+        """
+        query_params = [tz] + params
+        if limit is not None:
+            query += " LIMIT %s OFFSET %s"
+            query_params += [limit, offset]
+        cr.execute(query, query_params)
+        return [
+            {
+                "fecha": fecha,
+                "orden": orden or "",
+                "asesor": asesor,
+                "cliente": cliente,
+                "total": float(total),
+            }
+            for fecha, orden, asesor, cliente, total in cr.fetchall()
+        ]
+
     @http.route("/pos_sales_advisor/filters", type="json", auth="user")
     def filters_metadata(self):
         """Metadatos para los selects del sidebar del dashboard."""
@@ -232,6 +262,55 @@ class PosSalesAdvisorController(http.Controller):
             ])
 
         filename = f"metricas_asesores_{start_date or 'inicio'}_{end_date or 'hoy'}.csv"
+        return request.make_response(
+            output.getvalue(),
+            headers=[
+                ("Content-Type", "text/csv; charset=utf-8"),
+                ("Content-Disposition", content_disposition(filename)),
+            ],
+        )
+
+    @http.route("/pos_sales_advisor/sales", type="json", auth="user")
+    def sales(self, start_date=None, end_date=None, advisor="all", pos="all", company="all", page=1, per_page=50):
+        """Listado paginado de ventas individuales por asesor para el período filtrado."""
+        self._check_access()
+        cr = request.env.cr
+        where, params = self._build_where_clause(start_date, end_date, advisor, pos, company)
+        tz = self._get_timezone()
+
+        cr.execute(
+            f"SELECT COUNT(*) {self._base_from()} WHERE {where} AND po.sales_advisor_id IS NOT NULL",
+            params,
+        )
+        total = cr.fetchone()[0]
+
+        try:
+            page = max(1, int(page))
+            per_page = max(1, int(per_page))
+        except (TypeError, ValueError):
+            page, per_page = 1, 50
+        pages = max(1, -(-total // per_page))  # ceil
+        page = min(page, pages)
+        offset = (page - 1) * per_page
+
+        rows = self._get_sales_rows(where, params, tz, limit=per_page, offset=offset)
+        return {"sales": rows, "page": page, "pages": pages, "total": total}
+
+    @http.route("/pos_sales_advisor/export_sales", type="http", auth="user")
+    def export_sales(self, start_date=None, end_date=None, advisor="all", pos="all", company="all", **kwargs):
+        """Exporta las ventas individuales por asesor como CSV, incluyendo la fecha de la venta."""
+        self._check_access()
+        where, params = self._build_where_clause(start_date or None, end_date or None, advisor, pos, company)
+        tz = self._get_timezone()
+        rows = self._get_sales_rows(where, params, tz)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Fecha", "Orden", "Asesor", "Cliente", "Total"])
+        for r in rows:
+            writer.writerow([r["fecha"], r["orden"], r["asesor"], r["cliente"], f"{r['total']:.2f}"])
+
+        filename = f"ventas_asesores_{start_date or 'inicio'}_{end_date or 'hoy'}.csv"
         return request.make_response(
             output.getvalue(),
             headers=[

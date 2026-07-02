@@ -17,6 +17,7 @@ class PosSalesAdvisorDashboard extends Component {
             pos: "all",
             company: "all",
             search: "",
+            activeTab: "summary",
             loading: false,
             syncTime: "Cargando...",
             theme: "dark",
@@ -47,6 +48,14 @@ class PosSalesAdvisorDashboard extends Component {
                 advisor_share: { labels: [], values: [] },
             },
             table: [],
+        });
+
+        this.salesData = useState({
+            sales: [],
+            page: 1,
+            pages: 1,
+            total: 0,
+            perPage: 50,
         });
 
         this.charts = {};
@@ -115,13 +124,40 @@ class PosSalesAdvisorDashboard extends Component {
         }
     }
 
+    switchTab(tab) {
+        this.state.activeTab = tab;
+        if (tab === "sales") {
+            this.loadSales();
+        } else if (tab === "summary") {
+            setTimeout(() => this.renderAllCharts(), 50);
+        }
+    }
+
+    async prevSalesPage() {
+        if (this.salesData.page > 1) {
+            this.salesData.page--;
+            await this.loadSales();
+        }
+    }
+
+    async nextSalesPage() {
+        if (this.salesData.page < this.salesData.pages) {
+            this.salesData.page++;
+            await this.loadSales();
+        }
+    }
+
     toggleTheme() {
         this.state.theme = this.state.theme === "dark" ? "light" : "dark";
         setTimeout(() => this.renderAllCharts(), 50);
     }
 
     async applyFilters() {
+        this.salesData.page = 1;
         await this.refreshData();
+        if (this.state.activeTab === "sales") {
+            await this.loadSales();
+        }
     }
 
     async clearFilters() {
@@ -131,7 +167,11 @@ class PosSalesAdvisorDashboard extends Component {
         this.state.pos = "all";
         this.state.company = "all";
         this.state.search = "";
+        this.salesData.page = 1;
         await this.refreshData();
+        if (this.state.activeTab === "sales") {
+            await this.loadSales();
+        }
     }
 
     // --- Formateadores ---
@@ -231,6 +271,37 @@ class PosSalesAdvisorDashboard extends Component {
             company: this.state.company,
         });
         window.open(`/pos_sales_advisor/export?${params.toString()}`, "_blank");
+    }
+
+    async loadSales() {
+        this.state.loading = true;
+        try {
+            const data = await rpc("/pos_sales_advisor/sales", {
+                start_date: this.state.startDate || null,
+                end_date: this.state.endDate || null,
+                advisor: this.state.advisor,
+                pos: this.state.pos,
+                company: this.state.company,
+                page: this.salesData.page,
+                per_page: this.salesData.perPage,
+            });
+            Object.assign(this.salesData, data);
+        } catch (e) {
+            console.error("Error al cargar ventas por asesor:", e);
+        } finally {
+            this.state.loading = false;
+        }
+    }
+
+    exportSalesCSV() {
+        const params = new URLSearchParams({
+            start_date: this.state.startDate || "",
+            end_date: this.state.endDate || "",
+            advisor: this.state.advisor,
+            pos: this.state.pos,
+            company: this.state.company,
+        });
+        window.open(`/pos_sales_advisor/export_sales?${params.toString()}`, "_blank");
     }
 
     // --- Gráficos ---

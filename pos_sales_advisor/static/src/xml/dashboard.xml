@@ -142,8 +142,15 @@
                     </div>
                 </header>
 
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'summary' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('summary')">Resumen</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'sales' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('sales')">Ventas por Asesor</button>
+                </nav>
+
                 <div class="tab-content">
-                    <section class="tab-pane active">
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'summary' ? 'active' : '')">
                         <!-- KPI Cards Grid -->
                         <div class="kpi-grid">
                             <div class="kpi-card shadow-glow green">
@@ -330,6 +337,54 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: Ventas individuales por asesor -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'sales' ? 'active' : '')">
+                        <div class="chart-container glass-panel">
+                            <div class="chart-header" style="position: relative;">
+                                <h3>Ventas por Asesor</h3>
+                                <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                    <button class="btn btn-secondary" t-on-click="exportSalesCSV">
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Orden</th>
+                                            <th>Asesor</th>
+                                            <th>Cliente</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="salesData.sales.length === 0">
+                                            <tr><td colspan="5" style="text-align:center;">Sin ventas para el período seleccionado</td></tr>
+                                        </t>
+                                        <t t-foreach="salesData.sales" t-as="sale" t-key="sale_index">
+                                            <tr>
+                                                <td t-esc="sale.fecha"/>
+                                                <td t-esc="sale.orden"/>
+                                                <td t-esc="sale.asesor"/>
+                                                <td t-esc="sale.cliente"/>
+                                                <td t-esc="formatCurrency(sale.total)"/>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="salesData.page === 1" t-on-click="prevSalesPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="salesData.page"/> de <t t-esc="salesData.pages"/> (Total: <t t-esc="salesData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="salesData.page >= salesData.pages" t-on-click="nextSalesPage">Siguiente</button>
                             </div>
                         </div>
                     </section>
