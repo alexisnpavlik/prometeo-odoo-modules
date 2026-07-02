@@ -4,6 +4,7 @@
     <!-- Botón de selección de asesor + badge flotante (mismo patrón que card_installment) -->
     <t t-inherit="point_of_sale.PaymentScreenButtons" t-inherit-mode="extension">
         <xpath expr="//div[contains(@class, 'payment-buttons')]" position="inside">
+            <t t-if="pos.config.enable_sales_advisor">
 
             <button class="button btn btn-light btn-lg lh-lg" id="button_sales_advisor"
                     t-on-click="() => this.onClickSalesAdvisor()">
@@ -31,6 +32,7 @@
                 </div>
             </div>
 
+            </t>
         </xpath>
     </t>
 

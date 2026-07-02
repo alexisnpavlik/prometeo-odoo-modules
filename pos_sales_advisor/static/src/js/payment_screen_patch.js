@@ -41,10 +41,14 @@ patch(PaymentScreen.prototype, {
     },
 
     /**
-     * Bloquea la validación si la caja requiere asesor y la orden no tiene uno.
+     * Bloquea la validación si la caja usa asesores, lo requiere y la orden no tiene uno.
      */
     async _isOrderValid(isForceValidate) {
-        if (this.pos.config.require_sales_advisor && !this.currentOrderAdvisor) {
+        if (
+            this.pos.config.enable_sales_advisor &&
+            this.pos.config.require_sales_advisor &&
+            !this.currentOrderAdvisor
+        ) {
             this.dialog.add(AlertDialog, {
                 title: _t("Falta el asesor de venta"),
                 body: _t("Esta caja requiere seleccionar un asesor de venta antes de validar el pago."),
