@@ -66,24 +66,24 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Punto de Venta (Caja)</label>
+                        <label>Empresa</label>
                         <div class="select-wrapper">
-                            <select t-model="state.pos">
-                                <option value="all">Todas las cajas</option>
-                                <t t-foreach="filtersData.pos_configs" t-as="pos" t-key="pos">
-                                    <option t-att-value="pos"><t t-esc="pos"/></option>
+                            <select t-model="state.company" t-on-change="onCompanyChange">
+                                <option value="all">Todas las empresas</option>
+                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
+                                    <option t-att-value="company"><t t-esc="company"/></option>
                                 </t>
                             </select>
                         </div>
                     </div>
 
                     <div class="input-group">
-                        <label>Empresa</label>
+                        <label>Punto de Venta (Caja)</label>
                         <div class="select-wrapper">
-                            <select t-model="state.company">
-                                <option value="all">Todas las empresas</option>
-                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
-                                    <option t-att-value="company"><t t-esc="company"/></option>
+                            <select t-model="state.pos">
+                                <option value="all">Todas las cajas</option>
+                                <t t-foreach="currentPosList" t-as="pos" t-key="pos">
+                                    <option t-att-value="pos"><t t-esc="pos"/></option>
                                 </t>
                             </select>
                         </div>

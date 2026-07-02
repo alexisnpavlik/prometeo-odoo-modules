@@ -99,8 +99,21 @@ class PosSalesAdvisorController(http.Controller):
         )
         advisors = [r[0] for r in cr.fetchall()]
 
-        cr.execute("SELECT name FROM pos_config WHERE company_id IN %s ORDER BY name", [allowed_companies])
-        pos_configs = [r[0] for r in cr.fetchall()]
+        cr.execute(
+            """
+            SELECT pc.name, rc.name
+            FROM pos_config pc
+            JOIN res_company rc ON rc.id = pc.company_id
+            WHERE pc.company_id IN %s
+            ORDER BY pc.name
+            """,
+            [allowed_companies],
+        )
+        pos_rows = cr.fetchall()
+        pos_configs = [r[0] for r in pos_rows]
+        pos_configs_by_company = {}
+        for pos_name, company_name in pos_rows:
+            pos_configs_by_company.setdefault(company_name, []).append(pos_name)
 
         companies = request.env.companies.mapped("name")
 
@@ -110,6 +123,7 @@ class PosSalesAdvisorController(http.Controller):
         return {
             "advisors": advisors,
             "pos_configs": pos_configs,
+            "pos_configs_by_company": pos_configs_by_company,
             "companies": sorted(companies),
             "min_date": str(min_date or ""),
             "max_date": str(max_date or ""),

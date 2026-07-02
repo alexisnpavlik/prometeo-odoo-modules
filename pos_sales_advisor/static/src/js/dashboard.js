@@ -25,6 +25,7 @@ class PosSalesAdvisorDashboard extends Component {
         this.filtersData = useState({
             advisors: [],
             pos_configs: [],
+            pos_configs_by_company: {},
             companies: [],
             min_date: "",
             max_date: "",
@@ -71,6 +72,14 @@ class PosSalesAdvisorDashboard extends Component {
     }
 
     // --- Getters reactivos ---
+    get currentPosList() {
+        const company = this.state.company;
+        if (company && company !== "all" && this.filtersData.pos_configs_by_company[company]) {
+            return this.filtersData.pos_configs_by_company[company];
+        }
+        return this.filtersData.pos_configs;
+    }
+
     get filteredTableRows() {
         const search = (this.state.search || "").toLowerCase().trim();
         if (!search) return this.metricsData.table;
@@ -97,6 +106,13 @@ class PosSalesAdvisorDashboard extends Component {
 
     onSearchInput(ev) {
         this.state.search = ev.target.value;
+    }
+
+    onCompanyChange() {
+        // Al cambiar de empresa, resetear la caja si ya no pertenece a la lista filtrada.
+        if (this.state.pos !== "all" && !this.currentPosList.includes(this.state.pos)) {
+            this.state.pos = "all";
+        }
     }
 
     toggleTheme() {
