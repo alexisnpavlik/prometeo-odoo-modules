@@ -13,9 +13,9 @@
             </button>
 
             <!-- Indicador visual flotante del asesor seleccionado -->
-            <div class="advisor-selected-badge position-absolute top-0 end-0 m-3 p-3 rounded-3 shadow-lg d-flex align-items-center bg-white border border-2"
+            <div class="advisor-selected-badge position-absolute end-0 m-3 p-3 rounded-3 shadow-lg d-flex align-items-center bg-white border border-2"
                  t-att-class="currentOrderAdvisor ? 'border-success' : (pos.config.require_sales_advisor ? 'border-warning' : 'border-secondary')"
-                 style="z-index: 1000; min-width: 240px; pointer-events: none;">
+                 style="z-index: 1000; min-width: 240px; pointer-events: none; top: 4rem;">
                 <div class="me-3 rounded-circle d-flex align-items-center justify-content-center"
                      t-att-class="currentOrderAdvisor ? 'bg-success text-white' : (pos.config.require_sales_advisor ? 'bg-warning text-dark' : 'bg-secondary text-white')"
                      style="width: 40px; height: 40px; font-size: 1.2rem;">
