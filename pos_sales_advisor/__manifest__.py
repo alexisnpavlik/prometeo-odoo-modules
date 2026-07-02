@@ -19,12 +19,18 @@
         "views/pos_sales_advisor_views.xml",
         "views/pos_order_views.xml",
         "views/res_config_settings_views.xml",
+        "views/menu_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
             "pos_sales_advisor/static/src/js/payment_screen_patch.js",
             "pos_sales_advisor/static/src/js/ticket_screen_patch.js",
             "pos_sales_advisor/static/src/xml/advisor_button.xml",
+        ],
+        "web.assets_backend": [
+            "pos_sales_advisor/static/src/css/dashboard.css",
+            "pos_sales_advisor/static/src/js/dashboard.js",
+            "pos_sales_advisor/static/src/xml/dashboard.xml",
         ],
     },
     "installable": True,

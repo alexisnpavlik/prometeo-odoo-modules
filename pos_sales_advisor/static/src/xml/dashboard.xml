@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_sales_advisor.DashboardTemplate">
+        <div t-att-class="'advisor-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+            <!-- Sidebar de Filtros (Glassmorphic) -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Asesores de Venta</h2>
+                        <span>Metrics Hub</span>
+                    </div>
+                </div>
+
+                <!-- Rango de Fechas Predefinido -->
+                <div class="sidebar-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="preset-dates">
+                        <button t-att-class="'btn-preset ' + (state.preset === 'today' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('today')">Hoy</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'yesterday' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('yesterday')">Ayer</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('7days')">Últimos 7 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('30days')">Últimos 30 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '60days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('60days')">Últimos 60 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('90days')">Últimos 90 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'all' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('all')">Todo</button>
+                    </div>
+
+                    <div class="custom-date-inputs">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="date" t-att-value="state.startDate" t-on-change="onStartDateChange"/>
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="date" t-att-value="state.endDate" t-on-change="onEndDateChange"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+
+                    <div class="input-group">
+                        <label>Asesor de Venta</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.advisor">
+                                <option value="all">Todos los asesores</option>
+                                <t t-foreach="filtersData.advisors" t-as="adv" t-key="adv">
+                                    <option t-att-value="adv"><t t-esc="adv"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Punto de Venta (Caja)</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.pos">
+                                <option value="all">Todas las cajas</option>
+                                <t t-foreach="filtersData.pos_configs" t-as="pos" t-key="pos">
+                                    <option t-att-value="pos"><t t-esc="pos"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Empresa</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.company">
+                                <option value="all">Todas las empresas</option>
+                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
+                                    <option t-att-value="company"><t t-esc="company"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer" style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
+                        <span>Aplicar</span>
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <header class="main-header">
+                    <div class="header-left">
+                        <h1>Dashboard de Asesores de Venta</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime">Cargando...</span>
+                        </div>
+
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="() => this.refreshData()" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="tab-content">
+                    <section class="tab-pane active">
+                        <!-- KPI Cards Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Ventas Netas Atribuidas</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.net_sales)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Bruto: <t t-esc="formatCurrency(metricsData.kpis.gross_sales)"/> · Dev.: <t t-esc="formatCurrency(metricsData.kpis.refunds)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Órdenes con Asesor</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="14 2 14 8 20 8"></polyline>
+                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.orders_count.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">En el período filtrado</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Ticket Promedio</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="9" cy="21" r="1"></circle>
+                                                <circle cx="20" cy="21" r="1"></circle>
+                                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.ticket_average)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Por orden con asesor</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.without_advisor_pct > 20 ? 'red' : 'amber')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Órdenes sin Asesor</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatPercent(metricsData.kpis.without_advisor_pct)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext"><t t-esc="metricsData.kpis.without_advisor_count.toLocaleString()"/> órdenes sin atribuir (control de adopción)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Grid -->
+                        <div class="charts-grid">
+                            <!-- Ranking de Asesores -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Ranking de Asesores</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Top 10 asesores por ventas netas (ventas menos devoluciones) en el período. Es la base directa para el cálculo de compensaciones.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-advisor-ranking"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Evolución Temporal -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Evolución de Ventas por Asesor</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="badge" t-esc="metricsData.charts.sales_trend.timeframe">Diario</span>
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text">
+                                                Ventas netas diarias de los 6 mejores asesores del período. Permite comparar consistencia y detectar picos.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-advisor-trend"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Participación -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Participación por Asesor</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Porcentaje de las ventas netas totales que aporta cada asesor en el período seleccionado.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-advisor-share"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Tabla Detalle -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Detalle por Asesor</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <button class="btn btn-secondary" t-on-click="exportCSV">
+                                            <span>Exportar CSV</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="input-group" style="margin-bottom: 10px;">
+                                    <input type="text" placeholder="Buscar asesor..." t-att-value="state.search" t-on-input="onSearchInput"/>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Asesor</th>
+                                                <th>Ventas Brutas</th>
+                                                <th>Devoluciones</th>
+                                                <th>Ventas Netas</th>
+                                                <th>Órdenes</th>
+                                                <th>Ticket Promedio</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-if="filteredTableRows.length === 0">
+                                                <tr><td colspan="6" style="text-align:center;">Sin datos para el período seleccionado</td></tr>
+                                            </t>
+                                            <t t-foreach="filteredTableRows" t-as="row" t-key="row.asesor">
+                                                <tr>
+                                                    <td t-esc="row.asesor"/>
+                                                    <td t-esc="formatCurrency(row.bruto)"/>
+                                                    <td t-esc="formatCurrency(row.devoluciones)"/>
+                                                    <td t-esc="formatCurrency(row.neto)"/>
+                                                    <td t-esc="row.ordenes.toLocaleString()"/>
+                                                    <td t-esc="formatCurrency(row.ticket_promedio)"/>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>
