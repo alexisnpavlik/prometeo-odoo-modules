@@ -22,12 +22,10 @@
     'data': [],
     'assets': {
         'web.assets_backend': [
-            'prometeo_sentry_monitoring/static/lib/sentry/bundle.min.js',
             'prometeo_sentry_monitoring/static/src/js/error_tracking_poc.js',
             'prometeo_sentry_monitoring/static/src/js/sentry_backend_init.js',
         ],
         'point_of_sale._assets_pos': [
-            'prometeo_sentry_monitoring/static/lib/sentry/bundle.min.js',
             'prometeo_sentry_monitoring/static/src/js/error_tracking_poc.js',
             'prometeo_sentry_monitoring/static/src/js/sentry_pos_init.js',
         ],

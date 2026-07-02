@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { session } from "@web/session";
+import { loadJS } from "@web/core/assets";
 
 // Initialize Sentry for backend web assets
 (async function initSentry() {
@@ -9,12 +10,15 @@ import { session } from "@web/session";
         return;
     }
 
-    if (!window.Sentry) {
-        console.warn("[SENTRY] SDK not found. Sentry will not be initialized.");
-        return;
-    }
-
     try {
+        // Load Sentry SDK dynamically to avoid Odoo asset minifier collisions
+        await loadJS("/prometeo_sentry_monitoring/static/lib/sentry/bundle.min.js");
+
+        if (!window.Sentry) {
+            console.warn("[SENTRY] SDK not found after dynamic load. Sentry will not be initialized.");
+            return;
+        }
+
         const response = await fetch('/prometeo_sentry_monitoring/config');
         const data = await response.json();
         const dsn = data?.dsn;
@@ -44,6 +48,6 @@ import { session } from "@web/session";
         });
         console.log("[SENTRY] Initialized successfully for Backend. Environment: backend, DB:", session.db);
     } catch (error) {
-        console.error("[SENTRY] Error initializing Sentry for Backend:", error);
+        console.error("[SENTRY] Error loading or initializing Sentry for Backend:", error);
     }
 })();

@@ -1,17 +1,21 @@
 /** @odoo-module **/
 
 import { session } from "@web/session";
+import { loadJS } from "@web/core/assets";
 import { patch } from "@web/core/utils/patch";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 
 // Initialize Sentry for POS
 (async function initSentry() {
-    if (!window.Sentry) {
-        console.warn("[SENTRY] SDK not found. Sentry will not be initialized.");
-        return;
-    }
-
     try {
+        // Load Sentry SDK dynamically to avoid Odoo asset minifier collisions
+        await loadJS("/prometeo_sentry_monitoring/static/lib/sentry/bundle.min.js");
+
+        if (!window.Sentry) {
+            console.warn("[SENTRY] SDK not found after dynamic load. Sentry will not be initialized.");
+            return;
+        }
+
         const response = await fetch('/prometeo_sentry_monitoring/config');
         const data = await response.json();
         const dsn = data?.dsn;
@@ -44,7 +48,7 @@ import { PosStore } from "@point_of_sale/app/store/pos_store";
         });
         console.log("[SENTRY] Initialized successfully for POS. Environment: pos, DB:", session.db);
     } catch (error) {
-        console.error("[SENTRY] Error initializing Sentry for POS:", error);
+        console.error("[SENTRY] Error loading or initializing Sentry for POS:", error);
     }
 })();
 
