@@ -73,6 +73,8 @@ class PosDashboardMetrics extends Component {
         });
 
         this.sessionsData = useState([]);
+
+        this.topArticlesData = useState({ by_revenue: [], by_units: [] });
         
         this.transactionsData = useState({
             sales: [],
@@ -154,6 +156,8 @@ class PosDashboardMetrics extends Component {
         // Carga diferida según pestaña activa
         if (tab === "sessions") {
             this.loadSessions();
+        } else if (tab === "toparticles") {
+            this.loadTopArticles();
         } else if (tab === "transactions") {
             this.loadTransactions();
         } else if (tab === "general") {
@@ -168,6 +172,8 @@ class PosDashboardMetrics extends Component {
             this.renderAllCharts();
             if (this.state.activeTab === "sessions") {
                 this.loadSessions();
+            } else if (this.state.activeTab === "toparticles") {
+                this.renderTopArticlesCharts();
             }
         }, 50);
     }
@@ -283,6 +289,8 @@ class PosDashboardMetrics extends Component {
                 this.renderAllCharts();
             } else if (this.state.activeTab === "sessions") {
                 await this.loadSessions();
+            } else if (this.state.activeTab === "toparticles") {
+                await this.loadTopArticles();
             } else if (this.state.activeTab === "transactions") {
                 await this.loadTransactions();
             }
@@ -298,7 +306,13 @@ class PosDashboardMetrics extends Component {
 
     async loadSessions() {
         try {
-            const data = await rpc("/pos_management_metrics/sessions", {});
+            const data = await rpc("/pos_management_metrics/sessions", {
+                start_date: this.state.startDate || null,
+                end_date: this.state.endDate || null,
+                pos: this.state.pos,
+                cashier: this.state.cashier,
+                company: this.state.company
+            });
             this.sessionsData.length = 0;
             this.sessionsData.push(...data.sessions);
 
@@ -306,6 +320,25 @@ class PosDashboardMetrics extends Component {
             setTimeout(() => this.renderSessionsChart(data.sessions), 50);
         } catch (e) {
             console.error("Error al cargar auditoría de cajas:", e);
+        }
+    }
+
+    async loadTopArticles() {
+        try {
+            const data = await rpc("/pos_management_metrics/top_articles", {
+                start_date: this.state.startDate || null,
+                end_date: this.state.endDate || null,
+                pos: this.state.pos,
+                cashier: this.state.cashier,
+                company: this.state.company,
+                category: this.state.category,
+                product: this.state.product,
+                limit: 20
+            });
+            Object.assign(this.topArticlesData, data);
+            setTimeout(() => this.renderTopArticlesCharts(), 50);
+        } catch (e) {
+            console.error("Error al cargar top de artículos:", e);
         }
     }
 
@@ -587,6 +620,73 @@ class PosDashboardMetrics extends Component {
             scales: {
                 x: { grid: { display: false } },
                 y: { grid: gridConfig }
+            }
+        });
+    }
+
+    renderTopArticlesCharts() {
+        const isLight = this.state.theme === "light";
+        const gridColor = isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.04)";
+        const gridConfig = { color: gridColor, drawBorder: false };
+        const shorten = (l) => (l && l.length > 30 ? l.substring(0, 27) + "..." : l);
+
+        const byRevenue = this.topArticlesData.by_revenue || [];
+        this.createOrUpdateChart("chart-top-articles-revenue", "bar", {
+            labels: byRevenue.map(r => shorten(r.producto)),
+            datasets: [{
+                label: "Facturación",
+                data: byRevenue.map(r => r.facturacion),
+                backgroundColor: "rgba(59, 130, 246, 0.65)",
+                borderColor: "#3b82f6",
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        }, {
+            indexAxis: "y",
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const row = byRevenue[context.dataIndex];
+                            return ` ${this.formatCurrency(row.facturacion)} (${row.unidades} un.)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } },
+                y: { grid: { display: false } }
+            }
+        });
+
+        const byUnits = this.topArticlesData.by_units || [];
+        this.createOrUpdateChart("chart-top-articles-units", "bar", {
+            labels: byUnits.map(r => shorten(r.producto)),
+            datasets: [{
+                label: "Unidades",
+                data: byUnits.map(r => r.unidades),
+                backgroundColor: "rgba(16, 185, 129, 0.65)",
+                borderColor: "#10b981",
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        }, {
+            indexAxis: "y",
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const row = byUnits[context.dataIndex];
+                            return ` ${row.unidades} un. (${this.formatCurrency(row.facturacion)})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: gridConfig, ticks: { precision: 0 } },
+                y: { grid: { display: false } }
             }
         });
     }
