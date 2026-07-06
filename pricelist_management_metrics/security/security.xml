@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_pricelist_metrics_user" model="res.groups">
+        <field name="name">Acceso a Métricas de Precios por Sucursal</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Permite acceder al dashboard comparativo de precios base vs listas de precios por sucursal/empresa.</field>
+    </record>
+</odoo>

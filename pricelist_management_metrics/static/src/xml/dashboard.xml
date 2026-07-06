@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="pricelist_management_metrics.DashboardTemplate">
+        <div t-att-class="'pricelist-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+            <!-- Sidebar de Filtros (Glassmorphic) -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Price Metrics</h2>
+                        <span>Metrics Hub</span>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="sidebar-section">
+                    <h3>Filtros</h3>
+
+                    <div class="input-group">
+                        <label>Sucursal (Lista de Precios)</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.pricelist">
+                                <option value="all">Todas las sucursales</option>
+                                <t t-foreach="filtersData.pricelists" t-as="pl" t-key="pl.id">
+                                    <option t-att-value="pl.id"><t t-esc="pl.nombre + (pl.empresa ? ' (' + pl.empresa + ')' : '')"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Categoría</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.category" t-on-change="onCategoryChange">
+                                <option value="all">Todas las categorías</option>
+                                <t t-foreach="filtersData.categories" t-as="cat" t-key="cat">
+                                    <option t-att-value="cat"><t t-esc="cat"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Producto</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.product">
+                                <option value="all">Todos los productos</option>
+                                <t t-foreach="currentProductsList" t-as="prod" t-key="prod">
+                                    <option t-att-value="prod"><t t-esc="prod"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" t-att-checked="state.onlyDiff" t-on-change="onOnlyDiffChange" style="width: auto; accent-color: #3b82f6;"/>
+                            <span>Solo productos con precio de sucursal</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer" style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
+                        <span>Aplicar</span>
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- Header -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <h1>Precios por Sucursal</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <!-- Botón de Alternancia de Tema Día/Noche -->
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime">Cargando...</span>
+                        </div>
+
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="() => this.refreshData()" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'table' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('table')">Comparativa de Precios</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'differences' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('differences')">Mayores Diferencias</button>
+                </nav>
+
+                <!-- Tab Content Wrapper -->
+                <div class="tab-content">
+
+                    <!-- TAB: COMPARATIVA -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'table' ? 'active' : '')">
+                        <!-- KPI Cards Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Productos Activos</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.total_products.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Sucursales comparadas: <t t-esc="metricsData.kpis.pricelist_count"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Con Precio de Sucursal</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.products_with_override.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Productos con precio de lista definido</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Diferencia Promedio</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="19" y1="5" x2="5" y2="19"></line>
+                                                <circle cx="6.5" cy="6.5" r="2.5"></circle>
+                                                <circle cx="17.5" cy="17.5" r="2.5"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.avg_diff_percent"/>%</div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Promedio absoluto vs precio base</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.max_diff_percent !== 0 ? 'red' : 'green')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Mayor Diferencia</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                                <polyline points="17 6 23 6 23 12"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatPercent(metricsData.kpis.max_diff_percent)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext" t-esc="metricsData.kpis.max_diff_product"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Comparativa -->
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Comparativa de Precios por Sucursal</h2>
+                                    <p class="subtitle">Precio base vs precio de lista definido en cada sucursal/empresa</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Buscar producto..." t-att-value="state.search" t-on-input="onSearchInput"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th class="text-right">Precio Base</th>
+                                            <t t-foreach="tableData.columns" t-as="col" t-key="col.id">
+                                                <th class="text-right">
+                                                    <t t-esc="col.nombre"/>
+                                                    <t t-if="col.empresa"><br/><span class="text-muted" style="font-weight: 400; font-size: 10px;"><t t-esc="col.empresa"/></span></t>
+                                                </th>
+                                            </t>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="tableData.rows.length === 0">
+                                            <tr>
+                                                <td t-att-colspan="tableData.columns.length + 3" class="text-center text-muted">No se encontraron productos con los filtros seleccionados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="tableData.rows" t-as="row" t-key="row.producto + '-' + row_index">
+                                            <tr>
+                                                <td style="font-weight: 700; color: inherit;"><t t-esc="row.producto"/></td>
+                                                <td><t t-esc="row.categoria"/></td>
+                                                <td class="text-right" style="font-weight: 600;"><t t-esc="formatCurrency(row.precio_base)"/></td>
+                                                <t t-foreach="tableData.columns" t-as="col" t-key="col.id">
+                                                    <t t-set="cell" t-value="getCell(row, col.id)"/>
+                                                    <td class="text-right">
+                                                        <span t-att-class="cell.defined ? 'price-defined' : 'price-inherited'" t-esc="formatCurrency(cell.price)"/>
+                                                        <t t-if="cell.defined and cell.diff !== 0">
+                                                            <br/><span t-att-class="'price-diff-badge ' + (cell.diff &gt; 0 ? 'up' : 'down')" t-esc="formatPercent(cell.diff)"/>
+                                                        </t>
+                                                        <t t-if="!cell.defined">
+                                                            <br/><span class="price-diff-badge base">base</span>
+                                                        </t>
+                                                    </td>
+                                                </t>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="tableData.page"/> de <t t-esc="tableData.pages"/> (Total: <t t-esc="tableData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= tableData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: MAYORES DIFERENCIAS -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'differences' ? 'active' : '')">
+                        <div class="charts-grid">
+                            <div class="chart-container span-two-cols glass-panel" style="min-height: 620px;">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Top 20 Productos con Mayor Diferencia de Precios</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra los productos con mayor diferencia porcentual entre el precio base y el precio de lista definido en cada sucursal/empresa. Un valor positivo indica que la sucursal vende más caro que el precio base; uno negativo, más barato.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body" style="height: 540px;">
+                                    <canvas id="chart-top-differences"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>
