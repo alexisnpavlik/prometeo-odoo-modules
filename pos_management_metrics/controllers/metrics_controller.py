@@ -348,16 +348,28 @@ class PosMetricsController(http.Controller):
                 WHERE pm.is_cash_count = TRUE
                 GROUP BY po.session_id
             ) cash ON cash.session_id = ps.id
+            LEFT JOIN res_company rc ON rc.id = pc.company_id
+            LEFT JOIN res_users ru ON ru.id = ps.user_id
+            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             WHERE ps.state = 'closed'
               AND pc.company_id IN %s
         """
         session_params = [allowed_companies]
         if start_date:
-            sessions_sql += " AND ps.stop_at >= %s::timestamp"
-            session_params.append(f"{start_date} 00:00:00")
+            sessions_sql += " AND ps.stop_at >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            session_params.extend([f"{start_date} 00:00:00", tz])
         if end_date:
-            sessions_sql += " AND ps.stop_at <= %s::timestamp"
-            session_params.append(f"{end_date} 23:59:59")
+            sessions_sql += " AND ps.stop_at <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            session_params.extend([f"{end_date} 23:59:59", tz])
+        if pos and pos != 'all':
+            sessions_sql += " AND pc.name = %s"
+            session_params.append(pos)
+        if company and company != 'all':
+            sessions_sql += " AND rc.name = %s"
+            session_params.append(company)
+        if cashier and cashier != 'all':
+            sessions_sql += " AND COALESCE(emp.name, ru.login) = %s"
+            session_params.append(cashier)
 
         cr.execute(sessions_sql, session_params)
         diff_row = cr.fetchone()
