@@ -35,8 +35,9 @@ class PricelistMetricsController(http.Controller):
             LEFT JOIN res_company rc ON rc.id = pl.company_id
             WHERE pl.active = TRUE
               AND (pl.company_id IS NULL OR pl.company_id IN %s)
+              AND LOWER(COALESCE(pl.name->>%s, pl.name->>'en_US')) NOT LIKE 'predeterminado%%'
             ORDER BY rc.name NULLS FIRST, 2
-        """, (lang, allowed_companies))
+        """, (lang, allowed_companies, lang))
         pricelists = cr.dictfetchall()
         if pricelist and pricelist != 'all':
             pricelists = [p for p in pricelists if p['id'] == int(pricelist)]
