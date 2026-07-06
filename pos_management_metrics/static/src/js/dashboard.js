@@ -24,6 +24,7 @@ class PosDashboardMetrics extends Component {
             page: 1,
             perPage: 15,
             activeTab: "general",
+            topSort: "revenue",
             loading: false,
             syncTime: "Cargando...",
             theme: "dark"
@@ -321,6 +322,16 @@ class PosDashboardMetrics extends Component {
         } catch (e) {
             console.error("Error al cargar auditoría de cajas:", e);
         }
+    }
+
+    get sortedTopArticles() {
+        return this.state.topSort === "units"
+            ? (this.topArticlesData.by_units || [])
+            : (this.topArticlesData.by_revenue || []);
+    }
+
+    setTopSort(mode) {
+        this.state.topSort = mode;
     }
 
     async loadTopArticles() {
@@ -634,7 +645,7 @@ class PosDashboardMetrics extends Component {
         this.createOrUpdateChart("chart-top-articles-revenue", "bar", {
             labels: byRevenue.map(r => shorten(r.producto)),
             datasets: [{
-                label: "Facturación",
+                label: "Total Vendido",
                 data: byRevenue.map(r => r.facturacion),
                 backgroundColor: "rgba(59, 130, 246, 0.65)",
                 borderColor: "#3b82f6",

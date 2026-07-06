@@ -392,7 +392,7 @@
                         <div class="charts-grid">
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 20 por Facturación</h3>
+                                    <h3>Top 20 por Total Vendido</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -432,8 +432,14 @@
                         <div class="glass-panel padded" style="margin-top: 20px;">
                             <div class="section-header">
                                 <div>
-                                    <h2>Detalle Top Artículos por Facturación</h2>
-                                    <p class="subtitle">Ranking con facturación y unidades de cada artículo</p>
+                                    <h2>Detalle Top Artículos</h2>
+                                    <p class="subtitle">Ranking con total vendido y unidades de cada artículo</p>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button t-att-class="'nav-tab ' + (state.topSort === 'revenue' ? 'active' : '')"
+                                            t-on-click="() => this.setTopSort('revenue')">Por Total Vendido</button>
+                                    <button t-att-class="'nav-tab ' + (state.topSort === 'units' ? 'active' : '')"
+                                            t-on-click="() => this.setTopSort('units')">Por Unidades</button>
                                 </div>
                             </div>
                             <div class="table-responsive">
@@ -443,17 +449,17 @@
                                             <th>#</th>
                                             <th>Artículo</th>
                                             <th>Categoría</th>
-                                            <th>Facturación</th>
+                                            <th>Total Vendido</th>
                                             <th>Unidades</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <t t-if="topArticlesData.by_revenue.length === 0">
+                                        <t t-if="sortedTopArticles.length === 0">
                                             <tr>
                                                 <td colspan="5" class="text-center text-muted">Sin ventas registradas para los filtros seleccionados.</td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="topArticlesData.by_revenue" t-as="a" t-key="a.producto">
+                                        <t t-foreach="sortedTopArticles" t-as="a" t-key="a.producto">
                                             <tr>
                                                 <td style="font-weight: 700;"><t t-esc="a_index + 1"/></td>
                                                 <td style="font-weight: 600; color:#fff;"><t t-esc="a.producto"/></td>
