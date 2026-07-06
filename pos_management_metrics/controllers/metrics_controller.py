@@ -163,7 +163,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id 
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE
+              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             ORDER BY ic.name, 2
         """, (lang,))
         products_by_category = {}
@@ -220,7 +220,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         
@@ -315,7 +315,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         kpi_params = [order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -348,16 +348,28 @@ class PosMetricsController(http.Controller):
                 WHERE pm.is_cash_count = TRUE
                 GROUP BY po.session_id
             ) cash ON cash.session_id = ps.id
+            LEFT JOIN res_company rc ON rc.id = pc.company_id
+            LEFT JOIN res_users ru ON ru.id = ps.user_id
+            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             WHERE ps.state = 'closed'
               AND pc.company_id IN %s
         """
         session_params = [allowed_companies]
         if start_date:
-            sessions_sql += " AND ps.stop_at >= %s::timestamp"
-            session_params.append(f"{start_date} 00:00:00")
+            sessions_sql += " AND ps.stop_at >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            session_params.extend([f"{start_date} 00:00:00", tz])
         if end_date:
-            sessions_sql += " AND ps.stop_at <= %s::timestamp"
-            session_params.append(f"{end_date} 23:59:59")
+            sessions_sql += " AND ps.stop_at <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            session_params.extend([f"{end_date} 23:59:59", tz])
+        if pos and pos != 'all':
+            sessions_sql += " AND pc.name = %s"
+            session_params.append(pos)
+        if company and company != 'all':
+            sessions_sql += " AND rc.name = %s"
+            session_params.append(company)
+        if cashier and cashier != 'all':
+            sessions_sql += " AND COALESCE(emp.name, ru.login) = %s"
+            session_params.append(cashier)
 
         cr.execute(sessions_sql, session_params)
         diff_row = cr.fetchone()
@@ -394,7 +406,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             trend_params = [tz, order_ids_tuple]
             for clause, val in zip(line_clauses, line_params):
@@ -423,7 +435,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             trend_params = [tz, order_ids_tuple]
             for clause, val in zip(line_clauses, line_params):
@@ -471,7 +483,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         pos_params = [order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -516,7 +528,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         prod_params = [lang, order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -547,7 +559,7 @@ class PosMetricsController(http.Controller):
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE pol.order_id IN %s
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE
+              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         cat_params = [order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -577,7 +589,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         dow_params = [tz, order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -602,7 +614,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         hour_params = [tz, order_ids_tuple]
         for clause, val in zip(line_clauses, line_params):
@@ -695,7 +707,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         prod_margin_params = [lang] + list(params)
@@ -734,7 +746,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
         """
         cat_margin_params = list(params)
@@ -788,11 +800,29 @@ class PosMetricsController(http.Controller):
         }
 
     @http.route('/pos_management_metrics/sessions', type='json', auth='user')
-    def get_sessions(self, **kwargs):
+    def get_sessions(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', **kwargs):
         self._check_access()
         cr = request.env.cr
         tz = self._get_timezone()
         allowed_companies = tuple(request.env.companies.ids)
+
+        session_filters = ""
+        extra_params = []
+        if start_date:
+            session_filters += " AND ps.start_at >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            extra_params.extend([f"{start_date} 00:00:00", tz])
+        if end_date:
+            session_filters += " AND ps.start_at <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            extra_params.extend([f"{end_date} 23:59:59", tz])
+        if pos and pos != 'all':
+            session_filters += " AND pc.name = %s"
+            extra_params.append(pos)
+        if company and company != 'all':
+            session_filters += " AND rc.name = %s"
+            extra_params.append(company)
+        if cashier and cashier != 'all':
+            session_filters += " AND COALESCE(emp_open.name, ru_o.login) = %s"
+            extra_params.append(cashier)
 
         query = f"""
             SELECT
@@ -835,7 +865,7 @@ class PosMetricsController(http.Controller):
                 WHERE pm.is_cash_count = TRUE
                 GROUP BY po.session_id
             ) cash ON cash.session_id = ps.id
-            WHERE pc.company_id IN %s
+            WHERE pc.company_id IN %s{session_filters}
             GROUP BY
                 ps.id, ps.name, pc.name,
                 ps.start_at, ps.stop_at,
@@ -847,7 +877,7 @@ class PosMetricsController(http.Controller):
                 ps.state, rc.name
             ORDER BY ps.start_at DESC;
         """
-        cr.execute(query, (tz, tz, allowed_companies))
+        cr.execute(query, [tz, tz, allowed_companies] + extra_params)
         sessions = cr.dictfetchall()
 
         # Limpiar registros para serialización JSON segura (evitar NaT/NaN)
@@ -866,6 +896,58 @@ class PosMetricsController(http.Controller):
             s['horas_abierta'] = float(s['horas_abierta'] or 0.0) if s['horas_abierta'] else 0.0
 
         return {"sessions": sessions}
+
+    @http.route('/pos_management_metrics/top_articles', type='json', auth='user')
+    def get_top_articles(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=20, **kwargs):
+        """Top de artículos por facturación y por unidades vendidas, respetando los filtros del dashboard."""
+        self._check_access()
+        cr = request.env.cr
+        lang = self._get_lang()
+
+        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
+
+        query = f"""
+            SELECT
+                COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
+                COALESCE(ic.name, 'Sin categoría')        AS categoria,
+                SUM(pol.price_subtotal_incl)              AS facturacion,
+                SUM(pol.qty)                              AS unidades
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN pos_config pc ON pc.id = po.config_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category ic ON ic.id = pt.categ_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN res_company rc ON rc.id = po.company_id
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+        """
+        params_list = [lang] + list(params)
+
+        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        for clause, val in zip(line_clauses, line_params):
+            query += f" AND {clause}"
+            params_list.append(val)
+
+        query += " GROUP BY 1, 2"
+
+        cr.execute(query, params_list)
+        rows = [
+            {
+                "producto": r["producto"],
+                "categoria": r["categoria"],
+                "facturacion": float(r["facturacion"] or 0.0),
+                "unidades": float(r["unidades"] or 0.0),
+            }
+            for r in cr.dictfetchall()
+        ]
+
+        limit = int(limit or 20)
+        by_revenue = sorted(rows, key=lambda r: r["facturacion"], reverse=True)[:limit]
+        by_units = sorted(rows, key=lambda r: r["unidades"], reverse=True)[:limit]
+
+        return {"by_revenue": by_revenue, "by_units": by_units}
 
     @http.route('/pos_management_metrics/raw_sales', type='json', auth='user')
     def get_raw_sales(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', search=None, page=1, per_page=15, **kwargs):
@@ -889,7 +971,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         count_params = list(params)
         for clause, val in zip(line_clauses, line_params):
@@ -926,7 +1008,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         sales_params = [tz, lang] + list(params)
         for clause, val in zip(line_clauses, line_params):
@@ -998,7 +1080,7 @@ class PosMetricsController(http.Controller):
                 LEFT JOIN res_users ru ON ru.id = po.user_id
                 LEFT JOIN hr_employee emp ON emp.user_id = ru.id
                 LEFT JOIN res_company rc ON rc.id = po.company_id
-                WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+                WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             sales_params = [tz, lang] + list(params)
             for clause, val in zip(line_clauses, line_params):
