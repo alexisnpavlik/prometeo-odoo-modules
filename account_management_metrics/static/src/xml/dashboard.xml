@@ -66,18 +66,6 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Sucursal (Diario / Punto de Venta)</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.journal">
-                                <option value="all">Todas las sucursales</option>
-                                <t t-foreach="filtersData.journals" t-as="j" t-key="j.id">
-                                    <option t-att-value="j.id"><t t-esc="j.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
                         <label>Tipo de Comprobante</label>
                         <div class="select-wrapper">
                             <select t-model="state.docType">
@@ -89,17 +77,6 @@
                         </div>
                     </div>
 
-                    <div class="input-group">
-                        <label>Vendedor</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.salesperson">
-                                <option value="all">Todos los vendedores</option>
-                                <t t-foreach="filtersData.salespersons" t-as="s" t-key="s.id">
-                                    <option t-att-value="s.id"><t t-esc="s.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="sidebar-footer" style="display: flex; gap: 8px;">
@@ -162,6 +139,8 @@
                             t-on-click="() => this.switchTab('general')">Panel General</button>
                     <button t-att-class="'nav-tab ' + (state.activeTab === 'invoices' ? 'active' : '')"
                             t-on-click="() => this.switchTab('invoices')">Comprobantes</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'drafts' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('drafts')">Facturas en Borrador</button>
                 </nav>
 
                 <!-- Tab Content Wrapper -->
@@ -312,26 +291,6 @@
                                 </div>
                             </div>
 
-                            <!-- By Journal (Sucursal) -->
-                            <div class="chart-container glass-panel">
-                                <div class="chart-header" style="position: relative;">
-                                    <h3>Facturación por Sucursal</h3>
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Muestra la facturación total publicada agrupada por diario de venta (punto de venta / sucursal), permitiendo comparar el rendimiento de cada sucursal en el período seleccionado.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="chart-body">
-                                    <canvas id="chart-by-journal"></canvas>
-                                </div>
-                            </div>
-
                             <!-- Doc Types -->
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
@@ -475,6 +434,65 @@
                                     Página <t t-esc="state.page"/> de <t t-esc="invoicesData.pages"/> (Total: <t t-esc="invoicesData.total"/>)
                                 </span>
                                 <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= invoicesData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: FACTURAS EN BORRADOR -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'drafts' ? 'active' : '')">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Facturas en Borrador</h2>
+                                    <p class="subtitle">Comprobantes pendientes de publicar: monto retenido a la espera de validación</p>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Número</th>
+                                            <th>Fecha</th>
+                                            <th>Tipo de Comprobante</th>
+                                            <th>Cliente</th>
+                                            <th>Empresa</th>
+                                            <th>Sucursal (Diario)</th>
+                                            <th>Vendedor</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="draftsData.invoices.length === 0">
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted">No hay facturas en borrador para los filtros seleccionados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="draftsData.invoices" t-as="inv" t-key="inv.move_id">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;">
+                                                    <t t-esc="inv.numero === '/' ? 'Sin numerar' : inv.numero"/>
+                                                </td>
+                                                <td><t t-esc="inv.fecha"/></td>
+                                                <td><t t-esc="inv.tipo_doc"/></td>
+                                                <td><t t-esc="inv.cliente"/></td>
+                                                <td><t t-esc="inv.empresa"/></td>
+                                                <td><t t-esc="inv.diario"/></td>
+                                                <td><t t-esc="inv.vendedor"/></td>
+                                                <td style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(inv.total)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.draftPage === 1" t-on-click="prevDraftPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="state.draftPage"/> de <t t-esc="draftsData.pages"/> (Total: <t t-esc="draftsData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.draftPage >= draftsData.pages" t-on-click="nextDraftPage">Siguiente</button>
                             </div>
                         </div>
                     </section>

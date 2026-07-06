@@ -15,11 +15,10 @@ class AccountDashboardMetrics extends Component {
             startDate: "",
             endDate: "",
             company: "all",
-            journal: "all",
             docType: "all",
-            salesperson: "all",
             search: "",
             page: 1,
+            draftPage: 1,
             perPage: 15,
             activeTab: "general",
             loading: false,
@@ -29,9 +28,7 @@ class AccountDashboardMetrics extends Component {
 
         this.filtersData = useState({
             companies: [],
-            journals: [],
             doc_types: [],
-            salespersons: [],
             min_date: "",
             max_date: ""
         });
@@ -53,7 +50,6 @@ class AccountDashboardMetrics extends Component {
             },
             charts: {
                 invoicing_trend: { labels: [], companies: {}, timeframe: "Diario" },
-                by_journal: { labels: [], values: [] },
                 by_company: { labels: [], values: [] },
                 doc_types: { labels: [], counts: [], amounts: [] },
                 status: { labels: [], values: [] },
@@ -62,6 +58,13 @@ class AccountDashboardMetrics extends Component {
         });
 
         this.invoicesData = useState({
+            invoices: [],
+            page: 1,
+            pages: 1,
+            total: 0
+        });
+
+        this.draftsData = useState({
             invoices: [],
             page: 1,
             pages: 1,
@@ -109,9 +112,12 @@ class AccountDashboardMetrics extends Component {
     switchTab(tab) {
         this.state.activeTab = tab;
         this.state.page = 1;
+        this.state.draftPage = 1;
 
         if (tab === "invoices") {
             this.loadInvoices();
+        } else if (tab === "drafts") {
+            this.loadDrafts();
         } else if (tab === "general") {
             // Re-renderizar gráficos en pestaña general para ajustar dimensiones
             setTimeout(() => this.renderAllCharts(), 50);
@@ -132,9 +138,7 @@ class AccountDashboardMetrics extends Component {
         this.state.preset = "30days";
         this.setPresetDates("30days");
         this.state.company = "all";
-        this.state.journal = "all";
         this.state.docType = "all";
-        this.state.salesperson = "all";
         this.state.search = "";
         this.state.page = 1;
         await this.refreshData();
@@ -198,9 +202,7 @@ class AccountDashboardMetrics extends Component {
             start_date: this.state.startDate || null,
             end_date: this.state.endDate || null,
             company: this.state.company,
-            journal: this.state.journal,
-            doc_type: this.state.docType,
-            salesperson: this.state.salesperson
+            doc_type: this.state.docType
         };
     }
 
@@ -225,6 +227,8 @@ class AccountDashboardMetrics extends Component {
                 this.renderAllCharts();
             } else if (this.state.activeTab === "invoices") {
                 await this.loadInvoices();
+            } else if (this.state.activeTab === "drafts") {
+                await this.loadDrafts();
             }
 
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
@@ -247,6 +251,34 @@ class AccountDashboardMetrics extends Component {
             Object.assign(this.invoicesData, data);
         } catch (e) {
             console.error("Error al cargar comprobantes:", e);
+        }
+    }
+
+    async loadDrafts() {
+        try {
+            const data = await rpc("/account_management_metrics/raw_invoices", {
+                ...this.getFilterPayload(),
+                state: "draft",
+                page: this.state.draftPage,
+                per_page: this.state.perPage
+            });
+            Object.assign(this.draftsData, data);
+        } catch (e) {
+            console.error("Error al cargar facturas en borrador:", e);
+        }
+    }
+
+    async prevDraftPage() {
+        if (this.state.draftPage > 1) {
+            this.state.draftPage--;
+            await this.loadDrafts();
+        }
+    }
+
+    async nextDraftPage() {
+        if (this.state.draftPage < this.draftsData.pages) {
+            this.state.draftPage++;
+            await this.loadDrafts();
         }
     }
 
@@ -281,9 +313,7 @@ class AccountDashboardMetrics extends Component {
             start_date: this.state.startDate || '',
             end_date: this.state.endDate || '',
             company: this.state.company,
-            journal: this.state.journal,
             doc_type: this.state.docType,
-            salesperson: this.state.salesperson,
             search: this.state.search || ''
         });
         window.open(`/account_management_metrics/export?${params.toString()}`, '_blank');
@@ -375,26 +405,7 @@ class AccountDashboardMetrics extends Component {
             }
         });
 
-        // 2. Facturación por Sucursal (Diario / Punto de Venta)
-        this.createOrUpdateChart("chart-by-journal", "bar", {
-            labels: this.metricsData.charts.by_journal.labels.map(l => l.length > 25 ? l.substring(0, 22) + "..." : l),
-            datasets: [{
-                label: "Facturación",
-                data: this.metricsData.charts.by_journal.values,
-                backgroundColor: "rgba(59, 130, 246, 0.65)",
-                borderColor: "#3b82f6",
-                borderWidth: 1.5,
-                borderRadius: 4
-            }]
-        }, {
-            indexAxis: "y",
-            scales: {
-                x: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } },
-                y: { grid: { display: false } }
-            }
-        });
-
-        // 3. Cobros por Medio de Pago (Horizontal Bar - Porcentual)
+        // 2. Cobros por Medio de Pago (Horizontal Bar - Porcentual)
         const payValues = this.metricsData.charts.payment_methods.values;
         const totalPayment = payValues.reduce((a, b) => a + b, 0);
         const paymentLabels = this.metricsData.charts.payment_methods.labels.map((l) => {
