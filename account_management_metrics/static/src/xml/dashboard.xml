@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="account_management_metrics.DashboardTemplate">
+        <div t-att-class="'account-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+            <!-- Sidebar de Filtros (Glassmorphic) -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Invoicing Metrics</h2>
+                        <span>Metrics Hub</span>
+                    </div>
+                </div>
+
+                <!-- Rango de Fechas Predefinido -->
+                <div class="sidebar-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="preset-dates">
+                        <button t-att-class="'btn-preset ' + (state.preset === 'today' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('today')">Hoy</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'yesterday' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('yesterday')">Ayer</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('7days')">Últimos 7 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('30days')">Últimos 30 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '60days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('60days')">Últimos 60 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('90days')">Últimos 90 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'all' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('all')">Todo</button>
+                    </div>
+
+                    <div class="custom-date-inputs">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="date" t-att-value="state.startDate" t-on-change="onStartDateChange"/>
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="date" t-att-value="state.endDate" t-on-change="onEndDateChange"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+
+                    <div class="input-group">
+                        <label>Empresa</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.company">
+                                <option value="all">Todas las empresas</option>
+                                <t t-foreach="filtersData.companies" t-as="c" t-key="c.id">
+                                    <option t-att-value="c.id"><t t-esc="c.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Sucursal (Diario / Punto de Venta)</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.journal">
+                                <option value="all">Todas las sucursales</option>
+                                <t t-foreach="filtersData.journals" t-as="j" t-key="j.id">
+                                    <option t-att-value="j.id"><t t-esc="j.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Tipo de Comprobante</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.docType">
+                                <option value="all">Todos los tipos</option>
+                                <t t-foreach="filtersData.doc_types" t-as="d" t-key="d.id">
+                                    <option t-att-value="d.id"><t t-esc="d.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Vendedor</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.salesperson">
+                                <option value="all">Todos los vendedores</option>
+                                <t t-foreach="filtersData.salespersons" t-as="s" t-key="s.id">
+                                    <option t-att-value="s.id"><t t-esc="s.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer" style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
+                        <span>Aplicar</span>
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- Header -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <h1>Dashboard de Facturación</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <!-- Botón de Alternancia de Tema Día/Noche -->
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime">Cargando...</span>
+                        </div>
+
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="() => this.refreshData(true)" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'general' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('general')">Panel General</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'invoices' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('invoices')">Comprobantes</button>
+                </nav>
+
+                <!-- Tab Content Wrapper -->
+                <div class="tab-content">
+
+                    <!-- TAB: GENERAL -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'general' ? 'active' : '')">
+                        <!-- KPI Cards Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Facturación Total (Con IVA)</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.total_facturado)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Sin IVA: <t t-esc="formatCurrency(metricsData.kpis.total_facturado_neto)"/> (neta de NC)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Comprobantes Emitidos</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="14 2 14 8 20 8"></polyline>
+                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.comprobantes_emitidos.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Promedio por factura: <t t-esc="formatCurrency(metricsData.kpis.promedio_por_factura)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Notas de Crédito Emitidas</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="1 4 1 10 7 10"></polyline>
+                                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.nc_emitidas.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Monto: <t t-esc="formatCurrency(metricsData.kpis.monto_nc)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow orange">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Facturas en Borrador</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.borradores.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Monto pendiente de publicar: <t t-esc="formatCurrency(metricsData.kpis.monto_borradores)"/></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.canceladas &gt; 0 ? 'red' : 'green')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Facturas Canceladas</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.canceladas.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">
+                                            <t t-esc="formatCurrency(metricsData.kpis.monto_canceladas)"/> · Tasa: <t t-esc="metricsData.kpis.tasa_cancelacion"/>%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Grid -->
+                        <div class="charts-grid">
+                            <!-- Invoicing Trend -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Evolución Temporal de Facturación</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="badge" t-esc="metricsData.charts.invoicing_trend.timeframe || 'Diario'">Diario</span>
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text">
+                                                Muestra la facturación diaria publicada de cada empresa durante el período seleccionado (facturas menos notas de crédito). Ayuda a identificar patrones de crecimiento y estacionalidad en la emisión de comprobantes.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-invoicing-trend"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Payment Methods -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Cobros por Medio de Pago</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra la participación porcentual de cada medio de pago (diario de cobro: efectivo, banco, tarjeta) sobre los montos conciliados contra los comprobantes del período. Las notas de crédito restan del medio correspondiente.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-payment-methods"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- By Journal (Sucursal) -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Facturación por Sucursal</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra la facturación total publicada agrupada por diario de venta (punto de venta / sucursal), permitiendo comparar el rendimiento de cada sucursal en el período seleccionado.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-by-journal"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Doc Types -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Comprobantes por Tipo</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Cantidad de comprobantes emitidos por tipo de documento (Factura A, B, C, Notas de Crédito, Notas de Débito). El tooltip muestra además el monto total de cada tipo.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-doc-types"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Status Doughnut -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Distribución por Estado</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Distribución de los comprobantes del período según su estado: publicados, en borrador y cancelados. Un volumen alto de borradores o cancelaciones puede indicar problemas operativos en la emisión.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-status"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- By Company -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Facturación por Empresa</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Compara la facturación total publicada de cada empresa del grupo en el período seleccionado, neta de notas de crédito.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-by-company"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: COMPROBANTES -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'invoices' ? 'active' : '')">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Detalle de Comprobantes</h2>
+                                    <p class="subtitle">Auditoría de facturas y notas de crédito en todos sus estados</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Buscar número, cliente, vendedor..." t-on-input="onSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Número</th>
+                                            <th>Fecha</th>
+                                            <th>Tipo de Comprobante</th>
+                                            <th>Cliente</th>
+                                            <th>Empresa</th>
+                                            <th>Sucursal (Diario)</th>
+                                            <th>Vendedor</th>
+                                            <th>Estado</th>
+                                            <th>Total</th>
+                                            <th>Saldo Pendiente</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="invoicesData.invoices.length === 0">
+                                            <tr>
+                                                <td colspan="10" class="text-center text-muted">No se encontraron comprobantes registrados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="invoicesData.invoices" t-as="inv" t-key="inv.move_id">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="inv.numero"/></td>
+                                                <td><t t-esc="inv.fecha"/></td>
+                                                <td><t t-esc="inv.tipo_doc"/></td>
+                                                <td><t t-esc="inv.cliente"/></td>
+                                                <td><t t-esc="inv.empresa"/></td>
+                                                <td><t t-esc="inv.diario"/></td>
+                                                <td><t t-esc="inv.vendedor"/></td>
+                                                <td>
+                                                    <span t-att-class="'status-pill ' + inv.estado">
+                                                        <t t-esc="inv.estado_label"/>
+                                                    </span>
+                                                </td>
+                                                <td style="font-weight: 600; color: #fff;">
+                                                    <t t-if="inv.total &lt; 0">
+                                                        <span class="diff-negative"><t t-esc="formatCurrency(inv.total)"/></span>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <t t-esc="formatCurrency(inv.total)"/>
+                                                    </t>
+                                                </td>
+                                                <td><t t-esc="formatCurrency(inv.saldo)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="state.page"/> de <t t-esc="invoicesData.pages"/> (Total: <t t-esc="invoicesData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= invoicesData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>
