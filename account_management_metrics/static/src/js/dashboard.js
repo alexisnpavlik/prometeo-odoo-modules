@@ -406,7 +406,7 @@ class AccountDashboardMetrics extends Component {
             }
         });
 
-        // 2. Ventas Totales (POS) vs Facturado con AFIP
+        // 2. Ventas Totales (POS) vs Facturado con ARCA
         const vsData = this.metricsData.charts.sales_vs_invoiced;
         this.createOrUpdateChart("chart-sales-vs-invoiced", "line", {
             labels: vsData.labels,
@@ -423,7 +423,7 @@ class AccountDashboardMetrics extends Component {
                     pointHoverRadius: 6
                 },
                 {
-                    label: "Facturado (AFIP)",
+                    label: "Facturado (ARCA)",
                     data: vsData.facturado,
                     borderColor: "#3b82f6",
                     backgroundColor: "rgba(59, 130, 246, 0.08)",

@@ -278,7 +278,7 @@ class AccountMetricsController(http.Controller):
             "timeframe": "Diario",
         }
 
-        # 3. Ventas totales (POS) vs facturado con AFIP, por día
+        # 3. Ventas totales (POS) vs facturado con ARCA, por día
         # Detecta la venta no respaldada por comprobante fiscal: compara el total
         # vendido en el POS contra la facturación publicada (neta de NC).
         inv_by_date = {}
