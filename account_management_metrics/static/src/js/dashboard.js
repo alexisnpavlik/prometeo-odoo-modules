@@ -50,6 +50,7 @@ class AccountDashboardMetrics extends Component {
             },
             charts: {
                 invoicing_trend: { labels: [], companies: {}, timeframe: "Diario" },
+                sales_vs_invoiced: { labels: [], ventas: [], facturado: [], total_ventas: 0, total_facturado: 0, diferencia: 0 },
                 by_company: { labels: [], values: [] },
                 doc_types: { labels: [], counts: [], amounts: [] },
                 status: { labels: [], values: [] },
@@ -405,7 +406,66 @@ class AccountDashboardMetrics extends Component {
             }
         });
 
-        // 2. Cobros por Medio de Pago (Horizontal Bar - Porcentual)
+        // 2. Ventas Totales (POS) vs Facturado con AFIP
+        const vsData = this.metricsData.charts.sales_vs_invoiced;
+        this.createOrUpdateChart("chart-sales-vs-invoiced", "line", {
+            labels: vsData.labels,
+            datasets: [
+                {
+                    label: "Ventas Totales",
+                    data: vsData.ventas,
+                    borderColor: "#10b981",
+                    backgroundColor: "rgba(16, 185, 129, 0.08)",
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointBackgroundColor: "#10b981",
+                    pointHoverRadius: 6
+                },
+                {
+                    label: "Facturado (AFIP)",
+                    data: vsData.facturado,
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59, 130, 246, 0.08)",
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3,
+                    pointBackgroundColor: "#3b82f6",
+                    pointHoverRadius: 6
+                }
+            ]
+        }, {
+            plugins: {
+                legend: {
+                    display: true,
+                    position: "top",
+                    labels: {
+                        color: "#94a3b8",
+                        boxWidth: 12,
+                        boxHeight: 12,
+                        usePointStyle: true,
+                        pointStyle: "circle",
+                        font: { size: 11, weight: "bold" },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        footer: (items) => {
+                            if (items.length < 2) return "";
+                            const diff = (items[0].raw || 0) - (items[1].raw || 0);
+                            return `Diferencia: ${this.formatCurrency(diff)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: gridConfig },
+                y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
+            }
+        });
+
+        // 3. Cobros por Medio de Pago (Horizontal Bar - Porcentual)
         const payValues = this.metricsData.charts.payment_methods.values;
         const totalPayment = payValues.reduce((a, b) => a + b, 0);
         const paymentLabels = this.metricsData.charts.payment_methods.labels.map((l) => {

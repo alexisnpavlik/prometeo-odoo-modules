@@ -23,6 +23,9 @@ class AccountMetricsController(http.Controller):
         if not request.env.user.has_group("account_management_metrics.group_account_metrics_user"):
             raise AccessError("No tienes permisos para acceder a las métricas de facturación.")
 
+    def _get_timezone(self):
+        return request.env.user.tz or "America/Argentina/Buenos_Aires"
+
     def _resolve_names(self, model, ids):
         """Resuelve {id: display_name} vía ORM con sudo (solo lectura de etiquetas).
 
@@ -275,7 +278,50 @@ class AccountMetricsController(http.Controller):
             "timeframe": "Diario",
         }
 
-        # 3. Facturación por empresa
+        # 3. Ventas totales (POS) vs facturado con AFIP, por día
+        # Detecta la venta no respaldada por comprobante fiscal: compara el total
+        # vendido en el POS contra la facturación publicada (neta de NC).
+        inv_by_date = {}
+        for fecha, _cid, subtotal in trend_rows:
+            if fecha:
+                inv_by_date[fecha] = inv_by_date.get(fecha, 0.0) + float(subtotal or 0.0)
+
+        pos_by_date = {}
+        if "pos.order" in request.env:
+            tz = self._get_timezone()
+            pos_where = "po.state IN ('paid', 'done', 'invoiced') AND po.company_id IN %s"
+            pos_params = [tz, tuple(request.env.companies.ids)]
+            if company and company != "all":
+                pos_where += " AND po.company_id = %s"
+                pos_params.append(int(company))
+            if start_date:
+                pos_where += " AND po.date_order >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+                pos_params.extend([f"{start_date} 00:00:00", tz])
+            if end_date:
+                pos_where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+                pos_params.extend([f"{end_date} 23:59:59", tz])
+            cr.execute(f"""
+                SELECT (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS fecha,
+                       SUM(po.amount_total) AS total
+                FROM pos_order po
+                WHERE {pos_where}
+                GROUP BY fecha
+            """, pos_params)
+            pos_by_date = {r[0]: float(r[1] or 0.0) for r in cr.fetchall() if r[0]}
+
+        vs_dates = sorted(set(inv_by_date) | set(pos_by_date))
+        total_ventas = round(sum(pos_by_date.values()), 2)
+        total_facturado_vs = round(sum(inv_by_date.values()), 2)
+        sales_vs_invoiced = {
+            "labels": [d.strftime("%d/%m/%Y") for d in vs_dates],
+            "ventas": [round(pos_by_date.get(d, 0.0), 2) for d in vs_dates],
+            "facturado": [round(inv_by_date.get(d, 0.0), 2) for d in vs_dates],
+            "total_ventas": total_ventas,
+            "total_facturado": total_facturado_vs,
+            "diferencia": round(total_ventas - total_facturado_vs, 2),
+        }
+
+        # 4. Facturación por empresa
         cr.execute(f"""
             SELECT am.company_id, SUM(am.amount_total_signed) AS subtotal
             FROM account_move am
@@ -290,7 +336,7 @@ class AccountMetricsController(http.Controller):
             "values": [round(float(r[1] or 0.0), 2) for r in company_rows],
         }
 
-        # 4. Comprobantes emitidos por tipo (Factura A/B/C, NC, ND...)
+        # 5. Comprobantes emitidos por tipo (Factura A/B/C, NC, ND...)
         cr.execute(f"""
             SELECT am.l10n_latam_document_type_id,
                    COUNT(*) AS cantidad,
@@ -308,7 +354,7 @@ class AccountMetricsController(http.Controller):
             "amounts": [round(float(r[2] or 0.0), 2) for r in doc_rows],
         }
 
-        # 5. Distribución por estado (doughnut)
+        # 6. Distribución por estado (doughnut)
         cr.execute(f"""
             SELECT am.state, COUNT(*)
             FROM account_move am
@@ -321,7 +367,7 @@ class AccountMetricsController(http.Controller):
             "values": [state_data.get(s, 0) for s in ("posted", "draft", "cancel")],
         }
 
-        # 6. Cobros por medio de pago (sobre los comprobantes publicados filtrados)
+        # 7. Cobros por medio de pago (sobre los comprobantes publicados filtrados)
         cr.execute(f"""
             SELECT am.id FROM account_move am
             WHERE {where_clause} AND am.state = 'posted'
@@ -333,6 +379,7 @@ class AccountMetricsController(http.Controller):
             "kpis": kpis,
             "charts": {
                 "invoicing_trend": invoicing_trend,
+                "sales_vs_invoiced": sales_vs_invoiced,
                 "by_company": by_company,
                 "doc_types": doc_types_chart,
                 "status": status_chart,

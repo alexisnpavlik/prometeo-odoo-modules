@@ -271,6 +271,31 @@
                                 </div>
                             </div>
 
+                            <!-- Ventas vs Facturado -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Ventas Totales vs Facturado (AFIP)</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <span t-att-class="'badge ' + (metricsData.charts.sales_vs_invoiced.diferencia &gt; 0 ? 'text-red' : '')">
+                                            Diferencia: <t t-esc="formatCurrency(metricsData.charts.sales_vs_invoiced.diferencia)"/>
+                                        </span>
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text">
+                                                Compara el total vendido en el punto de venta contra la facturación fiscal publicada (neta de notas de crédito) de cada día. La brecha entre ambas líneas representa las ventas que no fueron respaldadas con un comprobante emitido ante AFIP.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-sales-vs-invoiced"></canvas>
+                                </div>
+                            </div>
+
                             <!-- Payment Methods -->
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
