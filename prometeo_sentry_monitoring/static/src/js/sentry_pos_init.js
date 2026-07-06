@@ -28,7 +28,7 @@ import { PosStore } from "@point_of_sale/app/store/pos_store";
         window.Sentry.init({
             dsn: dsn,
             sendDefaultPii: true,
-            environment: "pos",
+            environment: window.location.origin,
             tracesSampleRate: 0,
             beforeSend(event) {
                 // Add tags
@@ -46,7 +46,7 @@ import { PosStore } from "@point_of_sale/app/store/pos_store";
                 return event;
             }
         });
-        console.log("[SENTRY] Initialized successfully for POS. Environment: pos, DB:", session.db);
+        console.log("[SENTRY] Initialized successfully for POS. Environment:", window.location.origin, "DB:", session.db);
     } catch (error) {
         console.error("[SENTRY] Error loading or initializing Sentry for POS:", error);
     }

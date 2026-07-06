@@ -27,6 +27,40 @@ _logger = logging.getLogger(__name__)
 # Example match: .../local-addons/pos_sales_advisor/... -> pos_sales_advisor
 ADDON_REGEX = re.compile(r'(?:addons|local-addons|prometeo-addons)/([^/]+)/')
 
+# Cache of instance URL (web.base.url) per database, resolved lazily on first event
+_INSTANCE_URL_CACHE = {}
+
+
+def _get_instance_url(db_name):
+    """
+    Resuelve la URL de la instancia (web.base.url) para usarla como environment.
+    Se resuelve lazy en el primer evento (al init no hay DB disponible) y se
+    cachea por base de datos. Prioridad: SENTRY_ENVIRONMENT > web.base.url.
+    """
+    env_url = os.environ.get('SENTRY_ENVIRONMENT')
+    if env_url:
+        return env_url.strip()
+
+    if not db_name:
+        return None
+    if db_name in _INSTANCE_URL_CACHE:
+        return _INSTANCE_URL_CACHE[db_name]
+
+    url = None
+    try:
+        import odoo
+        registry = odoo.registry(db_name)
+        with registry.cursor() as cr:
+            cr.execute("SELECT value FROM ir_config_parameter WHERE key = 'web.base.url'")
+            row = cr.fetchone()
+            if row and row[0]:
+                url = row[0].strip()
+    except Exception:
+        url = None
+
+    if url:
+        _INSTANCE_URL_CACHE[db_name] = url
+    return url
 
 
 def before_send(event, hint):
@@ -41,6 +75,11 @@ def before_send(event, hint):
         if db_name:
             event['tags'] = event.get('tags') or {}
             event['tags']['db_name'] = db_name
+
+        # Environment = URL de la instancia, para distinguir origen entre sucursales
+        instance_url = _get_instance_url(db_name)
+        if instance_url:
+            event['environment'] = instance_url
 
         # 2. Parse traceback frames to discover module of origin
         exc_info = hint.get('exc_info') if hint else None

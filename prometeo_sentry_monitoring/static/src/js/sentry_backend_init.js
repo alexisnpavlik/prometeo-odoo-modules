@@ -31,7 +31,7 @@ import { loadJS } from "@web/core/assets";
         window.Sentry.init({
             dsn: dsn,
             sendDefaultPii: true,
-            environment: "backend",
+            environment: window.location.origin,
             tracesSampleRate: 0,
             beforeSend(event) {
                 // Add tags
@@ -46,7 +46,7 @@ import { loadJS } from "@web/core/assets";
                 return event;
             }
         });
-        console.log("[SENTRY] Initialized successfully for Backend. Environment: backend, DB:", session.db);
+        console.log("[SENTRY] Initialized successfully for Backend. Environment:", window.location.origin, "DB:", session.db);
     } catch (error) {
         console.error("[SENTRY] Error loading or initializing Sentry for Backend:", error);
     }
