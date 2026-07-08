@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_edit_product_defaults" model="res.groups">
+        <field name="name">Editar valores por defecto de producto</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Permite editar los campos que Product Default Settings deja bloqueados: Tipo de producto, Rastrear inventario, Política de facturación, Ventas, Compras y Punto de venta. Desactivado por defecto.</field>
+    </record>
+</odoo>

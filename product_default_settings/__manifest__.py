@@ -6,8 +6,11 @@
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["point_of_sale"],
-    "data": [],
+    "depends": ["point_of_sale", "sale", "purchase"],
+    "data": [
+        "security/security.xml",
+        "views/product_template_views.xml",
+    ],
     "installable": True,
     "auto_install": False,
     "application": False,
