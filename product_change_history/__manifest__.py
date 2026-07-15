@@ -13,11 +13,15 @@ y computados puros), incluyendo relacionales (many2one, many2many, one2many) que
 tracking nativo no cubre.
 
 Formato: una linea por campo cambiado -> "Etiqueta: valor viejo -> valor nuevo".
+
+Ademas registra los ajustes de inventario (stock.quant): al aplicar un ajuste,
+postea en el chatter de la plantilla "Ajuste de inventario: cantidad vieja ->
+nueva en <ubicacion>".
     """,
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["product", "mail"],
+    "depends": ["product", "mail", "stock"],
     "data": [],
     "installable": True,
     "auto_install": False,
