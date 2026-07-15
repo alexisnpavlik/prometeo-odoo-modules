@@ -11,7 +11,6 @@
 
             <div class="ppcm-filters">
                 <select t-model="state.company" t-on-change="onFilterChange">
-                    <option value="current">Mi empresa</option>
                     <option value="all">Todas las empresas</option>
                     <t t-foreach="filters.companies" t-as="c" t-key="c.id">
                         <option t-att-value="c.id"><t t-esc="c.name"/></option>

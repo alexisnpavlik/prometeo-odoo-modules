@@ -11,7 +11,7 @@ class PriceChangeDashboard extends Component {
     setup() {
         this.action = useService("action");
         this.state = useState({
-            company: "current",
+            company: "all",
             stateFilter: "pending",
             window: "30",
             category: "all",
