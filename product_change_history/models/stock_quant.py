@@ -43,19 +43,26 @@ class StockQuant(models.Model):
             template = snap["template"]
             if not template:
                 continue
-            variant = ""
-            if snap["product"] != template.product_variant_id or template.product_variant_count > 1:
-                variant = _(" (variante %s)", snap["product"].display_name)
-            lot = _(" [lote %s]", snap["lot"]) if snap["lot"] else ""
-            body = _(
-                "Ajuste de inventario%(variant)s%(lot)s: %(old)s → %(new)s %(uom)s en %(loc)s",
-                variant=variant,
-                lot=lot,
-                old=self._pch_fmt_qty(snap["old_qty"]),
-                new=self._pch_fmt_qty(snap["new_qty"]),
-                uom=snap["uom"],
-                loc=snap["location"],
-            )
-            template.message_post(body=body)
+            try:
+                variant = ""
+                if snap["product"] != template.product_variant_id or template.product_variant_count > 1:
+                    variant = _(" (variante %s)", snap["product"].display_name)
+                lot = _(" [lote %s]", snap["lot"]) if snap["lot"] else ""
+                body = _(
+                    "Ajuste de inventario%(variant)s%(lot)s: %(old)s → %(new)s %(uom)s en %(loc)s",
+                    variant=variant,
+                    lot=lot,
+                    old=self._pch_fmt_qty(snap["old_qty"]),
+                    new=self._pch_fmt_qty(snap["new_qty"]),
+                    uom=snap["uom"],
+                    loc=snap["location"],
+                )
+                template.message_post(body=body)
+            except Exception as e:
+                # El historial nunca debe abortar el ajuste de inventario.
+                _logger.warning(
+                    "product_change_history: fallo al registrar ajuste de %s: %s",
+                    template, e,
+                )
 
         return res

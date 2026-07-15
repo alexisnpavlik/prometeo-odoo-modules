@@ -75,6 +75,13 @@ class ProductTemplate(models.Model):
         res = super().write(vals)
 
         if candidates:
-            self._message_track(candidates, initial_values)
+            try:
+                self._message_track(candidates, initial_values)
+            except Exception as e:
+                # El historial nunca debe abortar el guardado del producto.
+                _logger.warning(
+                    "product_change_history: fallo al registrar cambios en %s: %s",
+                    self, e,
+                )
 
         return res
