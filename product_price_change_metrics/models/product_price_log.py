@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-import logging
-
-from odoo import _, api, fields, models
-
-_logger = logging.getLogger(__name__)
+from odoo import api, fields, models
 
 
 class ProductPriceLog(models.Model):
+    """Registro de cambios de precio de producto, para actualización de góndola."""
+
     _name = "product.price.log"
     _description = "Cambio de precio para actualización de góndola"
     _order = "change_date desc, id desc"

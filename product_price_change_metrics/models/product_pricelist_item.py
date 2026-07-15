@@ -64,10 +64,13 @@ class ProductPricelistItem(models.Model):
             old = old_state.get(item.id)
             if old is not None and old == snap:
                 continue
+            price_type, new_price = snap
+            if old is None and not new_price:
+                # Alta de item sin precio real (placeholder $0): no ensuciar la checklist.
+                continue
             tmpl = item.product_tmpl_id or item.product_id.product_tmpl_id
             if not tmpl:
                 continue
-            price_type, new_price = snap
             old_price = old[1] if old else 0.0
             company = item.pricelist_id.company_id
             if company:
