@@ -6,6 +6,11 @@
         <field name="comment">Permite ver la lista de productos con precio cambiado recientemente y marcarlos como actualizados en góndola.</field>
     </record>
 
+    <!-- Activa el acceso por defecto: todo usuario interno hereda el grupo. -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_price_change_metrics_user'))]"/>
+    </record>
+
     <record id="rule_price_log_company" model="ir.rule">
         <field name="name">product.price.log multi-company</field>
         <field name="model_id" ref="model_product_price_log"/>
