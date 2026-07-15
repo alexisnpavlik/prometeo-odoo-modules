@@ -1,0 +1,17 @@
+.ppcm-wrap { padding: 16px; font-size: 14px; }
+.ppcm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.ppcm-header h2 { margin: 0; }
+.ppcm-pending { font-weight: 600; background: #fff3cd; color: #664d03; padding: 6px 12px; border-radius: 6px; }
+.ppcm-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ppcm-filters select, .ppcm-filters input { padding: 6px 8px; border: 1px solid #ced4da; border-radius: 4px; }
+.ppcm-actions { margin-bottom: 12px; display: flex; gap: 8px; }
+.ppcm-table { width: 100%; border-collapse: collapse; }
+.ppcm-table th, .ppcm-table td { padding: 8px 10px; border-bottom: 1px solid #e9ecef; text-align: left; }
+.ppcm-table th { background: #f8f9fa; }
+.ppcm-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ppcm-up { color: #198754; }
+.ppcm-down { color: #dc3545; }
+.ppcm-done { opacity: 0.55; }
+.ppcm-empty { text-align: center; color: #6c757d; padding: 24px; }
+.ppcm-pager { margin-top: 12px; display: flex; gap: 12px; align-items: center; }
+.ppcm-pager button { padding: 4px 10px; }
