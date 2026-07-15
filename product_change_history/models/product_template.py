@@ -1,8 +1,12 @@
 import logging
 
-from odoo import models
+from odoo import _, models
 
 _logger = logging.getLogger(__name__)
+
+# Campos de imagen (binary) a registrar. El tracking nativo no soporta binary,
+# asi que en vez de "viejo -> nuevo" se postea una nota de actualizada/eliminada.
+_IMAGE_FIELDS = {"image_1920"}
 
 # Campos magicos / tecnicos que nunca se registran en el historial.
 _MAGIC_FIELDS = {
@@ -65,12 +69,17 @@ class ProductTemplate(models.Model):
         formato que el tracking de Odoo.
         """
         candidates = self._pch_candidate_fields(vals)
+        image_fields = [f for f in vals if f in _IMAGE_FIELDS]
         initial_values = {}
+        old_images = {}
         if candidates:
             for record in self:
                 initial_values[record.id] = {
                     fname: record[fname] for fname in candidates
                 }
+        if image_fields:
+            for record in self:
+                old_images[record.id] = {f: record[f] for f in image_fields}
 
         res = super().write(vals)
 
@@ -84,4 +93,28 @@ class ProductTemplate(models.Model):
                     self, e,
                 )
 
+        if image_fields:
+            self._pch_log_image_changes(image_fields, old_images)
+
         return res
+
+    def _pch_log_image_changes(self, image_fields, old_images):
+        """Postea una nota cuando cambia una imagen (campo binary sin tracking)."""
+        for record in self:
+            olds = old_images.get(record.id, {})
+            for fname in image_fields:
+                try:
+                    new_val = record[fname]
+                    if new_val == olds.get(fname):
+                        continue
+                    body = (
+                        _("Imagen del producto actualizada")
+                        if new_val
+                        else _("Imagen del producto eliminada")
+                    )
+                    record.message_post(body=body)
+                except Exception as e:
+                    _logger.warning(
+                        "product_change_history: fallo al registrar imagen de %s: %s",
+                        record, e,
+                    )
