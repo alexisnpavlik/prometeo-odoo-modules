@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ===================== Grupo (el "check") ===================== -->
+
+    <record id="group_product_company_restricted" model="res.groups">
+        <field name="name">Restringido a productos de su empresa</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Crea y edita únicamente productos de su propia empresa. Los productos globales (sin empresa) y los de otras empresas los ve en solo lectura; al crear un producto se le estampa automáticamente su compañía. La restricción se aplica a nivel ORM (create/write/unlink), por lo que se mantiene aunque el usuario tenga otros grupos (Inventario, Ventas, etc.).</field>
+    </record>
+
+</odoo>
