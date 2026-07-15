@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_price_change_metrics_user" model="res.groups">
+        <field name="name">Acceso a Cambios de Precio (Góndola)</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Permite ver la lista de productos con precio cambiado recientemente y marcarlos como actualizados en góndola.</field>
+    </record>
+
+    <record id="rule_price_log_company" model="ir.rule">
+        <field name="name">product.price.log multi-company</field>
+        <field name="model_id" ref="model_product_price_log"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+</odoo>
