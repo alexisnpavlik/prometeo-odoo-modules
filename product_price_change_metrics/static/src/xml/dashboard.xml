@@ -58,11 +58,12 @@
                         <th>Delta</th>
                         <th>Fecha</th>
                         <th>Estado</th>
+                        <th>Actualizado por</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr t-if="data.rows.length === 0">
-                        <td colspan="9" class="ppcm-empty">Sin cambios para los filtros seleccionados.</td>
+                        <td colspan="10" class="ppcm-empty">Sin cambios para los filtros seleccionados.</td>
                     </tr>
                     <tr t-foreach="data.rows" t-as="row" t-key="row.id"
                         t-att-class="row.state === 'done' ? 'ppcm-done' : ''">
@@ -87,6 +88,7 @@
                             <t t-if="row.state === 'done'">Actualizado</t>
                             <t t-else="">Pendiente</t>
                         </td>
+                        <td><t t-esc="row.done_by"/></td>
                     </tr>
                 </tbody>
             </table>
