@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="product_price_change_metrics.Dashboard">
+        <div class="ppcm-wrap">
+            <div class="ppcm-header">
+                <h2>Cambios de Precio — Góndola</h2>
+                <div class="ppcm-pending">
+                    <span t-esc="data.pending"/> pendientes de actualizar
+                </div>
+            </div>
+
+            <div class="ppcm-filters">
+                <select t-model="state.company" t-on-change="onFilterChange">
+                    <option value="current">Mi empresa</option>
+                    <option value="all">Todas las empresas</option>
+                    <t t-foreach="filters.companies" t-as="c" t-key="c.id">
+                        <option t-att-value="c.id"><t t-esc="c.name"/></option>
+                    </t>
+                </select>
+                <select t-model="state.stateFilter" t-on-change="onFilterChange">
+                    <option value="pending">Pendientes</option>
+                    <option value="done">Actualizados</option>
+                    <option value="all">Todos</option>
+                </select>
+                <select t-model="state.window" t-on-change="onFilterChange">
+                    <option value="7">Últimos 7 días</option>
+                    <option value="30">Últimos 30 días</option>
+                    <option value="90">Últimos 90 días</option>
+                    <option value="all">Todo</option>
+                </select>
+                <select t-model="state.category" t-on-change="onFilterChange">
+                    <option value="all">Todas las categorías</option>
+                    <t t-foreach="filters.categories" t-as="cat" t-key="cat.id">
+                        <option t-att-value="cat.id"><t t-esc="cat.name"/></option>
+                    </t>
+                </select>
+                <input type="text" placeholder="Buscar producto..."
+                       t-model="state.search" t-on-keyup="onFilterChange"/>
+            </div>
+
+            <div class="ppcm-actions">
+                <button class="btn btn-primary" t-on-click="() => this.markDone(true)">
+                    Marcar seleccionados como actualizados
+                </button>
+                <button class="btn btn-secondary" t-on-click="() => this.markDone(false)">
+                    Volver a pendiente
+                </button>
+            </div>
+
+            <table class="ppcm-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th>Origen</th>
+                        <th>Anterior</th>
+                        <th>Nuevo</th>
+                        <th>Δ</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-if="data.rows.length === 0">
+                        <td colspan="9" class="ppcm-empty">Sin cambios para los filtros seleccionados.</td>
+                    </tr>
+                    <tr t-foreach="data.rows" t-as="row" t-key="row.id"
+                        t-att-class="row.state === 'done' ? 'ppcm-done' : ''">
+                        <td>
+                            <input type="checkbox" t-att-checked="isSelected(row.id)"
+                                   t-on-change="() => this.toggleRow(row.id)"/>
+                        </td>
+                        <td>
+                            <a href="#" t-on-click.prevent="() => this.openProduct(row.product_tmpl_id)">
+                                <t t-esc="row.product"/>
+                            </a>
+                        </td>
+                        <td><t t-esc="row.category"/></td>
+                        <td><t t-esc="row.source"/></td>
+                        <td class="ppcm-num"><t t-esc="row.old_price"/></td>
+                        <td class="ppcm-num"><t t-esc="row.new_price"/></td>
+                        <td t-att-class="'ppcm-num ' + (row.diff_amount >= 0 ? 'ppcm-up' : 'ppcm-down')">
+                            <t t-esc="row.diff_amount"/>
+                        </td>
+                        <td><t t-esc="row.date"/></td>
+                        <td>
+                            <t t-if="row.state === 'done'">Actualizado</t>
+                            <t t-else="">Pendiente</t>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="ppcm-pager">
+                <button t-on-click="() => this.goToPage(data.page - 1)" t-att-disabled="data.page &lt;= 1">◀</button>
+                <span><t t-esc="data.page"/> / <t t-esc="data.pages"/> (<t t-esc="data.total"/>)</span>
+                <button t-on-click="() => this.goToPage(data.page + 1)" t-att-disabled="data.page >= data.pages">▶</button>
+            </div>
+        </div>
+    </t>
+</templates>

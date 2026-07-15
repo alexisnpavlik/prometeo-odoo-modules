@@ -1,3 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="action_price_change_dashboard" model="ir.actions.client">
+        <field name="name">Cambios de Precio</field>
+        <field name="tag">product_price_change_metrics.dashboard</field>
+    </record>
+
+    <menuitem id="menu_price_change_root"
+              name="Cambios de Precio"
+              action="action_price_change_dashboard"
+              groups="product_price_change_metrics.group_price_change_metrics_user"
+              web_icon="product_price_change_metrics,static/description/icon.png"
+              sequence="52"/>
 </odoo>
