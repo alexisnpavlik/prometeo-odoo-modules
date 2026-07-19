@@ -150,29 +150,41 @@ class StockCountSession(models.Model):
             )
 
         quants = self.env["stock.quant"]
+        applied = 0
         failed = 0
         for line in self.line_ids:
+            error_msg = False
             try:
-                quants |= line._apply_line()
-                if line.error:
-                    failed += 1
+                with self.env.cr.savepoint():
+                    line_quants = line._apply_line()
+                    if line.error:
+                        failed += 1
+                    else:
+                        quants |= line_quants
+                        applied += 1
             except Exception as e:
-                line.error = str(e)
+                # El savepoint revierte la escritura de line.error, así que se
+                # persiste después, fuera de su alcance.
+                error_msg = str(e)
                 failed += 1
                 _logger.exception(
                     "Conteo %s: falló la línea del producto %s",
                     self.name,
                     line.product_id.display_name,
                 )
+            if error_msg:
+                line.error = error_msg
 
         if quants:
-            quants.with_context(inventory_mode=True).action_apply_inventory()
+            quants.with_context(
+                inventory_mode=True, set_inventory_quantity_auto_apply=True
+            ).action_apply_inventory()
 
         self.write({"state": "applied", "date_applied": fields.Datetime.now()})
         _logger.info(
             "Conteo %s aplicado: %s líneas ajustadas, %s con error",
             self.name,
-            len(quants),
+            applied,
             failed,
         )
         return True

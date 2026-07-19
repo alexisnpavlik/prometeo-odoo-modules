@@ -128,6 +128,15 @@ class StockCountLine(models.Model):
         """
         self.ensure_one()
         self.error = False
+
+        if self.product_id.tracking != "none":
+            self.error = _(
+                "El producto '%s' se maneja por lotes o números de serie. "
+                "Ajustalo a mano desde Inventario.",
+                self.product_id.display_name,
+            )
+            return self.env["stock.quant"]
+
         quants = self._get_quants()
 
         if len(quants) > 1:
@@ -137,12 +146,6 @@ class StockCountLine(models.Model):
                 len(quants),
             )
             return self.env["stock.quant"]
-
-        quant_model = (
-            self.env["stock.quant"]
-            .with_company(self.company_id)
-            .with_context(inventory_mode=True)
-        )
 
         if quants:
             quant = quants.with_company(self.company_id).with_context(
@@ -154,6 +157,11 @@ class StockCountLine(models.Model):
         if self.counted_qty <= 0:
             return self.env["stock.quant"]
 
+        quant_model = (
+            self.env["stock.quant"]
+            .with_company(self.company_id)
+            .with_context(inventory_mode=True)
+        )
         return quant_model.create(
             {
                 "product_id": self.product_id.id,
