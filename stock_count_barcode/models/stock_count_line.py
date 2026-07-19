@@ -110,6 +110,10 @@ class StockCountLine(models.Model):
         producto, ubicación) y se hace un único _read_group sobre
         stock.quant por cada combinación de empresa/ubicación presente,
         repartiendo los totales a cada línea.
+
+        Igual que _get_quants(), esto lee la ubicación exacta y no baja a
+        las hijas: si algún día se crean sublocaciones de estante, hay que
+        corregir los dos lugares, no uno solo.
         """
         results_by_key = {}
         # Agrupamos por (company_id, location_id) para respetar el contexto
@@ -155,6 +159,28 @@ class StockCountLine(models.Model):
                         line.product_id.display_name,
                     )
                 )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Impide agregar líneas a una sesión que no está en borrador.
+
+        Sin esto se podría sumar por RPC una línea a un conteo ya aplicado:
+        no movería stock, pero contaminaría el registro de qué se contó,
+        que es justamente lo que unlink() y write() protegen.
+        """
+        sessions = self.env["stock.count.session"].browse(
+            [vals["session_id"] for vals in vals_list if vals.get("session_id")]
+        )
+        for session in sessions:
+            if session.state != "draft":
+                raise UserError(
+                    _(
+                        "No se pueden agregar líneas a la sesión '%s': no "
+                        "está en borrador.",
+                        session.name,
+                    )
+                )
+        return super().create(vals_list)
 
     def unlink(self):
         """Impide borrar una línea cuya sesión no está en borrador.

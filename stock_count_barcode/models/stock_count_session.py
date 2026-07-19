@@ -105,18 +105,12 @@ class StockCountSession(models.Model):
                     )
                 )
 
-    # Campos que action_apply() puede escribir sobre una sesión sin que se
-    # considere una edición de negocio (la transición de estado en sí).
-    _APPLIED_WRITE_ALLOWED_FIELDS = {"state", "date_applied"}
-
     def write(self, vals):
         """Bloquea empresa/ubicación con líneas cargadas, y edición de sesiones aplicadas.
 
         Una sesión aplicada ya movió stock real: permitir que se edite o
         borre por RPC falsificaría el registro de qué se contó y quién lo
-        aplicó. Solo se permite que action_apply() escriba state/date_applied
-        durante la propia transición (ocurre mientras el estado todavía es
-        'draft', antes de este write).
+        aplicó.
         """
         locked_fields = {"company_id", "location_id"}
         if locked_fields & set(vals):
@@ -130,17 +124,24 @@ class StockCountSession(models.Model):
                             session.name,
                         )
                     )
-        if set(vals) - self._APPLIED_WRITE_ALLOWED_FIELDS:
-            for session in self:
-                if session.state == "applied":
-                    raise UserError(
-                        _(
-                            "No se puede modificar la sesión '%s': ya fue "
-                            "aplicada y el registro del conteo no se puede "
-                            "alterar.",
-                            session.name,
-                        )
+        # Ningún campo es escribible una vez aplicada, ni siquiera 'state' o
+        # 'date_applied'. No hace falta whitelist para action_apply(): su
+        # propio write ocurre mientras el estado todavía es 'draft', así que
+        # nunca entra acá. Dejar 'state' pasar permitiría reabrir la sesión
+        # con un write crudo por RPC, esquivando action_reset_to_draft() y
+        # habilitando re-aplicar cantidades viejas contra el stock actual;
+        # dejar pasar 'date_applied' permitiría falsificar el sello de
+        # auditoría.
+        for session in self:
+            if session.state == "applied":
+                raise UserError(
+                    _(
+                        "No se puede modificar la sesión '%s': ya fue "
+                        "aplicada y el registro del conteo no se puede "
+                        "alterar. Corregí el conteo con una sesión nueva.",
+                        session.name,
                     )
+                )
         return super().write(vals)
 
     def unlink(self):
