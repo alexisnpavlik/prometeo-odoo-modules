@@ -115,3 +115,49 @@ class StockCountLine(models.Model):
                         line.product_id.display_name,
                     )
                 )
+
+    def _apply_line(self):
+        """Prepara el quant de esta línea con la cantidad contada.
+
+        No aplica el ajuste: solo escribe inventory_quantity. El que aplica es
+        action_apply_inventory() sobre el conjunto de quants, en la sesión.
+
+        Devuelve el quant preparado, o un recordset vacío si no hay nada que
+        ajustar. Si la línea no se puede aplicar, setea self.error y devuelve
+        un recordset vacío.
+        """
+        self.ensure_one()
+        self.error = False
+        quants = self._get_quants()
+
+        if len(quants) > 1:
+            self.error = _(
+                "El producto tiene %s quants en la ubicación (lotes, series o "
+                "paquetes). Ajustalo a mano desde Inventario.",
+                len(quants),
+            )
+            return self.env["stock.quant"]
+
+        quant_model = (
+            self.env["stock.quant"]
+            .with_company(self.company_id)
+            .with_context(inventory_mode=True)
+        )
+
+        if quants:
+            quant = quants.with_company(self.company_id).with_context(
+                inventory_mode=True
+            )
+            quant.inventory_quantity = self.counted_qty
+            return quant
+
+        if self.counted_qty <= 0:
+            return self.env["stock.quant"]
+
+        return quant_model.create(
+            {
+                "product_id": self.product_id.id,
+                "location_id": self.location_id.id,
+                "inventory_quantity": self.counted_qty,
+            }
+        )

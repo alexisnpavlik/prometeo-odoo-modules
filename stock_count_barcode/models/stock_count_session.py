@@ -125,3 +125,54 @@ class StockCountSession(models.Model):
                 )
         self.write({"state": "draft"})
         return True
+
+    def action_apply(self):
+        """Aplica el conteo como ajuste de inventario nativo.
+
+        Las líneas que fallan quedan marcadas con su error y no frenan a las
+        demás: abortar toda la sesión por un producto con lotes obligaría a
+        recontar la ubicación entera.
+        """
+        self.ensure_one()
+        self._check_draft()
+
+        if not self.env.user.has_group("stock.group_stock_manager"):
+            raise UserError(
+                _(
+                    "Solo un administrador de inventario puede aplicar un "
+                    "conteo. Pedile a un responsable que la aplique."
+                )
+            )
+
+        if not self.line_ids:
+            raise UserError(
+                _("La sesión '%s' no tiene líneas para aplicar.", self.name)
+            )
+
+        quants = self.env["stock.quant"]
+        failed = 0
+        for line in self.line_ids:
+            try:
+                quants |= line._apply_line()
+                if line.error:
+                    failed += 1
+            except Exception as e:
+                line.error = str(e)
+                failed += 1
+                _logger.exception(
+                    "Conteo %s: falló la línea del producto %s",
+                    self.name,
+                    line.product_id.display_name,
+                )
+
+        if quants:
+            quants.with_context(inventory_mode=True).action_apply_inventory()
+
+        self.write({"state": "applied", "date_applied": fields.Datetime.now()})
+        _logger.info(
+            "Conteo %s aplicado: %s líneas ajustadas, %s con error",
+            self.name,
+            len(quants),
+            failed,
+        )
+        return True
