@@ -1,3 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="view_stock_count_session_list" model="ir.ui.view">
+        <field name="name">stock.count.session.list</field>
+        <field name="model">stock.count.session</field>
+        <field name="arch" type="xml">
+            <list string="Conteos de stock">
+                <field name="name"/>
+                <field name="location_id"/>
+                <field name="user_id"/>
+                <field name="date_start"/>
+                <field name="line_count"/>
+                <field name="diff_count"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'applied'"
+                       decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_stock_count_session_form" model="ir.ui.view">
+        <field name="name">stock.count.session.form</field>
+        <field name="model">stock.count.session</field>
+        <field name="arch" type="xml">
+            <form string="Conteo de stock" class="o_stock_count_form">
+                <header>
+                    <button name="action_apply" type="object" string="Aplicar"
+                            class="btn-primary" invisible="state != 'draft'"
+                            groups="stock.group_stock_manager"
+                            confirm="Se van a ajustar las cantidades contadas. ¿Aplicar el conteo?"/>
+                    <button name="action_cancel" type="object" string="Cancelar"
+                            invisible="state != 'draft'"/>
+                    <button name="action_reset_to_draft" type="object"
+                            string="Volver a borrador" invisible="state != 'cancelled'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"
+                                   readonly="line_count > 0 or state != 'draft'"/>
+                            <field name="location_id"
+                                   readonly="line_count > 0 or state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="user_id" readonly="state != 'draft'"/>
+                            <field name="date_start"/>
+                            <field name="date_applied" invisible="state != 'applied'"/>
+                            <field name="line_count"/>
+                            <field name="diff_count"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Conteo" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom" create="0">
+                                    <field name="product_id" readonly="1"/>
+                                    <field name="barcode" optional="show"/>
+                                    <field name="counted_qty"/>
+                                    <field name="theoretical_qty" readonly="1"/>
+                                    <field name="difference_qty" readonly="1"
+                                           decoration-danger="difference_qty != 0"/>
+                                    <field name="uom_id" optional="hide"/>
+                                    <field name="error" readonly="1" optional="show"
+                                           decoration-danger="error"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_stock_count_session_search" model="ir.ui.view">
+        <field name="name">stock.count.session.search</field>
+        <field name="model">stock.count.session</field>
+        <field name="arch" type="xml">
+            <search string="Conteos">
+                <field name="name"/>
+                <field name="location_id"/>
+                <field name="user_id"/>
+                <filter name="filter_draft" string="Borrador"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_applied" string="Aplicados"
+                        domain="[('state', '=', 'applied')]"/>
+                <filter name="filter_mine" string="Mis conteos"
+                        domain="[('user_id', '=', uid)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_location" string="Ubicación"
+                            context="{'group_by': 'location_id'}"/>
+                    <filter name="group_user" string="Usuario"
+                            context="{'group_by': 'user_id'}"/>
+                    <filter name="group_state" string="Estado"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_stock_count_session" model="ir.actions.act_window">
+        <field name="name">Conteos de stock</field>
+        <field name="res_model">stock.count.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_stock_count_session_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Creá tu primer conteo</p>
+            <p>Elegí una ubicación, escaneá los productos con la cámara y cargá
+               la cantidad real contada. Al aplicar, las diferencias se ajustan
+               en el inventario.</p>
+        </field>
+    </record>
+
+    <!-- Formulario de carga rápida de cantidad, abierto tras cada escaneo -->
+    <record id="view_stock_count_line_quick_form" model="ir.ui.view">
+        <field name="name">stock.count.line.quick.form</field>
+        <field name="model">stock.count.line</field>
+        <field name="arch" type="xml">
+            <form string="Cantidad contada" class="o_stock_count_quick_form">
+                <sheet>
+                    <div class="oe_title">
+                        <h2><field name="product_id" readonly="1" options="{'no_open': True}"/></h2>
+                    </div>
+                    <group>
+                        <field name="counted_qty" class="o_stock_count_qty_input"/>
+                        <field name="theoretical_qty" readonly="1"/>
+                        <field name="uom_id" readonly="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirmar" special="save" class="btn-primary"/>
+                    <button string="Descartar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
 </odoo>

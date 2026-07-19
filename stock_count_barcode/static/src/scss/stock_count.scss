@@ -1,1 +1,17 @@
-// estilos del conteo de stock
+// Conteo de stock — ajustes para pantalla de teléfono
+.o_stock_count_form {
+    .o_stock_count_scan_button {
+        width: 100%;
+        min-height: 3.5rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+}
+
+.o_stock_count_quick_form {
+    .o_stock_count_qty_input input {
+        font-size: 1.5rem;
+        text-align: right;
+    }
+}

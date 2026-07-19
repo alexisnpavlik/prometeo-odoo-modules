@@ -1,3 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <menuitem id="menu_stock_count_session"
+              name="Conteos de stock"
+              parent="stock.menu_stock_warehouse_mgmt"
+              action="action_stock_count_session"
+              groups="stock.group_stock_user"
+              sequence="95"/>
 </odoo>
