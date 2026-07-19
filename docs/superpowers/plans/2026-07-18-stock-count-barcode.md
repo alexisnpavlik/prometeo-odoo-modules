@@ -25,6 +25,7 @@
 - **Toda escritura/creación de `stock.quant` requiere `.with_context(inventory_mode=True)`**, si no Odoo rechaza los campos de inventario.
 - En `data` del manifiesto, `security/*` siempre antes que `views/*`.
 - **Sin tests automatizados** — el repo no tiene suite. Cada tarea cierra con verificación manual en el contenedor.
+- **`--no-http` es obligatorio** en todo `odoo -i/-u`: el puerto 8069 ya lo tiene el proceso principal del contenedor y sin ese flag el comando falla.
 - Contenedor local: `odoo-odoo-1` (Postgres en `odoo-postgres18-1`). Bases disponibles: **`prod`** (producción) y `calidad`. Este plan usa **`calidad`** — nunca `prod`; `docker` corre sin `sudo`.
 - **Las pruebas de shell terminan con `env.cr.rollback()`.** Se prueba contra `calidad`: no dejes datos de prueba.
 
@@ -554,7 +555,7 @@ Un asset declarado en el manifiesto que no existe rompe el arranque del webclien
 - [ ] **Step 5: Instalar el módulo**
 
 ```bash
-docker exec odoo-odoo-1 odoo -i stock_count_barcode -d calidad --stop-after-init
+docker exec odoo-odoo-1 odoo -i stock_count_barcode -d calidad --stop-after-init --no-http
 ```
 
 Esperado: termina sin traceback, con líneas de log del tipo `loading stock_count_barcode/...` y `Modules loaded.`
@@ -712,7 +713,7 @@ Esperado: `ok`.
 - [ ] **Step 4: Actualizar el módulo y probar desde el shell**
 
 ```bash
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init --no-http
 ```
 
 Esperado: sin traceback.
@@ -962,7 +963,7 @@ El botón **Aplicar** vive en el `<header>`, no al pie de la lista: en un conteo
 ```bash
 cd /home/alexis/Documents/Github/prometeo-odoo-modules
 python3 -c "import xml.dom.minidom as m; m.parse('stock_count_barcode/views/stock_count_session_views.xml'); m.parse('stock_count_barcode/views/menu_views.xml'); print('xml ok')"
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init --no-http
 ```
 
 Esperado: `xml ok` y actualización sin traceback.
@@ -1202,7 +1203,7 @@ En `views/stock_count_session_views.xml`, dentro de `view_stock_count_session_fo
 cd /home/alexis/Documents/Github/prometeo-odoo-modules
 python3 -c "import xml.dom.minidom as m; m.parse('stock_count_barcode/views/stock_count_session_views.xml'); m.parse('stock_count_barcode/static/src/xml/scan_button.xml'); print('xml ok')"
 python3 -c "import ast; ast.parse(open('stock_count_barcode/models/stock_count_session.py').read()); print('py ok')"
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init --no-http
 ```
 
 Esperado: `xml ok`, `py ok`, actualización sin traceback.
