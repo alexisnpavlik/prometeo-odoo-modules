@@ -25,8 +25,8 @@
 - **Toda escritura/creación de `stock.quant` requiere `.with_context(inventory_mode=True)`**, si no Odoo rechaza los campos de inventario.
 - En `data` del manifiesto, `security/*` siempre antes que `views/*`.
 - **Sin tests automatizados** — el repo no tiene suite. Cada tarea cierra con verificación manual en el contenedor.
-- Contenedor local: `odoo-odoo-1` (Postgres en `odoo-postgres18-1`). Bases disponibles: **`prod`** (producción) y `calidad`. Este plan usa `prod`, que es contra la que hay que verificar; `docker` corre sin `sudo`.
-- **Las pruebas de shell terminan con `env.cr.rollback()`.** Se prueba contra `prod`: no dejes datos de prueba.
+- Contenedor local: `odoo-odoo-1` (Postgres en `odoo-postgres18-1`). Bases disponibles: **`prod`** (producción) y `calidad`. Este plan usa **`calidad`** — nunca `prod`; `docker` corre sin `sudo`.
+- **Las pruebas de shell terminan con `env.cr.rollback()`.** Se prueba contra `calidad`: no dejes datos de prueba.
 
 ---
 
@@ -554,7 +554,7 @@ Un asset declarado en el manifiesto que no existe rompe el arranque del webclien
 - [ ] **Step 5: Instalar el módulo**
 
 ```bash
-docker exec odoo-odoo-1 odoo -i stock_count_barcode -d prod --stop-after-init
+docker exec odoo-odoo-1 odoo -i stock_count_barcode -d calidad --stop-after-init
 ```
 
 Esperado: termina sin traceback, con líneas de log del tipo `loading stock_count_barcode/...` y `Modules loaded.`
@@ -562,9 +562,9 @@ Esperado: termina sin traceback, con líneas de log del tipo `loading stock_coun
 - [ ] **Step 6: Verificar que los modelos y la secuencia existen**
 
 ```bash
-docker exec odoo-postgres18-1 psql -U odoo -d prod -tAc \
+docker exec odoo-postgres18-1 psql -U odoo -d calidad -tAc \
   "select model from ir_model where model in ('stock.count.session','stock.count.line') order by model"
-docker exec odoo-postgres18-1 psql -U odoo -d prod -tAc \
+docker exec odoo-postgres18-1 psql -U odoo -d calidad -tAc \
   "select prefix from ir_sequence where code='stock.count.session'"
 ```
 
@@ -712,7 +712,7 @@ Esperado: `ok`.
 - [ ] **Step 4: Actualizar el módulo y probar desde el shell**
 
 ```bash
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d prod --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
 ```
 
 Esperado: sin traceback.
@@ -720,7 +720,7 @@ Esperado: sin traceback.
 Ahora probá el ciclo completo en el shell de Odoo. Reemplazá `<ubicacion_id>` por el id de una ubicación interna real y `<producto_id>` por un producto **sin lotes** con stock en esa ubicación.
 
 ```bash
-docker exec -i odoo-odoo-1 odoo shell -d prod --no-http <<'PY'
+docker exec -i odoo-odoo-1 odoo shell -d calidad --no-http <<'PY'
 session = env['stock.count.session'].create({
     'location_id': <ubicacion_id>,
 })
@@ -962,7 +962,7 @@ El botón **Aplicar** vive en el `<header>`, no al pie de la lista: en un conteo
 ```bash
 cd /home/alexis/Documents/Github/prometeo-odoo-modules
 python3 -c "import xml.dom.minidom as m; m.parse('stock_count_barcode/views/stock_count_session_views.xml'); m.parse('stock_count_barcode/views/menu_views.xml'); print('xml ok')"
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d prod --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
 ```
 
 Esperado: `xml ok` y actualización sin traceback.
@@ -1202,7 +1202,7 @@ En `views/stock_count_session_views.xml`, dentro de `view_stock_count_session_fo
 cd /home/alexis/Documents/Github/prometeo-odoo-modules
 python3 -c "import xml.dom.minidom as m; m.parse('stock_count_barcode/views/stock_count_session_views.xml'); m.parse('stock_count_barcode/static/src/xml/scan_button.xml'); print('xml ok')"
 python3 -c "import ast; ast.parse(open('stock_count_barcode/models/stock_count_session.py').read()); print('py ok')"
-docker exec odoo-odoo-1 odoo -u stock_count_barcode -d prod --stop-after-init
+docker exec odoo-odoo-1 odoo -u stock_count_barcode -d calidad --stop-after-init
 ```
 
 Esperado: `xml ok`, `py ok`, actualización sin traceback.
