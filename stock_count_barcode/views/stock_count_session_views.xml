@@ -57,6 +57,8 @@
                         </group>
                     </group>
 
+                    <widget name="stock_count_scan_button" invisible="state != 'draft'"/>
+
                     <notebook>
                         <page string="Conteo" name="lines">
                             <field name="line_ids" readonly="state != 'draft'">

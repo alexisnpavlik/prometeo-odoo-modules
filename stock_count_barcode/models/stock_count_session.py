@@ -188,3 +188,54 @@ class StockCountSession(models.Model):
             failed,
         )
         return True
+
+    def action_scan_barcode(self, barcode):
+        """Procesa un código escaneado y devuelve la acción para cargar cantidad.
+
+        Si el producto ya está en la sesión, se reutiliza su línea en vez de
+        crear una nueva: el usuario ve el total cargado y decide.
+        """
+        self.ensure_one()
+        self._check_draft()
+
+        barcode = (barcode or "").strip()
+        if not barcode:
+            return {"error": _("No se leyó ningún código.")}
+
+        product = (
+            self.env["product.product"]
+            .with_company(self.company_id)
+            .search([("barcode", "=", barcode)], limit=1)
+        )
+        if not product:
+            return {
+                "error": _("No hay ningún producto con el código %s.", barcode)
+            }
+
+        line = self.line_ids.filtered(lambda l: l.product_id == product)[:1]
+        if not line:
+            line = self.env["stock.count.line"].create(
+                {
+                    "session_id": self.id,
+                    "product_id": product.id,
+                    "counted_qty": 0.0,
+                }
+            )
+
+        return {
+            "action": {
+                "type": "ir.actions.act_window",
+                "res_model": "stock.count.line",
+                "res_id": line.id,
+                "views": [
+                    (
+                        self.env.ref(
+                            "stock_count_barcode.view_stock_count_line_quick_form"
+                        ).id,
+                        "form",
+                    )
+                ],
+                "target": "new",
+                "name": product.display_name,
+            }
+        }

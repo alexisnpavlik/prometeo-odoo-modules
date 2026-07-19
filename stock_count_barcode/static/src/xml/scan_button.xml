@@ -1,3 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
+
+    <t t-name="stock_count_barcode.ScanButton">
+        <div class="o_stock_count_scan">
+            <button type="button"
+                    class="btn btn-primary o_stock_count_scan_button"
+                    t-if="state.cameraSupported"
+                    t-att-disabled="disabled"
+                    t-on-click="onScanClick">
+                <i class="fa fa-camera me-2"/>Escanear producto
+            </button>
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Código de barras"
+                       t-att-disabled="disabled"
+                       t-model="state.manual"
+                       t-on-keydown="onManualSubmit"/>
+                <button type="button"
+                        class="btn btn-secondary"
+                        t-att-disabled="disabled"
+                        t-on-click="onManualSubmit">
+                    Cargar
+                </button>
+            </div>
+        </div>
+    </t>
+
 </templates>
