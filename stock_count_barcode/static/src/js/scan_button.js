@@ -16,7 +16,6 @@ export class StockCountScanButton extends Component {
         this.orm = useService("orm");
         this.action = useService("action");
         this.notification = useService("notification");
-        this.dialog = useService("dialog");
         this.state = useState({
             cameraSupported: isBarcodeScannerSupported(),
             manual: "",
@@ -32,14 +31,22 @@ export class StockCountScanButton extends Component {
      * Abre la cámara, lee un código y lo procesa.
      */
     async onScanClick() {
-        let barcode;
-        try {
-            barcode = await scanBarcode(this.env);
-        } catch {
-            // El usuario cerró el escáner o denegó la cámara: no es un error.
+        if (this.state.busy) {
             return;
         }
-        await this.processBarcode(barcode);
+        this.state.busy = true;
+        try {
+            let barcode;
+            try {
+                barcode = await scanBarcode(this.env);
+            } catch {
+                // El usuario cerró el escáner o denegó la cámara: no es un error.
+                return;
+            }
+            await this.processBarcode(barcode);
+        } finally {
+            this.state.busy = false;
+        }
     }
 
     /**
@@ -49,40 +56,46 @@ export class StockCountScanButton extends Component {
         if (ev.key && ev.key !== "Enter") {
             return;
         }
-        const barcode = this.state.manual;
-        this.state.manual = "";
-        await this.processBarcode(barcode);
+        if (this.state.busy) {
+            return;
+        }
+        this.state.busy = true;
+        try {
+            const barcode = this.state.manual;
+            this.state.manual = "";
+            await this.processBarcode(barcode);
+        } finally {
+            this.state.busy = false;
+        }
     }
 
     /**
      * Guarda la sesión, manda el código al servidor y abre la carga de cantidad.
      */
     async processBarcode(barcode) {
-        if (!barcode || this.state.busy) {
+        if (!barcode) {
             return;
         }
-        this.state.busy = true;
-        try {
-            // La sesión tiene que estar guardada: el servidor crea la línea.
-            await this.props.record.save();
-            const result = await this.orm.call(
-                "stock.count.session",
-                "action_scan_barcode",
-                [this.props.record.resId, barcode]
-            );
-            if (result.error) {
-                this.notification.add(result.error, {
-                    type: "warning",
-                    title: _t("Código no reconocido"),
-                });
-                return;
-            }
-            await this.action.doAction(result.action, {
-                onClose: () => this.props.record.load(),
-            });
-        } finally {
-            this.state.busy = false;
+        // La sesión tiene que estar guardada: el servidor crea la línea.
+        const saved = await this.props.record.save();
+        if (!saved) {
+            return;
         }
+        const result = await this.orm.call(
+            "stock.count.session",
+            "action_scan_barcode",
+            [this.props.record.resId, barcode]
+        );
+        if (result.error) {
+            this.notification.add(result.error, {
+                type: "warning",
+                title: _t("Código no reconocido"),
+            });
+            return;
+        }
+        await this.action.doAction(result.action, {
+            onClose: () => this.props.record.load(),
+        });
     }
 }
 
