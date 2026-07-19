@@ -1,7 +1,7 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
@@ -82,8 +82,42 @@ class StockCountSession(models.Model):
                 ) or _("Nuevo")
         return super().create(vals_list)
 
+    @api.constrains("company_id", "location_id")
+    def _check_location_company(self):
+        """Evita mezclar stock de una empresa con la ubicación de otra.
+
+        Una ubicación compartida (company_id vacío) es válida. El chequeo
+        cubre el caso de que la sesión se arme por RPC, importación o
+        duplicado y termine con una ubicación que no es de su empresa.
+        """
+        for session in self:
+            if (
+                session.location_id.company_id
+                and session.location_id.company_id != session.company_id
+            ):
+                raise ValidationError(
+                    _(
+                        "La ubicación '%s' pertenece a la empresa '%s', "
+                        "distinta de la empresa de la sesión ('%s').",
+                        session.location_id.display_name,
+                        session.location_id.company_id.display_name,
+                        session.company_id.display_name,
+                    )
+                )
+
+    # Campos que action_apply() puede escribir sobre una sesión sin que se
+    # considere una edición de negocio (la transición de estado en sí).
+    _APPLIED_WRITE_ALLOWED_FIELDS = {"state", "date_applied"}
+
     def write(self, vals):
-        """Bloquea empresa y ubicación una vez que la sesión tiene líneas."""
+        """Bloquea empresa/ubicación con líneas cargadas, y edición de sesiones aplicadas.
+
+        Una sesión aplicada ya movió stock real: permitir que se edite o
+        borre por RPC falsificaría el registro de qué se contó y quién lo
+        aplicó. Solo se permite que action_apply() escriba state/date_applied
+        durante la propia transición (ocurre mientras el estado todavía es
+        'draft', antes de este write).
+        """
         locked_fields = {"company_id", "location_id"}
         if locked_fields & set(vals):
             for session in self:
@@ -96,7 +130,35 @@ class StockCountSession(models.Model):
                             session.name,
                         )
                     )
+        if set(vals) - self._APPLIED_WRITE_ALLOWED_FIELDS:
+            for session in self:
+                if session.state == "applied":
+                    raise UserError(
+                        _(
+                            "No se puede modificar la sesión '%s': ya fue "
+                            "aplicada y el registro del conteo no se puede "
+                            "alterar.",
+                            session.name,
+                        )
+                    )
         return super().write(vals)
+
+    def unlink(self):
+        """Impide borrar una sesión que no está en borrador.
+
+        Borrar una sesión aplicada dejaría movimientos de stock reales sin
+        el registro de auditoría de qué se contó y quién lo aplicó.
+        """
+        for session in self:
+            if session.state != "draft":
+                raise UserError(
+                    _(
+                        "No se puede eliminar la sesión '%s': no está en "
+                        "borrador.",
+                        session.name,
+                    )
+                )
+        return super().unlink()
 
     def _check_draft(self):
         """Valida que la sesión esté en borrador antes de modificarla."""
@@ -120,22 +182,34 @@ class StockCountSession(models.Model):
                 raise UserError(
                     _(
                         "Solo se pueden reabrir sesiones canceladas. "
-                        "Un conteo aplicado se corrige con una sesión nueva.",
+                        "Un conteo aplicado se corrige con una sesión nueva."
                     )
                 )
         self.write({"state": "draft"})
         return True
 
     def action_apply(self):
-        """Aplica el conteo como ajuste de inventario nativo.
+        """Aplica el conteo como ajuste de inventario nativo, línea por línea.
 
-        Las líneas que fallan quedan marcadas con su error y no frenan a las
-        demás: abortar toda la sesión por un producto con lotes obligaría a
-        recontar la ubicación entera.
+        Cada línea corre en su propio savepoint que envuelve tanto la
+        preparación del quant (_apply_line) como la aplicación contable
+        (action_apply_inventory): esta última es la parte que realmente
+        puede fallar (cuenta contable faltante, período cerrado,
+        _check_company, etc.), así que aislarla por línea es lo que
+        garantiza que un solo producto problemático no revierta el conteo
+        entero. Las líneas que fallan quedan marcadas con su error y no
+        frenan a las demás; la sesión pasa a 'applied' de todos modos.
         """
         self.ensure_one()
         self._check_draft()
 
+        # No eliminar este chequeo aunque parezca redundante con el ACL:
+        # _is_inventory_mode() en el core (stock/models/stock_quant.py,
+        # ~línea 1240) solo exige stock.group_stock_user para aplicar
+        # inventory_quantity. El ACL de este módulo da write/unlink a ese
+        # mismo grupo, y el groups= del botón en la vista es solo UI. Este
+        # has_group() es la única barrera real contra que un usuario de
+        # inventario común mueva stock llamando action_apply por RPC.
         if not self.env.user.has_group("stock.group_stock_manager"):
             raise UserError(
                 _(
@@ -149,7 +223,6 @@ class StockCountSession(models.Model):
                 _("La sesión '%s' no tiene líneas para aplicar.", self.name)
             )
 
-        quants = self.env["stock.quant"]
         applied = 0
         failed = 0
         for line in self.line_ids:
@@ -159,11 +232,17 @@ class StockCountSession(models.Model):
                     line_quants = line._apply_line()
                     if line.error:
                         failed += 1
+                    elif line_quants:
+                        line_quants.with_context(
+                            inventory_mode=True,
+                            set_inventory_quantity_auto_apply=True,
+                        ).action_apply_inventory()
+                        applied += 1
                     else:
-                        quants |= line_quants
                         applied += 1
             except Exception as e:
-                # El savepoint revierte la escritura de line.error, así que se
+                # El savepoint revierte la escritura de line.error (y
+                # cualquier cambio de la aplicación contable), así que se
                 # persiste después, fuera de su alcance.
                 error_msg = str(e)
                 failed += 1
@@ -174,11 +253,6 @@ class StockCountSession(models.Model):
                 )
             if error_msg:
                 line.error = error_msg
-
-        if quants:
-            quants.with_context(
-                inventory_mode=True, set_inventory_quantity_auto_apply=True
-            ).action_apply_inventory()
 
         self.write({"state": "applied", "date_applied": fields.Datetime.now()})
         _logger.info(
