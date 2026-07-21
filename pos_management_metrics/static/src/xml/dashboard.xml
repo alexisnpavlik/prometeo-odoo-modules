@@ -392,7 +392,7 @@
                         <div class="charts-grid">
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 20 por Total Vendido</h3>
+                                    <h3>Top 50 por Total Vendido</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -400,7 +400,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Los 20 artículos que más ingresos generaron (IVA incluido) durante el período y filtros seleccionados.
+                                            Los 50 artículos que más ingresos generaron (IVA incluido) durante el período y filtros seleccionados.
                                         </div>
                                     </div>
                                 </div>
@@ -411,7 +411,7 @@
 
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 20 por Unidades Vendidas</h3>
+                                    <h3>Top 50 por Unidades Vendidas</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -419,7 +419,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Los 20 artículos con mayor cantidad de unidades vendidas durante el período y filtros seleccionados.
+                                            Los 50 artículos con mayor cantidad de unidades vendidas durante el período y filtros seleccionados.
                                         </div>
                                     </div>
                                 </div>

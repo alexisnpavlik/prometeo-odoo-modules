@@ -344,7 +344,7 @@ class PosDashboardMetrics extends Component {
                 company: this.state.company,
                 category: this.state.category,
                 product: this.state.product,
-                limit: 20
+                limit: 50
             });
             Object.assign(this.topArticlesData, data);
             setTimeout(() => this.renderTopArticlesCharts(), 50);

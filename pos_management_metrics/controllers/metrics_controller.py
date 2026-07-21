@@ -898,7 +898,7 @@ class PosMetricsController(http.Controller):
         return {"sessions": sessions}
 
     @http.route('/pos_management_metrics/top_articles', type='json', auth='user')
-    def get_top_articles(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=20, **kwargs):
+    def get_top_articles(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=50, **kwargs):
         """Top de artículos por facturación y por unidades vendidas, respetando los filtros del dashboard."""
         self._check_access()
         cr = request.env.cr
@@ -922,8 +922,9 @@ class PosMetricsController(http.Controller):
             LEFT JOIN hr_employee emp ON emp.user_id = ru.id
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+              AND COALESCE(pt.name->>%s, pt.name->>'en_US') NOT ILIKE %s AND COALESCE(pt.name->>%s, pt.name->>'en_US') NOT ILIKE %s
         """
-        params_list = [lang] + list(params)
+        params_list = [lang] + list(params) + [lang, '%recargo%', lang, '%cancha%']
 
         line_clauses, line_params = self._build_line_filters(category, product, lang)
         for clause, val in zip(line_clauses, line_params):
@@ -943,7 +944,7 @@ class PosMetricsController(http.Controller):
             for r in cr.dictfetchall()
         ]
 
-        limit = int(limit or 20)
+        limit = int(limit or 50)
         by_revenue = sorted(rows, key=lambda r: r["facturacion"], reverse=True)[:limit]
         by_units = sorted(rows, key=lambda r: r["unidades"], reverse=True)[:limit]
 
