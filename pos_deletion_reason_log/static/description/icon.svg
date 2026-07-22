@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cyber-Glassmorphic 3D module icon template.
+  Filter-free (only gradients + layered opacity) so it renders identically in
+  ImageMagick MSVG, rsvg-convert and cairosvg.
+  To re-skin: change the two ACCENT colors below and the GLYPH <text>.
+    ACCENT-A (cyan)    : #22e6ff
+    ACCENT-B (magenta) : #ff3df0
+-->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- deep cyber background -->
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%"  stop-color="#1b2747"/>
+      <stop offset="55%" stop-color="#0a1124"/>
+      <stop offset="100%" stop-color="#04060e"/>
+    </radialGradient>
+    <!-- frosted glass fill -->
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <!-- top sheen on the glass -->
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="18%"  stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- neon glow halo (fake blur) -->
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#22e6ff" stop-opacity="0.85"/>
+      <stop offset="40%" stop-color="#22e6ff" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#22e6ff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- accent gradient for the glyph -->
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#22e6ff"/>
+      <stop offset="100%" stop-color="#ff3df0"/>
+    </linearGradient>
+    <!-- specular highlight blob -->
+    <radialGradient id="spec" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="512" height="512" rx="108" fill="url(#bg)"/>
+
+  <!-- faint cyber grid -->
+  <g stroke="#6fe9ff" stroke-opacity="0.06" stroke-width="1.5">
+    <path d="M64 0V512 M160 0V512 M256 0V512 M352 0V512 M448 0V512"/>
+    <path d="M0 64H512 M0 160H512 M0 256H512 M0 352H512 M0 448H512"/>
+  </g>
+
+  <!-- floating shadow under the glass stack (3D float) -->
+  <ellipse cx="256" cy="408" rx="150" ry="34" fill="#000000" fill-opacity="0.45"/>
+
+  <!-- back glass panel (depth layer) -->
+  <g transform="translate(256 250) rotate(-8) translate(-256 -250)">
+    <rect x="146" y="140" width="220" height="220" rx="46"
+          fill="url(#glass)" stroke="#22e6ff" stroke-opacity="0.25" stroke-width="2"/>
+  </g>
+
+  <!-- front glass panel -->
+  <g transform="translate(256 256) rotate(6) translate(-256 -256)">
+    <rect x="136" y="146" width="240" height="240" rx="52"
+          fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2.5"/>
+    <!-- inner neon edge -->
+    <rect x="146" y="156" width="220" height="220" rx="44"
+          fill="none" stroke="url(#neon)" stroke-opacity="0.55" stroke-width="2"/>
+    <!-- top sheen -->
+    <rect x="136" y="146" width="240" height="240" rx="52" fill="url(#sheen)"/>
+
+    <!-- neon halo behind glyph -->
+    <circle cx="256" cy="266" r="92" fill="url(#halo)"/>
+
+    <!-- GLYPH: replace with the module initial -->
+    <text x="256" y="266" text-anchor="middle" dominant-baseline="central"
+          font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+          font-size="170" fill="url(#neon)">D</text>
+  </g>
+
+  <!-- corner specular highlight -->
+  <ellipse cx="180" cy="170" rx="120" ry="80" fill="url(#spec)" opacity="0.5"/>
+</svg>
