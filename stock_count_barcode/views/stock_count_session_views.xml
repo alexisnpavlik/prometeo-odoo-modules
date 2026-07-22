@@ -49,7 +49,7 @@
                                    readonly="line_count > 0 or state != 'draft'"/>
                         </group>
                         <group>
-                            <field name="user_id" readonly="state != 'draft'"/>
+                            <field name="user_id" readonly="1"/>
                             <field name="date_start"/>
                             <field name="date_applied" invisible="state != 'applied'"/>
                             <field name="line_count"/>
@@ -64,7 +64,7 @@
                             <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom" create="0">
                                     <field name="product_id" readonly="1"/>
-                                    <field name="barcode" optional="show"/>
+                                    <field name="barcode" optional="show" readonly="1"/>
                                     <field name="counted_qty"/>
                                     <field name="theoretical_qty" readonly="1"/>
                                     <field name="difference_qty" readonly="1"

@@ -35,6 +35,7 @@ class StockCountSession(models.Model):
         "res.users",
         string="Contado por",
         required=True,
+        readonly=True,
         default=lambda self: self.env.user,
     )
     state = fields.Selection(
