@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_pos_deletion_log"
+              name="Eliminaciones POS"
+              parent="point_of_sale.menu_point_of_sale"
+              action="action_pos_deletion_log"
+              groups="pos_deletion_reason_log.group_pos_deletion_audit"
+              sequence="90"/>
+
+    <menuitem id="menu_pos_deletion_reason"
+              name="Motivos de eliminación"
+              parent="point_of_sale.menu_point_config_product"
+              action="action_pos_deletion_reason"
+              groups="point_of_sale.group_pos_manager"
+              sequence="90"/>
+</odoo>
