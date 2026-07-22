@@ -233,6 +233,20 @@ class StockCountLine(models.Model):
         self.ensure_one()
         self.error = False
 
+        if not self.product_id.is_storable:
+            self.error = _(
+                "El producto '%s' es un consumible o servicio: no maneja "
+                "stock y no se puede ajustar su cantidad.",
+                self.product_id.display_name,
+            )
+            _logger.warning(
+                "Conteo: línea rechazada para el producto %s (id %s): no es "
+                "almacenable (is_storable=False), no admite quants.",
+                self.product_id.display_name,
+                self.product_id.id,
+            )
+            return self.env["stock.quant"]
+
         if self.product_id.tracking != "none":
             self.error = _(
                 "El producto '%s' se maneja por lotes o números de serie. "

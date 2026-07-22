@@ -288,6 +288,15 @@ class StockCountSession(models.Model):
                 "error": _("No hay ningún producto con el código %s.", barcode)
             }
 
+        if not product.is_storable:
+            return {
+                "error": _(
+                    "'%s' es un consumible o servicio: no maneja stock y no "
+                    "se puede contar.",
+                    product.display_name,
+                )
+            }
+
         line = self.line_ids.filtered(lambda l: l.product_id == product)[:1]
         if not line:
             line = self.env["stock.count.line"].create(
