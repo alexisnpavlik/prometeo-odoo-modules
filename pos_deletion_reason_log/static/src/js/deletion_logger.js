@@ -1,6 +1,5 @@
 /** @odoo-module **/
 
-import { _t } from "@web/core/l10n/translation";
 import { DeletionReasonPopup } from "./deletion_reason_popup";
 
 /**

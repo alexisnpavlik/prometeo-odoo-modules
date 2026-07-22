@@ -13,9 +13,10 @@ patch(OrderSummary.prototype, {
         const order = this.currentOrder;
         const line = order && order.get_selected_orderline && order.get_selected_orderline();
         const config = this.pos.config;
+        const { numpadMode } = this.pos;
 
         // Caso 1: eliminación de línea completa
-        if (line && val === "remove" && config.require_reason_line_deletion) {
+        if (line && numpadMode === "quantity" && val === "remove" && config.require_reason_line_deletion) {
             const product = line.get_product();
             const reason = await askReason(this, _t("Motivo — Eliminar línea"));
             if (!reason) {
@@ -38,7 +39,7 @@ patch(OrderSummary.prototype, {
         }
 
         // Caso 2: reducción de cantidad (valor numérico menor al actual)
-        if (line && config.require_reason_qty_reduction && this._isNumericValue(val)) {
+        if (line && numpadMode === "quantity" && config.require_reason_qty_reduction && this._isNumericValue(val)) {
             const currentQty = line.get_quantity ? line.get_quantity() : 0;
             const newQty = parseFloat(val);
             if (!isNaN(newQty) && newQty < currentQty) {

@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted, useRef } from "@odoo/owl";
+import { Component, useState, onMounted } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { _t } from "@web/core/l10n/translation";
@@ -17,7 +17,6 @@ export class DeletionReasonPopup extends Component {
             note: "",
             warning: "",
         });
-        this.noteRef = useRef("noteInput");
         onMounted(() => {
             const reasons = this.reasons;
             if (reasons.length) {
