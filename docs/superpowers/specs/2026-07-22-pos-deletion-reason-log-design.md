@@ -44,6 +44,34 @@ Si el módulo de aprobación está instalado, ambos patches se apilan
    otro módulo está instalado) y elimina.
 4. Verificar que la orden/línea **realmente** se eliminó (ya no está en
    `pos.orders` / la línea ya no existe). Si sí → RPC al backend con el registro.
+
+### Excepción: reducción de cantidad (no es motivo-primero)
+
+Descubierto durante la implementación (Task 6, revisión final de branch): el
+numpad del POS de Odoo 18 dispara `OrderSummary._setValue` **en cada tecla**
+tecleada, no al confirmar el valor final. Interceptarlo ahí para pedir motivo
+hacía que el popup apareciera con el primer dígito (ej. escribir "12" sobre
+una línea con cantidad 50 disparaba el popup al ver "1", interpretándolo como
+una reducción de 49 unidades, antes de que el cajero terminara de escribir).
+
+Por eso, **solo para este evento**, el flujo es ask-after-en-vez-de-antes:
+1. Al seleccionar una línea (`PosStore.selectOrderLine`, el único choke point
+   por el que pasan tanto el click manual como el auto-select al agregar/
+   mergear productos) se guarda su cantidad de partida.
+2. Al deseleccionarla (se elige otra línea, o se agrega/mergea otro producto)
+   se compara la cantidad final contra la guardada.
+3. Si bajó → se pide motivo. Si confirma, se registra. Si cancela, se
+   **revierte** la cantidad (a diferencia de los otros 2 eventos, acá el
+   cambio ya se aplicó en vivo mientras el cajero tecleaba).
+4. Corre en background (no bloquea el cambio de línea), porque el código base
+   de Odoo llama a `selectOrderLine` sin `await` en varios lugares y espera
+   que la selección ya haya cambiado sincrónicamente justo después.
+
+Limitación v1 aceptada: si el cajero reduce la cantidad de la última línea
+tocada y cierra/cobra la orden sin volver a seleccionar otra línea, ese ajuste
+no dispara la verificación (no hay un evento de "deselección final" al salir
+de la pantalla). Los otros 2 eventos (orden completa, línea completa) no
+tienen esta limitación — mantienen el flujo motivo-primero original.
    Si no (rechazado/cancelado) → no registrar.
 
 ## Componentes
