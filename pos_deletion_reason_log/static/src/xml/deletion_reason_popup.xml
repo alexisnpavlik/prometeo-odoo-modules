@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_deletion_reason_log.DeletionReasonPopup" owl="1">
+        <Dialog size="'md'" title="props.title || 'Motivo de eliminación'">
+            <div class="deletion-reason-popup">
+                <div class="mb-3">
+                    <label class="form-label">Motivo</label>
+                    <select class="form-select form-select-lg" t-on-change="onReasonChange">
+                        <t t-foreach="reasons" t-as="reason" t-key="reason.id">
+                            <option t-att-value="reason.id" t-att-selected="reason.id === state.reasonId">
+                                <t t-esc="reason.name"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Nota (opcional)</label>
+                    <textarea class="form-control" rows="3"
+                              t-model="state.note" placeholder="Detalle opcional..."/>
+                </div>
+                <p t-if="state.warning" class="text-danger small mb-0" t-esc="state.warning"/>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="confirm">Confirmar</button>
+                <button class="btn btn-secondary" t-on-click="cancel">Cancelar</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

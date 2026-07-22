@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_pos_deletion_reason" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.pos.deletion.reason</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='product_and_category_block']" position="after">
+                <block id="pos_deletion_reason_block" title="Registro de eliminaciones">
+                    <setting string="Motivo al eliminar orden" help="Pide un motivo cuando se elimina una orden completa.">
+                        <field name="require_reason_order_deletion"/>
+                    </setting>
+                    <setting string="Motivo al eliminar línea" help="Pide un motivo cuando se borra una línea/producto.">
+                        <field name="require_reason_line_deletion"/>
+                    </setting>
+                    <setting string="Motivo al reducir cantidad" help="Pide un motivo cuando se reduce la cantidad de una línea.">
+                        <field name="require_reason_qty_reduction"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
