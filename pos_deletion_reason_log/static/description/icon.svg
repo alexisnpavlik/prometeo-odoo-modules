@@ -1,87 +1,150 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Cyber-Glassmorphic 3D module icon template.
-  Filter-free (only gradients + layered opacity) so it renders identically in
-  ImageMagick MSVG, rsvg-convert and cairosvg.
-  To re-skin: change the two ACCENT colors below and the GLYPH <text>.
-    ACCENT-A (cyan)    : #22e6ff
-    ACCENT-B (magenta) : #ff3df0
--->
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- deep cyber background -->
-    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
-      <stop offset="0%"  stop-color="#1b2747"/>
-      <stop offset="55%" stop-color="#0a1124"/>
-      <stop offset="100%" stop-color="#04060e"/>
+    <!-- Background Gradient -->
+    <radialGradient id="bg-grad" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#192849"/>
+      <stop offset="60%" stop-color="#0a1226"/>
+      <stop offset="100%" stop-color="#040711"/>
     </radialGradient>
-    <!-- frosted glass fill -->
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.22"/>
-      <stop offset="45%"  stop-color="#ffffff" stop-opacity="0.07"/>
+
+    <!-- Glassmorphic Gradient -->
+    <linearGradient id="glass-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.08"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
     </linearGradient>
-    <!-- top sheen on the glass -->
-    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.45"/>
-      <stop offset="18%"  stop-color="#ffffff" stop-opacity="0.06"/>
+
+    <!-- Glowing Cyan Accent -->
+    <linearGradient id="cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#4facfe"/>
+    </linearGradient>
+
+    <!-- Coral Red Deletion Glow -->
+    <linearGradient id="red-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4b4b"/>
+      <stop offset="100%" stop-color="#ff1a53"/>
+    </linearGradient>
+
+    <!-- Sheen Gradient -->
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4"/>
+      <stop offset="25%" stop-color="#ffffff" stop-opacity="0.05"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <!-- neon glow halo (fake blur) -->
-    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"  stop-color="#22e6ff" stop-opacity="0.85"/>
-      <stop offset="40%" stop-color="#22e6ff" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#22e6ff" stop-opacity="0"/>
+
+    <!-- Neon Halos -->
+    <radialGradient id="halo-red" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff4b4b" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ff4b4b" stop-opacity="0"/>
     </radialGradient>
-    <!-- accent gradient for the glyph -->
-    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#22e6ff"/>
-      <stop offset="100%" stop-color="#ff3df0"/>
-    </linearGradient>
-    <!-- specular highlight blob -->
-    <radialGradient id="spec" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    <radialGradient id="halo-cyan" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#00f2fe" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
-  <!-- backdrop -->
-  <rect x="0" y="0" width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Base Icon Card -->
+  <rect x="16" y="16" width="480" height="480" rx="90" fill="url(#bg-grad)" stroke="#ffffff" stroke-opacity="0.15" stroke-width="3"/>
+  <rect x="16" y="16" width="480" height="480" rx="90" fill="url(#sheen)"/>
 
-  <!-- faint cyber grid -->
-  <g stroke="#6fe9ff" stroke-opacity="0.06" stroke-width="1.5">
-    <path d="M64 0V512 M160 0V512 M256 0V512 M352 0V512 M448 0V512"/>
-    <path d="M0 64H512 M0 160H512 M0 256H512 M0 352H512 M0 448H512"/>
+  <!-- Background Grid -->
+  <g stroke="#00f2fe" stroke-opacity="0.05" stroke-width="1.5">
+    <line x1="64" y1="0" x2="64" y2="512"/>
+    <line x1="160" y1="0" x2="160" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="352" y1="0" x2="352" y2="512"/>
+    <line x1="448" y1="0" x2="448" y2="512"/>
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
   </g>
 
-  <!-- floating shadow under the glass stack (3D float) -->
-  <ellipse cx="256" cy="408" rx="150" ry="34" fill="#000000" fill-opacity="0.45"/>
+  <!-- Floating Shadow -->
+  <ellipse cx="256" cy="425" rx="160" ry="30" fill="#000000" fill-opacity="0.45"/>
 
-  <!-- back glass panel (depth layer) -->
-  <g transform="translate(256 250) rotate(-8) translate(-256 -250)">
-    <rect x="146" y="140" width="220" height="220" rx="46"
-          fill="url(#glass)" stroke="#22e6ff" stroke-opacity="0.25" stroke-width="2"/>
+  <!-- Clipboard Base (Back Layer) -->
+  <g transform="translate(256, 260) rotate(-6) translate(-256, -260)">
+    <rect x="135" y="110" width="240" height="290" rx="28" fill="url(#glass-grad)" stroke="#00f2fe" stroke-opacity="0.35" stroke-width="2.5"/>
+    <rect x="200" y="96" width="110" height="24" rx="8" fill="#192849" stroke="url(#cyan-glow)" stroke-width="2"/>
+    <circle cx="256" cy="108" r="5" fill="#00f2fe"/>
+    
+    <!-- Checklist items on clipboard -->
+    <line x1="170" y1="170" x2="340" y2="170" stroke="#ffffff" stroke-opacity="0.25" stroke-width="4" stroke-linecap="round"/>
+    <line x1="170" y1="200" x2="320" y2="200" stroke="#ffffff" stroke-opacity="0.25" stroke-width="4" stroke-linecap="round"/>
+    <line x1="170" y1="230" x2="300" y2="230" stroke="#ffffff" stroke-opacity="0.25" stroke-width="4" stroke-linecap="round"/>
+    <line x1="170" y1="260" x2="330" y2="260" stroke="#ffffff" stroke-opacity="0.25" stroke-width="4" stroke-linecap="round"/>
   </g>
 
-  <!-- front glass panel -->
-  <g transform="translate(256 256) rotate(6) translate(-256 -256)">
-    <rect x="136" y="146" width="240" height="240" rx="52"
-          fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2.5"/>
-    <!-- inner neon edge -->
-    <rect x="146" y="156" width="220" height="220" rx="44"
-          fill="none" stroke="url(#neon)" stroke-opacity="0.55" stroke-width="2"/>
-    <!-- top sheen -->
-    <rect x="136" y="146" width="240" height="240" rx="52" fill="url(#sheen)"/>
-
-    <!-- neon halo behind glyph -->
-    <circle cx="256" cy="266" r="92" fill="url(#halo)"/>
-
-    <!-- GLYPH: replace with the module initial -->
-    <text x="256" y="266" text-anchor="middle" dominant-baseline="central"
-          font-family="Arial, Helvetica, sans-serif" font-weight="bold"
-          font-size="170" fill="url(#neon)">D</text>
+  <!-- POS Receipt (Glowing Cyan) -->
+  <g transform="translate(240, 210) rotate(4) translate(-240, -210)">
+    <circle cx="240" cy="210" r="100" fill="url(#halo-cyan)"/>
+    
+    <!-- Receipt Body with perforated edges -->
+    <path d="M 170 100 L 310 100 L 310 310 L 298.5 300 L 287 310 L 275.5 300 L 264 310 L 252.5 300 L 241 310 L 229.5 300 L 218 310 L 206.5 300 L 195 310 L 183.5 300 L 172 310 L 170 308 Z" 
+          fill="#0a1936" stroke="url(#cyan-glow)" stroke-width="3"/>
+    
+    <text x="240" y="135" text-anchor="middle" fill="#00f2fe" font-family="Arial, sans-serif" font-weight="bold" font-size="13" letter-spacing="1.5">POS RECEIPT</text>
+    <line x1="190" y1="148" x2="290" y2="148" stroke="#00f2fe" stroke-dasharray="3 3" stroke-width="1.5"/>
+    
+    <!-- Simulated Receipt items -->
+    <rect x="190" y="165" width="60" height="6" rx="3" fill="#ffffff" fill-opacity="0.7"/>
+    <rect x="260" y="165" width="30" height="6" rx="3" fill="#00f2fe"/>
+    <rect x="190" y="185" width="75" height="6" rx="3" fill="#ffffff" fill-opacity="0.7"/>
+    <rect x="275" y="185" width="15" height="6" rx="3" fill="#00f2fe"/>
+    <rect x="190" y="205" width="50" height="6" rx="3" fill="#ffffff" fill-opacity="0.7"/>
+    <rect x="250" y="205" width="40" height="6" rx="3" fill="#00f2fe"/>
+    
+    <!-- Barcode at bottom of receipt -->
+    <g fill="#ffffff" fill-opacity="0.8">
+      <rect x="190" y="240" width="4" height="24"/>
+      <rect x="197" y="240" width="8" height="24"/>
+      <rect x="208" y="240" width="2" height="24"/>
+      <rect x="213" y="240" width="6" height="24"/>
+      <rect x="222" y="240" width="4" height="24"/>
+      <rect x="229" y="240" width="8" height="24"/>
+      <rect x="240" y="240" width="2" height="24"/>
+      <rect x="245" y="240" width="6" height="24"/>
+      <rect x="254" y="240" width="4" height="24"/>
+      <rect x="261" y="240" width="8" height="24"/>
+      <rect x="272" y="240" width="2" height="24"/>
+      <rect x="277" y="240" width="12" height="24"/>
+    </g>
   </g>
 
-  <!-- corner specular highlight -->
-  <ellipse cx="180" cy="170" rx="120" ry="80" fill="url(#spec)" opacity="0.5"/>
+  <!-- Glowing Red Deletion Shield Badge -->
+  <g transform="translate(230, 310)">
+    <circle cx="0" cy="0" r="70" fill="url(#halo-red)"/>
+    <path d="M 0 -45 L 38 -22 C 38 20 22 50 0 62 C -22 50 -38 20 -38 -22 Z" 
+          fill="#1c0711" stroke="url(#red-glow)" stroke-width="4"/>
+    
+    <!-- Trash Bin / X Icon inside Shield -->
+    <g stroke="#ff1a53" stroke-width="4" stroke-linecap="round">
+      <!-- Trash Bin Lid -->
+      <line x1="-16" y1="-12" x2="16" y2="-12"/>
+      <path d="M -6 -12 L -4 -18 L 4 -18 L 6 -12" fill="none"/>
+      <!-- Trash Bin Body -->
+      <path d="M -12 -12 L -9 18 C -9 22 -6 24 0 24 C 6 24 9 22 9 18 L 12 -12" fill="none"/>
+      <!-- Inner vertical stripes -->
+      <line x1="-4" y1="-5" x2="-3" y2="15" stroke-width="3"/>
+      <line x1="0" y1="-5" x2="0" y2="15" stroke-width="3"/>
+      <line x1="4" y1="-5" x2="3" y2="15" stroke-width="3"/>
+    </g>
+  </g>
+
+  <!-- Glowing Cyan Speech Bubble (Reason Log prompt) -->
+  <g transform="translate(350, 330)">
+    <circle cx="0" cy="0" r="50" fill="url(#halo-cyan)"/>
+    <rect x="-35" y="-30" width="70" height="50" rx="16" fill="#081833" stroke="url(#cyan-glow)" stroke-width="3"/>
+    <path d="M -15 20 L -25 34 L 0 20 Z" fill="#081833" stroke="url(#cyan-glow)" stroke-width="3" stroke-linejoin="round"/>
+    
+    <!-- Pencil & Question Mark Icon -->
+    <g fill="none" stroke="#00f2fe" stroke-width="3" stroke-linecap="round">
+      <!-- Pencil -->
+      <path d="M -16 6 L 2 -12 L 8 -6 L -10 12 L -18 14 Z"/>
+      <!-- Question Mark -->
+      <path d="M 12 -14 C 12 -19 19 -19 19 -14 C 19 -9 14 -8 14 -4"/>
+      <circle cx="14" cy="4" r="1.5" fill="#00f2fe"/>
+    </g>
+  </g>
 </svg>
