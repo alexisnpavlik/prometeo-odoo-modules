@@ -7,7 +7,10 @@ import { askReason, logDeletion } from "./deletion_logger";
 
 patch(OrderSummary.prototype, {
     /**
-     * Intercepta borrado de línea ('remove') y reducción de cantidad para pedir motivo.
+     * Intercepta borrado de línea completa ('remove') para pedir motivo.
+     * La reducción de cantidad se resuelve aparte, en PosStore.selectOrderLine
+     * (pos_store.js), porque acá _setValue se dispara en cada tecla del numpad
+     * y no al confirmar el valor final.
      */
     async _setValue(val) {
         const order = this.currentOrder;
@@ -15,7 +18,6 @@ patch(OrderSummary.prototype, {
         const config = this.pos.config;
         const { numpadMode } = this.pos;
 
-        // Caso 1: eliminación de línea completa
         if (line && numpadMode === "quantity" && val === "remove" && config.require_reason_line_deletion) {
             const product = line.get_product();
             const reason = await askReason(this, _t("Motivo — Eliminar línea"));
@@ -29,7 +31,7 @@ patch(OrderSummary.prototype, {
                     deletion_type: "line",
                     order_ref: order.uuid || order.name || "",
                     product_id: product ? product.id : false,
-                    qty_removed: line.__prevQty != null ? line.__prevQty : (line.get_quantity ? line.get_quantity() : 0),
+                    qty_removed: line.get_quantity ? line.get_quantity() : 0,
                     amount_removed: 0,
                     reason_id: reason.reason_id,
                     reason_note: reason.reason_note,
@@ -38,40 +40,6 @@ patch(OrderSummary.prototype, {
             return result;
         }
 
-        // Caso 2: reducción de cantidad (valor numérico menor al actual)
-        if (line && numpadMode === "quantity" && config.require_reason_qty_reduction && this._isNumericValue(val)) {
-            const currentQty = line.get_quantity ? line.get_quantity() : 0;
-            const newQty = parseFloat(val);
-            if (!isNaN(newQty) && newQty < currentQty) {
-                const product = line.get_product();
-                const reason = await askReason(this, _t("Motivo — Reducir cantidad"));
-                if (!reason) {
-                    return; // cancelado
-                }
-                const result = await super._setValue(val);
-                const appliedQty = line.get_quantity ? line.get_quantity() : currentQty;
-                if (appliedQty === newQty) {
-                    await logDeletion(this, {
-                        deletion_type: "qty_reduction",
-                        order_ref: order.uuid || order.name || "",
-                        product_id: product ? product.id : false,
-                        qty_removed: currentQty - newQty,
-                        amount_removed: 0,
-                        reason_id: reason.reason_id,
-                        reason_note: reason.reason_note,
-                    });
-                }
-                return result;
-            }
-        }
-
         return super._setValue(val);
-    },
-
-    /**
-     * Detecta si el valor del numpad representa una cantidad numérica directa.
-     */
-    _isNumericValue(val) {
-        return typeof val === "string" && /^[0-9]+([.,][0-9]*)?$/.test(val);
     },
 });
