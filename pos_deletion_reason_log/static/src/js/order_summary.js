@@ -48,15 +48,18 @@ patch(OrderSummary.prototype, {
                     return; // cancelado
                 }
                 const result = await super._setValue(val);
-                await logDeletion(this, {
-                    deletion_type: "qty_reduction",
-                    order_ref: order.uuid || order.name || "",
-                    product_id: product ? product.id : false,
-                    qty_removed: currentQty - newQty,
-                    amount_removed: 0,
-                    reason_id: reason.reason_id,
-                    reason_note: reason.reason_note,
-                });
+                const appliedQty = line.get_quantity ? line.get_quantity() : currentQty;
+                if (appliedQty === newQty) {
+                    await logDeletion(this, {
+                        deletion_type: "qty_reduction",
+                        order_ref: order.uuid || order.name || "",
+                        product_id: product ? product.id : false,
+                        qty_removed: currentQty - newQty,
+                        amount_removed: 0,
+                        reason_id: reason.reason_id,
+                        reason_note: reason.reason_note,
+                    });
+                }
                 return result;
             }
         }
