@@ -330,7 +330,7 @@
 
 /* Tarjetas KPI Brillantes */
 .pos-dashboard-wrap .kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;
 }
 
 .pos-dashboard-wrap .kpi-card {
