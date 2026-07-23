@@ -26,6 +26,7 @@ aprobación de manager (los popups se apilan), pero no depende de él.
         "views/pos_deletion_log_views.xml",
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
+        "views/report_saledetails_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [

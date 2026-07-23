@@ -134,6 +134,18 @@ Se cargan al POS (ya disponibles en `pos.config` del frontend).
 - Vistas: lista + pivot de `pos.deletion.log` bajo menú **Punto de Venta**.
 - Menú de configuración para `pos.deletion.reason`.
 
+### Informe de sesión imprimible (agregado)
+
+- `models/report_sale_details.py` hereda `report.point_of_sale.report_saledetails`
+  y extiende `get_sale_details`: agrega `deletions` (lista ordenada por fecha/hora
+  con cajero, tipo, producto, cantidad, motivo, nota) y `deletions_count`
+  (`{order, line, qty_reduction}`), con el mismo alcance del reporte (por sesión
+  si hay `session_ids`, si no por rango de fecha + config).
+- `views/report_saledetails_views.xml` hereda `point_of_sale.pos_session_sales_details`
+  e inserta (xpath después de `//div[@id='discounts']`) una sección `t-if="deletions"`
+  con resumen de contadores + tabla detallada. Aplica al PDF "Detalles de ventas"
+  del backend y al reporte de cierre imprimible.
+
 ## Layout
 
 ```
