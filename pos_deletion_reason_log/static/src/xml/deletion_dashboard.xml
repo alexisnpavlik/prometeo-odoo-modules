@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_deletion_reason_log.DeletionDashboard">
+        <div t-att-class="'del-dash ' + (state.theme === 'light' ? 'theme-light' : 'theme-dark')">
+            <!-- Sidebar de filtros -->
+            <aside class="del-sidebar">
+                <div class="del-brand">
+                    <h2>Auditoría de Eliminaciones</h2>
+                    <span class="del-sub">Punto de Venta</span>
+                </div>
+
+                <div class="del-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="del-presets">
+                        <button t-att-class="'del-preset ' + (state.preset === 'today' ? 'active' : '')" t-on-click="() => this.onPreset('today')">Hoy</button>
+                        <button t-att-class="'del-preset ' + (state.preset === 'yesterday' ? 'active' : '')" t-on-click="() => this.onPreset('yesterday')">Ayer</button>
+                        <button t-att-class="'del-preset ' + (state.preset === '7days' ? 'active' : '')" t-on-click="() => this.onPreset('7days')">7 días</button>
+                        <button t-att-class="'del-preset ' + (state.preset === '30days' ? 'active' : '')" t-on-click="() => this.onPreset('30days')">30 días</button>
+                        <button t-att-class="'del-preset ' + (state.preset === '90days' ? 'active' : '')" t-on-click="() => this.onPreset('90days')">90 días</button>
+                        <button t-att-class="'del-preset ' + (state.preset === 'all' ? 'active' : '')" t-on-click="() => this.onPreset('all')">Todo</button>
+                    </div>
+                    <div class="del-input">
+                        <label>Desde</label>
+                        <input type="date" t-att-value="state.startDate" t-on-change="onStartDate"/>
+                    </div>
+                    <div class="del-input">
+                        <label>Hasta</label>
+                        <input type="date" t-att-value="state.endDate" t-on-change="onEndDate"/>
+                    </div>
+                </div>
+
+                <div class="del-section">
+                    <h3>Filtros</h3>
+                    <div class="del-input">
+                        <label>Caja</label>
+                        <select t-model="state.pos">
+                            <option value="all">Todas</option>
+                            <t t-foreach="filtersData.cajas" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
+                        </select>
+                    </div>
+                    <div class="del-input">
+                        <label>Cajero</label>
+                        <select t-model="state.cashier">
+                            <option value="all">Todos</option>
+                            <t t-foreach="filtersData.cajeros" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
+                        </select>
+                    </div>
+                    <div class="del-input">
+                        <label>Empresa</label>
+                        <select t-model="state.company">
+                            <option value="all">Todas</option>
+                            <t t-foreach="filtersData.empresas" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
+                        </select>
+                    </div>
+                    <div class="del-input">
+                        <label>Tipo</label>
+                        <select t-model="state.dtype">
+                            <option value="all">Todos</option>
+                            <option value="order">Orden completa</option>
+                            <option value="line">Línea / producto</option>
+                            <option value="qty_reduction">Reducción cantidad</option>
+                        </select>
+                    </div>
+                    <div class="del-input">
+                        <label>Motivo</label>
+                        <select t-model="state.reason">
+                            <option value="all">Todos</option>
+                            <t t-foreach="filtersData.motivos" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="del-actions">
+                    <button class="del-btn primary" t-on-click="applyFilters">Aplicar</button>
+                    <button class="del-btn" t-on-click="clearFilters">Limpiar</button>
+                </div>
+            </aside>
+
+            <!-- Contenido principal -->
+            <main class="del-main">
+                <header class="del-header">
+                    <h1>Dashboard de Eliminaciones</h1>
+                    <div class="del-header-right">
+                        <span class="del-sync">
+                            <span t-att-class="'del-dot ' + (state.loading ? 'anim' : 'ok')"></span>
+                            <span t-esc="state.syncTime"/>
+                        </span>
+                        <button class="del-btn" t-on-click="toggleTheme" title="Cambiar tema">
+                            <t t-esc="state.theme === 'light' ? '🌙' : '☀️'"/>
+                        </button>
+                        <button class="del-btn" t-on-click="() => this.fetchMetrics()">↻</button>
+                    </div>
+                </header>
+
+                <!-- KPI cards -->
+                <section class="del-kpis">
+                    <div class="del-kpi">
+                        <span class="del-kpi-label">Total eliminaciones</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.total"/>
+                    </div>
+                    <div class="del-kpi accent-red">
+                        <span class="del-kpi-label">Órdenes eliminadas</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.n_order"/>
+                    </div>
+                    <div class="del-kpi accent-amber">
+                        <span class="del-kpi-label">Líneas eliminadas</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.n_line"/>
+                    </div>
+                    <div class="del-kpi accent-blue">
+                        <span class="del-kpi-label">Reducciones de cantidad</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.n_qty"/>
+                        <span class="del-kpi-foot"><t t-esc="data.kpis.units"/> u. quitadas</span>
+                    </div>
+                    <div class="del-kpi accent-green">
+                        <span class="del-kpi-label">Importe eliminado</span>
+                        <span class="del-kpi-value">$ <t t-esc="money(data.kpis.amount)"/></span>
+                    </div>
+                    <div class="del-kpi accent-purple">
+                        <span class="del-kpi-label">Tasa de eliminación</span>
+                        <span class="del-kpi-value"><t t-esc="data.kpis.deletion_rate"/>%</span>
+                        <span class="del-kpi-foot">órdenes elim. / total</span>
+                    </div>
+                </section>
+
+                <!-- Charts -->
+                <section class="del-charts">
+                    <div class="del-card wide">
+                        <h4>Ranking de cajeros</h4>
+                        <div class="del-canvas-wrap">
+                            <canvas t-ref="cashiersChart"/>
+                            <p t-if="!data.cashiers.length" class="del-empty">Sin datos en el período.</p>
+                        </div>
+                    </div>
+                    <div class="del-card">
+                        <h4>Por motivo</h4>
+                        <div class="del-canvas-wrap">
+                            <canvas t-ref="reasonsChart"/>
+                            <p t-if="!data.reasons.length" class="del-empty">Sin datos.</p>
+                        </div>
+                    </div>
+                    <div class="del-card wide">
+                        <h4>Tendencia diaria</h4>
+                        <div class="del-canvas-wrap">
+                            <canvas t-ref="trendChart"/>
+                            <p t-if="!data.trend.length" class="del-empty">Sin datos.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tabla detalle -->
+                <section class="del-card">
+                    <h4>Detalle (últimas 500)</h4>
+                    <div class="del-table-wrap">
+                        <table class="del-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha/hora</th><th>Cajero</th><th>Tipo</th><th>Producto</th>
+                                    <th class="num">Cant.</th><th class="num">Importe</th><th>Motivo</th><th>Nota</th><th>Caja</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="data.detail" t-as="d" t-key="d_index">
+                                    <td t-esc="d.fecha"/>
+                                    <td t-esc="d.cajero"/>
+                                    <td><span t-att-class="'del-tag t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
+                                    <td t-esc="d.producto"/>
+                                    <td class="num" t-esc="d.qty"/>
+                                    <td class="num">$ <t t-esc="money(d.amount)"/></td>
+                                    <td t-esc="d.motivo"/>
+                                    <td t-esc="d.nota"/>
+                                    <td t-esc="d.caja"/>
+                                </tr>
+                                <tr t-if="!data.detail.length"><td colspan="9" class="del-empty">Sin eliminaciones en el período.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </t>
+</templates>

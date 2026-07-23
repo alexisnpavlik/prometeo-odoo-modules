@@ -17,7 +17,7 @@ aprobación de manager (los popups se apilan), pero no depende de él.
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["point_of_sale"],
+    "depends": ["point_of_sale", "web"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
@@ -27,11 +27,20 @@ aprobación de manager (los popups se apilan), pero no depende de él.
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
         "views/report_saledetails_views.xml",
+        "views/dashboard_menu_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
-            "pos_deletion_reason_log/static/src/js/**/*",
-            "pos_deletion_reason_log/static/src/xml/**/*",
+            "pos_deletion_reason_log/static/src/js/deletion_reason_popup.js",
+            "pos_deletion_reason_log/static/src/js/deletion_logger.js",
+            "pos_deletion_reason_log/static/src/js/pos_store.js",
+            "pos_deletion_reason_log/static/src/js/order_summary.js",
+            "pos_deletion_reason_log/static/src/xml/deletion_reason_popup.xml",
+        ],
+        "web.assets_backend": [
+            "pos_deletion_reason_log/static/src/css/deletion_dashboard.css",
+            "pos_deletion_reason_log/static/src/js/deletion_dashboard.js",
+            "pos_deletion_reason_log/static/src/xml/deletion_dashboard.xml",
         ],
     },
     "installable": True,

@@ -146,6 +146,29 @@ Se cargan al POS (ya disponibles en `pos.config` del frontend).
   con resumen de contadores + tabla detallada. Aplica al PDF "Detalles de ventas"
   del backend y al reporte de cierre imprimible.
 
+### Dashboard de auditoría (agregado, v1)
+
+Dashboard OWL en el backend siguiendo el patrón de `pos_management_metrics`,
+dentro de este mismo módulo. Acceso gateado por `group_pos_deletion_audit`.
+
+- `controllers/deletion_metrics_controller.py` — 2 endpoints JSON
+  (`/pos_deletion_metrics/filters`, `/pos_deletion_metrics/metrics`) con SQL
+  crudo sobre `pos_deletion_log`, scoping multi-compañía por
+  `request.env.companies.ids`, filtros por fecha (tz del usuario), caja, cajero,
+  empresa, tipo y motivo. `_check_access` exige el grupo audit.
+- Métricas v1: KPIs (total, órdenes/líneas/reducciones, importe eliminado,
+  unidades quitadas, tasa de eliminación = órdenes elim. / total órdenes del
+  período); charts (ranking de cajeros apilado por tipo, distribución por motivo,
+  tendencia diaria conteo+importe); tabla detalle (últimas 500).
+- Frontend: `static/src/js/deletion_dashboard.js` (componente + registro en
+  `actions`), `static/src/xml/deletion_dashboard.xml`, `static/src/css/
+  deletion_dashboard.css`. Chart.js vía `loadJS` (CDN, igual que el otro módulo).
+- `views/dashboard_menu_views.xml` — `ir.actions.client` + `menuitem` bajo
+  Punto de Venta → Reporting.
+- **Assets**: los JS del POS se listan explícitos (no glob) para que el
+  dashboard backend NO entre al bundle del POS; el dashboard va en
+  `web.assets_backend`.
+
 ## Layout
 
 ```
