@@ -392,7 +392,8 @@
     display: flex; justify-content: space-between; align-items: center;
 }
 .pos-dashboard-wrap .chart-header h3 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; }
-.pos-dashboard-wrap .chart-body { flex: 1; padding: 16px; position: relative; width: 100%; height: 100%; }
+.pos-dashboard-wrap .chart-body { flex: 1; padding: 16px; position: relative; width: 100%; height: 100%; overflow: hidden; }
+.pos-dashboard-wrap .chart-body canvas { max-width: 100% !important; max-height: 100% !important; }
 
 .pos-dashboard-wrap .badge {
     background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--color-blue);

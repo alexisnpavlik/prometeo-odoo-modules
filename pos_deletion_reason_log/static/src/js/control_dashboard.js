@@ -234,6 +234,13 @@ class PosControlDashboard extends Component {
                 },
             });
         }
+
+        // El canvas puede medirse antes de que el layout flex termine de
+        // asentar (más notorio en la dona, que queda descentrada/recortada
+        // por el overflow:hidden del panel). Forzar un resize post-layout.
+        requestAnimationFrame(() => {
+            Object.values(this._charts).forEach((c) => c && c.resize());
+        });
     }
 }
 
