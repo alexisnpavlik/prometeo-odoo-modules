@@ -38,8 +38,10 @@ class PosControlDashboard extends Component {
             company: "all",
             dtype: "all",
             reason: "all",
+            category: "all",
+            product: "all",
         });
-        this.filtersData = useState({ cajas: [], cajeros: [], empresas: [], motivos: [] });
+        this.filtersData = useState({ cajas: [], cajeros: [], empresas: [], motivos: [], categorias: [], productos: [] });
         this.data = useState({
             kpis: {
                 total: 0, n_order: 0, n_line: 0, n_qty: 0, n_discount: 0, n_price: 0,
@@ -119,6 +121,8 @@ class PosControlDashboard extends Component {
                 company: this.state.company,
                 dtype: this.state.dtype,
                 reason: this.state.reason,
+                category: this.state.category,
+                product: this.state.product,
             });
             Object.assign(this.data, res);
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
@@ -140,6 +144,8 @@ class PosControlDashboard extends Component {
         this.state.company = "all";
         this.state.dtype = "all";
         this.state.reason = "all";
+        this.state.category = "all";
+        this.state.product = "all";
         this.fetchMetrics();
     }
     toggleTheme() {

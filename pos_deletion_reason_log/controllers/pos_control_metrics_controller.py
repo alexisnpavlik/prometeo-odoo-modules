@@ -24,13 +24,14 @@ class PosControlMetricsController(http.Controller):
 
     def _build_where(
         self, start_date=None, end_date=None, pos="all", cashier="all",
-        company="all", dtype="all", reason="all",
+        company="all", dtype="all", reason="all", category="all", product="all",
     ):
         """WHERE compartido sobre pos_control_log (alias dl)."""
         allowed = tuple(request.env.companies.ids) or (0,)
         where = "dl.company_id IN %s"
         params = [allowed]
         tz = self._get_timezone()
+        lang = self._get_lang()
 
         if start_date:
             where += " AND dl.event_datetime >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
@@ -52,7 +53,13 @@ class PosControlMetricsController(http.Controller):
             params.append(dtype)
         if reason and reason != "all":
             where += " AND COALESCE(pdr.name->>%s, pdr.name->>'en_US') = %s"
-            params.extend([self._get_lang(), reason])
+            params.extend([lang, reason])
+        if category and category != "all":
+            where += " AND ic.name = %s"
+            params.append(category)
+        if product and product != "all":
+            where += " AND COALESCE(pt.name->>%s, pt.name->>'en_US') = %s"
+            params.extend([lang, product])
         return where, params
 
     _JOINS = """
@@ -64,6 +71,7 @@ class PosControlMetricsController(http.Controller):
         LEFT JOIN pos_deletion_reason pdr ON pdr.id = dl.reason_id
         LEFT JOIN product_product pp ON pp.id = dl.product_id
         LEFT JOIN product_template pt ON pt.id = pp.product_tmpl_id
+        LEFT JOIN product_category ic ON ic.id = pt.categ_id
     """
 
     @http.route("/pos_control_metrics/filters", type="json", auth="user")
@@ -106,24 +114,45 @@ class PosControlMetricsController(http.Controller):
         )
         motivos = [r[0] for r in cr.fetchall() if r[0]]
 
+        cr.execute(
+            "SELECT DISTINCT ic.name FROM pos_control_log dl "
+            "JOIN product_product pp ON pp.id = dl.product_id "
+            "JOIN product_template pt ON pt.id = pp.product_tmpl_id "
+            "JOIN product_category ic ON ic.id = pt.categ_id "
+            "WHERE dl.company_id IN %s AND ic.name IS NOT NULL ORDER BY ic.name",
+            [allowed],
+        )
+        categorias = [r[0] for r in cr.fetchall()]
+
+        cr.execute(
+            "SELECT DISTINCT COALESCE(pt.name->>%s, pt.name->>'en_US') FROM pos_control_log dl "
+            "JOIN product_product pp ON pp.id = dl.product_id "
+            "JOIN product_template pt ON pt.id = pp.product_tmpl_id "
+            "WHERE dl.company_id IN %s ORDER BY 1",
+            [lang, allowed],
+        )
+        productos = [r[0] for r in cr.fetchall() if r[0]]
+
         return {
             "cajas": cajas,
             "cajeros": cajeros,
             "empresas": empresas,
             "motivos": motivos,
+            "categorias": categorias,
+            "productos": productos,
         }
 
     @http.route("/pos_control_metrics/metrics", type="json", auth="user")
     def get_metrics(
         self, start_date=None, end_date=None, pos="all", cashier="all",
-        company="all", dtype="all", reason="all", **kwargs
+        company="all", dtype="all", reason="all", category="all", product="all", **kwargs
     ):
         self._check_access()
         cr = request.env.cr
         lang = self._get_lang()
         tz = self._get_timezone()
         where, params = self._build_where(
-            start_date, end_date, pos, cashier, company, dtype, reason
+            start_date, end_date, pos, cashier, company, dtype, reason, category, product
         )
 
         # --- KPIs: conteo por tipo, importe y unidades ---
