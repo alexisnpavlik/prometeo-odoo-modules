@@ -493,14 +493,17 @@ class PosConfig(models.Model):
 
     require_reason_order_deletion = fields.Boolean(
         string="Motivo al eliminar orden",
+        default=True,
         help="Pide un motivo cuando el cajero elimina una orden completa.",
     )
     require_reason_line_deletion = fields.Boolean(
         string="Motivo al eliminar línea",
+        default=True,
         help="Pide un motivo cuando el cajero borra una línea/producto de la orden.",
     )
     require_reason_qty_reduction = fields.Boolean(
         string="Motivo al reducir cantidad",
+        default=True,
         help="Pide un motivo cuando el cajero reduce la cantidad de una línea.",
     )
 ```
