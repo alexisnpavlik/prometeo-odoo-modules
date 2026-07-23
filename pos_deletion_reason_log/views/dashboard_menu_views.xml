@@ -7,8 +7,8 @@
 
     <menuitem id="menu_pos_deletion_dashboard"
               name="Métricas de Cajeros"
-              parent="point_of_sale.menu_point_rep"
               action="action_pos_deletion_dashboard"
               groups="pos_deletion_reason_log.group_pos_deletion_audit"
-              sequence="80"/>
+              web_icon="pos_deletion_reason_log,static/description/icon.png"
+              sequence="50"/>
 </odoo>

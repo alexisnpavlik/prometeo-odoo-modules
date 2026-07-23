@@ -48,5 +48,5 @@ aprobación de manager (los popups se apilan), pero no depende de él.
     },
     "installable": True,
     "auto_install": False,
-    "application": False,
+    "application": True,
 }
