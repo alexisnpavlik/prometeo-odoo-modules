@@ -40,7 +40,7 @@
 
                 <!-- Filtros -->
                 <div class="sidebar-section">
-                    <h3>Filtros</h3>
+                    <h3>Filtros Avanzados</h3>
                     <div class="input-group">
                         <label>Punto de Venta (Caja)</label>
                         <div class="select-wrapper">
