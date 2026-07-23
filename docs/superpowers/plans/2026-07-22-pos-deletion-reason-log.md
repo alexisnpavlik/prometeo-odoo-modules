@@ -503,18 +503,17 @@ class PosConfig(models.Model):
         string="Motivo al reducir cantidad",
         help="Pide un motivo cuando el cajero reduce la cantidad de una línea.",
     )
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        """Asegura que los toggles de motivo lleguen al frontend del POS."""
-        fields_list = super()._load_pos_data_fields(config_id)
-        fields_list += [
-            "require_reason_order_deletion",
-            "require_reason_line_deletion",
-            "require_reason_qty_reduction",
-        ]
-        return fields_list
 ```
+
+> **CORRECCIÓN (post-implementación):** la versión original de este plan incluía
+> aquí un override de `_load_pos_data_fields` en `pos.config` "defensivo". Es
+> **incorrecto y rompe el POS**: el mixin devuelve `[]` a propósito, y una lista
+> vacía hace que `search_read` cargue TODOS los campos de `pos.config` (incluido
+> `use_pricelist`, que el core lee sin chequeo en `_load_pos_data`). Devolver una
+> lista acotada provoca `KeyError: 'use_pricelist'` al abrir el POS. **NO agregar
+> ese override.** Los toggles `require_reason_*` llegan solos al frontend por la
+> carga completa de `pos.config` (igual que los `validate_*` de
+> `pos_special_approval_omax`, que tampoco hace override).
 
 - [ ] **Step 2: Crear `pos_deletion_reason_log/models/pos_session.py`**
 
