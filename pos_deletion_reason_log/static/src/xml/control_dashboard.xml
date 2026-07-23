@@ -46,17 +46,8 @@
                         <label>Punto de Venta (Caja)</label>
                         <div class="select-wrapper">
                             <select t-model="state.pos">
-                                <option value="all">Todas</option>
+                                <option value="all">Todas las cajas</option>
                                 <t t-foreach="filtersData.cajas" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Cajero</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.cashier">
-                                <option value="all">Todos</option>
-                                <t t-foreach="filtersData.cajeros" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
                             </select>
                         </div>
                     </div>
@@ -64,8 +55,17 @@
                         <label>Empresa</label>
                         <div class="select-wrapper">
                             <select t-model="state.company">
-                                <option value="all">Todas</option>
+                                <option value="all">Todas las empresas</option>
                                 <t t-foreach="filtersData.empresas" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Cajero</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.cashier">
+                                <option value="all">Todos los cajeros</option>
+                                <t t-foreach="filtersData.cajeros" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
                             </select>
                         </div>
                     </div>
@@ -73,7 +73,7 @@
                         <label>Tipo</label>
                         <div class="select-wrapper">
                             <select t-model="state.dtype">
-                                <option value="all">Todos</option>
+                                <option value="all">Todos los tipos</option>
                                 <option value="order">Orden eliminada</option>
                                 <option value="line">Línea eliminada</option>
                                 <option value="qty_reduction">Reducción cantidad</option>
