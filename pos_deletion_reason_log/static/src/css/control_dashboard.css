@@ -66,6 +66,8 @@
 .del-kpi.accent-blue { border-left-color: #3b82f6; }
 .del-kpi.accent-green { border-left-color: #10b981; }
 .del-kpi.accent-purple { border-left-color: #8b5cf6; }
+.del-kpi.accent-pink { border-left-color: #ec4899; }
+.del-kpi.accent-teal { border-left-color: #14b8a6; }
 
 /* Charts + cards */
 .del-charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
@@ -88,6 +90,8 @@
 .del-tag.t-order { background: #ef4444; }
 .del-tag.t-line { background: #f59e0b; }
 .del-tag.t-qty_reduction { background: #3b82f6; }
+.del-tag.t-high_discount { background: #8b5cf6; }
+.del-tag.t-price_reduction { background: #ec4899; }
 
 @media (max-width: 900px) {
     .del-charts { grid-template-columns: 1fr; }

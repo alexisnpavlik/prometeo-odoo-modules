@@ -25,3 +25,20 @@ class PosConfig(models.Model):
         default=True,
         help="Pide un motivo cuando el cajero reduce la cantidad de una línea.",
     )
+    require_reason_high_discount = fields.Boolean(
+        string="Motivo en descuento alto",
+        default=True,
+        help="Pide un motivo cuando el descuento de una línea supera el umbral configurado.",
+    )
+    high_discount_threshold = fields.Float(
+        string="Umbral de descuento alto (%)",
+        default=35.0,
+        help="Porcentaje a partir del cual un descuento de línea se considera alto "
+             "y requiere motivo.",
+    )
+    require_reason_price_reduction = fields.Boolean(
+        string="Motivo al reducir precio",
+        default=True,
+        help="Pide un motivo cuando el cajero baja el precio de una línea por debajo "
+             "del que tenía al seleccionarla.",
+    )

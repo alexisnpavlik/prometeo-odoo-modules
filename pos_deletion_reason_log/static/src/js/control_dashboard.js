@@ -6,20 +6,24 @@ import { rpc } from "@web/core/network/rpc";
 import { loadJS } from "@web/core/assets";
 
 const TYPE_LABELS = {
-    order: "Orden completa",
-    line: "Línea / producto",
+    order: "Orden eliminada",
+    line: "Línea eliminada",
     qty_reduction: "Reducción cantidad",
+    high_discount: "Descuento alto",
+    price_reduction: "Reducción precio",
 };
 
 const COLORS = {
     order: "#ef4444",
     line: "#f59e0b",
     qty: "#3b82f6",
+    discount: "#8b5cf6",
+    price: "#ec4899",
     palette: ["#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"],
 };
 
-class PosDeletionDashboard extends Component {
-    static template = "pos_deletion_reason_log.DeletionDashboard";
+class PosControlDashboard extends Component {
+    static template = "pos_deletion_reason_log.ControlDashboard";
 
     setup() {
         this.state = useState({
@@ -37,7 +41,10 @@ class PosDeletionDashboard extends Component {
         });
         this.filtersData = useState({ cajas: [], cajeros: [], empresas: [], motivos: [] });
         this.data = useState({
-            kpis: { total: 0, n_order: 0, n_line: 0, n_qty: 0, amount: 0, units: 0, deletion_rate: 0 },
+            kpis: {
+                total: 0, n_order: 0, n_line: 0, n_qty: 0, n_discount: 0, n_price: 0,
+                amount: 0, units: 0, avg_discount: 0, deletion_rate: 0,
+            },
             cashiers: [],
             reasons: [],
             trend: [],
@@ -93,7 +100,7 @@ class PosDeletionDashboard extends Component {
     // ---- Datos ----
     async loadFilters() {
         try {
-            const res = await rpc("/pos_deletion_metrics/filters", {});
+            const res = await rpc("/pos_control_metrics/filters", {});
             Object.assign(this.filtersData, res);
         } catch (e) {
             console.error("filters error", e);
@@ -104,7 +111,7 @@ class PosDeletionDashboard extends Component {
         this.state.loading = true;
         this.state.syncTime = "Sincronizando...";
         try {
-            const res = await rpc("/pos_deletion_metrics/metrics", {
+            const res = await rpc("/pos_control_metrics/metrics", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
                 pos: this.state.pos,
@@ -168,6 +175,8 @@ class PosDeletionDashboard extends Component {
                         { label: TYPE_LABELS.order, data: this.data.cashiers.map((c) => c.n_order), backgroundColor: COLORS.order },
                         { label: TYPE_LABELS.line, data: this.data.cashiers.map((c) => c.n_line), backgroundColor: COLORS.line },
                         { label: TYPE_LABELS.qty_reduction, data: this.data.cashiers.map((c) => c.n_qty), backgroundColor: COLORS.qty },
+                        { label: TYPE_LABELS.high_discount, data: this.data.cashiers.map((c) => c.n_discount), backgroundColor: COLORS.discount },
+                        { label: TYPE_LABELS.price_reduction, data: this.data.cashiers.map((c) => c.n_price), backgroundColor: COLORS.price },
                     ],
                 },
                 options: {
@@ -203,7 +212,7 @@ class PosDeletionDashboard extends Component {
                 data: {
                     labels: this.data.trend.map((t) => t.dia),
                     datasets: [
-                        { label: "Eliminaciones", data: this.data.trend.map((t) => t.total), borderColor: COLORS.order, backgroundColor: "rgba(239,68,68,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
+                        { label: "Eventos", data: this.data.trend.map((t) => t.total), borderColor: COLORS.order, backgroundColor: "rgba(239,68,68,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
                         { label: "Importe ($)", data: this.data.trend.map((t) => t.amount), borderColor: COLORS.qty, backgroundColor: "rgba(59,130,246,0.15)", fill: true, tension: 0.3, yAxisID: "y1" },
                     ],
                 },
@@ -221,4 +230,4 @@ class PosDeletionDashboard extends Component {
     }
 }
 
-registry.category("actions").add("pos_deletion_reason_log.dashboard", PosDeletionDashboard);
+registry.category("actions").add("pos_deletion_reason_log.dashboard", PosControlDashboard);

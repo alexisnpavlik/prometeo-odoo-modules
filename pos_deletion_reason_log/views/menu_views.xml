@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_pos_deletion_log"
-              name="Eliminaciones POS"
+    <menuitem id="menu_pos_control_log"
+              name="Trazabilidad POS"
               parent="point_of_sale.menu_point_of_sale"
-              action="action_pos_deletion_log"
+              action="action_pos_control_log"
               groups="pos_deletion_reason_log.group_pos_deletion_audit"
               sequence="90"/>
 

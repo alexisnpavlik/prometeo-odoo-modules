@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
-    <t t-name="pos_deletion_reason_log.DeletionDashboard">
+    <t t-name="pos_deletion_reason_log.ControlDashboard">
         <div t-att-class="'del-dash ' + (state.theme === 'light' ? 'theme-light' : 'theme-dark')">
             <!-- Sidebar de filtros -->
             <aside class="del-sidebar">
@@ -56,9 +56,11 @@
                         <label>Tipo</label>
                         <select t-model="state.dtype">
                             <option value="all">Todos</option>
-                            <option value="order">Orden completa</option>
-                            <option value="line">Línea / producto</option>
+                            <option value="order">Orden eliminada</option>
+                            <option value="line">Línea eliminada</option>
                             <option value="qty_reduction">Reducción cantidad</option>
+                            <option value="high_discount">Descuento alto</option>
+                            <option value="price_reduction">Reducción precio</option>
                         </select>
                     </div>
                     <div class="del-input">
@@ -79,7 +81,7 @@
             <!-- Contenido principal -->
             <main class="del-main">
                 <header class="del-header">
-                    <h1>Dashboard de Eliminaciones</h1>
+                    <h1>Métricas de Cajeros</h1>
                     <div class="del-header-right">
                         <span class="del-sync">
                             <span t-att-class="'del-dot ' + (state.loading ? 'anim' : 'ok')"></span>
@@ -95,7 +97,7 @@
                 <!-- KPI cards -->
                 <section class="del-kpis">
                     <div class="del-kpi">
-                        <span class="del-kpi-label">Total eliminaciones</span>
+                        <span class="del-kpi-label">Total operaciones</span>
                         <span class="del-kpi-value" t-esc="data.kpis.total"/>
                     </div>
                     <div class="del-kpi accent-red">
@@ -111,11 +113,20 @@
                         <span class="del-kpi-value" t-esc="data.kpis.n_qty"/>
                         <span class="del-kpi-foot"><t t-esc="data.kpis.units"/> u. quitadas</span>
                     </div>
+                    <div class="del-kpi accent-purple">
+                        <span class="del-kpi-label">Descuentos altos</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.n_discount"/>
+                        <span class="del-kpi-foot">prom. <t t-esc="data.kpis.avg_discount"/>%</span>
+                    </div>
+                    <div class="del-kpi accent-pink">
+                        <span class="del-kpi-label">Reducciones de precio</span>
+                        <span class="del-kpi-value" t-esc="data.kpis.n_price"/>
+                    </div>
                     <div class="del-kpi accent-green">
-                        <span class="del-kpi-label">Importe eliminado</span>
+                        <span class="del-kpi-label">Importe afectado</span>
                         <span class="del-kpi-value">$ <t t-esc="money(data.kpis.amount)"/></span>
                     </div>
-                    <div class="del-kpi accent-purple">
+                    <div class="del-kpi accent-teal">
                         <span class="del-kpi-label">Tasa de eliminación</span>
                         <span class="del-kpi-value"><t t-esc="data.kpis.deletion_rate"/>%</span>
                         <span class="del-kpi-foot">órdenes elim. / total</span>
@@ -149,13 +160,14 @@
 
                 <!-- Tabla detalle -->
                 <section class="del-card">
-                    <h4>Detalle (últimas 500)</h4>
+                    <h4>Detalle (últimos 500)</h4>
                     <div class="del-table-wrap">
                         <table class="del-table">
                             <thead>
                                 <tr>
                                     <th>Fecha/hora</th><th>Cajero</th><th>Tipo</th><th>Producto</th>
-                                    <th class="num">Cant.</th><th class="num">Importe</th><th>Motivo</th><th>Nota</th><th>Caja</th>
+                                    <th class="num">Cant.</th><th class="num">Desc. %</th><th class="num">Precio</th>
+                                    <th class="num">Importe</th><th>Motivo</th><th>Nota</th><th>Caja</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,12 +177,18 @@
                                     <td><span t-att-class="'del-tag t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
                                     <td t-esc="d.producto"/>
                                     <td class="num" t-esc="d.qty"/>
+                                    <td class="num"><t t-if="d.tipo === 'high_discount'"><t t-esc="d.discount"/>%</t></td>
+                                    <td class="num">
+                                        <t t-if="d.tipo === 'price_reduction'">
+                                            $<t t-esc="money(d.old_price)"/> → $<t t-esc="money(d.new_price)"/>
+                                        </t>
+                                    </td>
                                     <td class="num">$ <t t-esc="money(d.amount)"/></td>
                                     <td t-esc="d.motivo"/>
                                     <td t-esc="d.nota"/>
                                     <td t-esc="d.caja"/>
                                 </tr>
-                                <tr t-if="!data.detail.length"><td colspan="9" class="del-empty">Sin eliminaciones en el período.</td></tr>
+                                <tr t-if="!data.detail.length"><td colspan="11" class="del-empty">Sin operaciones en el período.</td></tr>
                             </tbody>
                         </table>
                     </div>
