@@ -42,7 +42,7 @@
                 <div class="sidebar-section">
                     <h3>Filtros</h3>
                     <div class="input-group">
-                        <label>Caja</label>
+                        <label>Punto de Venta (Caja)</label>
                         <div class="select-wrapper">
                             <select t-model="state.pos">
                                 <option value="all">Todas</option>
@@ -78,33 +78,6 @@
                                 <option value="qty_reduction">Reducción cantidad</option>
                                 <option value="high_discount">Descuento alto</option>
                                 <option value="price_reduction">Reducción precio</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Motivo</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.reason">
-                                <option value="all">Todos</option>
-                                <t t-foreach="filtersData.motivos" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Categoría</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.category">
-                                <option value="all">Todas</option>
-                                <t t-foreach="filtersData.categorias" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label>Producto</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.product">
-                                <option value="all">Todos</option>
-                                <t t-foreach="filtersData.productos" t-as="c" t-key="c"><option t-att-value="c"><t t-esc="c"/></option></t>
                             </select>
                         </div>
                     </div>
