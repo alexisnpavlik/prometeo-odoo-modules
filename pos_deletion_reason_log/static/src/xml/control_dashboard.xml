@@ -21,9 +21,10 @@
                     <div class="preset-dates">
                         <button t-att-class="'btn-preset ' + (state.preset === 'today' ? 'active' : '')" t-on-click="() => this.onPreset('today')">Hoy</button>
                         <button t-att-class="'btn-preset ' + (state.preset === 'yesterday' ? 'active' : '')" t-on-click="() => this.onPreset('yesterday')">Ayer</button>
-                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')" t-on-click="() => this.onPreset('7days')">7 días</button>
-                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')" t-on-click="() => this.onPreset('30days')">30 días</button>
-                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')" t-on-click="() => this.onPreset('90days')">90 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')" t-on-click="() => this.onPreset('7days')">Últimos 7 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')" t-on-click="() => this.onPreset('30days')">Últimos 30 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '60days' ? 'active' : '')" t-on-click="() => this.onPreset('60days')">Últimos 60 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')" t-on-click="() => this.onPreset('90days')">Últimos 90 días</button>
                         <button t-att-class="'btn-preset ' + (state.preset === 'all' ? 'active' : '')" t-on-click="() => this.onPreset('all')">Todo</button>
                     </div>
                     <div class="custom-date-inputs">

@@ -80,6 +80,8 @@ class PosControlDashboard extends Component {
             start.setDate(today.getDate() - 6);
         } else if (preset === "30days") {
             start.setDate(today.getDate() - 29);
+        } else if (preset === "60days") {
+            start.setDate(today.getDate() - 59);
         } else if (preset === "90days") {
             start.setDate(today.getDate() - 89);
         } else if (preset === "all") {
