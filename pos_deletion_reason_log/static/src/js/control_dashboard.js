@@ -30,6 +30,7 @@ class PosControlDashboard extends Component {
             loading: false,
             syncTime: "Cargando...",
             theme: "dark",
+            activeTab: "general",
             preset: "30days",
             startDate: "",
             endDate: "",
@@ -126,6 +127,15 @@ class PosControlDashboard extends Component {
             this.state.syncTime = "Error de sincronización";
         } finally {
             this.state.loading = false;
+        }
+    }
+
+    switchTab(tab) {
+        this.state.activeTab = tab;
+        if (tab === "general") {
+            // El canvas queda oculto (display:none) mientras esa pestaña no está
+            // activa; Chart.js necesita un resize una vez que vuelve a ser visible.
+            requestAnimationFrame(() => this.renderCharts());
         }
     }
 

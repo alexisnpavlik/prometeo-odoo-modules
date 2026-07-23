@@ -459,6 +459,46 @@
 .pos-dashboard-wrap .icon-spin-target.spinning { animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+/* Navegación por Pestañas (Tabs) */
+.pos-dashboard-wrap .nav-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1px;
+}
+
+.pos-dashboard-wrap .nav-tab {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    position: relative;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .nav-tab:hover { color: var(--text-primary); }
+.pos-dashboard-wrap .nav-tab.active { color: var(--text-primary); }
+
+.pos-dashboard-wrap .nav-tab.active::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-blue) 0%, var(--color-purple) 100%);
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 -2px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Contenido de Paneles (Tabs) */
+.pos-dashboard-wrap .tab-content { position: relative; width: 100%; }
+.pos-dashboard-wrap .tab-pane { display: none; flex-direction: column; gap: 24px; width: 100%; }
+.pos-dashboard-wrap .tab-pane.active { display: flex; }
+
 /* Responsive */
 @media (max-width: 992px) {
     .pos-dashboard-wrap { flex-direction: column; position: relative; height: auto; min-height: 100%; overflow-y: auto; }

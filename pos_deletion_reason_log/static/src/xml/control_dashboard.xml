@@ -130,6 +130,17 @@
                     </div>
                 </header>
 
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'general' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('general')">Panel General</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'detail' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('detail')">Detalle de operaciones</button>
+                </nav>
+
+                <div class="tab-content">
+                <section t-att-class="'tab-pane ' + (state.activeTab === 'general' ? 'active' : '')">
+
                 <!-- KPI Cards -->
                 <div class="kpi-grid">
                     <div class="kpi-card shadow-glow blue">
@@ -294,8 +305,10 @@
                     </div>
                 </div>
 
-                <!-- Tabla detalle -->
-                <div>
+                </section>
+
+                <!-- TAB: DETALLE -->
+                <section t-att-class="'tab-pane ' + (state.activeTab === 'detail' ? 'active' : '')">
                     <div class="section-header">
                         <div>
                             <h2>Detalle de operaciones</h2>
@@ -335,6 +348,7 @@
                             </tbody>
                         </table>
                     </div>
+                </section>
                 </div>
             </main>
         </div>
