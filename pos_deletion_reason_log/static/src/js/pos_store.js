@@ -7,27 +7,42 @@ import { askReason, logEvent, snapshotOrder } from "./control_logger";
 
 patch(PosStore.prototype, {
     /**
-     * Pide motivo antes de eliminar la orden y registra si la eliminación ocurrió.
+     * Único choke point de eliminación de órdenes en el POS: tanto el ícono de
+     * tacho (onDeleteOrder llama a this.deleteOrders([order]) internamente)
+     * como "Cancelar órdenes" del popup de cierre de caja (cuando queda una
+     * orden sin finalizar) pasan por acá. Se pide un solo motivo para todo el
+     * lote antes de ejecutar la baja real.
+     *
+     * orders=[] con solo serverIds (sync en background de bajas ya decididas
+     * en otro lado) no pide motivo: no hay nada nuevo que el cajero esté
+     * decidiendo en este momento.
      */
-    async onDeleteOrder(order) {
-        if (!this.config.require_reason_order_deletion) {
-            return super.onDeleteOrder(order);
+    async deleteOrders(orders, serverIds = []) {
+        if (!this.config.require_reason_order_deletion || !orders || !orders.length) {
+            return super.deleteOrders(orders, serverIds);
         }
-        const snapshot = snapshotOrder(order);
-        const reason = await askReason(this, _t("Motivo — Eliminar orden"));
+        const snapshots = orders.map((order) => ({ order, snapshot: snapshotOrder(order) }));
+        const title =
+            orders.length > 1
+                ? _t("Motivo — Cancelar %s órdenes sin finalizar", orders.length)
+                : _t("Motivo — Eliminar orden");
+        const reason = await askReason(this, title);
         if (!reason) {
-            return false; // cancelado: no eliminar
+            return false; // cancelado: no se elimina ninguna orden del lote
         }
-        const result = await super.onDeleteOrder(order);
-        // Verificar que la orden ya no exista en el POS
-        const stillExists = this.data.models["pos.order"].get(order.id);
-        if (!stillExists) {
-            await logEvent(this, {
-                event_type: "order",
-                ...snapshot,
-                reason_id: reason.reason_id,
-                reason_note: reason.reason_note,
-            });
+        const result = await super.deleteOrders(orders, serverIds);
+        if (result) {
+            for (const { order, snapshot } of snapshots) {
+                const stillExists = this.data.models["pos.order"].get(order.id);
+                if (!stillExists) {
+                    await logEvent(this, {
+                        event_type: "order",
+                        ...snapshot,
+                        reason_id: reason.reason_id,
+                        reason_note: reason.reason_note,
+                    });
+                }
+            }
         }
         return result;
     },

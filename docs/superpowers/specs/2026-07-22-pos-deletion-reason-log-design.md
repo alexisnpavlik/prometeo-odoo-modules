@@ -29,7 +29,15 @@ eliminar) pero **no depende de él**: el módulo es standalone.
 
 Eventos que piden motivo y quedan registrados (cada uno con toggle propio):
 
-1. **Eliminar orden completa** — `PosStore.onDeleteOrder`.
+1. **Eliminar orden completa** — `PosStore.deleteOrders(orders, serverIds)`. Es
+   el choke point real (no `onDeleteOrder`, que internamente lo llama con un
+   array de 1 elemento): también lo usa el popup de cierre de caja cuando
+   queda una orden sin finalizar y el cajero elige "Cancelar órdenes"
+   (`ClosingPopup.handleClosingError`, rama `cancel`). Un solo motivo cubre
+   todo el lote si hay más de una orden. La llamada de sync en background
+   (`syncAllOrders` → `deleteOrders([], orderIdsToDelete)`, orders vacío) no
+   pide motivo — no es una decisión nueva del cajero, es una baja ya resuelta
+   sincronizándose con el servidor.
 2. **Eliminar línea/producto** — `OrderSummary._setValue` con `remove`.
 3. **Reducir cantidad de una línea** — capturado en `PosStore.selectOrderLine`
    (baseline al seleccionar, comparación al deseleccionar).
@@ -136,8 +144,10 @@ tienen esta limitación — mantienen el flujo motivo-primero original.
 - `static/src/js/control_logger.js` (antes `deletion_logger.js`) — `askReason`,
   `logEvent` (antes `logDeletion`, llama `orm.call("pos.control.log", "log_event", ...)`),
   `snapshotOrder`.
-- `static/src/js/pos_store.js` — patch `onDeleteOrder` (evento `order`, ask-before)
-  y patch `selectOrderLine`: captura baseline `{qty, discount, price}` de la línea
+- `static/src/js/pos_store.js` — patch `deleteOrders` (evento `order`, ask-before,
+  motivo único por lote — cubre trash icon vía `onDeleteOrder` y "Cancelar
+  órdenes" del cierre de caja vía `ClosingPopup`) y patch `selectOrderLine`:
+  captura baseline `{qty, discount, price}` de la línea
   al seleccionarla (`_captureLineBaseline`); al deseleccionar (`_resolvePendingLineChanges`)
   compara y resuelve, en orden, `_resolveQtyReduction`, `_resolveHighDiscount`,
   `_resolvePriceReduction` — cada uno pide motivo solo si corresponde y revierte
