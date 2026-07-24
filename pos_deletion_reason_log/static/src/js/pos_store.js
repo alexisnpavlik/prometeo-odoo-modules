@@ -59,15 +59,23 @@ patch(PosStore.prototype, {
      * orders=[] con solo serverIds (sync en background de bajas ya decididas
      * en otro lado) no pide motivo: no hay nada nuevo que el cajero esté
      * decidiendo en este momento.
+     *
+     * Solo se pide motivo por las órdenes CON productos: borrar una orden vacía
+     * (incluida la orden en blanco que el POS siempre mantiene abierta) no es un
+     * evento a auditar, y pedir motivo ahí trababa al cajero al limpiar órdenes
+     * vacías. Las vacías se borran sin preguntar.
      */
     async deleteOrders(orders, serverIds = []) {
-        if (!this.config.require_reason_order_deletion || !orders || !orders.length) {
+        const withProducts = (orders || []).filter(
+            (o) => o && o.get_orderlines && o.get_orderlines().length > 0
+        );
+        if (!this.config.require_reason_order_deletion || !withProducts.length) {
             return super.deleteOrders(orders, serverIds);
         }
-        const snapshots = orders.map((order) => ({ order, snapshot: snapshotOrder(order) }));
+        const snapshots = withProducts.map((order) => ({ order, snapshot: snapshotOrder(order) }));
         const title =
-            orders.length > 1
-                ? _t("Motivo — Cancelar %s órdenes sin finalizar", orders.length)
+            withProducts.length > 1
+                ? _t("Motivo — Cancelar %s órdenes sin finalizar", withProducts.length)
                 : _t("Motivo — Eliminar orden");
         const reason = await askReason(this, title);
         if (!reason) {
