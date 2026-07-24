@@ -1073,7 +1073,7 @@ class PosMetricsController(http.Controller):
             })
             fmt_text = workbook.add_format({'border': 1})
             fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
-            fmt_qty = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+            fmt_qty = workbook.add_format({'border': 1, 'num_format': '#,##0'})
 
             periodo = f"Período: {start_date or 'inicio'} a {end_date or 'hoy'}"
             sheets = [
@@ -1099,7 +1099,7 @@ class PosMetricsController(http.Controller):
                     sheet.write_string(line, 1, row.get('producto') or '', fmt_text)
                     sheet.write_string(line, 2, row.get('categoria') or '', fmt_text)
                     sheet.write_number(line, 3, float(row.get('facturacion') or 0.0), fmt_money)
-                    sheet.write_number(line, 4, float(row.get('unidades') or 0.0), fmt_qty)
+                    sheet.write_number(line, 4, round(float(row.get('unidades') or 0.0)), fmt_qty)
 
                 sheet.freeze_panes(4, 0)
 
