@@ -16,7 +16,9 @@ Colección optimizada de módulos y adaptaciones de **Odoo v18.0** para entornos
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
   - [4. Inventario, Compras & Ventas](#4-inventario-compras--ventas)
-  - [5. Interfaz de Usuario & Base (Web)](#5-interfaz-de-usuario--base-web)
+  - [5. Productos & Catálogo](#5-productos--catálogo)
+  - [6. Métricas, Dashboards & Monitoreo](#6-métricas-dashboards--monitoreo)
+  - [7. Interfaz de Usuario & Base (Web)](#7-interfaz-de-usuario--base-web)
 - [🛠️ Requisitos e Instalación](#️-requisitos-e-instalación)
   - [Dependencias de Python](#dependencias-de-python)
   - [Configuración en Odoo (`odoo.conf`)](#configuración-en-odoo-odooconf)
@@ -30,8 +32,9 @@ Colección optimizada de módulos y adaptaciones de **Odoo v18.0** para entornos
 *   🇦🇷 **Localización Argentina Completa**: Integración nativa con los servicios web de AFIP (Facturación Electrónica, Consulta de Padrón, etc.) mediante la librería `pyafipws` portada para Odoo 18.
 *   🛒 **Punto de Venta (POS) Profesional**: Botones de descuento ágiles, control de perfiles de solo lectura, venta estructurada de packs, y parametrizaciones por defecto para evitar errores operativos en caja.
 *   🏢 **Gestión Multi-Compañía Segura**: Herramientas visuales y de control del framework (como selectores de compañía seguros y colores dinámicos) que evitan registros accidentales en empresas incorrectas.
-*   📊 **KPIs y Métricas**: Tableros analíticos e indicadores integrados para Inventario y POS, listos para la toma de decisiones.
+*   📊 **KPIs y Métricas**: Tableros analíticos OWL + Chart.js para Inventario, POS, Facturación y Listas de Precios, con exportación a Excel.
 *   💳 **Usabilidad Financiera (LATAM)**: Gestión refinada de transferencias internas, cobros complejos y administración de cheques de terceros.
+*   🔍 **Trazabilidad y Auditoría**: Historial completo de cambios de productos, log de eliminaciones/descuentos en caja y monitoreo de errores de frontend con Sentry.
 
 ---
 
@@ -58,10 +61,10 @@ Extensiones para mejorar la velocidad de atención, la seguridad y el control de
 | :--- | :--- | :--- |
 | **Card installment** | [`card_installment`](./card_installment) | Gestión de coeficientes de cuotas y recargos con tarjetas en los métodos de pago del POS. |
 | **POS Close Draft Invoices** | [`pos_close_with_draft_invoices`](./pos_close_with_draft_invoices) | Permite cerrar la sesión de POS aunque queden facturas en borrador vinculadas a las órdenes. |
+| **POS Deletion Reason Log** | [`pos_deletion_reason_log`](./pos_deletion_reason_log) | Pide motivo y deja registro al eliminar órdenes/líneas, bajar cantidades, aplicar descuentos altos o reducir precios; incluye dashboard con filtros y export. |
 | **POS Global Discount** | [`pos_global_discount_button`](./pos_global_discount_button) | Agrega un botón configurable para aplicar descuentos a todo el pedido de forma ágil. |
 | **POS Global Surcharge** | [`pos_global_surcharge_button`](./pos_global_surcharge_button) | Agrega un botón 'Recargo' en el POS para aplicar/quitar un porcentaje de recargo global. |
 | **POS Invoice Default Off** | [`pos_invoice_default_off`](./pos_invoice_default_off) | Desmarca por defecto la opción de solicitar factura al cobrar, acelerando el flujo de tickets. |
-| **POS Management Metrics** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard y reportes con indicadores clave sobre ventas y arqueos de caja. |
 | **POS Pricelist Enforce** | [`pos_pricelist_enforce`](./pos_pricelist_enforce) | Corrige el bug del POS que deja líneas a precio público en vez de aplicar la lista de precios fija. |
 | **POS Print Last Session** | [`pos_print_last_session`](./pos_print_last_session) | Permite imprimir el reporte de cierre de caja correspondiente a la sesión anterior. |
 | **POS Product Pack** | [`pos_product_pack`](./pos_product_pack) | Habilita la venta de productos compuestos (combos/packs) de forma integrada. |
@@ -80,6 +83,7 @@ Flujos contables simplificados y adaptaciones de usabilidad para el equipo de ad
 | **Talonarios de Recibos** | [`account_payment_pro_receiptbook`](./account_payment_pro_receiptbook) | Control y numeración de cobros/pagos mediante el uso de talonarios de recibos físicos. |
 | **Pagos Avanzados** | [`account_payment_pro`](./account_payment_pro) | Interfaz unificada y extendida para el procesamiento de cobros y pagos contables. |
 | **UX Contabilidad** | [`account_ux`](./account_ux) | Pequeños ajustes de usabilidad para acelerar la carga de facturas y la conciliación. |
+| **Facturas Inter-Compañía** | [`account_invoice_inter_company`](./account_invoice_inter_company) | Genera automáticamente la factura espejo (compra/venta) en la empresa contraparte. |
 
 ### 4. Inventario, Compras & Ventas
 
@@ -90,20 +94,45 @@ Operaciones automatizadas y visibilidad logística integrada en tiempo real.
 | **Actualización de Costos** | [`purchase_auto_update_cost`](./purchase_auto_update_cost) | Actualiza el costo de adquisición del producto de forma automática al recibir la compra. |
 | **Hide Create Receipt** | [`stock_hide_create_receipt`](./stock_hide_create_receipt) | Oculta los botones de creación manual de nuevas recepciones en el flujo de almacén. |
 | **Intercompany Sales/Stock** | `purchase_sale_*_inter_company` | Genera de forma automática órdenes espejo y transferencias de stock entre empresas vinculadas. |
-| **Métricas de Inventario** | [`inventory_dashboard_metrics`](./inventory_dashboard_metrics) | KPIs de rotación, stock mínimo, valorización y estado general del inventario. |
-| **Product Default Settings** | [`product_default_settings`](./product_default_settings) | Valores por defecto y configuraciones automáticas para productos (disponibilidad en POS, etc.). |
-| **Product Image Zoom** | [`product_image_zoom`](./product_image_zoom) | Amplía la imagen del producto al hacer clic en su ficha en el backend. |
+| **Stock Intercompany** | [`stock_intercompany`](./stock_intercompany) | Vincula la entrega de una empresa con la recepción automática en la empresa destino. |
 | **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
 | **Stock Picking Auto Qty** | [`stock_picking_auto_qty`](./stock_picking_auto_qty) | Auto-completa la cantidad hecha con la cantidad demandada en albaranes de salida para permitir la disponibilidad. |
+| **Conteo por Código de Barras** | [`stock_count_barcode`](./stock_count_barcode) | Sesiones de conteo de inventario escaneando con la cámara del teléfono o lector láser; aplica las cantidades contadas al ajuste de stock. |
 
-### 5. Interfaz de Usuario & Base (Web)
+### 5. Productos & Catálogo
+
+Gestión del catálogo, control de cambios y restricciones multi-compañía sobre productos.
+
+| Módulo | Directorio | Descripción |
+| :--- | :--- | :--- |
+| **Product Default Settings** | [`product_default_settings`](./product_default_settings) | Valores por defecto y configuraciones automáticas para productos (disponibilidad en POS, etc.). |
+| **Product Image Zoom** | [`product_image_zoom`](./product_image_zoom) | Amplía la imagen del producto al hacer clic en su ficha en el backend. |
+| **Product Pack** | [`product_pack`](./product_pack) | Define productos compuestos (packs/combos) con sus componentes y reglas de precio. |
+| **Product Change History** | [`product_change_history`](./product_change_history) | Postea en el chatter **todos** los campos editados del producto, no solo los que tienen `tracking=True`. |
+| **Product Company Restriction** | [`product_company_restriction`](./product_company_restriction) | Grupo que limita la creación/edición/borrado de productos a los de la propia empresa del usuario. |
+| **Barcodes Generator** | [`barcodes_generator_abstract`](./barcodes_generator_abstract) · [`barcodes_generator_product`](./barcodes_generator_product) | Generación automática de códigos de barras (EAN13 y otros) para cualquier modelo y para plantillas/variantes de producto. |
+
+### 6. Métricas, Dashboards & Monitoreo
+
+Tableros OWL con Chart.js sobre datos en vivo, más monitoreo de errores en producción.
+
+| Módulo | Directorio | Descripción |
+| :--- | :--- | :--- |
+| **Métricas de Inventario** | [`inventory_dashboard_metrics`](./inventory_dashboard_metrics) | KPIs de rotación, stock mínimo, valorización y estado general del inventario. |
+| **Métricas de POS** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard y reportes con indicadores clave sobre ventas y arqueos de caja, con exportación a Excel. |
+| **Métricas de Facturación** | [`account_management_metrics`](./account_management_metrics) | Comprobantes por tipo (A/B/C, NC), facturación por sucursal y diario, cobros por medio de pago, borradores y canceladas. |
+| **Métricas de Listas de Precios** | [`pricelist_management_metrics`](./pricelist_management_metrics) | Comparativa de precio base vs. precio vigente por lista/sucursal, filtrable por producto y categoría. |
+| **Cambios de Precio (Góndola)** | [`product_price_change_metrics`](./product_price_change_metrics) | Lista de trabajo por sucursal con los productos que cambiaron de precio, marcables como pendiente/actualizado para reetiquetar. |
+| **Sentry Monitoring** | [`prometeo_sentry_monitoring`](./prometeo_sentry_monitoring) | Captura errores de frontend (backend web y POS) y los envía a Sentry; DSN vía `SENTRY_DSN` o parámetro del sistema. |
+
+### 7. Interfaz de Usuario & Base (Web)
 
 Ajustes a nivel de framework para mitigar errores operativos en configuraciones multi-compañía.
 
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la interfaz de Odoo dinámicamente según la compañía activa, brindando una señal visual clara. |
-| **Web Single Company** | [`web_single_company`](./web_single_company) | Fuerza la navegación y selección a una única empresa activa por sesión de usuario. |
+| **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a cualquier modelo. |
 
 ---
 
