@@ -9,15 +9,17 @@ import { askReason, logEvent, snapshotOrder } from "./control_logger";
 patch(PosStore.prototype, {
     /**
      * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
-     * unitario 0 (producto sin precio cargado). Los hijos de combo NO se
-     * excluyen: si un combo reparte precio 0 en alguna línea hija, también
-     * se bloquea (decisión explícita, para no dejar ningún hueco de precio 0).
+     * unitario 0 (producto sin precio cargado). Se excluyen los hijos de combo,
+     * que legítimamente van en 0 porque el precio lo lleva la línea padre.
      */
     async pay() {
         if (this.config.block_zero_price_payment) {
             const order = this.get_order();
             const zeroLines = (order?.get_orderlines() || []).filter(
-                (line) => !line.is_reward_line && line.get_unit_price() === 0
+                (line) =>
+                    !line.combo_parent_id &&
+                    !line.is_reward_line &&
+                    line.get_unit_price() === 0
             );
             if (zeroLines.length) {
                 const names = zeroLines

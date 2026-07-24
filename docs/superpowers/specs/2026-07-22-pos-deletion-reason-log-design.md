@@ -166,11 +166,11 @@ tienen esta limitación — mantienen el flujo motivo-primero original.
 - `require_reason_price_reduction`
 - `block_zero_price_payment` (default True) — impide pasar a la pantalla de pago
   si alguna línea tiene precio unitario 0 (producto sin precio cargado). Patch de
-  `PosStore.pay()`: muestra AlertDialog listando los productos y aborta. Solo se
-  excluyen las líneas de recompensa (`is_reward_line`). Los hijos de combo
-  **no** se excluyen (decisión explícita del usuario): si un combo reparte
-  precio 0 en una línea hija, también bloquea. Campo nuevo con default=True →
-  cajas existentes en True sin migración.
+  `PosStore.pay()`: muestra AlertDialog listando los productos y aborta. Se
+  excluyen los hijos de combo (`combo_parent_id`), que legítimamente van en 0
+  porque el precio lo lleva la línea padre, y las líneas de recompensa
+  (`is_reward_line`). Campo nuevo con default=True → cajas existentes en True
+  sin migración.
 - `block_close_with_pending_orders` (default True) — impide cerrar la caja si
   quedan órdenes con productos sin finalizar. Patch de `ClosePosPopup.confirm()`
   (`static/src/js/closing_popup.js`): antes del flujo base, si hay órdenes en
