@@ -6,6 +6,7 @@ import datetime
 import csv
 import io
 import logging
+import xlsxwriter
 
 _logger = logging.getLogger(__name__)
 
@@ -1038,6 +1039,86 @@ class PosMetricsController(http.Controller):
             "pages": total_pages,
             "total": total_rows
         }
+
+    @http.route('/pos_management_metrics/export_top_articles', type='http', auth='user')
+    def export_top_articles_xlsx(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=50, **kwargs):
+        """Exporta a Excel el top de artículos en dos hojas: por total vendido y por unidades."""
+        try:
+            self._check_access()
+
+            # Sanitizar filtros en caso de peticiones http GET planas
+            start_date = start_date if start_date and start_date not in ('null', '') else None
+            end_date = end_date if end_date and end_date not in ('null', '') else None
+            pos = pos or 'all'
+            cashier = cashier or 'all'
+            company = company or 'all'
+            category = category or 'all'
+            product = product or 'all'
+            try:
+                limit = int(limit or 50)
+            except (TypeError, ValueError):
+                limit = 50
+
+            data = self.get_top_articles(
+                start_date=start_date, end_date=end_date, pos=pos, cashier=cashier,
+                company=company, category=category, product=product, limit=limit
+            )
+
+            output = io.BytesIO()
+            workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+            fmt_title = workbook.add_format({'bold': True, 'font_size': 12})
+            fmt_header = workbook.add_format({
+                'bold': True, 'bg_color': '#1e293b', 'font_color': '#ffffff',
+                'border': 1, 'align': 'center', 'valign': 'vcenter'
+            })
+            fmt_text = workbook.add_format({'border': 1})
+            fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+            fmt_qty = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+
+            periodo = f"Período: {start_date or 'inicio'} a {end_date or 'hoy'}"
+            sheets = [
+                (f"Top {limit} por Total Vendido", data.get("by_revenue") or []),
+                (f"Top {limit} por Unidades", data.get("by_units") or []),
+            ]
+
+            for sheet_name, rows in sheets:
+                sheet = workbook.add_worksheet(sheet_name[:31])
+                sheet.set_column(0, 0, 6)
+                sheet.set_column(1, 1, 50)
+                sheet.set_column(2, 2, 30)
+                sheet.set_column(3, 4, 18)
+
+                sheet.write(0, 0, sheet_name, fmt_title)
+                sheet.write(1, 0, periodo)
+                for col, header in enumerate(['#', 'Artículo', 'Categoría', 'Total Vendido', 'Unidades']):
+                    sheet.write(3, col, header, fmt_header)
+
+                for idx, row in enumerate(rows):
+                    line = 4 + idx
+                    sheet.write_number(line, 0, idx + 1, fmt_text)
+                    sheet.write_string(line, 1, row.get('producto') or '', fmt_text)
+                    sheet.write_string(line, 2, row.get('categoria') or '', fmt_text)
+                    sheet.write_number(line, 3, float(row.get('facturacion') or 0.0), fmt_money)
+                    sheet.write_number(line, 4, float(row.get('unidades') or 0.0), fmt_qty)
+
+                sheet.freeze_panes(4, 0)
+
+            workbook.close()
+            xlsx_data = output.getvalue()
+            output.close()
+
+            filename = f"top_articulos_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            return request.make_response(
+                xlsx_data,
+                headers=[
+                    ('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                    ('Content-Disposition', f'attachment; filename="{filename}"'),
+                    ('Content-Length', str(len(xlsx_data))),
+                ]
+            )
+        except Exception as e:
+            _logger.exception("Error exportando top de artículos POS")
+            return request.make_response(str(e), status=500)
 
     @http.route('/pos_management_metrics/export', type='http', auth='user')
     def export_csv(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):

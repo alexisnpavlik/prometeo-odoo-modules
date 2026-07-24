@@ -398,6 +398,21 @@ class PosDashboardMetrics extends Component {
         }
     }
 
+    exportTopArticlesExcel() {
+        // Exporta el top 50 (por total vendido y por unidades) a Excel con los filtros activos
+        const params = new URLSearchParams({
+            start_date: this.state.startDate || '',
+            end_date: this.state.endDate || '',
+            pos: this.state.pos,
+            cashier: this.state.cashier,
+            company: this.state.company,
+            category: this.state.category,
+            product: this.state.product,
+            limit: 50
+        });
+        window.open(`/pos_management_metrics/export_top_articles?${params.toString()}`, '_blank');
+    }
+
     exportCSV() {
         // Redireccionar al endpoint de tipo HTTP de exportación pasándole filtros GET
         const params = new URLSearchParams({
