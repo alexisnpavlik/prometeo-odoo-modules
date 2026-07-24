@@ -48,3 +48,9 @@ class PosConfig(models.Model):
         help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. "
              "El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.",
     )
+    block_zero_price_payment = fields.Boolean(
+        string="Bloquear cobro con productos a precio 0",
+        default=True,
+        help="Impide pasar a la pantalla de pago si alguna línea de la orden tiene "
+             "precio unitario 0. Evita cobrar productos sin precio cargado.",
+    )

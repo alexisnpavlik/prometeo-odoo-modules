@@ -3,9 +3,44 @@
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { askReason, logEvent, snapshotOrder } from "./control_logger";
 
 patch(PosStore.prototype, {
+    /**
+     * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
+     * unitario 0 (producto sin precio cargado). Se excluyen los hijos de combo,
+     * que legítimamente van en 0 porque el precio lo lleva la línea padre.
+     */
+    async pay() {
+        if (this.config.block_zero_price_payment) {
+            const order = this.get_order();
+            const zeroLines = (order?.get_orderlines() || []).filter(
+                (line) =>
+                    !line.combo_parent_id &&
+                    !line.is_reward_line &&
+                    line.get_unit_price() === 0
+            );
+            if (zeroLines.length) {
+                const names = zeroLines
+                    .map((l) => l.get_full_product_name?.() || l.get_product()?.display_name || "")
+                    .filter(Boolean)
+                    .join(", ");
+                this.env.services.dialog.add(AlertDialog, {
+                    title: _t("No se puede cobrar"),
+                    body: _t(
+                        "Hay %s producto(s) con precio 0 en la orden (%s). " +
+                            "Cargá el precio correcto antes de cobrar.",
+                        zeroLines.length,
+                        names
+                    ),
+                });
+                return;
+            }
+        }
+        return super.pay(...arguments);
+    },
+
     /**
      * Único choke point de eliminación de órdenes en el POS: tanto el ícono de
      * tacho (onDeleteOrder llama a this.deleteOrders([order]) internamente)

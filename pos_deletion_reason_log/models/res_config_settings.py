@@ -26,3 +26,6 @@ class ResConfigSettings(models.TransientModel):
     block_close_with_pending_orders = fields.Boolean(
         related="pos_config_id.block_close_with_pending_orders", readonly=False
     )
+    block_zero_price_payment = fields.Boolean(
+        related="pos_config_id.block_zero_price_payment", readonly=False
+    )
