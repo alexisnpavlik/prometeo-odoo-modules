@@ -162,6 +162,13 @@ tienen esta limitación — mantienen el flujo motivo-primero original.
 - `require_reason_qty_reduction`
 - `require_reason_high_discount` + `high_discount_threshold` (Float, default 35.0)
 - `require_reason_price_reduction`
+- `block_close_with_pending_orders` (default True) — impide cerrar la caja si
+  quedan órdenes con productos sin finalizar. Patch de `ClosePosPopup.confirm()`
+  (`static/src/js/closing_popup.js`): antes del flujo base, si hay órdenes en
+  memoria con `!finalized && get_orderlines().length > 0`, muestra un AlertDialog
+  y aborta el cierre. El cajero debe cobrar o cancelar (el borrado pide motivo)
+  esas órdenes antes de cerrar. Campo nuevo con default=True → las cajas
+  existentes lo reciben en True al crearse la columna (sin migración).
 
 Se cargan al POS (ya disponibles en `pos.config` del frontend — **no** hay
 override de `_load_pos_data_fields`, ver nota de la Task 4 corregida en el plan).

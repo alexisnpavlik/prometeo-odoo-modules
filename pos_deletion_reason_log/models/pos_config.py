@@ -42,3 +42,9 @@ class PosConfig(models.Model):
         help="Pide un motivo cuando el cajero baja el precio de una línea por debajo "
              "del que tenía al seleccionarla.",
     )
+    block_close_with_pending_orders = fields.Boolean(
+        string="Bloquear cierre con órdenes pendientes",
+        default=True,
+        help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. "
+             "El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.",
+    )

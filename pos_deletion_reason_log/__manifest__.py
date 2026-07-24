@@ -38,6 +38,7 @@ aprobación de manager (los popups se apilan), pero no depende de él.
             "pos_deletion_reason_log/static/src/js/control_logger.js",
             "pos_deletion_reason_log/static/src/js/pos_store.js",
             "pos_deletion_reason_log/static/src/js/order_summary.js",
+            "pos_deletion_reason_log/static/src/js/closing_popup.js",
             "pos_deletion_reason_log/static/src/xml/deletion_reason_popup.xml",
         ],
         "web.assets_backend": [

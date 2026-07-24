@@ -23,3 +23,6 @@ class ResConfigSettings(models.TransientModel):
     require_reason_price_reduction = fields.Boolean(
         related="pos_config_id.require_reason_price_reduction", readonly=False
     )
+    block_close_with_pending_orders = fields.Boolean(
+        related="pos_config_id.block_close_with_pending_orders", readonly=False
+    )
