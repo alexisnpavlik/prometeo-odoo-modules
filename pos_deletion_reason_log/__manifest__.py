@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Deletion Reason Log",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Point of Sale",
     "summary": "Traza en el POS eliminaciones, descuentos altos y reducciones de precio, pidiendo motivo",
     "description": """
