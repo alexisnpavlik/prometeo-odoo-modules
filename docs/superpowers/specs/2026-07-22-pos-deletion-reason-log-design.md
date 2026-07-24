@@ -108,6 +108,20 @@ otra línea, nunca se disparaba la verificación. `PosStore.pay()` ahora hace
 queda bloqueado hasta resolver el motivo. Acá sí se espera la resolución (a
 diferencia de `selectOrderLine`, que corre en background a propósito).
 
+**Descuento global** (`pos_discount`): no pasa por el control por línea, porque
+en vez de tocar `line.discount` agrega una línea con el producto de descuento y
+precio negativo — `get_discount()` nunca lo ve. Se controla aparte en
+`static/src/js/control_buttons.js`, patch de `ControlButtons.apply_discount(pc)`:
+el porcentaje llega explícito, así que es **ask-before** (si el cajero cancela,
+el descuento simplemente no se aplica, sin revert). Se registra como
+`high_discount` con `discount_percent = pc` y `amount_removed` = suma de las
+líneas del producto de descuento. **`pos_discount` es dependencia obligatoria en
+el manifest**: su patch de `apply_discount` no llama a `super`, así que el
+nuestro solo funciona si carga después, y el orden de assets lo determina el
+grafo de dependencias (sin la dependencia, alfabéticamente cargaría antes y
+quedaría anulado). Ojo: agregar una dependencia nueva requiere
+`ir.module.module.update_list()` — un `-u` normal no la registra.
+
 **Cierre del bypass "cancelar el popup con la X/Escape"**: `askReason` resolvía
 `null` mediante un prop `close`, pero el servicio de diálogos hace
 `subProps: {...props, close}` y lo pisaba. Cerrar con X o Escape dejaba la
