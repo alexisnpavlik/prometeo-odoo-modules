@@ -436,6 +436,7 @@
 .pos-dashboard-wrap .status-pill.t-qty_reduction { background: var(--color-blue-glow); color: var(--color-blue); border: 1px solid rgba(59, 130, 246, 0.3); }
 .pos-dashboard-wrap .status-pill.t-high_discount { background: var(--color-purple-glow); color: var(--color-purple); border: 1px solid rgba(139, 92, 246, 0.3); }
 .pos-dashboard-wrap .status-pill.t-price_reduction { background: var(--color-pink-glow); color: var(--color-pink); border: 1px solid rgba(236, 72, 153, 0.3); }
+.pos-dashboard-wrap .status-pill.t-price_increase { background: var(--color-teal-glow); color: var(--color-teal); border: 1px solid rgba(20, 184, 166, 0.3); }
 
 .pos-dashboard-wrap .text-muted { color: var(--text-muted) !important; }
 

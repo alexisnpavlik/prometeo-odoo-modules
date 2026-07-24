@@ -79,6 +79,7 @@
                                 <option value="qty_reduction">Reducción cantidad</option>
                                 <option value="high_discount">Descuento alto</option>
                                 <option value="price_reduction">Reducción precio</option>
+                                <option value="price_increase">Aumento precio</option>
                             </select>
                         </div>
                     </div>
@@ -241,6 +242,22 @@
                         </div>
                     </div>
 
+                    <div class="kpi-card shadow-glow teal">
+                        <div class="kpi-card-inner">
+                            <div class="kpi-meta">
+                                <span class="kpi-title">Aumentos de precio</span>
+                                <div class="kpi-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                        <polyline points="17 6 23 6 23 12"></polyline>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value" t-esc="data.kpis.n_price_up"/>
+                            <div class="kpi-footer"><span class="kpi-subtext">Precio subido en línea</span></div>
+                        </div>
+                    </div>
+
                     <div class="kpi-card shadow-glow green">
                         <div class="kpi-card-inner">
                             <div class="kpi-meta">
@@ -336,7 +353,7 @@
                                         <t t-if="d.tipo === 'high_discount'"><t t-esc="d.discount"/>%</t>
                                     </td>
                                     <td class="num">
-                                        <t t-if="d.tipo === 'price_reduction'">
+                                        <t t-if="d.tipo === 'price_reduction' or d.tipo === 'price_increase'">
                                             $<t t-esc="money(d.old_price)"/> → $<t t-esc="money(d.new_price)"/>
                                         </t>
                                     </td>

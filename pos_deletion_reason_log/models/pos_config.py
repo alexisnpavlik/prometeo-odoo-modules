@@ -42,6 +42,12 @@ class PosConfig(models.Model):
         help="Pide un motivo cuando el cajero baja el precio de una línea por debajo "
              "del que tenía al seleccionarla.",
     )
+    require_reason_price_increase = fields.Boolean(
+        string="Motivo al aumentar precio",
+        default=True,
+        help="Pide un motivo cuando el cajero sube el precio de una línea por encima "
+             "del que tenía al seleccionarla.",
+    )
     block_close_with_pending_orders = fields.Boolean(
         string="Bloquear cierre con órdenes pendientes",
         default=True,

@@ -17,6 +17,7 @@ class PosControlLog(models.Model):
             ("qty_reduction", "Reducción de cantidad"),
             ("high_discount", "Descuento alto"),
             ("price_reduction", "Reducción de precio"),
+            ("price_increase", "Aumento de precio"),
         ],
         string="Tipo",
         required=True,

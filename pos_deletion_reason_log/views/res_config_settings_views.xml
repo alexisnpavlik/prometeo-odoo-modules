@@ -26,6 +26,9 @@
                     <setting string="Motivo al reducir precio" help="Pide un motivo cuando se baja el precio de una línea por debajo del que tenía al seleccionarla.">
                         <field name="require_reason_price_reduction"/>
                     </setting>
+                    <setting string="Motivo al aumentar precio" help="Pide un motivo cuando se sube el precio de una línea por encima del que tenía al seleccionarla.">
+                        <field name="require_reason_price_increase"/>
+                    </setting>
                     <setting string="Bloquear cierre con órdenes pendientes" help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.">
                         <field name="block_close_with_pending_orders"/>
                     </setting>

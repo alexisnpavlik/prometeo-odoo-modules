@@ -123,6 +123,7 @@ class PosControlMetricsController(http.Controller):
                 COUNT(*) FILTER (WHERE dl.event_type = 'qty_reduction') AS n_qty,
                 COUNT(*) FILTER (WHERE dl.event_type = 'high_discount') AS n_discount,
                 COUNT(*) FILTER (WHERE dl.event_type = 'price_reduction') AS n_price,
+                COUNT(*) FILTER (WHERE dl.event_type = 'price_increase') AS n_price_up,
                 COALESCE(SUM(dl.amount_removed), 0) AS amount,
                 COALESCE(SUM(dl.qty_removed) FILTER (WHERE dl.event_type = 'qty_reduction'), 0) AS units,
                 COALESCE(AVG(dl.discount_percent) FILTER (WHERE dl.event_type = 'high_discount'), 0) AS avg_discount
@@ -139,6 +140,7 @@ class PosControlMetricsController(http.Controller):
             "n_qty": int(row.get("n_qty") or 0),
             "n_discount": int(row.get("n_discount") or 0),
             "n_price": int(row.get("n_price") or 0),
+            "n_price_up": int(row.get("n_price_up") or 0),
             "amount": float(row.get("amount") or 0.0),
             "units": float(row.get("units") or 0.0),
             "avg_discount": round(float(row.get("avg_discount") or 0.0), 2),
@@ -174,6 +176,7 @@ class PosControlMetricsController(http.Controller):
                 COUNT(*) FILTER (WHERE dl.event_type = 'qty_reduction') AS n_qty,
                 COUNT(*) FILTER (WHERE dl.event_type = 'high_discount') AS n_discount,
                 COUNT(*) FILTER (WHERE dl.event_type = 'price_reduction') AS n_price,
+                COUNT(*) FILTER (WHERE dl.event_type = 'price_increase') AS n_price_up,
                 COALESCE(SUM(dl.amount_removed), 0) AS amount,
                 COUNT(*) AS total
             {self._JOINS}
@@ -192,6 +195,7 @@ class PosControlMetricsController(http.Controller):
                 "n_qty": int(r["n_qty"]),
                 "n_discount": int(r["n_discount"]),
                 "n_price": int(r["n_price"]),
+                "n_price_up": int(r["n_price_up"]),
                 "amount": float(r["amount"]),
                 "total": int(r["total"]),
             }

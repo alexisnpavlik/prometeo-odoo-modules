@@ -144,7 +144,7 @@ patch(PosStore.prototype, {
 
         await this._resolveQtyReduction(order, line, before);
         await this._resolveHighDiscount(order, line, before);
-        await this._resolvePriceReduction(order, line, before);
+        await this._resolvePriceChange(order, line, before);
     },
 
     async _resolveQtyReduction(order, line, before) {
@@ -200,23 +200,37 @@ patch(PosStore.prototype, {
         });
     },
 
-    async _resolvePriceReduction(order, line, before) {
-        if (!this.config.require_reason_price_reduction) {
+    /**
+     * Resuelve el cambio de precio de la línea en ambos sentidos: bajarlo
+     * (price_reduction) y subirlo (price_increase), cada uno con su propio
+     * toggle de configuración. En el aumento, amount_removed queda negativo
+     * (el importe se movió a favor del negocio, no en contra), para que las
+     * sumas de importe afectado del dashboard no mezclen los dos sentidos.
+     */
+    async _resolvePriceChange(order, line, before) {
+        const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
+        if (currentPrice === before.price) {
             return;
         }
-        const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
-        if (currentPrice >= before.price) {
+        const isIncrease = currentPrice > before.price;
+        const enabled = isIncrease
+            ? this.config.require_reason_price_increase
+            : this.config.require_reason_price_reduction;
+        if (!enabled) {
             return;
         }
         const product = line.get_product();
-        const reason = await askReason(this, _t("Motivo — Reducir precio"));
+        const reason = await askReason(
+            this,
+            isIncrease ? _t("Motivo — Aumentar precio") : _t("Motivo — Reducir precio")
+        );
         if (!reason) {
             line.set_unit_price(before.price);
             return;
         }
         const qty = line.get_quantity ? line.get_quantity() : 0;
         await logEvent(this, {
-            event_type: "price_reduction",
+            event_type: isIncrease ? "price_increase" : "price_reduction",
             order_ref: order.uuid || order.name || "",
             product_id: product ? product.id : false,
             old_price: before.price,
