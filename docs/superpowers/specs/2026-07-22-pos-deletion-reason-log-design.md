@@ -99,12 +99,21 @@ Por eso, **solo para este evento**, el flujo es ask-after-en-vez-de-antes:
    de Odoo llama a `selectOrderLine` sin `await` en varios lugares y espera
    que la selección ya haya cambiado sincrónicamente justo después.
 
-Limitación v1 aceptada: si el cajero reduce la cantidad de la última línea
-tocada y cierra/cobra la orden sin volver a seleccionar otra línea, ese ajuste
-no dispara la verificación (no hay un evento de "deselección final" al salir
-de la pantalla). Los otros 2 eventos (orden completa, línea completa) no
-tienen esta limitación — mantienen el flujo motivo-primero original.
    Si no (rechazado/cancelado) → no registrar.
+
+**Cierre del bypass "editar y cobrar directo"** (era limitación v1): si el cajero
+editaba la última línea tocada y ese cambio se cobraba sin volver a seleccionar
+otra línea, nunca se disparaba la verificación. `PosStore.pay()` ahora hace
+`await this._resolvePendingLineChanges(...)` antes de seguir, así que el cobro
+queda bloqueado hasta resolver el motivo. Acá sí se espera la resolución (a
+diferencia de `selectOrderLine`, que corre en background a propósito).
+
+**Cierre del bypass "cancelar el popup con la X/Escape"**: `askReason` resolvía
+`null` mediante un prop `close`, pero el servicio de diálogos hace
+`subProps: {...props, close}` y lo pisaba. Cerrar con X o Escape dejaba la
+promesa colgada para siempre: no corría el revert del cambio ni el registro, y
+el cambio quedaba aplicado sin motivo. Ahora la cancelación va por el `onClose`
+del servicio, con guard `settled` para que no pise un payload ya confirmado.
 
 ## Componentes
 

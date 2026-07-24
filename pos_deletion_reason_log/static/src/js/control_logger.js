@@ -4,15 +4,34 @@ import { DeletionReasonPopup } from "./deletion_reason_popup";
 
 /**
  * Muestra el popup de motivo. Devuelve {reason_id, reason_note} o null si se canceló.
+ *
+ * La resolución en "cancelado" va por el `onClose` del servicio de diálogos y NO
+ * por un prop `close`: el servicio hace `subProps: {...props, close}`, o sea que
+ * pisa cualquier `close` que le pasemos. Pasarlo como prop hacía que cerrar con
+ * la X o con Escape no resolviera nunca la promesa — el await quedaba colgado y
+ * no corrían ni el revert del cambio ni el registro (bypass de la seguridad).
+ * El guard `settled` evita que el onClose pise el payload ya confirmado.
  */
 export async function askReason(component, title) {
     const dialog = component.env.services.dialog;
     return new Promise((resolve) => {
-        dialog.add(DeletionReasonPopup, {
-            title: title,
-            getPayload: (result) => resolve(result),
-            close: () => resolve(null),
-        });
+        let settled = false;
+        const settle = (value) => {
+            if (!settled) {
+                settled = true;
+                resolve(value);
+            }
+        };
+        dialog.add(
+            DeletionReasonPopup,
+            {
+                title: title,
+                getPayload: (result) => settle(result),
+            },
+            {
+                onClose: () => settle(null),
+            }
+        );
     });
 }
 

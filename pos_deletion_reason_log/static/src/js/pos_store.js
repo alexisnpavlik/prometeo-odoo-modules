@@ -13,6 +13,14 @@ patch(PosStore.prototype, {
      * que legítimamente van en 0 porque el precio lo lleva la línea padre.
      */
     async pay() {
+        // Resolver acá los cambios pendientes de la línea seleccionada (cantidad,
+        // descuento, precio). Normalmente se resuelven al deseleccionar la línea,
+        // pero si el cajero edita y va derecho a Cobrar nunca se deselecciona:
+        // sin esto, el cambio se cobraría sin pedir motivo ni quedar registrado.
+        // Acá sí se espera (a diferencia de selectOrderLine) porque el cobro debe
+        // quedar bloqueado hasta que el motivo esté resuelto.
+        await this._resolvePendingLineChanges(this.get_order());
+
         if (this.config.block_zero_price_payment) {
             const order = this.get_order();
             const zeroLines = (order?.get_orderlines() || []).filter(
