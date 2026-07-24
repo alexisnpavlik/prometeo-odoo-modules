@@ -29,6 +29,9 @@
                     <setting string="Bloquear cierre con órdenes pendientes" help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.">
                         <field name="block_close_with_pending_orders"/>
                     </setting>
+                    <setting string="Bloquear cobro con productos a precio 0" help="Impide pasar a la pantalla de pago si alguna línea tiene precio unitario 0. Evita cobrar productos sin precio cargado.">
+                        <field name="block_zero_price_payment"/>
+                    </setting>
                 </block>
             </xpath>
         </field>
