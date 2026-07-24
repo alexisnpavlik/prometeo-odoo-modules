@@ -42,7 +42,8 @@ Eventos que piden motivo y quedan registrados (cada uno con toggle propio):
 3. **Reducir cantidad de una línea** — capturado en `PosStore.selectOrderLine`
    (baseline al seleccionar, comparación al deseleccionar).
 4. **Descuento alto** — línea cuyo descuento supera `high_discount_threshold`
-   (config, default 35%) durante la edición. Mismo mecanismo de baseline/
+   (config, default 30%; hasta 30 inclusive no pide) durante la edición.
+   Mismo mecanismo de baseline/
    comparación que cantidad, sobre `line.get_discount()`.
 5. **Reducción de precio** — línea cuyo precio baja respecto al que tenía al
    seleccionarla (`line.get_unit_price()`). Mismo mecanismo.
@@ -160,7 +161,8 @@ tienen esta limitación — mantienen el flujo motivo-primero original.
 - `require_reason_order_deletion`
 - `require_reason_line_deletion`
 - `require_reason_qty_reduction`
-- `require_reason_high_discount` + `high_discount_threshold` (Float, default 35.0)
+- `require_reason_high_discount` + `high_discount_threshold` (Float, default 30.0;
+  se pide motivo solo por encima del umbral — hasta 30 inclusive no pide)
 - `require_reason_price_reduction`
 - `block_close_with_pending_orders` (default True) — impide cerrar la caja si
   quedan órdenes con productos sin finalizar. Patch de `ClosePosPopup.confirm()`

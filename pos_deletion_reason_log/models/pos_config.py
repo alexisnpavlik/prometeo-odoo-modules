@@ -32,9 +32,9 @@ class PosConfig(models.Model):
     )
     high_discount_threshold = fields.Float(
         string="Umbral de descuento alto (%)",
-        default=35.0,
-        help="Porcentaje a partir del cual un descuento de línea se considera alto "
-             "y requiere motivo.",
+        default=30.0,
+        help="Porcentaje por encima del cual un descuento de línea se considera alto "
+             "y requiere motivo. Hasta este valor inclusive no se pide motivo.",
     )
     require_reason_price_reduction = fields.Boolean(
         string="Motivo al reducir precio",
