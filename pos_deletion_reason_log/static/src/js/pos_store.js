@@ -86,7 +86,13 @@ patch(PosStore.prototype, {
             for (const { order, snapshot } of snapshots) {
                 const stillExists = this.data.models["pos.order"].get(order.id);
                 if (!stillExists) {
-                    await logEvent(this, {
+                    // Sin await, a propósito: entre super.deleteOrders() (la orden
+                    // ya no existe) y afterOrderDeletion() (se selecciona la
+                    // siguiente) no puede haber esperas largas. Un await de RPC acá
+                    // deja renderizar a ProductScreen con la orden activa muerta, y
+                    // su onWillRender crea una orden nueva aunque haya otras
+                    // abiertas. logEvent ya es best-effort (try/catch interno).
+                    logEvent(this, {
                         event_type: "order",
                         ...snapshot,
                         reason_id: reason.reason_id,
