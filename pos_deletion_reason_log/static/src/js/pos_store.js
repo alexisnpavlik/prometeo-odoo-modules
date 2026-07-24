@@ -3,41 +3,57 @@
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
-import { askReason, logDeletion, snapshotOrder } from "./deletion_logger";
+import { askReason, logEvent, snapshotOrder } from "./control_logger";
 
 patch(PosStore.prototype, {
     /**
-     * Pide motivo antes de eliminar la orden y registra si la eliminación ocurrió.
+     * Único choke point de eliminación de órdenes en el POS: tanto el ícono de
+     * tacho (onDeleteOrder llama a this.deleteOrders([order]) internamente)
+     * como "Cancelar órdenes" del popup de cierre de caja (cuando queda una
+     * orden sin finalizar) pasan por acá. Se pide un solo motivo para todo el
+     * lote antes de ejecutar la baja real.
+     *
+     * orders=[] con solo serverIds (sync en background de bajas ya decididas
+     * en otro lado) no pide motivo: no hay nada nuevo que el cajero esté
+     * decidiendo en este momento.
      */
-    async onDeleteOrder(order) {
-        if (!this.config.require_reason_order_deletion) {
-            return super.onDeleteOrder(order);
+    async deleteOrders(orders, serverIds = []) {
+        if (!this.config.require_reason_order_deletion || !orders || !orders.length) {
+            return super.deleteOrders(orders, serverIds);
         }
-        const snapshot = snapshotOrder(order);
-        const reason = await askReason(this, _t("Motivo — Eliminar orden"));
+        const snapshots = orders.map((order) => ({ order, snapshot: snapshotOrder(order) }));
+        const title =
+            orders.length > 1
+                ? _t("Motivo — Cancelar %s órdenes sin finalizar", orders.length)
+                : _t("Motivo — Eliminar orden");
+        const reason = await askReason(this, title);
         if (!reason) {
-            return false; // cancelado: no eliminar
+            return false; // cancelado: no se elimina ninguna orden del lote
         }
-        const result = await super.onDeleteOrder(order);
-        // Verificar que la orden ya no exista en el POS
-        const stillExists = this.data.models["pos.order"].get(order.id);
-        if (!stillExists) {
-            await logDeletion(this, {
-                deletion_type: "order",
-                ...snapshot,
-                reason_id: reason.reason_id,
-                reason_note: reason.reason_note,
-            });
+        const result = await super.deleteOrders(orders, serverIds);
+        if (result) {
+            for (const { order, snapshot } of snapshots) {
+                const stillExists = this.data.models["pos.order"].get(order.id);
+                if (!stillExists) {
+                    await logEvent(this, {
+                        event_type: "order",
+                        ...snapshot,
+                        reason_id: reason.reason_id,
+                        reason_note: reason.reason_note,
+                    });
+                }
+            }
         }
         return result;
     },
 
     /**
      * Antes de cambiar la línea seleccionada, resuelve en background cualquier
-     * reducción de cantidad pendiente de motivo sobre la línea que se deja de
-     * editar (no se espera esa resolución para no romper el código base, que
-     * en varios lugares llama a selectOrderLine sin await). Luego captura la
-     * cantidad "de partida" de la nueva línea seleccionada.
+     * cambio pendiente de motivo sobre la línea que se deja de editar (cantidad
+     * reducida, descuento por encima del umbral, o precio bajado). No se espera
+     * esa resolución para no romper el código base, que en varios lugares llama
+     * a selectOrderLine sin await. Luego captura el estado "de partida" (cantidad,
+     * descuento, precio) de la nueva línea seleccionada.
      *
      * Se intercepta acá y no en OrderSummary._setValue porque el numpad dispara
      * _setValue en cada tecla (valor intermedio mientras se escribe), y pedir
@@ -46,62 +62,131 @@ patch(PosStore.prototype, {
      * en una línea como el auto-select al agregar/mergear productos.
      */
     selectOrderLine(order, line) {
-        this._resolvePendingQtyReduction(order);
+        this._resolvePendingLineChanges(order);
         super.selectOrderLine(order, line);
-        this._captureQtyBeforeEdit(line);
+        this._captureLineBaseline(line);
     },
 
     /**
-     * Guarda la cantidad de la línea en el momento en que se selecciona, para
-     * poder comparar contra la cantidad final cuando se deseleccione.
+     * Guarda cantidad, descuento y precio de la línea en el momento en que se
+     * selecciona, para poder comparar contra los valores finales cuando se
+     * deseleccione.
      */
-    _captureQtyBeforeEdit(line) {
+    _captureLineBaseline(line) {
         if (!line) {
             return;
         }
-        if (!this._deletionReasonQtyBeforeEdit) {
-            this._deletionReasonQtyBeforeEdit = new Map();
+        if (!this._controlLogBaseline) {
+            this._controlLogBaseline = new Map();
         }
-        this._deletionReasonQtyBeforeEdit.set(line.uuid, line.get_quantity());
+        this._controlLogBaseline.set(line.uuid, {
+            qty: line.get_quantity(),
+            discount: line.get_discount(),
+            price: line.get_unit_price(),
+        });
     },
 
     /**
-     * Si la línea que estaba seleccionada bajó de cantidad respecto a cuando
-     * se seleccionó, pide motivo y registra. Si el cajero cancela, revierte la
-     * cantidad a la que tenía antes de editar (acá el motivo se pide DESPUÉS
-     * del cambio, no antes, a diferencia de los otros flujos — ver nota en
-     * selectOrderLine).
+     * Compara el estado final de la línea que estaba seleccionada contra su
+     * baseline y, si corresponde, pide motivo para cada cambio detectado
+     * (cantidad reducida, descuento alto, precio bajado). Si el cajero cancela
+     * el motivo de un cambio, ese cambio puntual se revierte (acá el motivo se
+     * pide DESPUÉS del cambio, no antes, a diferencia del flujo de eliminación).
      */
-    async _resolvePendingQtyReduction(order) {
-        if (!order || !this.config.require_reason_qty_reduction || !this._deletionReasonQtyBeforeEdit) {
+    async _resolvePendingLineChanges(order) {
+        if (!order || !this._controlLogBaseline) {
             return;
         }
         const line = order.get_selected_orderline && order.get_selected_orderline();
         if (!line) {
             return;
         }
-        const before = this._deletionReasonQtyBeforeEdit.get(line.uuid);
-        this._deletionReasonQtyBeforeEdit.delete(line.uuid);
-        if (before == null) {
+        const before = this._controlLogBaseline.get(line.uuid);
+        this._controlLogBaseline.delete(line.uuid);
+        if (!before) {
+            return;
+        }
+
+        await this._resolveQtyReduction(order, line, before);
+        await this._resolveHighDiscount(order, line, before);
+        await this._resolvePriceReduction(order, line, before);
+    },
+
+    async _resolveQtyReduction(order, line, before) {
+        if (!this.config.require_reason_qty_reduction) {
             return;
         }
         const currentQty = line.get_quantity ? line.get_quantity() : 0;
-        if (currentQty >= before) {
-            return; // no hubo reducción
+        if (currentQty >= before.qty) {
+            return;
         }
         const product = line.get_product();
         const reason = await askReason(this, _t("Motivo — Reducir cantidad"));
         if (!reason) {
-            // Cancelado: revertir la cantidad a la que tenía antes de editar
-            line.set_quantity(before, Boolean(line.combo_line_ids?.length));
+            line.set_quantity(before.qty, Boolean(line.combo_line_ids?.length));
             return;
         }
-        await logDeletion(this, {
-            deletion_type: "qty_reduction",
+        await logEvent(this, {
+            event_type: "qty_reduction",
             order_ref: order.uuid || order.name || "",
             product_id: product ? product.id : false,
-            qty_removed: before - currentQty,
+            qty_removed: before.qty - currentQty,
             amount_removed: 0,
+            reason_id: reason.reason_id,
+            reason_note: reason.reason_note,
+        });
+    },
+
+    async _resolveHighDiscount(order, line, before) {
+        if (!this.config.require_reason_high_discount) {
+            return;
+        }
+        const threshold = this.config.high_discount_threshold || 0;
+        const currentDiscount = line.get_discount ? line.get_discount() : 0;
+        if (currentDiscount <= threshold || currentDiscount <= before.discount) {
+            return; // no subió por encima del umbral en esta edición
+        }
+        const product = line.get_product();
+        const reason = await askReason(this, _t("Motivo — Descuento alto"));
+        if (!reason) {
+            line.set_discount(before.discount);
+            return;
+        }
+        const qty = line.get_quantity ? line.get_quantity() : 0;
+        const price = line.get_unit_price ? line.get_unit_price() : 0;
+        await logEvent(this, {
+            event_type: "high_discount",
+            order_ref: order.uuid || order.name || "",
+            product_id: product ? product.id : false,
+            discount_percent: currentDiscount,
+            amount_removed: price * qty * (currentDiscount / 100),
+            reason_id: reason.reason_id,
+            reason_note: reason.reason_note,
+        });
+    },
+
+    async _resolvePriceReduction(order, line, before) {
+        if (!this.config.require_reason_price_reduction) {
+            return;
+        }
+        const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
+        if (currentPrice >= before.price) {
+            return;
+        }
+        const product = line.get_product();
+        const reason = await askReason(this, _t("Motivo — Reducir precio"));
+        if (!reason) {
+            line.set_unit_price(before.price);
+            return;
+        }
+        const qty = line.get_quantity ? line.get_quantity() : 0;
+        await logEvent(this, {
+            event_type: "price_reduction",
+            order_ref: order.uuid || order.name || "",
+            product_id: product ? product.id : false,
+            old_price: before.price,
+            new_price: currentPrice,
+            amount_removed: (before.price - currentPrice) * qty,
             reason_id: reason.reason_id,
             reason_note: reason.reason_note,
         });

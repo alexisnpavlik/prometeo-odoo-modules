@@ -3,7 +3,7 @@
 import { OrderSummary } from "@point_of_sale/app/screens/product_screen/order_summary/order_summary";
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
-import { askReason, logDeletion } from "./deletion_logger";
+import { askReason, logEvent } from "./control_logger";
 
 patch(OrderSummary.prototype, {
     /**
@@ -27,8 +27,8 @@ patch(OrderSummary.prototype, {
             const result = await super._setValue(val);
             const stillExists = order.get_orderlines().includes(line);
             if (!stillExists) {
-                await logDeletion(this, {
-                    deletion_type: "line",
+                await logEvent(this, {
+                    event_type: "line",
                     order_ref: order.uuid || order.name || "",
                     product_id: product ? product.id : false,
                     qty_removed: line.get_quantity ? line.get_quantity() : 0,

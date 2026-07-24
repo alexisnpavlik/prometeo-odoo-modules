@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="pos_session_sales_details_control_events"
+              inherit_id="point_of_sale.pos_session_sales_details">
+        <xpath expr="//div[@id='discounts']" position="after">
+            <div t-if="control_events" id="control_events" style="break-inside: avoid; page-break-inside: avoid;">
+                <h6 class="bg-secondary p-1 fw-bold">Trazabilidad</h6>
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Órdenes eliminadas</strong>: <span t-out="control_counts['order']">0</span> ·
+                        <strong>Líneas eliminadas</strong>: <span t-out="control_counts['line']">0</span> ·
+                        <strong>Reducciones de cantidad</strong>: <span t-out="control_counts['qty_reduction']">0</span> ·
+                        <strong>Descuentos altos</strong>: <span t-out="control_counts['high_discount']">0</span> ·
+                        <strong>Reducciones de precio</strong>: <span t-out="control_counts['price_reduction']">0</span>
+                    </div>
+                </div>
+                <table class="table table-sm table-borderless mt-2">
+                    <thead>
+                        <tr class="border-bottom border-secondary fw-bold">
+                            <th>Fecha/hora</th>
+                            <th>Cajero</th>
+                            <th>Tipo</th>
+                            <th>Producto</th>
+                            <th class="text-end">Cantidad</th>
+                            <th class="text-end">Desc. %</th>
+                            <th class="text-end">Precio</th>
+                            <th>Motivo</th>
+                            <th>Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="control_events" t-as="d" class="border-bottom border-secondary">
+                            <td><span t-out="d['datetime']" t-options="{'widget': 'datetime'}">2026-01-01 00:00:00</span></td>
+                            <td><span t-out="d['user_name']">Cajero</span></td>
+                            <td><span t-out="d['type_label']">Tipo</span></td>
+                            <td><span t-out="d['product_name']">Producto</span></td>
+                            <td class="text-end"><span t-out="d['qty']" t-options="{'widget': 'float', 'precision': 2}">0</span></td>
+                            <td class="text-end">
+                                <t t-if="d['discount']">
+                                    <span t-out="d['discount']" t-options="{'widget': 'float', 'precision': 2}">0</span>%
+                                </t>
+                            </td>
+                            <td class="text-end">
+                                <t t-if="d['new_price']">
+                                    <span t-out="d['old_price']" t-options="{'widget': 'float', 'precision': 2}">0</span>
+                                    →
+                                    <span t-out="d['new_price']" t-options="{'widget': 'float', 'precision': 2}">0</span>
+                                </t>
+                            </td>
+                            <td><span t-out="d['reason']">Motivo</span></td>
+                            <td><span t-out="d['note']"></span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <br/>
+            </div>
+        </xpath>
+    </template>
+</odoo>

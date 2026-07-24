@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_control_log_view_list" model="ir.ui.view">
+        <field name="name">pos.control.log.list</field>
+        <field name="model">pos.control.log</field>
+        <field name="arch" type="xml">
+            <list string="Trazabilidad POS" create="false" edit="false">
+                <field name="event_datetime"/>
+                <field name="event_type"/>
+                <field name="user_id"/>
+                <field name="pos_config_id"/>
+                <field name="order_ref"/>
+                <field name="product_id"/>
+                <field name="qty_removed"/>
+                <field name="discount_percent" optional="show"/>
+                <field name="old_price" optional="hide"/>
+                <field name="new_price" optional="hide"/>
+                <field name="amount_removed"/>
+                <field name="reason_id"/>
+                <field name="reason_note" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="pos_control_log_view_form" model="ir.ui.view">
+        <field name="name">pos.control.log.form</field>
+        <field name="model">pos.control.log</field>
+        <field name="arch" type="xml">
+            <form string="Operación POS" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="event_datetime"/>
+                            <field name="event_type"/>
+                            <field name="user_id"/>
+                            <field name="pos_config_id"/>
+                            <field name="session_id"/>
+                        </group>
+                        <group>
+                            <field name="order_ref"/>
+                            <field name="product_id"/>
+                            <field name="qty_removed"/>
+                            <field name="discount_percent"/>
+                            <field name="old_price"/>
+                            <field name="new_price"/>
+                            <field name="amount_removed"/>
+                            <field name="reason_id"/>
+                        </group>
+                    </group>
+                    <group string="Nota">
+                        <field name="reason_note" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="pos_control_log_view_pivot" model="ir.ui.view">
+        <field name="name">pos.control.log.pivot</field>
+        <field name="model">pos.control.log</field>
+        <field name="arch" type="xml">
+            <pivot string="Trazabilidad POS">
+                <field name="user_id" type="row"/>
+                <field name="event_type" type="col"/>
+                <field name="amount_removed" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="pos_control_log_view_search" model="ir.ui.view">
+        <field name="name">pos.control.log.search</field>
+        <field name="model">pos.control.log</field>
+        <field name="arch" type="xml">
+            <search string="Trazabilidad POS">
+                <field name="user_id"/>
+                <field name="product_id"/>
+                <field name="order_ref"/>
+                <field name="reason_id"/>
+                <filter name="type_order" string="Orden eliminada" domain="[('event_type','=','order')]"/>
+                <filter name="type_line" string="Línea eliminada" domain="[('event_type','=','line')]"/>
+                <filter name="type_qty" string="Reducción cantidad" domain="[('event_type','=','qty_reduction')]"/>
+                <filter name="type_discount" string="Descuento alto" domain="[('event_type','=','high_discount')]"/>
+                <filter name="type_price" string="Reducción precio" domain="[('event_type','=','price_reduction')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_user" string="Cajero" context="{'group_by':'user_id'}"/>
+                    <filter name="group_type" string="Tipo" context="{'group_by':'event_type'}"/>
+                    <filter name="group_reason" string="Motivo" context="{'group_by':'reason_id'}"/>
+                    <filter name="group_config" string="Punto de venta" context="{'group_by':'pos_config_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pos_control_log" model="ir.actions.act_window">
+        <field name="name">Trazabilidad POS</field>
+        <field name="res_model">pos.control.log</field>
+        <field name="view_mode">list,form,pivot</field>
+        <field name="search_view_id" ref="pos_control_log_view_search"/>
+    </record>
+</odoo>

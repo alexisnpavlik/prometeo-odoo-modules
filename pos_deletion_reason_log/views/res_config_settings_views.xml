@@ -6,7 +6,7 @@
         <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//block[@id='product_and_category_block']" position="after">
-                <block id="pos_deletion_reason_block" title="Registro de eliminaciones">
+                <block id="pos_deletion_reason_block" title="Trazabilidad de operaciones POS">
                     <setting string="Motivo al eliminar orden" help="Pide un motivo cuando se elimina una orden completa.">
                         <field name="require_reason_order_deletion"/>
                     </setting>
@@ -15,6 +15,19 @@
                     </setting>
                     <setting string="Motivo al reducir cantidad" help="Pide un motivo cuando se reduce la cantidad de una línea.">
                         <field name="require_reason_qty_reduction"/>
+                    </setting>
+                    <setting string="Motivo en descuento alto" help="Pide un motivo cuando el descuento de una línea supera el umbral.">
+                        <field name="require_reason_high_discount"/>
+                        <div class="content-group mt16" invisible="not require_reason_high_discount">
+                            <label for="high_discount_threshold" string="Umbral (%)"/>
+                            <field name="high_discount_threshold" class="oe_inline"/>
+                        </div>
+                    </setting>
+                    <setting string="Motivo al reducir precio" help="Pide un motivo cuando se baja el precio de una línea por debajo del que tenía al seleccionarla.">
+                        <field name="require_reason_price_reduction"/>
+                    </setting>
+                    <setting string="Bloquear cierre con órdenes pendientes" help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.">
+                        <field name="block_close_with_pending_orders"/>
                     </setting>
                 </block>
             </xpath>

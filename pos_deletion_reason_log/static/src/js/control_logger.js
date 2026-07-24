@@ -17,9 +17,10 @@ export async function askReason(component, title) {
 }
 
 /**
- * Registra la eliminación en el backend (best-effort; no traba el POS si falla).
+ * Registra el evento controlado en el backend (best-effort; no traba el POS
+ * si falla la llamada — la operación ya ocurrió, el registro es auditoría).
  */
-export async function logDeletion(component, vals) {
+export async function logEvent(component, vals) {
     try {
         const pos = component.env.services.pos;
         const orm = component.env.services.orm;
@@ -28,9 +29,9 @@ export async function logDeletion(component, vals) {
             session_id: pos.session.id,
             ...vals,
         };
-        await orm.call("pos.deletion.log", "log_deletion", [fullVals]);
+        await orm.call("pos.control.log", "log_event", [fullVals]);
     } catch (error) {
-        console.error("pos_deletion_reason_log: no se pudo registrar la eliminación", error);
+        console.error("pos_deletion_reason_log: no se pudo registrar el evento", error);
     }
 }
 

@@ -1,30 +1,50 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class PosConfig(models.Model):
     _inherit = "pos.config"
 
+    # NO sobrescribir _load_pos_data_fields en pos.config: el mixin devuelve []
+    # a propósito, y una lista vacía hace que search_read cargue TODOS los campos
+    # (incluido use_pricelist, que el core lee sin chequeo en _load_pos_data).
+    # Devolver una lista acotada rompe el POS con KeyError: 'use_pricelist'.
+    # Estos toggles llegan solos al frontend por la carga completa de pos.config.
     require_reason_order_deletion = fields.Boolean(
         string="Motivo al eliminar orden",
+        default=True,
         help="Pide un motivo cuando el cajero elimina una orden completa.",
     )
     require_reason_line_deletion = fields.Boolean(
         string="Motivo al eliminar línea",
+        default=True,
         help="Pide un motivo cuando el cajero borra una línea/producto de la orden.",
     )
     require_reason_qty_reduction = fields.Boolean(
         string="Motivo al reducir cantidad",
+        default=True,
         help="Pide un motivo cuando el cajero reduce la cantidad de una línea.",
     )
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        """Asegura que los toggles de motivo lleguen al frontend del POS."""
-        fields_list = super()._load_pos_data_fields(config_id)
-        fields_list += [
-            "require_reason_order_deletion",
-            "require_reason_line_deletion",
-            "require_reason_qty_reduction",
-        ]
-        return fields_list
+    require_reason_high_discount = fields.Boolean(
+        string="Motivo en descuento alto",
+        default=True,
+        help="Pide un motivo cuando el descuento de una línea supera el umbral configurado.",
+    )
+    high_discount_threshold = fields.Float(
+        string="Umbral de descuento alto (%)",
+        default=35.0,
+        help="Porcentaje a partir del cual un descuento de línea se considera alto "
+             "y requiere motivo.",
+    )
+    require_reason_price_reduction = fields.Boolean(
+        string="Motivo al reducir precio",
+        default=True,
+        help="Pide un motivo cuando el cajero baja el precio de una línea por debajo "
+             "del que tenía al seleccionarla.",
+    )
+    block_close_with_pending_orders = fields.Boolean(
+        string="Bloquear cierre con órdenes pendientes",
+        default=True,
+        help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. "
+             "El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.",
+    )
