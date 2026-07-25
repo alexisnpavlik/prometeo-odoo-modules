@@ -70,7 +70,7 @@ patch(PosStore.prototype, {
             (o) => o && o.get_orderlines && o.get_orderlines().length > 0
         );
         if (!this.config.require_reason_order_deletion || !withProducts.length) {
-            return super.deleteOrders(orders, serverIds);
+            return this._deleteOrdersKeepingSelection(orders, serverIds);
         }
         const snapshots = withProducts.map((order) => ({ order, snapshot: snapshotOrder(order) }));
         const title =
@@ -81,18 +81,12 @@ patch(PosStore.prototype, {
         if (!reason) {
             return false; // cancelado: no se elimina ninguna orden del lote
         }
-        const result = await super.deleteOrders(orders, serverIds);
+        const result = await this._deleteOrdersKeepingSelection(orders, serverIds);
         if (result) {
             for (const { order, snapshot } of snapshots) {
                 const stillExists = this.data.models["pos.order"].get(order.id);
                 if (!stillExists) {
-                    // Sin await, a propósito: entre super.deleteOrders() (la orden
-                    // ya no existe) y afterOrderDeletion() (se selecciona la
-                    // siguiente) no puede haber esperas largas. Un await de RPC acá
-                    // deja renderizar a ProductScreen con la orden activa muerta, y
-                    // su onWillRender crea una orden nueva aunque haya otras
-                    // abiertas. logEvent ya es best-effort (try/catch interno).
-                    logEvent(this, {
+                    await logEvent(this, {
                         event_type: "order",
                         ...snapshot,
                         reason_id: reason.reason_id,
@@ -100,6 +94,45 @@ patch(PosStore.prototype, {
                     });
                 }
             }
+        }
+        return result;
+    },
+
+    /**
+     * Llama al borrado real del core dejando siempre una orden viva seleccionada.
+     *
+     * El core saca la orden del modelo (removeOrder) y recién después espera el
+     * RPC action_pos_order_cancel. Durante esa espera, get_order() devuelve
+     * undefined porque selectedOrderUuid sigue apuntando a la orden borrada, y
+     * OWL alcanza a renderizar: el onWillRender de ProductScreen hace
+     * `if (currentOrder?.state !== "draft") add_new_order()`, y con undefined esa
+     * condición da true. Se crea una orden nueva que después afterOrderDeletion
+     * elige como "la última abierta" — por eso al eliminar una orden aparecía otra
+     * y la cantidad de órdenes nunca bajaba.
+     *
+     * Adelantar el cambio de selección a una orden que sobrevive cierra esa
+     * ventana: el render intermedio ve una orden draft válida y no crea nada.
+     * Si no queda ninguna sobreviviente no se toca nada: ahí que el core cree la
+     * orden nueva es justamente lo correcto.
+     */
+    async _deleteOrdersKeepingSelection(orders, serverIds) {
+        const doomed = new Set((orders || []).filter(Boolean).map((o) => o.uuid));
+        const current = this.get_order();
+        const previous = current;
+        let switched = false;
+        if (current && doomed.has(current.uuid)) {
+            const survivor = this.get_open_orders()
+                .filter((o) => !doomed.has(o.uuid))
+                .at(-1);
+            if (survivor) {
+                this.set_order(survivor);
+                switched = true;
+            }
+        }
+        const result = await super.deleteOrders(orders, serverIds);
+        if (!result && switched && this.get_order() !== previous) {
+            // El core abortó el borrado: la orden sigue viva, devolvemos el foco.
+            this.set_order(previous);
         }
         return result;
     },
