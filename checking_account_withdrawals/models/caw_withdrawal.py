@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from dateutil.relativedelta import relativedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -75,6 +77,11 @@ class CawWithdrawal(models.Model):
         inverse_name="withdrawal_id",
         string="Líneas",
     )
+    installment_ids = fields.One2many(
+        comodel_name="caw.installment",
+        inverse_name="withdrawal_id",
+        string="Cuotas",
+    )
     amount_total = fields.Monetary(
         string="Total",
         compute="_compute_amount_total",
@@ -135,3 +142,82 @@ class CawWithdrawal(models.Model):
         if any(w.state not in ("draft", "cancel") for w in self):
             raise UserError(_("Solo se pueden eliminar retiros en borrador o cancelados."))
         return super().unlink()
+
+    def write(self, vals):
+        """Impide editar las líneas de un retiro que ya salió de borrador."""
+        if "line_ids" in vals and any(w.state not in ("draft",) for w in self):
+            raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
+        return super().write(vals)
+
+    def _caw_due_date(self, index, first_days, period, cutoff_day):
+        """Calcula el vencimiento de la cuota `index` (base 0) del retiro."""
+        due = self.date + relativedelta(days=first_days)
+        if period == "days":
+            due += relativedelta(days=first_days * index)
+        elif period == "weeks":
+            due += relativedelta(weeks=index)
+        else:
+            due += relativedelta(months=index)
+        if cutoff_day:
+            due += relativedelta(day=min(cutoff_day, 28))
+        return due
+
+    def _caw_build_installment_values(self, count, first_days, period, cutoff_day):
+        """Arma los valores de las cuotas. El resto del redondeo va a la última."""
+        self.ensure_one()
+        if count < 1:
+            raise UserError(_("La cantidad de cuotas debe ser al menos 1."))
+        currency = self.currency_id
+        base = currency.round(self.amount_total / count)
+        values = []
+        accumulated = 0.0
+        for index in range(count):
+            is_last = index == count - 1
+            amount = currency.round(self.amount_total - accumulated) if is_last else base
+            accumulated += amount
+            values.append({
+                "withdrawal_id": self.id,
+                "sequence": index + 1,
+                "date_due": self._caw_due_date(index, first_days, period, cutoff_day),
+                "amount": amount,
+            })
+        return values
+
+    def _caw_generate_installments(self, count, first_days, period, cutoff_day):
+        """Borra las cuotas existentes y genera el plan indicado."""
+        for withdrawal in self:
+            withdrawal.installment_ids.unlink()
+            values = withdrawal._caw_build_installment_values(count, first_days, period, cutoff_day)
+            self.env["caw.installment"].sudo().create(values)
+            _logger.info("Retiro %s: generadas %s cuotas", withdrawal.name, count)
+        return True
+
+    def _caw_check_confirmable(self):
+        """Valida las precondiciones para confirmar un retiro."""
+        for withdrawal in self:
+            if withdrawal.state != "draft":
+                raise UserError(_("El retiro %s ya fue confirmado.", withdrawal.name))
+            if not withdrawal.partner_id.caw_enabled:
+                raise UserError(_(
+                    "El contacto %s no está habilitado para cuenta corriente.",
+                    withdrawal.partner_id.display_name,
+                ))
+            if not withdrawal.line_ids:
+                raise UserError(_("El retiro %s no tiene líneas.", withdrawal.name))
+            if withdrawal.currency_id.compare_amounts(withdrawal.amount_total, 0.0) <= 0:
+                raise UserError(_("El total del retiro %s debe ser mayor a cero.", withdrawal.name))
+
+    def action_confirm(self):
+        """Confirma el retiro generando las cuotas con los defaults de la compañía."""
+        self._caw_check_confirmable()
+        for withdrawal in self:
+            company = withdrawal.company_id
+            withdrawal._caw_generate_installments(
+                count=company.caw_installment_count or 1,
+                first_days=company.caw_installment_days or 30,
+                period=company.caw_installment_period or "months",
+                cutoff_day=company.caw_cutoff_day or 0,
+            )
+            withdrawal.state = "pending"
+            withdrawal.message_post(body=_("Retiro confirmado por %s.", self.env.user.display_name))
+        return True

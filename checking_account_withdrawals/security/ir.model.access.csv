@@ -5,3 +5,5 @@ access_caw_withdrawal_user,caw.withdrawal user,model_caw_withdrawal,checking_acc
 access_caw_withdrawal_manager,caw.withdrawal manager,model_caw_withdrawal,checking_account_withdrawals.group_cc_manager,1,1,1,1
 access_caw_withdrawal_line_user,caw.withdrawal.line user,model_caw_withdrawal_line,checking_account_withdrawals.group_cc_user,1,1,1,1
 access_caw_withdrawal_line_manager,caw.withdrawal.line manager,model_caw_withdrawal_line,checking_account_withdrawals.group_cc_manager,1,1,1,1
+access_caw_installment_user,caw.installment user,model_caw_installment,checking_account_withdrawals.group_cc_user,1,0,0,0
+access_caw_installment_manager,caw.installment manager,model_caw_installment,checking_account_withdrawals.group_cc_manager,1,1,1,1
