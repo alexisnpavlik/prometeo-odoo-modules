@@ -1,3 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_caw_account_user,caw.account user,model_caw_account,checking_account_withdrawals.group_cc_user,1,0,0,0
 access_caw_account_manager,caw.account manager,model_caw_account,checking_account_withdrawals.group_cc_manager,1,1,1,1
+access_caw_withdrawal_user,caw.withdrawal user,model_caw_withdrawal,checking_account_withdrawals.group_cc_user,1,1,1,0
+access_caw_withdrawal_manager,caw.withdrawal manager,model_caw_withdrawal,checking_account_withdrawals.group_cc_manager,1,1,1,1
+access_caw_withdrawal_line_user,caw.withdrawal.line user,model_caw_withdrawal_line,checking_account_withdrawals.group_cc_user,1,1,1,1
+access_caw_withdrawal_line_manager,caw.withdrawal.line manager,model_caw_withdrawal_line,checking_account_withdrawals.group_cc_manager,1,1,1,1

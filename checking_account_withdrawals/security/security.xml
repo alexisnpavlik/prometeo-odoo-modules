@@ -25,4 +25,18 @@
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         <field name="global" eval="True"/>
     </record>
+
+    <record id="caw_withdrawal_company_rule" model="ir.rule">
+        <field name="name">caw.withdrawal: multi-compañía</field>
+        <field name="model_id" ref="model_caw_withdrawal"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="caw_withdrawal_line_company_rule" model="ir.rule">
+        <field name="name">caw.withdrawal.line: multi-compañía</field>
+        <field name="model_id" ref="model_caw_withdrawal_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
 </odoo>

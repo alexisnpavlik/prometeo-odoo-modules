@@ -21,6 +21,7 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "data/ir_sequence.xml",
     ],
     "installable": True,
     "auto_install": False,
