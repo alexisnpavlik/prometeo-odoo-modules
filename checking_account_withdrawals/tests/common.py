@@ -20,3 +20,6 @@ class CawCommon(TransactionCase):
             "is_storable": True,
             "list_price": 100.0,
         })
+        cls.warehouse = cls.env["stock.warehouse"].search(
+            [("company_id", "=", cls.company.id)], limit=1
+        )

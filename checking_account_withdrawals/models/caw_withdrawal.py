@@ -125,6 +125,24 @@ class CawWithdrawal(models.Model):
         index=True,
         help="Indicador independiente del estado: el retiro tiene al menos una cuota vencida.",
     )
+    picking_id = fields.Many2one(
+        comodel_name="stock.picking",
+        string="Albarán",
+        readonly=True,
+        copy=False,
+        index=True,
+    )
+    picking_state = fields.Selection(
+        related="picking_id.state",
+        string="Estado del albarán",
+        store=True,
+    )
+    is_inconsistent = fields.Boolean(
+        string="Inconsistente",
+        compute="_compute_is_inconsistent",
+        store=True,
+        help="El albarán fue cancelado pero el retiro sigue vivo. Requiere revisión del Manager.",
+    )
 
     @api.depends("line_ids.price_subtotal")
     def _compute_amount_total(self):
@@ -144,6 +162,14 @@ class CawWithdrawal(models.Model):
         for withdrawal in self:
             withdrawal.is_overdue = any(
                 installment.state == "overdue" for installment in withdrawal.installment_ids
+            )
+
+    @api.depends("picking_state", "is_cancelled")
+    def _compute_is_inconsistent(self):
+        """Señala los retiros vivos cuyo albarán fue cancelado."""
+        for withdrawal in self:
+            withdrawal.is_inconsistent = bool(
+                withdrawal.picking_state == "cancel" and not withdrawal.is_cancelled
             )
 
     @api.depends(
@@ -303,6 +329,81 @@ class CawWithdrawal(models.Model):
             if withdrawal.currency_id.compare_amounts(withdrawal.amount_total, 0.0) <= 0:
                 raise UserError(_("El total del retiro %s debe ser mayor a cero.", withdrawal.name))
 
+    def _caw_picking_type(self):
+        """Tipo de operación del albarán: el de la compañía o el de salidas del almacén."""
+        self.ensure_one()
+        picking_type = self.company_id.caw_picking_type_id
+        if picking_type:
+            return picking_type
+        warehouse = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id)], limit=1
+        )
+        if not warehouse:
+            raise UserError(_(
+                "No hay un almacén configurado en la compañía %s.", self.company_id.name
+            ))
+        return warehouse.out_type_id
+
+    def _caw_picking_values(self, picking_type):
+        """Valores de cabecera del albarán de salida del retiro."""
+        self.ensure_one()
+        return {
+            "partner_id": self.partner_id.id,
+            "picking_type_id": picking_type.id,
+            "location_id": picking_type.default_location_src_id.id,
+            "location_dest_id": picking_type.default_location_dest_id.id,
+            "scheduled_date": fields.Datetime.to_datetime(self.date),
+            "origin": self.name,
+            "company_id": self.company_id.id,
+        }
+
+    def _caw_move_values(self, line, picking):
+        """Valores del movimiento de stock de una línea del retiro."""
+        return {
+            "picking_id": picking.id,
+            "name": line.name or line.product_id.display_name,
+            "product_id": line.product_id.id,
+            "product_uom_qty": line.quantity,
+            "product_uom": line.product_id.uom_id.id,
+            "location_id": picking.location_id.id,
+            "location_dest_id": picking.location_dest_id.id,
+            "company_id": self.company_id.id,
+        }
+
+    def _caw_create_picking(self):
+        """Crea el albarán de salida del retiro. Usa sudo: el Operador no es de stock."""
+        picking_model = self.env["stock.picking"].sudo()
+        move_model = self.env["stock.move"].sudo()
+        for withdrawal in self.filtered(lambda w: not w.picking_id):
+            storable_lines = withdrawal.line_ids.filtered(
+                lambda l: l.product_id.is_storable
+            )
+            if not storable_lines:
+                _logger.info("Retiro %s sin productos almacenables: no genera albarán", withdrawal.name)
+                continue
+            picking_type = withdrawal._caw_picking_type()
+            picking = picking_model.create(withdrawal._caw_picking_values(picking_type))
+            move_model.create([
+                withdrawal._caw_move_values(line, picking) for line in storable_lines
+            ])
+            picking.action_confirm()
+            withdrawal.picking_id = picking.id
+            _logger.info("Retiro %s: albarán %s generado", withdrawal.name, picking.name)
+        return True
+
+    def action_view_picking(self):
+        """Abre el albarán asociado al retiro."""
+        self.ensure_one()
+        if not self.picking_id:
+            raise UserError(_("El retiro %s no tiene albarán asociado.", self.name))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Albarán del retiro %s", self.name),
+            "res_model": "stock.picking",
+            "res_id": self.picking_id.id,
+            "view_mode": "form",
+        }
+
     def action_confirm(self):
         """Confirma el retiro generando las cuotas con los defaults de la compañía."""
         self._caw_check_confirmable()
@@ -314,6 +415,7 @@ class CawWithdrawal(models.Model):
                 period=company.caw_installment_period or "months",
                 cutoff_day=company.caw_cutoff_day or 0,
             )
+            withdrawal._caw_create_picking()
             withdrawal.is_confirmed = True
             withdrawal.message_post(body=_("Retiro confirmado por %s.", self.env.user.display_name))
         return True
