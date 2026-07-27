@@ -11,3 +11,4 @@ access_caw_payment_user,caw.payment user,model_caw_payment,checking_account_with
 access_caw_payment_manager,caw.payment manager,model_caw_payment,checking_account_withdrawals.group_cc_manager,1,1,1,1
 access_caw_allocation_user,caw.allocation user,model_caw_allocation,checking_account_withdrawals.group_cc_user,1,0,0,0
 access_caw_allocation_manager,caw.allocation manager,model_caw_allocation,checking_account_withdrawals.group_cc_manager,1,1,1,1
+access_caw_confirm_wizard_user,caw.confirm.wizard user,model_caw_confirm_wizard,checking_account_withdrawals.group_cc_user,1,1,1,1

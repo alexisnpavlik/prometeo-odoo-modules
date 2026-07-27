@@ -408,14 +408,99 @@ class CawWithdrawal(models.Model):
         """Confirma el retiro generando las cuotas con los defaults de la compañía."""
         self._caw_check_confirmable()
         for withdrawal in self:
+            force = bool(self.env.context.get("caw_force_limit"))
+            warning = withdrawal._caw_check_limit(force=force)
+            if warning:
+                withdrawal.message_post(body=_(
+                    "Retiro confirmado por encima del límite de crédito%(forced)s: %(warning)s",
+                    forced=_(" (forzado por el Manager)") if force else "",
+                    warning=warning,
+                ))
             company = withdrawal.company_id
+            plan = self.env.context.get("caw_plan")
+            if plan:
+                count, first_days, period, cutoff_day = plan
+            else:
+                count = company.caw_installment_count or 1
+                first_days = company.caw_installment_days or 30
+                period = company.caw_installment_period or "months"
+                cutoff_day = company.caw_cutoff_day or 0
             withdrawal._caw_generate_installments(
-                count=company.caw_installment_count or 1,
-                first_days=company.caw_installment_days or 30,
-                period=company.caw_installment_period or "months",
-                cutoff_day=company.caw_cutoff_day or 0,
+                count=count, first_days=first_days, period=period, cutoff_day=cutoff_day
             )
             withdrawal._caw_create_picking()
             withdrawal.is_confirmed = True
             withdrawal.message_post(body=_("Retiro confirmado por %s.", self.env.user.display_name))
         return True
+
+    def _caw_check_limit(self, force=False):
+        """Evalúa saldo actual + total del retiro contra el límite de la cuenta.
+
+        Devuelve el texto de advertencia en modo 'warn' (o vacío si no se supera).
+        En modo 'block' levanta UserError salvo que `force` sea True.
+        """
+        self.ensure_one()
+        account = self.account_id.sudo()
+        if account.limit_mode == "none" or not account.credit_limit:
+            return ""
+        projected = account.balance + self.amount_total
+        if self.currency_id.compare_amounts(projected, account.credit_limit) <= 0:
+            return ""
+        message = _(
+            "El retiro deja a %(partner)s con un saldo de %(projected)s, "
+            "por encima de su límite de %(limit)s.",
+            partner=self.partner_id.display_name,
+            projected=projected,
+            limit=account.credit_limit,
+        )
+        if account.limit_mode == "block" and not force:
+            raise UserError(_(
+                "%(message)s\n\nSolo un Manager de Cuenta Corriente puede forzar este retiro.",
+                message=message,
+            ))
+        return message
+
+    def action_cancel(self):
+        """Cancela el retiro. Se bloquea si tiene pagos imputados."""
+        for withdrawal in self:
+            if withdrawal.is_cancelled:
+                raise UserError(_("El retiro %s ya está cancelado.", withdrawal.name))
+            allocations = withdrawal.installment_ids.mapped("allocation_ids").filtered(
+                lambda a: a.payment_id.state == "posted"
+            )
+            if allocations:
+                raise UserError(_(
+                    "El retiro %(name)s tiene pagos imputados por %(amount)s. "
+                    "Anulá primero esos pagos y volvé a intentar la cancelación.",
+                    name=withdrawal.name,
+                    amount=sum(allocations.mapped("amount")),
+                ))
+            if withdrawal.picking_id and withdrawal.picking_id.state != "done":
+                withdrawal.picking_id.sudo().action_cancel()
+            withdrawal.installment_ids.unlink()
+            withdrawal.is_cancelled = True
+            withdrawal.message_post(body=_(
+                "Retiro cancelado por %s.", self.env.user.display_name
+            ))
+        return True
+
+    def action_draft(self):
+        """Devuelve a borrador un retiro cancelado, para corregirlo."""
+        for withdrawal in self:
+            if not withdrawal.is_cancelled:
+                raise UserError(_("Solo se puede reabrir un retiro cancelado."))
+            withdrawal.write({"is_cancelled": False, "is_confirmed": False, "picking_id": False})
+        return True
+
+    def action_open_confirm_wizard(self):
+        """Abre el wizard de confirmación con el plan de cuotas y el chequeo de límite."""
+        self.ensure_one()
+        self._caw_check_confirmable()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Confirmar retiro %s", self.name),
+            "res_model": "caw.confirm.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_withdrawal_id": self.id},
+        }
