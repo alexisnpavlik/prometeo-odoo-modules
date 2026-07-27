@@ -42,6 +42,11 @@ class CawInstallment(models.Model):
     )
     currency_id = fields.Many2one(related="withdrawal_id.currency_id", readonly=True)
     sequence = fields.Integer(string="Nº de cuota", default=1, required=True)
+    allocation_ids = fields.One2many(
+        comodel_name="caw.allocation",
+        inverse_name="installment_id",
+        string="Imputaciones",
+    )
     date_due = fields.Date(string="Vencimiento", required=True, index=True)
     amount = fields.Monetary(
         string="Monto",
@@ -50,8 +55,9 @@ class CawInstallment(models.Model):
     )
     amount_allocated = fields.Monetary(
         string="Imputado",
+        compute="_compute_amount_allocated",
+        store=True,
         currency_field="currency_id",
-        default=0.0,
     )
     amount_residual = fields.Monetary(
         string="Residual",
@@ -75,6 +81,16 @@ class CawInstallment(models.Model):
             "El monto de la cuota debe ser mayor a cero.",
         ),
     ]
+
+    @api.depends("allocation_ids.amount", "allocation_ids.payment_id.state")
+    def _compute_amount_allocated(self):
+        """Suma de las imputaciones de pagos publicados sobre esta cuota."""
+        for installment in self:
+            installment.amount_allocated = sum(
+                installment.allocation_ids
+                .filtered(lambda a: a.payment_id.state == "posted")
+                .mapped("amount")
+            )
 
     @api.depends("amount", "amount_allocated")
     def _compute_amount_residual(self):

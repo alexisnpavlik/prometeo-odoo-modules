@@ -46,4 +46,18 @@
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         <field name="global" eval="True"/>
     </record>
+
+    <record id="caw_payment_company_rule" model="ir.rule">
+        <field name="name">caw.payment: multi-compañía</field>
+        <field name="model_id" ref="model_caw_payment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="caw_allocation_company_rule" model="ir.rule">
+        <field name="name">caw.allocation: multi-compañía</field>
+        <field name="model_id" ref="model_caw_allocation"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
 </odoo>
