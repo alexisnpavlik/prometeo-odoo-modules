@@ -1,1 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_caw_account_user,caw.account user,model_caw_account,checking_account_withdrawals.group_cc_user,1,0,0,0
+access_caw_account_manager,caw.account manager,model_caw_account,checking_account_withdrawals.group_cc_manager,1,1,1,1
