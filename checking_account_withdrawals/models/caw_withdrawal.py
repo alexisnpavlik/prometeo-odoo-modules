@@ -4,7 +4,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -92,11 +92,38 @@ class CawWithdrawal(models.Model):
     state = fields.Selection(
         selection=STATE_SELECTION,
         string="Estado",
-        default="draft",
-        required=True,
+        compute="_compute_state",
+        store=True,
+        readonly=True,
         copy=False,
         index=True,
         tracking=True,
+        default="draft",
+    )
+    is_cancelled = fields.Boolean(
+        string="Cancelado",
+        default=False,
+        copy=False,
+        help="Bandera interna: el estado computado la respeta para no pisar la cancelación.",
+    )
+    is_confirmed = fields.Boolean(
+        string="Confirmado",
+        default=False,
+        copy=False,
+        help="Bandera interna: pasa a True al confirmar y saca al retiro de borrador.",
+    )
+    amount_residual = fields.Monetary(
+        string="Residual",
+        compute="_compute_amount_residual",
+        store=True,
+        currency_field="currency_id",
+    )
+    is_overdue = fields.Boolean(
+        string="En mora",
+        compute="_compute_is_overdue",
+        store=True,
+        index=True,
+        help="Indicador independiente del estado: el retiro tiene al menos una cuota vencida.",
     )
 
     @api.depends("line_ids.price_subtotal")
@@ -104,6 +131,70 @@ class CawWithdrawal(models.Model):
         """Total del retiro: suma de los subtotales de sus líneas."""
         for withdrawal in self:
             withdrawal.amount_total = sum(withdrawal.line_ids.mapped("price_subtotal"))
+
+    @api.depends("installment_ids.amount_residual")
+    def _compute_amount_residual(self):
+        """Residual del retiro: suma de los residuales de sus cuotas."""
+        for withdrawal in self:
+            withdrawal.amount_residual = sum(withdrawal.installment_ids.mapped("amount_residual"))
+
+    @api.depends("installment_ids.state")
+    def _compute_is_overdue(self):
+        """Mora: al menos una cuota vencida. No altera el estado de pago."""
+        for withdrawal in self:
+            withdrawal.is_overdue = any(
+                installment.state == "overdue" for installment in withdrawal.installment_ids
+            )
+
+    @api.depends(
+        "is_cancelled",
+        "is_confirmed",
+        "amount_total",
+        "installment_ids.state",
+        "installment_ids.amount_allocated",
+        "installment_ids.amount_residual",
+    )
+    def _compute_state(self):
+        """Deriva el estado del retiro del estado de sus cuotas. Nunca se escribe a mano.
+
+        pending: ninguna cuota con imputación.
+        partial: al menos una cuota con imputación y residual total > 0.
+        paid:    TODAS las cuotas pagadas y residual del retiro en cero.
+        """
+        for withdrawal in self:
+            if withdrawal.is_cancelled:
+                withdrawal.state = "cancel"
+                continue
+            if not withdrawal.is_confirmed:
+                withdrawal.state = "draft"
+                continue
+            installments = withdrawal.installment_ids
+            currency = withdrawal.currency_id
+            residual = sum(installments.mapped("amount_residual"))
+            all_paid = bool(installments) and all(i.state == "paid" for i in installments)
+            if all_paid and currency.compare_amounts(residual, 0.0) == 0:
+                withdrawal.state = "paid"
+            elif any(i.amount_allocated > 0 for i in installments):
+                withdrawal.state = "partial"
+            else:
+                withdrawal.state = "pending"
+
+    @api.constrains("state", "installment_ids", "amount_residual")
+    def _check_no_false_paid(self):
+        """Blindaje de CC-31: rechaza 'paid' si alguna cuota tiene residual > 0."""
+        for withdrawal in self:
+            if withdrawal.state != "paid":
+                continue
+            open_installments = withdrawal.installment_ids.filtered(
+                lambda i: i.currency_id.compare_amounts(i.amount_residual, 0.0) > 0
+            )
+            if open_installments:
+                raise ValidationError(_(
+                    "El retiro %(name)s no puede figurar como pagado: tiene %(count)s cuota(s) "
+                    "con saldo pendiente.",
+                    name=withdrawal.name,
+                    count=len(open_installments),
+                ))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -145,7 +236,7 @@ class CawWithdrawal(models.Model):
 
     def write(self, vals):
         """Impide editar las líneas de un retiro que ya salió de borrador."""
-        if "line_ids" in vals and any(w.state not in ("draft",) for w in self):
+        if "line_ids" in vals and any(w.is_confirmed or w.is_cancelled for w in self):
             raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
         return super().write(vals)
 
@@ -184,11 +275,16 @@ class CawWithdrawal(models.Model):
         return values
 
     def _caw_generate_installments(self, count, first_days, period, cutoff_day):
-        """Borra las cuotas existentes y genera el plan indicado."""
+        """Borra las cuotas existentes y genera el plan indicado.
+
+        Generar el plan de cuotas es lo que saca al retiro de borrador, por eso
+        también levanta la bandera `is_confirmed` (el estado computado la respeta).
+        """
         for withdrawal in self:
             withdrawal.installment_ids.unlink()
             values = withdrawal._caw_build_installment_values(count, first_days, period, cutoff_day)
             self.env["caw.installment"].sudo().create(values)
+            withdrawal.is_confirmed = True
             _logger.info("Retiro %s: generadas %s cuotas", withdrawal.name, count)
         return True
 
@@ -218,6 +314,6 @@ class CawWithdrawal(models.Model):
                 period=company.caw_installment_period or "months",
                 cutoff_day=company.caw_cutoff_day or 0,
             )
-            withdrawal.state = "pending"
+            withdrawal.is_confirmed = True
             withdrawal.message_post(body=_("Retiro confirmado por %s.", self.env.user.display_name))
         return True
