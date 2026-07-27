@@ -55,6 +55,39 @@ class CawAccount(models.Model):
              "Bloqueo: solo un Manager puede forzar el retiro.",
     )
     active = fields.Boolean(default=True)
+    withdrawal_ids = fields.One2many(
+        comodel_name="caw.withdrawal",
+        inverse_name="account_id",
+        string="Retiros",
+    )
+    payment_ids = fields.One2many(
+        comodel_name="caw.payment",
+        inverse_name="account_id",
+        string="Pagos",
+    )
+    installment_ids = fields.One2many(
+        comodel_name="caw.installment",
+        inverse_name="account_id",
+        string="Cuotas",
+    )
+    balance = fields.Monetary(
+        string="Saldo",
+        compute="_compute_balances",
+        store=True,
+        currency_field="currency_id",
+    )
+    overdue_balance = fields.Monetary(
+        string="Saldo vencido",
+        compute="_compute_balances",
+        store=True,
+        currency_field="currency_id",
+    )
+    credit_balance = fields.Monetary(
+        string="Saldo a favor",
+        compute="_compute_credit_balance",
+        store=True,
+        currency_field="currency_id",
+    )
 
     _sql_constraints = [
         (
@@ -70,6 +103,36 @@ class CawAccount(models.Model):
         for account in self:
             if account.credit_limit < 0:
                 raise ValidationError(_("El límite de crédito no puede ser negativo."))
+
+    @api.depends(
+        "installment_ids.amount_residual",
+        "installment_ids.state",
+        "installment_ids.date_due",
+        "installment_ids.withdrawal_id.state",
+    )
+    def _compute_balances(self):
+        """Saldo y vencido: residuales de cuotas de retiros vivos (ni borrador ni cancelados)."""
+        today = fields.Date.context_today(self)
+        for account in self:
+            open_installments = account.installment_ids.filtered(
+                lambda i: i.withdrawal_id.state not in ("draft", "cancel")
+            )
+            account.balance = sum(open_installments.mapped("amount_residual"))
+            account.overdue_balance = sum(
+                open_installments
+                .filtered(lambda i: i.date_due and i.date_due < today and i.amount_residual > 0)
+                .mapped("amount_residual")
+            )
+
+    @api.depends("payment_ids.amount_unallocated", "payment_ids.state")
+    def _compute_credit_balance(self):
+        """Saldo a favor: remanente no imputado de los pagos publicados."""
+        for account in self:
+            account.credit_balance = sum(
+                account.payment_ids
+                .filtered(lambda p: p.state == "posted")
+                .mapped("amount_unallocated")
+            )
 
     @api.model
     def _get_or_create(self, partner, company):

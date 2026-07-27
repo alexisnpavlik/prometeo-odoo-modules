@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools import float_is_zero
+
+_logger = logging.getLogger(__name__)
 
 STATE_SELECTION = [
     ("pending", "Pendiente"),
@@ -144,3 +148,23 @@ class CawInstallment(models.Model):
                     name=withdrawal.name,
                     total=withdrawal.amount_total,
                 ))
+
+    @api.model
+    def _cron_update_overdue(self):
+        """Cron diario: recalcula el estado de las cuotas impagas ya vencidas.
+
+        El estado es computado y almacenado, pero depende de la fecha de hoy, que no es
+        un campo. Este cron fuerza el recálculo invalidando la caché de las candidatas.
+        """
+        today = fields.Date.context_today(self)
+        candidates = self.search([
+            ("date_due", "<", today),
+            ("state", "in", ("pending", "partial")),
+            ("withdrawal_id.state", "not in", ("draft", "cancel")),
+        ])
+        candidates.invalidate_recordset(["state"])
+        candidates.modified(["date_due"])
+        candidates._compute_state()
+        candidates.mapped("account_id").invalidate_recordset(["overdue_balance"])
+        _logger.info("Cron de vencidas: %s cuotas revisadas", len(candidates))
+        return True

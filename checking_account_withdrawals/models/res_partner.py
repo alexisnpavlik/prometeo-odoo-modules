@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class ResPartner(models.Model):
@@ -16,6 +16,54 @@ class ResPartner(models.Model):
         inverse_name="partner_id",
         string="Cuentas corrientes",
     )
+    caw_balance = fields.Monetary(
+        string="Saldo cuenta corriente",
+        compute="_compute_caw_amounts",
+        currency_field="currency_id",
+    )
+    caw_overdue_balance = fields.Monetary(
+        string="Saldo vencido",
+        compute="_compute_caw_amounts",
+        currency_field="currency_id",
+    )
+    caw_credit_balance = fields.Monetary(
+        string="Saldo a favor",
+        compute="_compute_caw_amounts",
+        currency_field="currency_id",
+    )
+    caw_withdrawal_count = fields.Integer(
+        string="Retiros",
+        compute="_compute_caw_amounts",
+    )
+
+    @api.depends(
+        "caw_account_ids.balance",
+        "caw_account_ids.overdue_balance",
+        "caw_account_ids.credit_balance",
+    )
+    def _compute_caw_amounts(self):
+        """Agrega los saldos de todas las cuentas del contacto visibles al usuario."""
+        withdrawal_model = self.env["caw.withdrawal"]
+        for partner in self:
+            accounts = partner.caw_account_ids
+            partner.caw_balance = sum(accounts.mapped("balance"))
+            partner.caw_overdue_balance = sum(accounts.mapped("overdue_balance"))
+            partner.caw_credit_balance = sum(accounts.mapped("credit_balance"))
+            partner.caw_withdrawal_count = withdrawal_model.search_count([
+                ("partner_id", "=", partner.id),
+            ]) if partner.id else 0
+
+    def action_caw_open_withdrawals(self):
+        """Botón inteligente: abre los retiros del contacto."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Retiros de %s", self.display_name),
+            "res_model": "caw.withdrawal",
+            "view_mode": "list,form",
+            "domain": [("partner_id", "=", self.id)],
+            "context": {"default_partner_id": self.id},
+        }
 
     @api.model_create_multi
     def create(self, vals_list):

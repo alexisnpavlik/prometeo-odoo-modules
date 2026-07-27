@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="cron_caw_update_overdue" model="ir.cron">
+        <field name="name">Cuenta corriente: marcar cuotas vencidas</field>
+        <field name="model_id" ref="model_caw_installment"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_update_overdue()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
