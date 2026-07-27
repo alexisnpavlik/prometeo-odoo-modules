@@ -9,8 +9,10 @@ import { askReason, logEvent, snapshotOrder } from "./control_logger";
 patch(PosStore.prototype, {
     /**
      * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
-     * unitario 0 (producto sin precio cargado). Se excluyen los hijos de combo,
-     * que legítimamente van en 0 porque el precio lo lleva la línea padre.
+     * unitario 0 (producto sin precio cargado) o negativo, cada uno con su
+     * propio toggle de configuración. Se excluyen los hijos de combo, que
+     * legítimamente van en 0 porque el precio lo lleva la línea padre, y las
+     * líneas de recompensa.
      */
     async pay() {
         // Resolver acá los cambios pendientes de la línea seleccionada (cantidad,
@@ -21,30 +23,31 @@ patch(PosStore.prototype, {
         // quedar bloqueado hasta que el motivo esté resuelto.
         await this._resolvePendingLineChanges(this.get_order());
 
-        if (this.config.block_zero_price_payment) {
-            const order = this.get_order();
-            const zeroLines = (order?.get_orderlines() || []).filter(
-                (line) =>
-                    !line.combo_parent_id &&
-                    !line.is_reward_line &&
-                    line.get_unit_price() === 0
-            );
-            if (zeroLines.length) {
-                const names = zeroLines
-                    .map((l) => l.get_full_product_name?.() || l.get_product()?.display_name || "")
-                    .filter(Boolean)
-                    .join(", ");
-                this.env.services.dialog.add(AlertDialog, {
-                    title: _t("No se puede cobrar"),
-                    body: _t(
-                        "Hay %s producto(s) con precio 0 en la orden (%s). " +
-                            "Cargá el precio correcto antes de cobrar.",
-                        zeroLines.length,
-                        names
-                    ),
-                });
-                return;
-            }
+        const order = this.get_order();
+        const lines = (order?.get_orderlines() || []).filter(
+            (line) => !line.combo_parent_id && !line.is_reward_line
+        );
+        const blockZero = this.config.block_zero_price_payment;
+        const blockNegative = this.config.block_negative_price_payment;
+        const badLines = lines.filter((line) => {
+            const price = line.get_unit_price();
+            return (blockZero && price === 0) || (blockNegative && price < 0);
+        });
+        if (badLines.length) {
+            const names = badLines
+                .map((l) => l.get_full_product_name?.() || l.get_product()?.display_name || "")
+                .filter(Boolean)
+                .join(", ");
+            this.env.services.dialog.add(AlertDialog, {
+                title: _t("No se puede cobrar"),
+                body: _t(
+                    "Hay %s producto(s) con precio 0 o negativo en la orden (%s). " +
+                        "Cargá el precio correcto antes de cobrar.",
+                    badLines.length,
+                    names
+                ),
+            });
+            return;
         }
         return super.pay(...arguments);
     },

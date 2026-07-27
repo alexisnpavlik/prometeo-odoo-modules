@@ -35,6 +35,9 @@
                     <setting string="Bloquear cobro con productos a precio 0" help="Impide pasar a la pantalla de pago si alguna línea tiene precio unitario 0. Evita cobrar productos sin precio cargado.">
                         <field name="block_zero_price_payment"/>
                     </setting>
+                    <setting string="Bloquear cobro con precio negativo" help="Impide pasar a la pantalla de pago si alguna línea tiene precio unitario negativo. Desactivalo si tu flujo de devoluciones usa precios negativos.">
+                        <field name="block_negative_price_payment"/>
+                    </setting>
                 </block>
             </xpath>
         </field>

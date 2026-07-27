@@ -60,3 +60,10 @@ class PosConfig(models.Model):
         help="Impide pasar a la pantalla de pago si alguna línea de la orden tiene "
              "precio unitario 0. Evita cobrar productos sin precio cargado.",
     )
+    block_negative_price_payment = fields.Boolean(
+        string="Bloquear cobro con precio negativo",
+        default=True,
+        help="Impide pasar a la pantalla de pago si alguna línea tiene precio "
+             "unitario negativo. Desactivalo si tu flujo de devoluciones usa "
+             "precios negativos de forma legítima.",
+    )

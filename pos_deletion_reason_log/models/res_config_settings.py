@@ -32,3 +32,6 @@ class ResConfigSettings(models.TransientModel):
     block_zero_price_payment = fields.Boolean(
         related="pos_config_id.block_zero_price_payment", readonly=False
     )
+    block_negative_price_payment = fields.Boolean(
+        related="pos_config_id.block_negative_price_payment", readonly=False
+    )

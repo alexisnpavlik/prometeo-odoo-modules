@@ -187,13 +187,21 @@ del servicio, con guard `settled` para que no pise un payload ya confirmado.
 - `require_reason_high_discount` + `high_discount_threshold` (Float, default 30.0;
   se pide motivo solo por encima del umbral — hasta 30 inclusive no pide)
 - `require_reason_price_reduction`
-- `block_zero_price_payment` (default True) — impide pasar a la pantalla de pago
-  si alguna línea tiene precio unitario 0 (producto sin precio cargado). Patch de
-  `PosStore.pay()`: muestra AlertDialog listando los productos y aborta. Se
-  excluyen los hijos de combo (`combo_parent_id`), que legítimamente van en 0
-  porque el precio lo lleva la línea padre, y las líneas de recompensa
-  (`is_reward_line`). Campo nuevo con default=True → cajas existentes en True
-  sin migración.
+- `block_zero_price_payment` (default True) + `block_negative_price_payment`
+  (default True) — impiden pasar a la pantalla de pago si alguna línea tiene
+  precio unitario 0 o negativo respectivamente (toggles independientes; el de
+  negativo se puede apagar si el flujo de devoluciones usa precios negativos
+  legítimamente). Patch de `PosStore.pay()`: muestra AlertDialog listando los
+  productos y aborta. Se excluyen los hijos de combo (`combo_parent_id`, el
+  precio lo lleva la línea padre) y las líneas de recompensa (`is_reward_line`).
+  Campos nuevos con default=True → cajas existentes en True sin migración.
+
+**Integridad del log (append-only):** `pos.control.log` es de solo lectura por
+ACL para todos los grupos (`group_pos_deletion_audit` y
+`point_of_sale.group_pos_manager`: `perm_read=1`, write/create/unlink=0). Los
+registros solo se crean vía el método `log_event`, que corre en `sudo()` y
+saltea el ACL. Así ni un manager puede editar/borrar registros de auditoría
+para tapar el trackeo.
 - `block_close_with_pending_orders` (default True) — impide cerrar la caja si
   quedan órdenes con productos sin finalizar. Patch de `ClosePosPopup.confirm()`
   (`static/src/js/closing_popup.js`): antes del flujo base, si hay órdenes en
