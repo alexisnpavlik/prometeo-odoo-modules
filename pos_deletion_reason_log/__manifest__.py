@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Deletion Reason Log",
-    "version": "18.0.1.2.0",
+    "version": "18.0.1.3.0",
     "category": "Point of Sale",
     "summary": "Traza en el POS eliminaciones, descuentos altos y reducciones de precio, pidiendo motivo",
     "description": """
@@ -20,7 +20,10 @@ aprobación de manager (los popups se apilan), pero no depende de él.
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["point_of_sale", "web"],
+    # pos_discount es necesario para controlar el descuento global: su patch de
+    # apply_discount no llama a super, así que el nuestro tiene que cargar
+    # después — la dependencia es la que garantiza ese orden de assets.
+    "depends": ["point_of_sale", "web", "pos_discount"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
@@ -39,6 +42,7 @@ aprobación de manager (los popups se apilan), pero no depende de él.
             "pos_deletion_reason_log/static/src/js/pos_store.js",
             "pos_deletion_reason_log/static/src/js/order_summary.js",
             "pos_deletion_reason_log/static/src/js/closing_popup.js",
+            "pos_deletion_reason_log/static/src/js/control_buttons.js",
             "pos_deletion_reason_log/static/src/xml/deletion_reason_popup.xml",
         ],
         "web.assets_backend": [

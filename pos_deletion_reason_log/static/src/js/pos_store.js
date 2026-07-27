@@ -9,34 +9,45 @@ import { askReason, logEvent, snapshotOrder } from "./control_logger";
 patch(PosStore.prototype, {
     /**
      * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
-     * unitario 0 (producto sin precio cargado). Se excluyen los hijos de combo,
-     * que legítimamente van en 0 porque el precio lo lleva la línea padre.
+     * unitario 0 (producto sin precio cargado) o negativo, cada uno con su
+     * propio toggle de configuración. Se excluyen los hijos de combo, que
+     * legítimamente van en 0 porque el precio lo lleva la línea padre, y las
+     * líneas de recompensa.
      */
     async pay() {
-        if (this.config.block_zero_price_payment) {
-            const order = this.get_order();
-            const zeroLines = (order?.get_orderlines() || []).filter(
-                (line) =>
-                    !line.combo_parent_id &&
-                    !line.is_reward_line &&
-                    line.get_unit_price() === 0
-            );
-            if (zeroLines.length) {
-                const names = zeroLines
-                    .map((l) => l.get_full_product_name?.() || l.get_product()?.display_name || "")
-                    .filter(Boolean)
-                    .join(", ");
-                this.env.services.dialog.add(AlertDialog, {
-                    title: _t("No se puede cobrar"),
-                    body: _t(
-                        "Hay %s producto(s) con precio 0 en la orden (%s). " +
-                            "Cargá el precio correcto antes de cobrar.",
-                        zeroLines.length,
-                        names
-                    ),
-                });
-                return;
-            }
+        // Resolver acá los cambios pendientes de la línea seleccionada (cantidad,
+        // descuento, precio). Normalmente se resuelven al deseleccionar la línea,
+        // pero si el cajero edita y va derecho a Cobrar nunca se deselecciona:
+        // sin esto, el cambio se cobraría sin pedir motivo ni quedar registrado.
+        // Acá sí se espera (a diferencia de selectOrderLine) porque el cobro debe
+        // quedar bloqueado hasta que el motivo esté resuelto.
+        await this._resolvePendingLineChanges(this.get_order());
+
+        const order = this.get_order();
+        const lines = (order?.get_orderlines() || []).filter(
+            (line) => !line.combo_parent_id && !line.is_reward_line
+        );
+        const blockZero = this.config.block_zero_price_payment;
+        const blockNegative = this.config.block_negative_price_payment;
+        const badLines = lines.filter((line) => {
+            const price = line.get_unit_price();
+            return (blockZero && price === 0) || (blockNegative && price < 0);
+        });
+        if (badLines.length) {
+            const names = badLines
+                .map((l) => l.get_full_product_name?.() || l.get_product()?.display_name || "")
+                .filter(Boolean)
+                .join(", ");
+            this.env.services.dialog.add(AlertDialog, {
+                title: _t("No se puede cobrar"),
+                body: _t(
+                    "Hay %s producto(s) con precio 0 o negativo en la orden (%s). " +
+                        "Cargá el precio correcto antes de cobrar.",
+                    badLines.length,
+                    names
+                ),
+            });
+            return;
         }
         return super.pay(...arguments);
     },
@@ -51,21 +62,29 @@ patch(PosStore.prototype, {
      * orders=[] con solo serverIds (sync en background de bajas ya decididas
      * en otro lado) no pide motivo: no hay nada nuevo que el cajero esté
      * decidiendo en este momento.
+     *
+     * Solo se pide motivo por las órdenes CON productos: borrar una orden vacía
+     * (incluida la orden en blanco que el POS siempre mantiene abierta) no es un
+     * evento a auditar, y pedir motivo ahí trababa al cajero al limpiar órdenes
+     * vacías. Las vacías se borran sin preguntar.
      */
     async deleteOrders(orders, serverIds = []) {
-        if (!this.config.require_reason_order_deletion || !orders || !orders.length) {
-            return super.deleteOrders(orders, serverIds);
+        const withProducts = (orders || []).filter(
+            (o) => o && o.get_orderlines && o.get_orderlines().length > 0
+        );
+        if (!this.config.require_reason_order_deletion || !withProducts.length) {
+            return this._deleteOrdersKeepingSelection(orders, serverIds);
         }
-        const snapshots = orders.map((order) => ({ order, snapshot: snapshotOrder(order) }));
+        const snapshots = withProducts.map((order) => ({ order, snapshot: snapshotOrder(order) }));
         const title =
-            orders.length > 1
-                ? _t("Motivo — Cancelar %s órdenes sin finalizar", orders.length)
+            withProducts.length > 1
+                ? _t("Motivo — Cancelar %s órdenes sin finalizar", withProducts.length)
                 : _t("Motivo — Eliminar orden");
         const reason = await askReason(this, title);
         if (!reason) {
             return false; // cancelado: no se elimina ninguna orden del lote
         }
-        const result = await super.deleteOrders(orders, serverIds);
+        const result = await this._deleteOrdersKeepingSelection(orders, serverIds);
         if (result) {
             for (const { order, snapshot } of snapshots) {
                 const stillExists = this.data.models["pos.order"].get(order.id);
@@ -78,6 +97,45 @@ patch(PosStore.prototype, {
                     });
                 }
             }
+        }
+        return result;
+    },
+
+    /**
+     * Llama al borrado real del core dejando siempre una orden viva seleccionada.
+     *
+     * El core saca la orden del modelo (removeOrder) y recién después espera el
+     * RPC action_pos_order_cancel. Durante esa espera, get_order() devuelve
+     * undefined porque selectedOrderUuid sigue apuntando a la orden borrada, y
+     * OWL alcanza a renderizar: el onWillRender de ProductScreen hace
+     * `if (currentOrder?.state !== "draft") add_new_order()`, y con undefined esa
+     * condición da true. Se crea una orden nueva que después afterOrderDeletion
+     * elige como "la última abierta" — por eso al eliminar una orden aparecía otra
+     * y la cantidad de órdenes nunca bajaba.
+     *
+     * Adelantar el cambio de selección a una orden que sobrevive cierra esa
+     * ventana: el render intermedio ve una orden draft válida y no crea nada.
+     * Si no queda ninguna sobreviviente no se toca nada: ahí que el core cree la
+     * orden nueva es justamente lo correcto.
+     */
+    async _deleteOrdersKeepingSelection(orders, serverIds) {
+        const doomed = new Set((orders || []).filter(Boolean).map((o) => o.uuid));
+        const current = this.get_order();
+        const previous = current;
+        let switched = false;
+        if (current && doomed.has(current.uuid)) {
+            const survivor = this.get_open_orders()
+                .filter((o) => !doomed.has(o.uuid))
+                .at(-1);
+            if (survivor) {
+                this.set_order(survivor);
+                switched = true;
+            }
+        }
+        const result = await super.deleteOrders(orders, serverIds);
+        if (!result && switched && this.get_order() !== previous) {
+            // El core abortó el borrado: la orden sigue viva, devolvemos el foco.
+            this.set_order(previous);
         }
         return result;
     },
@@ -144,7 +202,7 @@ patch(PosStore.prototype, {
 
         await this._resolveQtyReduction(order, line, before);
         await this._resolveHighDiscount(order, line, before);
-        await this._resolvePriceReduction(order, line, before);
+        await this._resolvePriceChange(order, line, before);
     },
 
     async _resolveQtyReduction(order, line, before) {
@@ -200,23 +258,37 @@ patch(PosStore.prototype, {
         });
     },
 
-    async _resolvePriceReduction(order, line, before) {
-        if (!this.config.require_reason_price_reduction) {
+    /**
+     * Resuelve el cambio de precio de la línea en ambos sentidos: bajarlo
+     * (price_reduction) y subirlo (price_increase), cada uno con su propio
+     * toggle de configuración. En el aumento, amount_removed queda negativo
+     * (el importe se movió a favor del negocio, no en contra), para que las
+     * sumas de importe afectado del dashboard no mezclen los dos sentidos.
+     */
+    async _resolvePriceChange(order, line, before) {
+        const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
+        if (currentPrice === before.price) {
             return;
         }
-        const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
-        if (currentPrice >= before.price) {
+        const isIncrease = currentPrice > before.price;
+        const enabled = isIncrease
+            ? this.config.require_reason_price_increase
+            : this.config.require_reason_price_reduction;
+        if (!enabled) {
             return;
         }
         const product = line.get_product();
-        const reason = await askReason(this, _t("Motivo — Reducir precio"));
+        const reason = await askReason(
+            this,
+            isIncrease ? _t("Motivo — Aumentar precio") : _t("Motivo — Reducir precio")
+        );
         if (!reason) {
             line.set_unit_price(before.price);
             return;
         }
         const qty = line.get_quantity ? line.get_quantity() : 0;
         await logEvent(this, {
-            event_type: "price_reduction",
+            event_type: isIncrease ? "price_increase" : "price_reduction",
             order_ref: order.uuid || order.name || "",
             product_id: product ? product.id : false,
             old_price: before.price,

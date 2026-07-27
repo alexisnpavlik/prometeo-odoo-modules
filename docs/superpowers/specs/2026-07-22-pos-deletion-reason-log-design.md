@@ -99,12 +99,35 @@ Por eso, **solo para este evento**, el flujo es ask-after-en-vez-de-antes:
    de Odoo llama a `selectOrderLine` sin `await` en varios lugares y espera
    que la selección ya haya cambiado sincrónicamente justo después.
 
-Limitación v1 aceptada: si el cajero reduce la cantidad de la última línea
-tocada y cierra/cobra la orden sin volver a seleccionar otra línea, ese ajuste
-no dispara la verificación (no hay un evento de "deselección final" al salir
-de la pantalla). Los otros 2 eventos (orden completa, línea completa) no
-tienen esta limitación — mantienen el flujo motivo-primero original.
    Si no (rechazado/cancelado) → no registrar.
+
+**Cierre del bypass "editar y cobrar directo"** (era limitación v1): si el cajero
+editaba la última línea tocada y ese cambio se cobraba sin volver a seleccionar
+otra línea, nunca se disparaba la verificación. `PosStore.pay()` ahora hace
+`await this._resolvePendingLineChanges(...)` antes de seguir, así que el cobro
+queda bloqueado hasta resolver el motivo. Acá sí se espera la resolución (a
+diferencia de `selectOrderLine`, que corre en background a propósito).
+
+**Descuento global** (`pos_discount`): no pasa por el control por línea, porque
+en vez de tocar `line.discount` agrega una línea con el producto de descuento y
+precio negativo — `get_discount()` nunca lo ve. Se controla aparte en
+`static/src/js/control_buttons.js`, patch de `ControlButtons.apply_discount(pc)`:
+el porcentaje llega explícito, así que es **ask-before** (si el cajero cancela,
+el descuento simplemente no se aplica, sin revert). Se registra como
+`high_discount` con `discount_percent = pc` y `amount_removed` = suma de las
+líneas del producto de descuento. **`pos_discount` es dependencia obligatoria en
+el manifest**: su patch de `apply_discount` no llama a `super`, así que el
+nuestro solo funciona si carga después, y el orden de assets lo determina el
+grafo de dependencias (sin la dependencia, alfabéticamente cargaría antes y
+quedaría anulado). Ojo: agregar una dependencia nueva requiere
+`ir.module.module.update_list()` — un `-u` normal no la registra.
+
+**Cierre del bypass "cancelar el popup con la X/Escape"**: `askReason` resolvía
+`null` mediante un prop `close`, pero el servicio de diálogos hace
+`subProps: {...props, close}` y lo pisaba. Cerrar con X o Escape dejaba la
+promesa colgada para siempre: no corría el revert del cambio ni el registro, y
+el cambio quedaba aplicado sin motivo. Ahora la cancelación va por el `onClose`
+del servicio, con guard `settled` para que no pise un payload ya confirmado.
 
 ## Componentes
 
@@ -164,13 +187,21 @@ tienen esta limitación — mantienen el flujo motivo-primero original.
 - `require_reason_high_discount` + `high_discount_threshold` (Float, default 30.0;
   se pide motivo solo por encima del umbral — hasta 30 inclusive no pide)
 - `require_reason_price_reduction`
-- `block_zero_price_payment` (default True) — impide pasar a la pantalla de pago
-  si alguna línea tiene precio unitario 0 (producto sin precio cargado). Patch de
-  `PosStore.pay()`: muestra AlertDialog listando los productos y aborta. Se
-  excluyen los hijos de combo (`combo_parent_id`), que legítimamente van en 0
-  porque el precio lo lleva la línea padre, y las líneas de recompensa
-  (`is_reward_line`). Campo nuevo con default=True → cajas existentes en True
-  sin migración.
+- `block_zero_price_payment` (default True) + `block_negative_price_payment`
+  (default True) — impiden pasar a la pantalla de pago si alguna línea tiene
+  precio unitario 0 o negativo respectivamente (toggles independientes; el de
+  negativo se puede apagar si el flujo de devoluciones usa precios negativos
+  legítimamente). Patch de `PosStore.pay()`: muestra AlertDialog listando los
+  productos y aborta. Se excluyen los hijos de combo (`combo_parent_id`, el
+  precio lo lleva la línea padre) y las líneas de recompensa (`is_reward_line`).
+  Campos nuevos con default=True → cajas existentes en True sin migración.
+
+**Integridad del log (append-only):** `pos.control.log` es de solo lectura por
+ACL para todos los grupos (`group_pos_deletion_audit` y
+`point_of_sale.group_pos_manager`: `perm_read=1`, write/create/unlink=0). Los
+registros solo se crean vía el método `log_event`, que corre en `sudo()` y
+saltea el ACL. Así ni un manager puede editar/borrar registros de auditoría
+para tapar el trackeo.
 - `block_close_with_pending_orders` (default True) — impide cerrar la caja si
   quedan órdenes con productos sin finalizar. Patch de `ClosePosPopup.confirm()`
   (`static/src/js/closing_popup.js`): antes del flujo base, si hay órdenes en

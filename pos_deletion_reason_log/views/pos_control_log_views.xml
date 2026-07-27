@@ -81,6 +81,7 @@
                 <filter name="type_qty" string="Reducción cantidad" domain="[('event_type','=','qty_reduction')]"/>
                 <filter name="type_discount" string="Descuento alto" domain="[('event_type','=','high_discount')]"/>
                 <filter name="type_price" string="Reducción precio" domain="[('event_type','=','price_reduction')]"/>
+                <filter name="type_price_up" string="Aumento precio" domain="[('event_type','=','price_increase')]"/>
                 <group expand="0" string="Agrupar por">
                     <filter name="group_user" string="Cajero" context="{'group_by':'user_id'}"/>
                     <filter name="group_type" string="Tipo" context="{'group_by':'event_type'}"/>

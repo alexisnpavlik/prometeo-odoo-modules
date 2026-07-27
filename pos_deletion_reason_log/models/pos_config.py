@@ -42,6 +42,12 @@ class PosConfig(models.Model):
         help="Pide un motivo cuando el cajero baja el precio de una línea por debajo "
              "del que tenía al seleccionarla.",
     )
+    require_reason_price_increase = fields.Boolean(
+        string="Motivo al aumentar precio",
+        default=True,
+        help="Pide un motivo cuando el cajero sube el precio de una línea por encima "
+             "del que tenía al seleccionarla.",
+    )
     block_close_with_pending_orders = fields.Boolean(
         string="Bloquear cierre con órdenes pendientes",
         default=True,
@@ -53,4 +59,11 @@ class PosConfig(models.Model):
         default=True,
         help="Impide pasar a la pantalla de pago si alguna línea de la orden tiene "
              "precio unitario 0. Evita cobrar productos sin precio cargado.",
+    )
+    block_negative_price_payment = fields.Boolean(
+        string="Bloquear cobro con precio negativo",
+        default=True,
+        help="Impide pasar a la pantalla de pago si alguna línea tiene precio "
+             "unitario negativo. Desactivalo si tu flujo de devoluciones usa "
+             "precios negativos de forma legítima.",
     )

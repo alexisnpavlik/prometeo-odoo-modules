@@ -10,7 +10,7 @@ class ReportSaleDetails(models.AbstractModel):
         self, date_start=False, date_stop=False, config_ids=False, session_ids=False, **kwargs
     ):
         """Agrega al informe de sesión el detalle de operaciones controladas
-        (eliminaciones, descuentos altos y reducciones de precio).
+        (eliminaciones, descuentos altos y cambios de precio).
 
         Usa el mismo alcance que el reporte base: por sesión si viene
         session_ids, si no por rango de fechas (+ config).
@@ -42,7 +42,7 @@ class ReportSaleDetails(models.AbstractModel):
         events = []
         counts = {
             "order": 0, "line": 0, "qty_reduction": 0,
-            "high_discount": 0, "price_reduction": 0,
+            "high_discount": 0, "price_reduction": 0, "price_increase": 0,
         }
         for log in logs:
             if log.event_type in counts:
