@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_checking_account" model="ir.module.category">
+        <field name="name">Cuenta Corriente</field>
+        <field name="description">Gestión de retiros de mercadería a cuenta corriente</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="group_cc_user" model="res.groups">
+        <field name="name">Operador de Cuenta Corriente</field>
+        <field name="category_id" ref="module_category_checking_account"/>
+        <field name="comment">Puede crear retiros, registrar pagos y consultar saldos. No puede modificar límites de crédito, imputar manualmente ni cancelar retiros.</field>
+    </record>
+
+    <record id="group_cc_manager" model="res.groups">
+        <field name="name">Manager de Cuenta Corriente</field>
+        <field name="category_id" ref="module_category_checking_account"/>
+        <field name="comment">Además de lo del Operador: define límites de crédito, imputa pagos manualmente, cancela retiros, anula pagos y fuerza retiros por encima del límite.</field>
+        <field name="implied_ids" eval="[(4, ref('group_cc_user'))]"/>
+    </record>
+</odoo>
