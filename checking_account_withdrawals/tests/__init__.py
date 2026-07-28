@@ -8,3 +8,4 @@ from . import test_picking
 from . import test_limit_and_cancel
 from . import test_allocate_wizard
 from . import test_statement
+from . import test_dashboard_controller
