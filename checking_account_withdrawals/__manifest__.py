@@ -30,10 +30,18 @@
         "views/caw_wizard_views.xml",
         "views/res_partner_views.xml",
         "views/res_config_settings_views.xml",
+        "views/dashboard_views.xml",
         "views/menu_views.xml",
         "report/report_caw_statement.xml",
         "report/report_caw_statement_templates.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "checking_account_withdrawals/static/src/css/dashboard.css",
+            "checking_account_withdrawals/static/src/js/dashboard.js",
+            "checking_account_withdrawals/static/src/xml/dashboard.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,

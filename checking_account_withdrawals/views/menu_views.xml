@@ -26,4 +26,8 @@
 
     <menuitem id="menu_caw_account" name="Cuentas corrientes"
               parent="menu_caw_config" action="action_caw_account" sequence="10"/>
+
+    <menuitem id="menu_caw_dashboard" name="Dashboard"
+              parent="menu_caw_root" action="action_caw_dashboard" sequence="5"
+              groups="checking_account_withdrawals.group_cc_manager"/>
 </odoo>
