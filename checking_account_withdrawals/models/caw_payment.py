@@ -166,3 +166,17 @@ class CawPayment(models.Model):
             payment.state = "cancel"
             payment.message_post(body=_("Pago anulado por %s.", self.env.user.display_name))
         return True
+
+    def action_open_allocate_wizard(self):
+        """Abre el wizard de imputación manual (solo Manager)."""
+        self.ensure_one()
+        if self.state != "posted":
+            raise UserError(_("Solo se puede imputar manualmente un pago publicado."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Imputar el pago %s", self.name),
+            "res_model": "caw.allocate.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_payment_id": self.id, "active_id": self.id},
+        }

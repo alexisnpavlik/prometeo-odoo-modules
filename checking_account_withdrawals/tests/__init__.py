@@ -6,3 +6,4 @@ from . import test_withdrawal_state
 from . import test_balance
 from . import test_picking
 from . import test_limit_and_cancel
+from . import test_allocate_wizard
