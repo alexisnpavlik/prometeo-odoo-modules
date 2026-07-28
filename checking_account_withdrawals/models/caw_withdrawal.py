@@ -4,7 +4,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -277,6 +277,10 @@ class CawWithdrawal(models.Model):
             due += relativedelta(months=index)
         if cutoff_day:
             due += relativedelta(day=min(cutoff_day, 28))
+            if due < self.date:
+                # El día de corte cayó antes de la fecha del retiro (p.ej. corte día 1
+                # sobre un retiro del día 5): correr al corte del mes siguiente.
+                due += relativedelta(months=1)
         return due
 
     def _caw_build_installment_values(self, count, first_days, period, cutoff_day):
@@ -392,7 +396,12 @@ class CawWithdrawal(models.Model):
         return True
 
     def action_view_picking(self):
-        """Abre el albarán asociado al retiro."""
+        """Abre el albarán asociado al retiro.
+
+        No usa sudo: el Operador (group_cc_user) tiene acceso de solo lectura granular
+        a stock.picking/stock.move/stock.move.line vía ir.model.access.csv, sin implicar
+        stock.group_stock_user (eso reactivaría reglas de stock que el módulo no quiere dar).
+        """
         self.ensure_one()
         if not self.picking_id:
             raise UserError(_("El retiro %s no tiene albarán asociado.", self.name))
@@ -403,6 +412,35 @@ class CawWithdrawal(models.Model):
             "res_id": self.picking_id.id,
             "view_mode": "form",
         }
+
+    def action_validate_picking(self):
+        """Valida el albarán de salida del retiro (descuenta el stock).
+
+        Usa sudo porque el Operador (group_cc_user) no tiene stock.group_stock_user.
+        Este módulo no maneja entregas parciales: si Odoo devuelve el wizard intermedio
+        de backorder (picking con cantidad hecha menor a la demandada), se resuelve
+        automáticamente eligiendo "sin entrega parcial" para no dejar el flujo a mitad
+        de camino esperando una acción manual que este módulo no expone.
+        """
+        self.ensure_one()
+        if not self.picking_id:
+            raise UserError(_("El retiro %s no tiene albarán asociado.", self.name))
+        if self.picking_id.state == "done":
+            raise UserError(_("El albarán del retiro %s ya está validado.", self.name))
+        picking = self.picking_id.sudo()
+        result = picking.button_validate()
+        if isinstance(result, dict) and result.get("res_model"):
+            wizard = (
+                self.env[result["res_model"]]
+                .sudo()
+                .with_context(**(result.get("context") or {}))
+                .create({})
+            )
+            if hasattr(wizard, "process_cancel_backorder"):
+                wizard.process_cancel_backorder()
+            elif hasattr(wizard, "process"):
+                wizard.process()
+        return True
 
     def action_confirm(self):
         """Confirma el retiro generando las cuotas con los defaults de la compañía."""
@@ -460,8 +498,18 @@ class CawWithdrawal(models.Model):
             ))
         return message
 
+    def _caw_check_manager(self):
+        """Bloquea en Python las acciones reservadas al Manager de Cuenta Corriente.
+
+        Complementa (no reemplaza) el `groups` de los botones en la vista: cubre
+        llamadas por código (RPC, otros módulos, shell) que no pasan por el form.
+        """
+        if not self.env.user.has_group("checking_account_withdrawals.group_cc_manager"):
+            raise AccessError(_("Solo un Manager de Cuenta Corriente puede realizar esta acción."))
+
     def action_cancel(self):
-        """Cancela el retiro. Se bloquea si tiene pagos imputados."""
+        """Cancela el retiro. Se bloquea si tiene pagos imputados o el albarán ya se validó."""
+        self._caw_check_manager()
         for withdrawal in self:
             if withdrawal.is_cancelled:
                 raise UserError(_("El retiro %s ya está cancelado.", withdrawal.name))
@@ -475,7 +523,13 @@ class CawWithdrawal(models.Model):
                     name=withdrawal.name,
                     amount=sum(allocations.mapped("amount")),
                 ))
-            if withdrawal.picking_id and withdrawal.picking_id.state != "done":
+            if withdrawal.picking_id and withdrawal.picking_id.state == "done":
+                raise UserError(_(
+                    "El retiro %s tiene el albarán validado (el stock ya se entregó). "
+                    "Gestioná una devolución antes de cancelarlo.",
+                    withdrawal.name,
+                ))
+            if withdrawal.picking_id:
                 withdrawal.picking_id.sudo().action_cancel()
             withdrawal.installment_ids.unlink()
             withdrawal.is_cancelled = True
@@ -486,10 +540,18 @@ class CawWithdrawal(models.Model):
 
     def action_draft(self):
         """Devuelve a borrador un retiro cancelado, para corregirlo."""
+        self._caw_check_manager()
         for withdrawal in self:
             if not withdrawal.is_cancelled:
                 raise UserError(_("Solo se puede reabrir un retiro cancelado."))
-            withdrawal.write({"is_cancelled": False, "is_confirmed": False, "picking_id": False})
+            vals = {"is_cancelled": False, "is_confirmed": False}
+            # Si el albarán quedó validado antes de cancelar (caso legado / dato migrado),
+            # no se limpia: regenerarlo duplicaría el descuento de stock ya hecho. En la
+            # práctica esto ya no ocurre porque action_cancel bloquea la cancelación con
+            # albarán 'done', pero se mantiene el resguardo por robustez.
+            if not (withdrawal.picking_id and withdrawal.picking_id.state == "done"):
+                vals["picking_id"] = False
+            withdrawal.write(vals)
         return True
 
     def action_open_confirm_wizard(self):

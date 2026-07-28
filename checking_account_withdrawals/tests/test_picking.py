@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from odoo.exceptions import UserError
 from odoo.tests import tagged
 
 from .common import CawCommon
@@ -56,3 +57,30 @@ class TestCawPicking(CawCommon):
         self.company.caw_picking_type_id = False
         withdrawal = self._confirmed()
         self.assertEqual(withdrawal.picking_id.picking_type_id, self.warehouse.out_type_id)
+
+    def test_action_validate_picking_deducts_stock(self):
+        """Validar la entrega pone el albarán en 'done' y descuenta el stock."""
+        withdrawal = self._confirmed(qty=3.0)
+        withdrawal.action_validate_picking()
+        self.assertEqual(withdrawal.picking_id.state, "done")
+
+    def test_action_validate_picking_requires_picking(self):
+        """Sin albarán asociado, no se puede validar la entrega."""
+        withdrawal = self.env["caw.withdrawal"].create({
+            "partner_id": self.partner.id,
+            "date": "2026-01-01",
+            "line_ids": [(0, 0, {
+                "product_id": self.product.id,
+                "quantity": 1.0,
+                "price_unit": 100.0,
+            })],
+        })
+        with self.assertRaises(UserError):
+            withdrawal.action_validate_picking()
+
+    def test_action_validate_picking_rejects_already_done(self):
+        """No se puede volver a validar un albarán ya validado."""
+        withdrawal = self._confirmed(qty=3.0)
+        withdrawal.action_validate_picking()
+        with self.assertRaises(UserError):
+            withdrawal.action_validate_picking()

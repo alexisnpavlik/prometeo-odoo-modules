@@ -53,3 +53,19 @@ class TestCawWithdrawal(CawCommon):
         other = self.env["res.partner"].create({"name": "No habilitado"})
         with self.assertRaises(UserError):
             self.env["caw.withdrawal"].create({"partner_id": other.id})
+
+    def test_line_write_blocked_after_confirm(self):
+        """Una vez confirmado el retiro, no se puede editar una línea directamente."""
+        from odoo.exceptions import UserError
+        withdrawal = self._new_withdrawal()
+        withdrawal.action_confirm()
+        with self.assertRaises(UserError):
+            withdrawal.line_ids.write({"price_unit": 999.0})
+
+    def test_line_unlink_blocked_after_confirm(self):
+        """Una vez confirmado el retiro, no se puede borrar una línea directamente."""
+        from odoo.exceptions import UserError
+        withdrawal = self._new_withdrawal()
+        withdrawal.action_confirm()
+        with self.assertRaises(UserError):
+            withdrawal.line_ids[0].unlink()

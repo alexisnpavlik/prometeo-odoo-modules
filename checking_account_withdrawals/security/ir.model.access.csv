@@ -15,3 +15,6 @@ access_caw_confirm_wizard_user,caw.confirm.wizard user,model_caw_confirm_wizard,
 access_caw_allocate_wizard_manager,caw.allocate.wizard manager,model_caw_allocate_wizard,checking_account_withdrawals.group_cc_manager,1,1,1,1
 access_caw_allocate_wizard_line_manager,caw.allocate.wizard.line manager,model_caw_allocate_wizard_line,checking_account_withdrawals.group_cc_manager,1,1,1,1
 access_caw_statement_wizard_user,caw.statement.wizard user,model_caw_statement_wizard,checking_account_withdrawals.group_cc_user,1,1,1,1
+access_stock_picking_cc_user,stock.picking cc user read,stock.model_stock_picking,checking_account_withdrawals.group_cc_user,1,0,0,0
+access_stock_move_cc_user,stock.move cc user read,stock.model_stock_move,checking_account_withdrawals.group_cc_user,1,0,0,0
+access_stock_move_line_cc_user,stock.move.line cc user read,stock.model_stock_move_line,checking_account_withdrawals.group_cc_user,1,0,0,0

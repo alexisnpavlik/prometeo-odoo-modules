@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ResCompany(models.Model):
@@ -32,3 +33,10 @@ class ResCompany(models.Model):
         help="Tipo de operación usado para el albarán de salida del retiro. "
              "Si está vacío se usa el de salidas del almacén principal.",
     )
+
+    @api.constrains("caw_cutoff_day")
+    def _check_caw_cutoff_day(self):
+        """El día de corte debe ser un día válido del mes (0 = sin día de corte)."""
+        for company in self:
+            if not 0 <= company.caw_cutoff_day <= 28:
+                raise ValidationError(_("El día de corte debe estar entre 0 y 28."))

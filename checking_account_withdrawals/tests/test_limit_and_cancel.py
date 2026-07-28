@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 
 from .common import CawCommon
@@ -90,6 +90,49 @@ class TestCawLimitAndCancel(CawCommon):
         with self.assertRaises(UserError):
             withdrawal.action_cancel()
         self.assertNotEqual(withdrawal.state, "cancel")
+
+    def test_cancel_is_blocked_with_picking_done(self):
+        """No se puede cancelar un retiro cuyo albarán ya fue validado (stock entregado)."""
+        self.account.limit_mode = "none"
+        self.company.caw_picking_type_id = self.warehouse.out_type_id
+        withdrawal = self._draft(200.0)
+        withdrawal.action_confirm()
+        withdrawal.action_validate_picking()
+        with self.assertRaises(UserError):
+            withdrawal.action_cancel()
+        self.assertNotEqual(withdrawal.state, "cancel")
+
+    def _cc_user(self):
+        """Crea un usuario con solo el grupo Operador (sin Manager)."""
+        return self.env["res.users"].create({
+            "name": "Operador CC Test",
+            "login": "caw_operator_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("checking_account_withdrawals.group_cc_user").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+
+    def test_action_cancel_requires_manager(self):
+        """Un Operador sin el grupo Manager no puede cancelar un retiro."""
+        self.account.limit_mode = "none"
+        withdrawal = self._draft(200.0)
+        withdrawal.action_confirm()
+        user = self._cc_user()
+        with self.assertRaises(AccessError):
+            withdrawal.with_user(user).action_cancel()
+
+    def test_action_draft_requires_manager(self):
+        """Un Operador sin el grupo Manager no puede reabrir un retiro cancelado."""
+        self.account.limit_mode = "none"
+        withdrawal = self._draft(200.0)
+        withdrawal.action_confirm()
+        withdrawal.action_cancel()
+        user = self._cc_user()
+        with self.assertRaises(AccessError):
+            withdrawal.with_user(user).action_draft()
 
     def test_wizard_generates_custom_plan(self):
         """El wizard genera el plan elegido en vez de los defaults de la compañía."""

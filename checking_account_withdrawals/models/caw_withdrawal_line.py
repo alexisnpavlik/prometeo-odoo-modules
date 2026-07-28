@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class CawWithdrawalLine(models.Model):
@@ -69,3 +69,23 @@ class CawWithdrawalLine(models.Model):
             if line.product_id:
                 line.name = line.product_id.display_name
                 line.price_unit = line.product_id.list_price
+
+    def _caw_check_not_locked(self):
+        """Bloquea la edición/borrado directo de líneas de un retiro confirmado o cancelado.
+
+        Mismo criterio que `caw.withdrawal.write` usa para bloquear `line_ids`: evita que
+        el Operador (con CRUD completo en el ACL de esta línea) altere el total de un
+        retiro ya confirmado escribiendo directamente sobre `caw.withdrawal.line`.
+        """
+        if any(line.withdrawal_id.is_confirmed or line.withdrawal_id.is_cancelled for line in self):
+            raise UserError(_("No se pueden modificar las líneas de un retiro confirmado o cancelado."))
+
+    def write(self, vals):
+        """Impide editar directamente una línea de un retiro confirmado o cancelado."""
+        self._caw_check_not_locked()
+        return super().write(vals)
+
+    def unlink(self):
+        """Impide borrar directamente una línea de un retiro confirmado o cancelado."""
+        self._caw_check_not_locked()
+        return super().unlink()

@@ -77,12 +77,18 @@ class CawDashboardController(http.Controller):
 
         credit_params = [tuple(env.companies.ids)]
         credit_where = "p.state = 'posted' AND p.company_id IN %s"
+        if start_date:
+            credit_where += " AND p.date >= %s"
+            credit_params.append(start_date)
+        if end_date:
+            credit_where += " AND p.date <= %s"
+            credit_params.append(end_date)
         if company and company != "all":
             credit_where += " AND p.company_id = %s"
             credit_params.append(int(company))
         env.cr.execute(f"""
             SELECT COALESCE(SUM(p.amount_unallocated), 0) AS credit_balance,
-                   COALESCE(SUM(p.amount) FILTER (WHERE TRUE), 0) AS collected
+                   COALESCE(SUM(p.amount), 0) AS collected
             FROM caw_payment p
             WHERE {credit_where}
         """, credit_params)
@@ -227,14 +233,12 @@ class CawDashboardController(http.Controller):
             "charts": self._caw_charts(env, start_date, end_date, company),
         }
 
-    @http.route("/checking_account_withdrawals/records", type="json", auth="user")
-    def records(self, model="withdrawals", start_date=None, end_date=None, company="all",
-                search=None, page=1, per_page=15, **kwargs):
-        """Listado paginado de retiros o cuotas para las pestañas del dashboard."""
-        self._check_access()
-        env = request.env
-        page = max(int(page or 1), 1)
-        per_page = min(max(int(per_page or 15), 1), 200)
+    def _caw_records_domain(self, env, model, start_date, end_date, company, search):
+        """Arma el dominio y resuelve el modelo/campo de fecha para retiros o cuotas.
+
+        Compartido por `records()` (paginado, para la tabla del dashboard) y `export()`
+        (sin cap de página, para el CSV) para que ambos filtren exactamente igual.
+        """
         domain = [("company_id", "in", env.companies.ids)]
         if company and company != "all":
             domain.append(("company_id", "=", int(company)))
@@ -251,6 +255,19 @@ class CawDashboardController(http.Controller):
             domain.append((date_field, "<=", end_date))
         if search:
             domain.append(("partner_id", "ilike", search))
+        return domain, record_model, date_field
+
+    @http.route("/checking_account_withdrawals/records", type="json", auth="user")
+    def records(self, model="withdrawals", start_date=None, end_date=None, company="all",
+                search=None, page=1, per_page=15, **kwargs):
+        """Listado paginado de retiros o cuotas para las pestañas del dashboard."""
+        self._check_access()
+        env = request.env
+        page = max(int(page or 1), 1)
+        per_page = min(max(int(per_page or 15), 1), 200)
+        domain, record_model, date_field = self._caw_records_domain(
+            env, model, start_date, end_date, company, search
+        )
         total = record_model.search_count(domain)
         records = record_model.search(
             domain, offset=(page - 1) * per_page, limit=per_page, order=f"{date_field} desc"
@@ -291,13 +308,16 @@ class CawDashboardController(http.Controller):
     @http.route("/checking_account_withdrawals/export", type="http", auth="user")
     def export(self, model="withdrawals", start_date=None, end_date=None, company="all",
                search=None, **kwargs):
-        """Exporta el listado filtrado a CSV."""
+        """Exporta el listado filtrado a CSV, sin el cap de 200 filas que usa la tabla del
+        dashboard (esa paginación es solo para la UI). El límite de 50000 es un resguardo
+        de memoria, no un tope de negocio: en la práctica ninguna cartera lo alcanza."""
         self._check_access()
-        data = self.records(
-            model=model, start_date=start_date, end_date=end_date,
-            company=company, search=search, page=1, per_page=10000,
+        env = request.env
+        domain, record_model, date_field = self._caw_records_domain(
+            env, model, start_date, end_date, company, search
         )
-        rows = data["records"]
+        records = record_model.search(domain, limit=50000, order=f"{date_field} desc")
+        rows = [self._caw_serialize(record, model) for record in records]
         output = io.StringIO()
         if rows:
             writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()), delimiter=";")

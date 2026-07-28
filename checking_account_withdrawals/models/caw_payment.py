@@ -2,7 +2,7 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -158,7 +158,9 @@ class CawPayment(models.Model):
         return True
 
     def action_cancel(self):
-        """Anula el pago revirtiendo todas sus imputaciones."""
+        """Anula el pago revirtiendo todas sus imputaciones. Solo un Manager puede hacerlo."""
+        if not self.env.user.has_group("checking_account_withdrawals.group_cc_manager"):
+            raise AccessError(_("Solo un Manager de Cuenta Corriente puede realizar esta acción."))
         for payment in self:
             if payment.state == "cancel":
                 raise UserError(_("El pago %s ya está anulado.", payment.name))

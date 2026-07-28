@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import tagged
 
 from .common import CawCommon
@@ -107,3 +107,20 @@ class TestCawPayment(CawCommon):
         payment = self._payment(0.0)
         with self.assertRaises(UserError):
             payment.action_post()
+
+    def test_action_cancel_requires_manager(self):
+        """Un Operador sin el grupo Manager no puede anular un pago."""
+        payment = self._payment(100.0)
+        payment.action_post()
+        user = self.env["res.users"].create({
+            "name": "Operador CC Test",
+            "login": "caw_payment_operator_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("checking_account_withdrawals.group_cc_user").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        with self.assertRaises(AccessError):
+            payment.with_user(user).action_cancel()

@@ -8,6 +8,7 @@ class ResPartner(models.Model):
     caw_enabled = fields.Boolean(
         string="Habilitado para cuenta corriente",
         tracking=True,
+        groups="checking_account_withdrawals.group_cc_manager",
         help="Si está marcado, este contacto puede retirar mercadería a cuenta corriente. "
              "Al marcarlo se crea automáticamente su cuenta en la compañía activa.",
     )

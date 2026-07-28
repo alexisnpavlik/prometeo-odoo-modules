@@ -103,6 +103,23 @@ class TestCawInstallment(CawCommon):
                 "amount": 1000.0,
             })
 
+    def test_due_date_never_precedes_withdrawal_date_with_cutoff(self):
+        """Un día de corte anterior al día del retiro no genera vencimientos pasados.
+
+        Antes del fix, first_days=5 + cutoff_day=1 sobre un retiro del 2026-01-05
+        producía due=2026-01-01, anterior a la fecha del retiro.
+        """
+        withdrawal = self._withdrawal(1000.0)
+        withdrawal.date = "2026-01-05"
+        withdrawal._caw_generate_installments(count=1, first_days=5, period="days", cutoff_day=1)
+        for installment in withdrawal.installment_ids:
+            self.assertGreaterEqual(installment.date_due, withdrawal.date)
+
+    def test_company_cutoff_day_out_of_range_is_rejected(self):
+        """El día de corte de la compañía debe estar entre 0 y 28."""
+        with self.assertRaises(ValidationError):
+            self.company.caw_cutoff_day = 29
+
     def test_lines_are_locked_after_confirm(self):
         """Un retiro confirmado no admite edición de líneas."""
         withdrawal = self._withdrawal(500.0)

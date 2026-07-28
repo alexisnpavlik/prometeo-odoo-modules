@@ -32,6 +32,10 @@
                 <header>
                     <button name="action_open_confirm_wizard" type="object" string="Confirmar"
                             class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_validate_picking" type="object" string="Validar entrega"
+                            class="oe_highlight"
+                            invisible="not picking_id or picking_state == 'done'"
+                            confirm="¿Confirmás la entrega de la mercadería? Esto descuenta el stock."/>
                     <button name="action_cancel" type="object" string="Cancelar"
                             invisible="state in ('draft', 'cancel')"
                             groups="checking_account_withdrawals.group_cc_manager"
