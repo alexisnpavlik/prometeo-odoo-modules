@@ -14,3 +14,4 @@ access_caw_allocation_manager,caw.allocation manager,model_caw_allocation,checki
 access_caw_confirm_wizard_user,caw.confirm.wizard user,model_caw_confirm_wizard,checking_account_withdrawals.group_cc_user,1,1,1,1
 access_caw_allocate_wizard_manager,caw.allocate.wizard manager,model_caw_allocate_wizard,checking_account_withdrawals.group_cc_manager,1,1,1,1
 access_caw_allocate_wizard_line_manager,caw.allocate.wizard.line manager,model_caw_allocate_wizard_line,checking_account_withdrawals.group_cc_manager,1,1,1,1
+access_caw_statement_wizard_user,caw.statement.wizard user,model_caw_statement_wizard,checking_account_withdrawals.group_cc_user,1,1,1,1

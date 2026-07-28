@@ -17,6 +17,9 @@
     <menuitem id="menu_caw_installment" name="Cuotas por vencer"
               parent="menu_caw_operations" action="action_caw_installment" sequence="30"/>
 
+    <menuitem id="menu_caw_statement" name="Resumen de cuenta"
+              parent="menu_caw_operations" action="action_caw_statement_wizard" sequence="40"/>
+
     <menuitem id="menu_caw_config" name="Configuración"
               parent="menu_caw_root" sequence="90"
               groups="checking_account_withdrawals.group_cc_manager"/>

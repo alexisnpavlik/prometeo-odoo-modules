@@ -72,4 +72,29 @@
             </form>
         </field>
     </record>
+
+    <record id="view_caw_statement_wizard_form" model="ir.ui.view">
+        <field name="name">caw.statement.wizard.form</field>
+        <field name="model">caw.statement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Resumen de cuenta">
+                <group>
+                    <field name="account_id" options="{'no_create': True}"/>
+                    <field name="date_to"/>
+                </group>
+                <footer>
+                    <button name="action_print" type="object" string="Imprimir"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_caw_statement_wizard" model="ir.actions.act_window">
+        <field name="name">Resumen de cuenta</field>
+        <field name="res_model">caw.statement.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 </odoo>

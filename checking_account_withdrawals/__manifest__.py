@@ -31,6 +31,8 @@
         "views/res_partner_views.xml",
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
+        "report/report_caw_statement.xml",
+        "report/report_caw_statement_templates.xml",
     ],
     "installable": True,
     "auto_install": False,

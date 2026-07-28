@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_caw_statement_document">
+        <t t-set="data" t-value="doc._caw_statement_data()"/>
+        <t t-call="web.external_layout">
+            <div class="page">
+                <h2>Resumen de cuenta corriente</h2>
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <strong>Contacto:</strong>
+                        <span t-field="doc.partner_id.display_name"/><br/>
+                        <strong>Compañía:</strong>
+                        <span t-field="data['account'].company_id.name"/>
+                    </div>
+                    <div class="col-6 text-end">
+                        <strong>Saldo a la fecha:</strong>
+                        <span t-esc="data['date_to']"/><br/>
+                        <strong>Emitido:</strong>
+                        <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y')"/>
+                    </div>
+                </div>
+
+                <h4>Retiros</h4>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Fecha</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-end">Residual</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="data['withdrawals']" t-as="withdrawal">
+                            <td><span t-field="withdrawal.name"/></td>
+                            <td><span t-field="withdrawal.date"/></td>
+                            <td class="text-end">
+                                <span t-field="withdrawal.amount_total"
+                                      t-options='{"widget": "monetary", "display_currency": withdrawal.currency_id}'/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="withdrawal.amount_residual"
+                                      t-options='{"widget": "monetary", "display_currency": withdrawal.currency_id}'/>
+                            </td>
+                            <td><span t-field="withdrawal.state"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>Cuotas</h4>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Retiro</th>
+                            <th>Cuota</th>
+                            <th>Vencimiento</th>
+                            <th class="text-end">Monto</th>
+                            <th class="text-end">Imputado</th>
+                            <th class="text-end">Residual</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="data['installments']" t-as="installment">
+                            <td><span t-field="installment.withdrawal_id.name"/></td>
+                            <td><span t-field="installment.sequence"/></td>
+                            <td><span t-field="installment.date_due"/></td>
+                            <td class="text-end">
+                                <span t-field="installment.amount"
+                                      t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="installment.amount_allocated"
+                                      t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="installment.amount_residual"
+                                      t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                            </td>
+                            <td><span t-field="installment.state"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>Pagos</h4>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Número</th>
+                            <th>Fecha</th>
+                            <th>Medio</th>
+                            <th>Referencia</th>
+                            <th class="text-end">Monto</th>
+                            <th class="text-end">Imputado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="data['payments']" t-as="payment">
+                            <td><span t-field="payment.name"/></td>
+                            <td><span t-field="payment.date"/></td>
+                            <td><span t-field="payment.payment_method"/></td>
+                            <td><span t-field="payment.ref"/></td>
+                            <td class="text-end">
+                                <span t-field="payment.amount"
+                                      t-options='{"widget": "monetary", "display_currency": payment.currency_id}'/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="payment.amount_allocated"
+                                      t-options='{"widget": "monetary", "display_currency": payment.currency_id}'/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="row mt-4">
+                    <div class="col-6 offset-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Total retirado</strong></td>
+                                <td class="text-end">
+                                    <span t-esc="data['total_withdrawn']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total pagado</strong></td>
+                                <td class="text-end">
+                                    <span t-esc="data['total_paid']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </td>
+                            </tr>
+                            <tr class="border-top">
+                                <td><strong>Saldo final</strong></td>
+                                <td class="text-end">
+                                    <strong>
+                                        <span t-esc="data['balance']"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Saldo vencido</td>
+                                <td class="text-end">
+                                    <span t-esc="data['overdue']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Saldo a favor</td>
+                                <td class="text-end">
+                                    <span t-esc="data['credit']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_caw_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="checking_account_withdrawals.report_caw_statement_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>
