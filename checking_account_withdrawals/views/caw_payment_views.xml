@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_caw_payment_list" model="ir.ui.view">
+        <field name="name">caw.payment.list</field>
+        <field name="model">caw.payment</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancel'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="payment_method"/>
+                <field name="ref" optional="show"/>
+                <field name="amount" sum="Total"/>
+                <field name="amount_allocated" sum="Imputado"/>
+                <field name="amount_unallocated" sum="Saldo a favor"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_caw_payment_form" model="ir.ui.view">
+        <field name="name">caw.payment.form</field>
+        <field name="model">caw.payment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_post" type="object" string="Publicar"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_open_allocate_wizard" type="object"
+                            string="Imputar manualmente" invisible="state != 'posted'"
+                            groups="checking_account_withdrawals.group_cc_manager"/>
+                    <button name="action_cancel" type="object" string="Anular"
+                            invisible="state == 'cancel'"
+                            groups="checking_account_withdrawals.group_cc_manager"
+                            confirm="Se revertirán todas las imputaciones de este pago. ¿Continuar?"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="account_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="amount" readonly="state != 'draft'"/>
+                            <field name="payment_method" readonly="state != 'draft'"/>
+                            <field name="ref"/>
+                            <field name="amount_allocated"/>
+                            <field name="amount_unallocated"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Imputaciones" name="allocations">
+                            <field name="allocation_ids" readonly="1">
+                                <list>
+                                    <field name="withdrawal_id"/>
+                                    <field name="installment_id"/>
+                                    <field name="amount" sum="Imputado"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_caw_payment" model="ir.actions.act_window">
+        <field name="name">Pagos</field>
+        <field name="res_model">caw.payment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_caw_withdrawal_list" model="ir.ui.view">
+        <field name="name">caw.withdrawal.list</field>
+        <field name="model">caw.withdrawal</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="is_overdue" decoration-muted="state == 'cancel'"
+                  decoration-success="state == 'paid'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="user_id" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="amount_residual" sum="Residual"/>
+                <field name="is_overdue" string="Mora" optional="show"/>
+                <field name="is_inconsistent" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'paid'"
+                       decoration-warning="state == 'partial'"
+                       decoration-info="state == 'pending'"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_caw_withdrawal_form" model="ir.ui.view">
+        <field name="name">caw.withdrawal.form</field>
+        <field name="model">caw.withdrawal</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_open_confirm_wizard" type="object" string="Confirmar"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Cancelar"
+                            invisible="state in ('draft', 'cancel')"
+                            groups="checking_account_withdrawals.group_cc_manager"
+                            confirm="¿Confirmás la cancelación de este retiro?"/>
+                    <button name="action_draft" type="object" string="Volver a borrador"
+                            invisible="state != 'cancel'"
+                            groups="checking_account_withdrawals.group_cc_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,pending,partial,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_picking" type="object" class="oe_stat_button"
+                                icon="fa-truck" invisible="not picking_id">
+                            <field name="picking_state" widget="statinfo" string="Albarán"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Inconsistente" bg_color="text-bg-danger"
+                            invisible="not is_inconsistent"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="account_id" readonly="1" groups="base.group_no_one"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="amount_total"/>
+                            <field name="amount_residual"/>
+                            <field name="is_overdue"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Líneas" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id"/>
+                                    <field name="name"/>
+                                    <field name="quantity"/>
+                                    <field name="price_unit"/>
+                                    <field name="price_subtotal" sum="Total"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Cuotas" name="installments">
+                            <!-- CC-21: el Manager edita montos y vencimientos libres; el
+                                 Operador la ve en solo lectura. El constraint de la Task 4
+                                 rechaza que la suma se aparte del total del retiro. -->
+                            <field name="installment_ids"
+                                   groups="checking_account_withdrawals.group_cc_manager">
+                                <list editable="bottom"
+                                      decoration-danger="state == 'overdue'"
+                                      decoration-success="state == 'paid'">
+                                    <field name="sequence"/>
+                                    <field name="date_due"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="amount_allocated" sum="Imputado" readonly="1"/>
+                                    <field name="amount_residual" sum="Residual" readonly="1"/>
+                                    <field name="state" widget="badge" readonly="1"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                            <field name="installment_ids" readonly="1"
+                                   groups="!checking_account_withdrawals.group_cc_manager">
+                                <list decoration-danger="state == 'overdue'"
+                                      decoration-success="state == 'paid'">
+                                    <field name="sequence"/>
+                                    <field name="date_due"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="amount_allocated" sum="Imputado"/>
+                                    <field name="amount_residual" sum="Residual"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes">
+                            <field name="note" placeholder="Notas internas del retiro..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_caw_withdrawal_search" model="ir.ui.view">
+        <field name="name">caw.withdrawal.search</field>
+        <field name="model">caw.withdrawal</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <filter name="filter_pending" string="Pendientes"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_partial" string="Pago parcial"
+                        domain="[('state', '=', 'partial')]"/>
+                <filter name="filter_paid" string="Pagados"
+                        domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="filter_overdue" string="Con cuotas vencidas"
+                        domain="[('is_overdue', '=', True)]"/>
+                <filter name="filter_inconsistent" string="Inconsistentes"
+                        domain="[('is_inconsistent', '=', True)]"/>
+                <separator/>
+                <filter name="filter_this_month" string="Este mes"
+                        date="date" default_period="month"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_partner" string="Contacto"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_state" string="Estado"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_company" string="Compañía"
+                            context="{'group_by': 'company_id'}"
+                            groups="base.group_multi_company"/>
+                    <filter name="group_date" string="Fecha"
+                            context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_caw_withdrawal" model="ir.actions.act_window">
+        <field name="name">Retiros</field>
+        <field name="res_model">caw.withdrawal</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_caw_withdrawal_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Registrá el primer retiro a cuenta corriente</p>
+            <p>Los retiros descuentan stock y generan las cuotas que el contacto deberá pagar.</p>
+        </field>
+    </record>
+</odoo>

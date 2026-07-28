@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_caw_confirm_wizard_form" model="ir.ui.view">
+        <field name="name">caw.confirm.wizard.form</field>
+        <field name="model">caw.confirm.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirmar retiro">
+                <field name="withdrawal_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="not limit_warning">
+                    <field name="limit_warning" readonly="1" nolabel="1"/>
+                </div>
+                <group>
+                    <group string="Situación del contacto">
+                        <field name="partner_id" readonly="1"/>
+                        <field name="current_balance"/>
+                        <field name="overdue_balance"/>
+                        <field name="amount_total"/>
+                    </group>
+                    <group string="Plan de cuotas">
+                        <field name="plan_mode" widget="radio"/>
+                        <field name="installment_count" invisible="plan_mode == 'cash'"/>
+                        <field name="first_days"/>
+                        <field name="period" invisible="plan_mode == 'cash'"/>
+                        <field name="cutoff_day"/>
+                    </group>
+                </group>
+                <group invisible="not limit_blocked"
+                       groups="checking_account_withdrawals.group_cc_manager">
+                    <field name="force_limit"/>
+                </group>
+                <div class="alert alert-danger" role="alert"
+                     invisible="not limit_blocked">
+                    Este retiro supera el límite de crédito en modo bloqueo.
+                    Solo un Manager puede forzarlo.
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object" string="Confirmar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_caw_allocate_wizard_form" model="ir.ui.view">
+        <field name="name">caw.allocate.wizard.form</field>
+        <field name="model">caw.allocate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Imputar pago">
+                <field name="payment_id" invisible="1"/>
+                <field name="currency_id" invisible="1"/>
+                <group>
+                    <field name="amount_available"/>
+                    <field name="amount_to_allocate"/>
+                </group>
+                <field name="line_ids">
+                    <list editable="bottom" create="false">
+                        <field name="withdrawal_id" readonly="1"/>
+                        <field name="installment_id" readonly="1"/>
+                        <field name="date_due" readonly="1"/>
+                        <field name="amount_residual" readonly="1"/>
+                        <field name="amount"/>
+                        <field name="currency_id" column_invisible="True"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_allocate" type="object" string="Imputar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
