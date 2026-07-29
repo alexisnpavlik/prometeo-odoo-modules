@@ -98,6 +98,24 @@ class TestCawWithdrawal(CawCommon):
         confirmed.invalidate_recordset()
         self.assertEqual(confirmed.amount_total, total_before)
 
+    def test_onchange_partner_id_preloads_account(self):
+        """Elegir el contacto precarga account_id en el registro en memoria (new).
+
+        Bug real detectado en uso: account_id se resuelve en create(), pero el
+        cliente web valida los campos obligatorios ANTES de llamar a create(). Sin
+        este onchange, account_id (required=True) queda vacío y el alta nunca
+        progresa desde la UI, aunque los tests que llaman a create() directamente
+        por ORM nunca lo detectan. account_id tiene groups="base.group_no_one" en
+        la vista, así que se verifica a nivel de modelo (new + onchange) en vez de
+        con Form, que no puede ver un campo ausente del arch renderizado.
+        """
+        self.partner.caw_enabled = True
+        withdrawal = self.env["caw.withdrawal"].new({})
+        withdrawal.partner_id = self.partner
+        withdrawal._onchange_partner_id()
+        self.assertTrue(withdrawal.account_id)
+        self.assertEqual(withdrawal.account_id.partner_id, self.partner)
+
     def _cc_user(self, login="caw_operator_withdrawal_test"):
         """Crea un usuario con solo el grupo Operador (sin Manager)."""
         return self.env["res.users"].create({

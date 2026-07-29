@@ -246,13 +246,26 @@ class CawWithdrawal(models.Model):
 
     @api.onchange("partner_id")
     def _onchange_partner_id(self):
-        """Restringe el selector de contactos a los habilitados."""
+        """Restringe el selector a contactos habilitados y precarga su cuenta corriente.
+
+        account_id se resuelve normalmente en create(), pero el cliente web valida los
+        campos obligatorios antes de intentar guardar (antes de llegar a create()), así
+        que sin este onchange el campo queda vacío para el usuario y el alta nunca
+        progresa. _get_or_create es idempotente: si la cuenta ya existe, la reutiliza.
+        """
         if self.partner_id and not self.partner_id.sudo().caw_enabled:
             self.partner_id = False
             return {"warning": {
                 "title": _("Contacto no habilitado"),
                 "message": _("Ese contacto no está habilitado para cuenta corriente."),
             }}
+        if self.partner_id:
+            company = self.company_id or self.env.company
+            self.account_id = self.env["caw.account"].sudo()._get_or_create(
+                self.partner_id, company
+            )
+        else:
+            self.account_id = False
 
     def unlink(self):
         """Solo se pueden borrar retiros en borrador o cancelados."""
