@@ -50,6 +50,7 @@ class CawPayment(models.Model):
     payment_method = fields.Selection(
         selection=[
             ("cash", "Efectivo"),
+            ("payroll_deduction", "Descuento en salario"),
             ("transfer", "Transferencia"),
             ("check", "Cheque"),
             ("card", "Tarjeta"),
