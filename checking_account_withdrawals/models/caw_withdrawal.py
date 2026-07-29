@@ -237,7 +237,7 @@ class CawWithdrawal(models.Model):
         """Devuelve la cuenta corriente del contacto, validando que esté habilitado."""
         partner = self.env["res.partner"].browse(vals.get("partner_id"))
         company = self.env["res.company"].browse(vals.get("company_id")) or self.env.company
-        if not partner or not partner.caw_enabled:
+        if not partner or not partner.sudo().caw_enabled:
             raise UserError(_(
                 "El contacto %s no está habilitado para cuenta corriente.",
                 partner.display_name or "",
@@ -247,7 +247,7 @@ class CawWithdrawal(models.Model):
     @api.onchange("partner_id")
     def _onchange_partner_id(self):
         """Restringe el selector de contactos a los habilitados."""
-        if self.partner_id and not self.partner_id.caw_enabled:
+        if self.partner_id and not self.partner_id.sudo().caw_enabled:
             self.partner_id = False
             return {"warning": {
                 "title": _("Contacto no habilitado"),
@@ -323,7 +323,7 @@ class CawWithdrawal(models.Model):
         for withdrawal in self:
             if withdrawal.state != "draft":
                 raise UserError(_("El retiro %s ya fue confirmado.", withdrawal.name))
-            if not withdrawal.partner_id.caw_enabled:
+            if not withdrawal.partner_id.sudo().caw_enabled:
                 raise UserError(_(
                     "El contacto %s no está habilitado para cuenta corriente.",
                     withdrawal.partner_id.display_name,

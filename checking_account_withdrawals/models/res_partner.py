@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 
 class ResPartner(models.Model):
@@ -8,9 +9,11 @@ class ResPartner(models.Model):
     caw_enabled = fields.Boolean(
         string="Habilitado para cuenta corriente",
         tracking=True,
-        groups="checking_account_withdrawals.group_cc_manager",
         help="Si está marcado, este contacto puede retirar mercadería a cuenta corriente. "
-             "Al marcarlo se crea automáticamente su cuenta en la compañía activa.",
+             "Al marcarlo se crea automáticamente su cuenta en la compañía activa.\n"
+             "Legible por cualquier usuario interno (el Operador necesita poder consultarlo "
+             "para operar retiros); solo un Manager de Cuenta Corriente puede cambiarlo "
+             "(ver write()).",
     )
     caw_account_ids = fields.One2many(
         comodel_name="caw.account",
@@ -74,7 +77,20 @@ class ResPartner(models.Model):
         return partners
 
     def write(self, vals):
-        """Crea la cuenta corriente al habilitar el contacto."""
+        """Crea la cuenta corriente al habilitar el contacto.
+
+        `caw_enabled` no lleva `groups=` (el Operador necesita poder LEERLO para operar
+        retiros sobre un contacto ya habilitado, y el domain de `caw.withdrawal.partner_id`
+        también necesita leerlo libremente al hacer `search()`). En cambio, la escritura
+        se restringe acá: solo un Manager de Cuenta Corriente puede cambiar el valor.
+        """
+        if "caw_enabled" in vals and not self.env.user.has_group(
+            "checking_account_withdrawals.group_cc_manager"
+        ):
+            raise AccessError(_(
+                "Solo un Manager de Cuenta Corriente puede habilitar o deshabilitar "
+                "la cuenta corriente de un contacto."
+            ))
         res = super().write(vals)
         if vals.get("caw_enabled"):
             self._caw_ensure_account()

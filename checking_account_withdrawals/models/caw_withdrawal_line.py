@@ -89,3 +89,20 @@ class CawWithdrawalLine(models.Model):
         """Impide borrar directamente una línea de un retiro confirmado o cancelado."""
         self._caw_check_not_locked()
         return super().unlink()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Impide crear líneas nuevas en un retiro ya confirmado o cancelado.
+
+        El ACL le da CRUD completo al Operador sobre esta línea (necesario para armar
+        el retiro en borrador), así que sin este guard podía agregar líneas después de
+        confirmar y alterar el total sin pasar por ningún chequeo. No se puede usar
+        `_caw_check_not_locked()` tal cual (lee `line.withdrawal_id` sobre un recordset
+        ya existente): acá se resuelve `withdrawal_id` desde cada `vals` antes de crear.
+        """
+        withdrawal_ids = {vals.get("withdrawal_id") for vals in vals_list if vals.get("withdrawal_id")}
+        withdrawals = self.env["caw.withdrawal"].browse(withdrawal_ids)
+        locked = withdrawals.filtered(lambda w: w.is_confirmed or w.is_cancelled)
+        if locked:
+            raise UserError(_("No se pueden agregar líneas a un retiro confirmado o cancelado."))
+        return super().create(vals_list)

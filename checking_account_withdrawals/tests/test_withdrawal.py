@@ -69,3 +69,68 @@ class TestCawWithdrawal(CawCommon):
         withdrawal.action_confirm()
         with self.assertRaises(UserError):
             withdrawal.line_ids[0].unlink()
+
+    def test_line_create_blocked_after_confirm(self):
+        """Una vez confirmado el retiro, no se puede crear una línea nueva apuntando a él."""
+        from odoo.exceptions import UserError
+        withdrawal = self._new_withdrawal()
+        withdrawal.action_confirm()
+        total_before = withdrawal.amount_total
+        with self.assertRaises(UserError):
+            self.env["caw.withdrawal.line"].create({
+                "withdrawal_id": withdrawal.id,
+                "product_id": self.product.id,
+                "quantity": 1.0,
+                "price_unit": 999.0,
+            })
+        withdrawal.invalidate_recordset()
+        self.assertEqual(withdrawal.amount_total, total_before)
+
+    def _cc_user(self, login="caw_operator_withdrawal_test"):
+        """Crea un usuario con solo el grupo Operador (sin Manager)."""
+        return self.env["res.users"].create({
+            "name": "Operador CC Test",
+            "login": login,
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("checking_account_withdrawals.group_cc_user").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+
+    def test_operator_can_read_caw_enabled_and_create_withdrawal(self):
+        """Un Operador (sin Manager) puede leer caw_enabled y crear un retiro normal.
+
+        Hallazgo re-revisión: `groups=` en el campo bloqueaba también la lectura, y
+        _caw_resolve_account/_onchange_partner_id/_caw_check_confirmable la necesitan
+        para dejar operar sobre un contacto ya habilitado.
+        """
+        self.partner.caw_enabled = True
+        user = self._cc_user()
+        partner_as_user = self.partner.with_user(user)
+        self.assertTrue(partner_as_user.caw_enabled)
+        withdrawal = self.env["caw.withdrawal"].with_user(user).create({
+            "partner_id": self.partner.id,
+            "line_ids": [(0, 0, {
+                "product_id": self.product.id,
+                "quantity": 1.0,
+                "price_unit": 100.0,
+            })],
+        })
+        self.assertTrue(withdrawal)
+        self.assertEqual(withdrawal.partner_id, self.partner)
+        self.assertEqual(withdrawal.amount_total, 100.0)
+
+    def test_operator_cannot_enable_partner(self):
+        """Un Operador no puede habilitar/deshabilitar la cuenta corriente de un contacto."""
+        from odoo.exceptions import AccessError
+        user = self._cc_user()
+        with self.assertRaises(AccessError):
+            self.partner.with_user(user).write({"caw_enabled": True})
+
+    def test_manager_can_enable_partner(self):
+        """Un Manager sí puede habilitar la cuenta corriente de un contacto sin error."""
+        other = self.env["res.partner"].create({"name": "Otro Fiado Test"})
+        other.write({"caw_enabled": True})
+        self.assertTrue(other.caw_enabled)
