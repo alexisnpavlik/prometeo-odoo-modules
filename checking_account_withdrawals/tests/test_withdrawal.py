@@ -86,6 +86,18 @@ class TestCawWithdrawal(CawCommon):
         withdrawal.invalidate_recordset()
         self.assertEqual(withdrawal.amount_total, total_before)
 
+    def test_line_reassign_to_confirmed_withdrawal_is_blocked(self):
+        """No se puede reasignar una línea de un borrador hacia un retiro ya confirmado."""
+        from odoo.exceptions import UserError
+        draft = self._new_withdrawal(lines=[(1.0, 50.0)])
+        confirmed = self._new_withdrawal()
+        confirmed.action_confirm()
+        total_before = confirmed.amount_total
+        with self.assertRaises(UserError):
+            draft.line_ids.write({"withdrawal_id": confirmed.id})
+        confirmed.invalidate_recordset()
+        self.assertEqual(confirmed.amount_total, total_before)
+
     def _cc_user(self, login="caw_operator_withdrawal_test"):
         """Crea un usuario con solo el grupo Operador (sin Manager)."""
         return self.env["res.users"].create({

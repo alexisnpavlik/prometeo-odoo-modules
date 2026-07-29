@@ -81,8 +81,18 @@ class CawWithdrawalLine(models.Model):
             raise UserError(_("No se pueden modificar las líneas de un retiro confirmado o cancelado."))
 
     def write(self, vals):
-        """Impide editar directamente una línea de un retiro confirmado o cancelado."""
+        """Impide editar directamente una línea de un retiro confirmado o cancelado.
+
+        Si `vals` reasigna `withdrawal_id`, `_caw_check_not_locked()` solo ve el retiro
+        de origen (el actual, leído antes del cambio): una línea de un borrador podía
+        reasignarse hacia un retiro ya confirmado sin error, alterando su `amount_total`.
+        Se agrega el chequeo del retiro de destino.
+        """
         self._caw_check_not_locked()
+        if "withdrawal_id" in vals:
+            target = self.env["caw.withdrawal"].browse(vals["withdrawal_id"])
+            if target.is_confirmed or target.is_cancelled:
+                raise UserError(_("No se pueden agregar líneas a un retiro confirmado o cancelado."))
         return super().write(vals)
 
     def unlink(self):
