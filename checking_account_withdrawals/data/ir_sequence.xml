@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="seq_caw_withdrawal" model="ir.sequence">
+        <field name="name">Retiro de cuenta corriente</field>
+        <field name="code">caw.withdrawal</field>
+        <field name="prefix">CC/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_caw_payment" model="ir.sequence">
+        <field name="name">Pago de cuenta corriente</field>
+        <field name="code">caw.payment</field>
+        <field name="prefix">CCP/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>

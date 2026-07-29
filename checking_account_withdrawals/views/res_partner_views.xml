@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_caw" model="ir.ui.view">
+        <field name="name">res.partner.form.caw</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_caw_open_withdrawals" type="object" class="oe_stat_button"
+                        icon="fa-shopping-basket" invisible="not caw_enabled"
+                        groups="checking_account_withdrawals.group_cc_user">
+                    <field name="caw_withdrawal_count" widget="statinfo" string="Retiros"/>
+                </button>
+            </xpath>
+            <xpath expr="//page[@name='sales_purchases']" position="after">
+                <page string="Cuenta corriente" name="caw"
+                      groups="checking_account_withdrawals.group_cc_user">
+                    <group>
+                        <group>
+                            <field name="caw_enabled"/>
+                        </group>
+                        <group invisible="not caw_enabled">
+                            <field name="caw_balance"/>
+                            <field name="caw_overdue_balance"/>
+                            <field name="caw_credit_balance"/>
+                        </group>
+                    </group>
+                    <field name="caw_account_ids" readonly="1" invisible="not caw_enabled"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

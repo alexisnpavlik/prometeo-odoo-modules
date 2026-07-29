@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_caw_root" name="Cuenta Corriente"
+              groups="checking_account_withdrawals.group_cc_user"
+              web_icon="checking_account_withdrawals,static/description/icon.png"
+              sequence="52"/>
+
+    <menuitem id="menu_caw_operations" name="Operaciones"
+              parent="menu_caw_root" sequence="10"/>
+
+    <menuitem id="menu_caw_withdrawal" name="Retiros"
+              parent="menu_caw_operations" action="action_caw_withdrawal" sequence="10"/>
+
+    <menuitem id="menu_caw_payment" name="Pagos"
+              parent="menu_caw_operations" action="action_caw_payment" sequence="20"/>
+
+    <menuitem id="menu_caw_installment" name="Cuotas por vencer"
+              parent="menu_caw_operations" action="action_caw_installment" sequence="30"/>
+
+    <menuitem id="menu_caw_statement" name="Resumen de cuenta"
+              parent="menu_caw_operations" action="action_caw_statement_wizard" sequence="40"/>
+
+    <menuitem id="menu_caw_config" name="Configuración"
+              parent="menu_caw_root" sequence="90"
+              groups="checking_account_withdrawals.group_cc_manager"/>
+
+    <menuitem id="menu_caw_account" name="Cuentas corrientes"
+              parent="menu_caw_config" action="action_caw_account" sequence="10"/>
+
+    <menuitem id="menu_caw_dashboard" name="Dashboard"
+              parent="menu_caw_root" action="action_caw_dashboard" sequence="5"
+              groups="checking_account_withdrawals.group_cc_manager"/>
+</odoo>

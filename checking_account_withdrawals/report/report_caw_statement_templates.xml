@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_caw_statement_document">
+        <t t-set="data" t-value="doc._caw_statement_data()"/>
+        <t t-call="web.external_layout">
+            <div class="page">
+                <style>
+                    .o_caw_statement .o_caw_kpi { border-radius: 6px; padding: 10px 12px; border: 1px solid #e5e7eb; }
+                    .o_caw_statement .o_caw_kpi_label { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+                    .o_caw_statement .o_caw_kpi_value { font-size: 18px; font-weight: 700; color: #1e293b; }
+                    .o_caw_statement .o_caw_kpi_overdue { background: #fef2f2; border-color: #fecaca; }
+                    .o_caw_statement .o_caw_kpi_overdue .o_caw_kpi_label,
+                    .o_caw_statement .o_caw_kpi_overdue .o_caw_kpi_value { color: #b91c1c; }
+                    .o_caw_statement .o_caw_kpi_credit { background: #f0fdf4; border-color: #bbf7d0; }
+                    .o_caw_statement .o_caw_kpi_credit .o_caw_kpi_label,
+                    .o_caw_statement .o_caw_kpi_credit .o_caw_kpi_value { color: #15803d; }
+                    .o_caw_statement h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .03em; color: #334155; border-left: 3px solid #3b82f6; padding-left: 8px; margin-top: 22px; margin-bottom: 8px; }
+                    .o_caw_statement table.table thead th { background: #1e293b; color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; border: none; }
+                    .o_caw_statement table.table tbody tr:nth-child(even) { background: #f8fafc; }
+                    .o_caw_statement table.table td, .o_caw_statement table.table th { padding: 5px 8px; }
+                    .o_caw_statement .badge { font-size: 10px; padding: 3px 8px; border-radius: 10px; color: #fff; }
+                    .o_caw_statement .badge-pending { background: #3b82f6; }
+                    .o_caw_statement .badge-partial { background: #f59e0b; }
+                    .o_caw_statement .badge-paid { background: #10b981; }
+                    .o_caw_statement .badge-overdue { background: #ef4444; }
+                    .o_caw_statement .badge-cancel { background: #94a3b8; }
+                    .o_caw_statement .o_caw_empty { color: #94a3b8; font-style: italic; padding: 6px 0; }
+                    .o_caw_statement .o_caw_totals td { padding: 4px 8px; }
+                    .o_caw_statement .o_caw_totals .o_caw_final td { border-top: 2px solid #1e293b; font-weight: 700; font-size: 13px; }
+                </style>
+
+                <div class="o_caw_statement">
+                    <div style="border-bottom: 3px solid #3b82f6; padding-bottom: 10px; margin-bottom: 16px;">
+                        <h2 style="margin-bottom: 2px;">Resumen de Cuenta Corriente</h2>
+                        <div class="row">
+                            <div class="col-6">
+                                <div style="font-size: 15px; font-weight: 700;" t-field="doc.partner_id.display_name"/>
+                                <div class="text-muted" t-field="data['account'].company_id.name"/>
+                            </div>
+                            <div class="col-6 text-end">
+                                <div>Saldo a la fecha:
+                                    <strong t-esc="data['date_to']" t-options='{"widget": "date"}'/>
+                                </div>
+                                <div class="text-muted">
+                                    Emitido: <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y')"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row text-center mb-2">
+                        <div class="col-4">
+                            <div class="o_caw_kpi">
+                                <div class="o_caw_kpi_label">Saldo final</div>
+                                <div class="o_caw_kpi_value">
+                                    <span t-esc="data['balance']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="o_caw_kpi o_caw_kpi_overdue">
+                                <div class="o_caw_kpi_label">Saldo vencido</div>
+                                <div class="o_caw_kpi_value">
+                                    <span t-esc="data['overdue']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="o_caw_kpi o_caw_kpi_credit">
+                                <div class="o_caw_kpi_label">Saldo a favor</div>
+                                <div class="o_caw_kpi_value">
+                                    <span t-esc="data['credit']"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4>Retiros</h4>
+                    <table class="table table-sm" t-if="data['withdrawals']">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Fecha</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Residual</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="data['withdrawals']" t-as="withdrawal">
+                                <td><span t-field="withdrawal.name"/></td>
+                                <td><span t-field="withdrawal.date"/></td>
+                                <td class="text-end">
+                                    <span t-field="withdrawal.amount_total"
+                                          t-options='{"widget": "monetary", "display_currency": withdrawal.currency_id}'/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-field="withdrawal.amount_residual"
+                                          t-options='{"widget": "monetary", "display_currency": withdrawal.currency_id}'/>
+                                </td>
+                                <td>
+                                    <span t-attf-class="badge badge-#{withdrawal.state}" t-field="withdrawal.state"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="o_caw_empty" t-if="not data['withdrawals']">Sin retiros en el período.</p>
+
+                    <h4>Cuotas</h4>
+                    <table class="table table-sm" t-if="data['installments']">
+                        <thead>
+                            <tr>
+                                <th>Retiro</th>
+                                <th>Cuota</th>
+                                <th>Vencimiento</th>
+                                <th class="text-end">Monto</th>
+                                <th class="text-end">Imputado</th>
+                                <th class="text-end">Residual</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="data['installments']" t-as="installment">
+                                <td><span t-field="installment.withdrawal_id.name"/></td>
+                                <td><span t-field="installment.sequence"/></td>
+                                <td><span t-field="installment.date_due"/></td>
+                                <td class="text-end">
+                                    <span t-field="installment.amount"
+                                          t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-field="installment.amount_allocated"
+                                          t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-field="installment.amount_residual"
+                                          t-options='{"widget": "monetary", "display_currency": installment.currency_id}'/>
+                                </td>
+                                <td>
+                                    <span t-attf-class="badge badge-#{installment.state}" t-field="installment.state"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="o_caw_empty" t-if="not data['installments']">Sin cuotas en el período.</p>
+
+                    <h4>Pagos</h4>
+                    <table class="table table-sm" t-if="data['payments']">
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Fecha</th>
+                                <th>Medio</th>
+                                <th>Referencia</th>
+                                <th class="text-end">Monto</th>
+                                <th class="text-end">Imputado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="data['payments']" t-as="payment">
+                                <td><span t-field="payment.name"/></td>
+                                <td><span t-field="payment.date"/></td>
+                                <td><span t-field="payment.payment_method"/></td>
+                                <td><span t-field="payment.ref"/></td>
+                                <td class="text-end">
+                                    <span t-field="payment.amount"
+                                          t-options='{"widget": "monetary", "display_currency": payment.currency_id}'/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-field="payment.amount_allocated"
+                                          t-options='{"widget": "monetary", "display_currency": payment.currency_id}'/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="o_caw_empty" t-if="not data['payments']">Sin pagos en el período.</p>
+
+                    <div class="row mt-3">
+                        <div class="col-6 offset-6">
+                            <table class="table table-sm o_caw_totals">
+                                <tr>
+                                    <td>Total retirado</td>
+                                    <td class="text-end">
+                                        <span t-esc="data['total_withdrawn']"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Total pagado</td>
+                                    <td class="text-end">
+                                        <span t-esc="data['total_paid']"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </td>
+                                </tr>
+                                <tr class="o_caw_final">
+                                    <td>Saldo final</td>
+                                    <td class="text-end">
+                                        <span t-esc="data['balance']"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_caw_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="checking_account_withdrawals.report_caw_statement_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>

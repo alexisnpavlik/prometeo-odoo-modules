@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="checking_account_withdrawals.DashboardTemplate">
+        <div t-att-class="'caw-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+            <!-- Sidebar de Filtros (Glassmorphic) -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Cuenta Corriente</h2>
+                        <span>Metrics Hub</span>
+                    </div>
+                </div>
+
+                <!-- Rango de Fechas Predefinido -->
+                <div class="sidebar-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="preset-dates">
+                        <button t-att-class="'btn-preset ' + (state.preset === 'today' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('today')">Hoy</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'yesterday' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('yesterday')">Ayer</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '7days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('7days')">Últimos 7 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '30days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('30days')">Últimos 30 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '60days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('60days')">Últimos 60 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === '90days' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('90days')">Últimos 90 días</button>
+                        <button t-att-class="'btn-preset ' + (state.preset === 'all' ? 'active' : '')"
+                                t-on-click="() => this.onPresetClick('all')">Todo</button>
+                    </div>
+
+                    <div class="custom-date-inputs">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="date" t-att-value="state.startDate" t-on-change="onStartDateChange"/>
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="date" t-att-value="state.endDate" t-on-change="onEndDateChange"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+
+                    <div class="input-group">
+                        <label>Empresa</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.company">
+                                <option value="all">Todas las empresas</option>
+                                <t t-foreach="filtersData.companies" t-as="c" t-key="c.id">
+                                    <option t-att-value="c.id"><t t-esc="c.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="sidebar-footer" style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
+                        <span>Aplicar</span>
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
+                        <span>Limpiar</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- Header -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <h1>Dashboard de Cuenta Corriente</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <!-- Botón de Alternancia de Tema Día/Noche -->
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime">Cargando...</span>
+                        </div>
+
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="() => this.refreshData(true)" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'general' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('general')">Panel General</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'withdrawals' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('withdrawals')">Retiros</button>
+                    <button t-att-class="'nav-tab ' + (state.activeTab === 'installments' ? 'active' : '')"
+                            t-on-click="() => this.switchTab('installments')">Cuotas</button>
+                </nav>
+
+                <!-- Tab Content Wrapper -->
+                <div class="tab-content">
+
+                    <!-- TAB: GENERAL -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'general' ? 'active' : '')">
+                        <!-- KPI Cards Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Saldo Total de Cartera</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.total_balance)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Saldo pendiente de cobro de todas las cuotas</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.overdue_balance &gt; 0 ? 'red' : 'green')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Saldo Vencido</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.overdue_balance)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Cuotas vencidas sin cobrar</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Saldo a Favor</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="1 4 1 10 7 10"></polyline>
+                                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.credit_balance)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Pagos aún no imputados a cuotas</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow purple">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Total Retirado</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.total_withdrawn)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Monto total de retiros del período</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow blue">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Cantidad de Retiros</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="14 2 14 8 20 8"></polyline>
+                                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.withdrawal_count.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Retiros confirmados en el período</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.overdue_installments &gt; 0 ? 'red' : 'green')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Cuotas Vencidas</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.overdue_installments.toLocaleString()"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Cuotas con fecha de vencimiento superada</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.overdue_rate &gt; 0 ? 'orange' : 'green')">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Tasa de Mora</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="metricsData.kpis.overdue_rate"/>%</div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Cuotas vencidas sobre el total de cuotas</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Cobrado en el Período</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path>
+                                                <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path>
+                                                <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.collected)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">Pagos registrados en el período</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Grid -->
+                        <div class="charts-grid">
+                            <!-- Evolución del Saldo -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Evolución del Saldo</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Muestra el saldo pendiente de cobro por mes de cada empresa durante el período seleccionado.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-balance-trend"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Cobrado vs Vencido -->
+                            <div class="chart-container span-two-cols glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Cobrado vs. Vencido</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Compara lo efectivamente cobrado contra el saldo vencido de las cuotas, por mes de vencimiento.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-collected-vs-overdue"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Estado de Cuotas -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Distribución de Cuotas por Estado</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Cantidad de cuotas del período según su estado: pendiente, parcial, pagada o vencida.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-installment-status"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Top Deudores -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Top Deudores</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Los diez contactos con mayor saldo pendiente en su cuenta corriente durante el período.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-top-partners"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Retiros por Compañía -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Retiros por Compañía</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Compara el monto total retirado de cada empresa del grupo en el período seleccionado.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-by-company"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: RETIROS -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'withdrawals' ? 'active' : '')">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Detalle de Retiros</h2>
+                                    <p class="subtitle">Retiros de mercadería a cuenta corriente en todos sus estados</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Buscar contacto..." t-on-input="onSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Número</th>
+                                            <th>Fecha</th>
+                                            <th>Contacto</th>
+                                            <th>Compañía</th>
+                                            <th>Total</th>
+                                            <th>Residual</th>
+                                            <th>Mora</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="withdrawalsData.records.length === 0">
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted">No se encontraron retiros registrados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="withdrawalsData.records" t-as="w" t-key="w.id">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="w.name"/></td>
+                                                <td><t t-esc="w.date"/></td>
+                                                <td><t t-esc="w.partner"/></td>
+                                                <td><t t-esc="w.company"/></td>
+                                                <td style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(w.amount_total)"/></td>
+                                                <td><t t-esc="formatCurrency(w.residual)"/></td>
+                                                <td>
+                                                    <span t-att-class="'status-pill ' + (w.overdue ? 'overdue' : '')">
+                                                        <t t-esc="w.overdue ? 'Sí' : 'No'"/>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="status-pill"><t t-esc="w.state"/></span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="state.page"/> de <t t-esc="withdrawalsData.pages"/> (Total: <t t-esc="withdrawalsData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= withdrawalsData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- TAB: CUOTAS -->
+                    <section t-att-class="'tab-pane ' + (state.activeTab === 'installments' ? 'active' : '')">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h2>Detalle de Cuotas</h2>
+                                    <p class="subtitle">Cuotas de los retiros con su estado de imputación</p>
+                                </div>
+                                <div class="header-actions">
+                                    <div class="search-box">
+                                        <input type="text" placeholder="Buscar contacto..." t-on-input="onSearchInput"/>
+                                    </div>
+                                    <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Contacto</th>
+                                            <th>Retiro</th>
+                                            <th>Cuota</th>
+                                            <th>Vencimiento</th>
+                                            <th>Monto</th>
+                                            <th>Imputado</th>
+                                            <th>Residual</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="installmentsData.records.length === 0">
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted">No hay cuotas para los filtros seleccionados.</td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="installmentsData.records" t-as="i" t-key="i.id">
+                                            <tr>
+                                                <td style="font-weight: 700; color: #fff;"><t t-esc="i.partner"/></td>
+                                                <td><t t-esc="i.withdrawal"/></td>
+                                                <td><t t-esc="i.sequence"/></td>
+                                                <td><t t-esc="i.date_due"/></td>
+                                                <td style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(i.amount)"/></td>
+                                                <td><t t-esc="formatCurrency(i.allocated)"/></td>
+                                                <td><t t-esc="formatCurrency(i.residual)"/></td>
+                                                <td>
+                                                    <span class="status-pill"><t t-esc="i.state"/></span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <div class="pagination">
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
+                                <span class="pagination-info">
+                                    Página <t t-esc="state.page"/> de <t t-esc="installmentsData.pages"/> (Total: <t t-esc="installmentsData.total"/>)
+                                </span>
+                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= installmentsData.pages" t-on-click="nextPage">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>
