@@ -9,6 +9,13 @@ class CawCommon(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.company = cls.env.ref("base.main_company")
+        # En algunos entornos compartidos (p.ej. DB `calidad`) main_company puede estar
+        # archivada por datos preexistentes ajenos a este módulo. Si está inactiva, el
+        # Many2many company_ids de un res.users nuevo no la reconoce como "empresa
+        # permitida" al validarse (respeta active_test), rompiendo tests que crean
+        # usuarios nuevos con company_ids=[(6,0,[cls.company.id])]. Se reactiva dentro de
+        # la transacción de test (se revierte solo al rollback, sin cambio persistente).
+        cls.company.sudo().active = True
         cls.env.user.company_ids = [(4, cls.company.id)]
         # Los tests ejercitan por defecto acciones Manager-only (cancelar, reabrir, anular
         # pagos). `has_group` no bypassea aunque el env corra con el usuario del sistema,
