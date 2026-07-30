@@ -33,7 +33,7 @@ class CawDashboardController(http.Controller):
         if not env.user.has_group("checking_account_withdrawals.group_cc_manager"):
             raise AccessError("No tenés permisos para acceder al dashboard de cuenta corriente.")
 
-    def _caw_where(self, env, start_date, end_date, company, alias="w"):
+    def _caw_where(self, env, start_date, end_date, company, partner, alias="w"):
         """WHERE parametrizado sobre caw_withdrawal (alias `w`), scopeado a las compañías."""
         where = f"{alias}.state NOT IN ('draft', 'cancel') AND {alias}.company_id IN %s"
         params = [tuple(env.companies.ids)]
@@ -46,12 +46,15 @@ class CawDashboardController(http.Controller):
         if company and company != "all":
             where += f" AND {alias}.company_id = %s"
             params.append(int(company))
+        if partner and partner != "all":
+            where += f" AND {alias}.partner_id = %s"
+            params.append(int(partner))
         return where, params
 
-    def _caw_kpis(self, env, start_date, end_date, company):
+    def _caw_kpis(self, env, start_date, end_date, company, partner):
         """Calcula los KPIs de la cartera de fiados en el período."""
         env.flush_all()
-        where, params = self._caw_where(env, start_date, end_date, company)
+        where, params = self._caw_where(env, start_date, end_date, company, partner)
         env.cr.execute(f"""
             SELECT COUNT(*) AS withdrawal_count,
                    COALESCE(SUM(w.amount_total), 0) AS total_withdrawn
@@ -86,6 +89,9 @@ class CawDashboardController(http.Controller):
         if company and company != "all":
             credit_where += " AND p.company_id = %s"
             credit_params.append(int(company))
+        if partner and partner != "all":
+            credit_where += " AND p.partner_id = %s"
+            credit_params.append(int(partner))
         env.cr.execute(f"""
             SELECT COALESCE(SUM(p.amount_unallocated), 0) AS credit_balance,
                    COALESCE(SUM(p.amount), 0) AS collected
@@ -108,10 +114,10 @@ class CawDashboardController(http.Controller):
             "collected": float(payments.get("collected") or 0),
         }
 
-    def _caw_charts(self, env, start_date, end_date, company):
+    def _caw_charts(self, env, start_date, end_date, company, partner):
         """Arma las series de los cinco gráficos del dashboard."""
         env.flush_all()
-        where, params = self._caw_where(env, start_date, end_date, company)
+        where, params = self._caw_where(env, start_date, end_date, company, partner)
 
         env.cr.execute(f"""
             SELECT to_char(date_trunc('month', w.date), 'YYYY-MM') AS period,
@@ -205,6 +211,18 @@ class CawDashboardController(http.Controller):
             return {}
         return {rec.id: rec.display_name for rec in env[model].sudo().browse(ids)}
 
+    def _caw_partners(self, env):
+        """Contactos con cuenta corriente en las compañías del usuario, para el filtro."""
+        env.cr.execute("""
+            SELECT DISTINCT partner_id FROM caw_account WHERE company_id IN %s
+        """, [tuple(env.companies.ids)])
+        partner_ids = [r["partner_id"] for r in env.cr.dictfetchall()]
+        partner_names = self._resolve_names(env, "res.partner", partner_ids)
+        return sorted(
+            ({"id": pid, "name": name} for pid, name in partner_names.items()),
+            key=lambda p: p["name"],
+        )
+
     @http.route("/checking_account_withdrawals/filters", type="json", auth="user")
     def filters(self, **kwargs):
         """Metadatos para poblar los selectores del dashboard."""
@@ -219,21 +237,22 @@ class CawDashboardController(http.Controller):
             "companies": [
                 {"id": c.id, "name": c.display_name} for c in env.companies
             ],
+            "partners": self._caw_partners(env),
             "min_date": str(dates.get("min_date") or ""),
             "max_date": str(dates.get("max_date") or ""),
         }
 
     @http.route("/checking_account_withdrawals/metrics", type="json", auth="user")
-    def metrics(self, start_date=None, end_date=None, company="all", **kwargs):
+    def metrics(self, start_date=None, end_date=None, company="all", partner="all", **kwargs):
         """KPIs y series de gráficos del dashboard."""
         self._check_access()
         env = request.env
         return {
-            "kpis": self._caw_kpis(env, start_date, end_date, company),
-            "charts": self._caw_charts(env, start_date, end_date, company),
+            "kpis": self._caw_kpis(env, start_date, end_date, company, partner),
+            "charts": self._caw_charts(env, start_date, end_date, company, partner),
         }
 
-    def _caw_records_domain(self, env, model, start_date, end_date, company, search):
+    def _caw_records_domain(self, env, model, start_date, end_date, company, partner, search):
         """Arma el dominio y resuelve el modelo/campo de fecha para retiros o cuotas.
 
         Compartido por `records()` (paginado, para la tabla del dashboard) y `export()`
@@ -242,6 +261,8 @@ class CawDashboardController(http.Controller):
         domain = [("company_id", "in", env.companies.ids)]
         if company and company != "all":
             domain.append(("company_id", "=", int(company)))
+        if partner and partner != "all":
+            domain.append(("partner_id", "=", int(partner)))
         if model == "installments":
             record_model = env["caw.installment"]
             date_field = "date_due"
@@ -259,14 +280,14 @@ class CawDashboardController(http.Controller):
 
     @http.route("/checking_account_withdrawals/records", type="json", auth="user")
     def records(self, model="withdrawals", start_date=None, end_date=None, company="all",
-                search=None, page=1, per_page=15, **kwargs):
+                partner="all", search=None, page=1, per_page=15, **kwargs):
         """Listado paginado de retiros o cuotas para las pestañas del dashboard."""
         self._check_access()
         env = request.env
         page = max(int(page or 1), 1)
         per_page = min(max(int(per_page or 15), 1), 200)
         domain, record_model, date_field = self._caw_records_domain(
-            env, model, start_date, end_date, company, search
+            env, model, start_date, end_date, company, partner, search
         )
         total = record_model.search_count(domain)
         records = record_model.search(
@@ -307,14 +328,14 @@ class CawDashboardController(http.Controller):
 
     @http.route("/checking_account_withdrawals/export", type="http", auth="user")
     def export(self, model="withdrawals", start_date=None, end_date=None, company="all",
-               search=None, **kwargs):
+               partner="all", search=None, **kwargs):
         """Exporta el listado filtrado a CSV, sin el cap de 200 filas que usa la tabla del
         dashboard (esa paginación es solo para la UI). El límite de 50000 es un resguardo
         de memoria, no un tope de negocio: en la práctica ninguna cartera lo alcanza."""
         self._check_access()
         env = request.env
         domain, record_model, date_field = self._caw_records_domain(
-            env, model, start_date, end_date, company, search
+            env, model, start_date, end_date, company, partner, search
         )
         records = record_model.search(domain, limit=50000, order=f"{date_field} desc")
         rows = [self._caw_serialize(record, model) for record in records]

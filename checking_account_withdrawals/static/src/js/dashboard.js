@@ -15,6 +15,7 @@ class CawDashboard extends Component {
             startDate: "",
             endDate: "",
             company: "all",
+            partner: "all",
             search: "",
             page: 1,
             perPage: 15,
@@ -26,6 +27,7 @@ class CawDashboard extends Component {
 
         this.filtersData = useState({
             companies: [],
+            partners: [],
             min_date: "",
             max_date: ""
         });
@@ -119,6 +121,7 @@ class CawDashboard extends Component {
         this.state.preset = "30days";
         this.setPresetDates("30days");
         this.state.company = "all";
+        this.state.partner = "all";
         this.state.search = "";
         this.state.page = 1;
         await this.refreshData();
@@ -181,7 +184,8 @@ class CawDashboard extends Component {
         return {
             start_date: this.state.startDate || null,
             end_date: this.state.endDate || null,
-            company: this.state.company
+            company: this.state.company,
+            partner: this.state.partner
         };
     }
 
@@ -264,6 +268,7 @@ class CawDashboard extends Component {
             start_date: this.state.startDate || '',
             end_date: this.state.endDate || '',
             company: this.state.company,
+            partner: this.state.partner,
             search: this.state.search || ''
         });
         window.open(`/checking_account_withdrawals/export?${params.toString()}`, '_blank');

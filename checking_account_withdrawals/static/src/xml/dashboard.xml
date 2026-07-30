@@ -65,6 +65,18 @@
                         </div>
                     </div>
 
+                    <div class="input-group">
+                        <label>Contacto</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.partner">
+                                <option value="all">Todos los contactos</option>
+                                <t t-foreach="filtersData.partners" t-as="p" t-key="p.id">
+                                    <option t-att-value="p.id"><t t-esc="p.name"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="sidebar-footer" style="display: flex; gap: 8px;">

@@ -44,7 +44,7 @@ class TestCawDashboard(CawCommon):
     def test_kpis_reflect_open_balance(self):
         """Los KPIs reportan el saldo de cartera y la cantidad de retiros."""
         kpis = self._controller()._caw_kpis(
-            self.env, start_date=None, end_date=None, company="all"
+            self.env, start_date=None, end_date=None, company="all", partner="all"
         )
         self.assertEqual(kpis["total_balance"], 1000.0)
         self.assertEqual(kpis["withdrawal_count"], 1)
@@ -53,7 +53,7 @@ class TestCawDashboard(CawCommon):
     def test_installment_status_chart_counts_states(self):
         """El gráfico de estados agrupa las cuotas por estado."""
         charts = self._controller()._caw_charts(
-            self.env, start_date=None, end_date=None, company="all"
+            self.env, start_date=None, end_date=None, company="all", partner="all"
         )
         status = charts["installment_status"]
         self.assertEqual(sum(status["values"]), 2)
@@ -61,9 +61,33 @@ class TestCawDashboard(CawCommon):
     def test_top_partners_lists_debtors(self):
         """El top de partners lista a los deudores por saldo."""
         charts = self._controller()._caw_charts(
-            self.env, start_date=None, end_date=None, company="all"
+            self.env, start_date=None, end_date=None, company="all", partner="all"
         )
         self.assertIn(self.partner.display_name, charts["top_partners"]["labels"])
+
+    def test_partner_filter_narrows_kpis_to_one_contact(self):
+        """El filtro de contacto acota los KPIs a un solo partner, ignorando al resto."""
+        other = self.env["res.partner"].create({"name": "Otro Fiado Dashboard Test"})
+        other.caw_enabled = True
+        self.env["caw.withdrawal"].create({
+            "partner_id": other.id,
+            "date": "2026-01-01",
+            "line_ids": [(0, 0, {
+                "product_id": self.product.id,
+                "quantity": 1.0,
+                "price_unit": 500.0,
+            })],
+        })
+        kpis = self._controller()._caw_kpis(
+            self.env, start_date=None, end_date=None, company="all", partner=str(self.partner.id)
+        )
+        self.assertEqual(kpis["total_balance"], 1000.0)
+        self.assertEqual(kpis["withdrawal_count"], 1)
+
+    def test_filters_lists_habilitated_partners(self):
+        """_caw_partners expone los contactos con cuenta corriente, para el filtro."""
+        names = [p["name"] for p in self._controller()._caw_partners(self.env)]
+        self.assertIn(self.partner.display_name, names)
 
     def test_access_is_denied_without_group(self):
         """Un usuario sin el grupo Manager no accede al dashboard."""
