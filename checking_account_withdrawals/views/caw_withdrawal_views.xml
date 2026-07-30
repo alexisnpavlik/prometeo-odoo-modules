@@ -82,7 +82,10 @@
                                     <field name="product_id" readonly="id"/>
                                     <field name="name"/>
                                     <field name="quantity"/>
-                                    <field name="price_unit"/>
+                                    <field name="price_unit"
+                                           groups="checking_account_withdrawals.group_cc_manager"/>
+                                    <field name="price_unit" readonly="1"
+                                           groups="!checking_account_withdrawals.group_cc_manager"/>
                                     <field name="price_subtotal" sum="Total"/>
                                     <field name="currency_id" column_invisible="True"/>
                                 </list>
