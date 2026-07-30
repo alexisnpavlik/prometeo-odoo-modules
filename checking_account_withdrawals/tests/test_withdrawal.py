@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo.tests import tagged
+from odoo.tests import Form, tagged
 
 from .common import CawCommon
 
@@ -158,6 +158,30 @@ class TestCawWithdrawal(CawCommon):
         user = self._cc_user()
         with self.assertRaises(AccessError):
             self.partner.with_user(user).write({"caw_enabled": True})
+
+    def test_operator_can_add_line_from_form_without_editing_price(self):
+        """Un Operador arma un retiro completo desde el formulario sin tocar el precio.
+
+        Bug real detectado en uso: duplicar el <field name="price_unit"> con groups
+        complementarios (uno editable para Manager, otro readonly para Operador) rompía
+        la validación de campos obligatorios del cliente web — Odoo no trackea bien dos
+        nodos con el mismo nombre en una misma lista editable, y el alta fallaba con
+        "no configuró un campo obligatorio" sobre price_unit aunque el onchange lo
+        completaba. El fix reemplaza la duplicación por un único campo con readonly
+        dinámico (caw_price_editable). Este test reproduce el flujo completo por Form,
+        que es justamente lo que Form(create()) por ORM directo no puede detectar.
+        """
+        self.partner.caw_enabled = True
+        user = self._cc_user(login="caw_operator_price_test")
+        with Form(self.env["caw.withdrawal"].with_user(user)) as form:
+            form.partner_id = self.partner
+            with form.line_ids.new() as line:
+                line.product_id = self.product
+                line.quantity = 2.0
+            withdrawal = form.save()
+        self.assertEqual(len(withdrawal.line_ids), 1)
+        self.assertEqual(withdrawal.line_ids.price_unit, self.product.list_price)
+        self.assertEqual(withdrawal.amount_total, 2.0 * self.product.list_price)
 
     def test_manager_can_enable_partner(self):
         """Un Manager sí puede habilitar la cuenta corriente de un contacto sin error."""

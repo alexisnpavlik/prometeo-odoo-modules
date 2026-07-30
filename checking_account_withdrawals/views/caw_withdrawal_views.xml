@@ -31,7 +31,13 @@
             <form>
                 <header>
                     <button name="action_open_confirm_wizard" type="object" string="Confirmar"
-                            class="oe_highlight" invisible="state != 'draft'"/>
+                            class="oe_highlight" invisible="state != 'draft'"
+                            groups="checking_account_withdrawals.group_cc_manager"/>
+                    <div class="alert alert-info mb-0" role="alert"
+                         invisible="state != 'draft'"
+                         groups="!checking_account_withdrawals.group_cc_manager">
+                        Pendiente de confirmación por un Manager de Cuenta Corriente.
+                    </div>
                     <button name="action_validate_picking" type="object" string="Validar entrega"
                             class="oe_highlight"
                             invisible="not picking_id or picking_state == 'done'"
@@ -82,7 +88,8 @@
                                     <field name="product_id" readonly="id"/>
                                     <field name="name"/>
                                     <field name="quantity"/>
-                                    <field name="price_unit"/>
+                                    <field name="caw_price_editable" column_invisible="True"/>
+                                    <field name="price_unit" readonly="not caw_price_editable" force_save="1"/>
                                     <field name="price_subtotal" sum="Total"/>
                                     <field name="currency_id" column_invisible="True"/>
                                 </list>

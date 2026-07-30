@@ -456,7 +456,13 @@ class CawWithdrawal(models.Model):
         return True
 
     def action_confirm(self):
-        """Confirma el retiro generando las cuotas con los defaults de la compañía."""
+        """Confirma el retiro generando las cuotas y aplicando el plan elegido.
+
+        Reservado al Manager: el Operador carga el retiro y lo deja en borrador, y es
+        el Manager quien revisa la situación del contacto, define el plan de cuotas y
+        recién ahí genera la deuda.
+        """
+        self._caw_check_manager()
         self._caw_check_confirmable()
         for withdrawal in self:
             force = bool(self.env.context.get("caw_force_limit"))
@@ -568,8 +574,12 @@ class CawWithdrawal(models.Model):
         return True
 
     def action_open_confirm_wizard(self):
-        """Abre el wizard de confirmación con el plan de cuotas y el chequeo de límite."""
+        """Abre el wizard de confirmación con el plan de cuotas y el chequeo de límite.
+
+        Solo Manager: es quien decide el plan de cuotas del retiro (ver action_confirm).
+        """
         self.ensure_one()
+        self._caw_check_manager()
         self._caw_check_confirmable()
         return {
             "type": "ir.actions.act_window",
