@@ -31,7 +31,13 @@
             <form>
                 <header>
                     <button name="action_open_confirm_wizard" type="object" string="Confirmar"
-                            class="oe_highlight" invisible="state != 'draft'"/>
+                            class="oe_highlight" invisible="state != 'draft'"
+                            groups="checking_account_withdrawals.group_cc_manager"/>
+                    <div class="alert alert-info mb-0" role="alert"
+                         invisible="state != 'draft'"
+                         groups="!checking_account_withdrawals.group_cc_manager">
+                        Pendiente de confirmación por un Manager de Cuenta Corriente.
+                    </div>
                     <button name="action_validate_picking" type="object" string="Validar entrega"
                             class="oe_highlight"
                             invisible="not picking_id or picking_state == 'done'"

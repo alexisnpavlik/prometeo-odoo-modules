@@ -102,11 +102,11 @@ class TestCawLimitAndCancel(CawCommon):
             withdrawal.action_cancel()
         self.assertNotEqual(withdrawal.state, "cancel")
 
-    def _cc_user(self):
+    def _cc_user(self, login="caw_operator_test"):
         """Crea un usuario con solo el grupo Operador (sin Manager)."""
         return self.env["res.users"].create({
             "name": "Operador CC Test",
-            "login": "caw_operator_test",
+            "login": login,
             "company_id": self.company.id,
             "company_ids": [(6, 0, [self.company.id])],
             "groups_id": [(6, 0, [
@@ -123,6 +123,23 @@ class TestCawLimitAndCancel(CawCommon):
         user = self._cc_user()
         with self.assertRaises(AccessError):
             withdrawal.with_user(user).action_cancel()
+
+    def test_action_confirm_requires_manager(self):
+        """El Operador carga el retiro pero no puede confirmarlo: lo decide el Manager."""
+        self.account.limit_mode = "none"
+        withdrawal = self._draft(200.0)
+        user = self._cc_user()
+        with self.assertRaises(AccessError):
+            withdrawal.with_user(user).action_confirm()
+        self.assertEqual(withdrawal.state, "draft")
+
+    def test_operator_cannot_open_confirm_wizard(self):
+        """El Operador tampoco puede abrir el wizard que define el plan de cuotas."""
+        self.account.limit_mode = "none"
+        withdrawal = self._draft(200.0)
+        user = self._cc_user(login="caw_operator_wizard_test")
+        with self.assertRaises(AccessError):
+            withdrawal.with_user(user).action_open_confirm_wizard()
 
     def test_action_draft_requires_manager(self):
         """Un Operador sin el grupo Manager no puede reabrir un retiro cancelado."""
