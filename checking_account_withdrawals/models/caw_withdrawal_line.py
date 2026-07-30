@@ -46,6 +46,22 @@ class CawWithdrawalLine(models.Model):
         store=True,
         currency_field="currency_id",
     )
+    caw_price_editable = fields.Boolean(
+        string="Precio editable por el usuario actual",
+        compute="_compute_caw_price_editable",
+        help="Solo un Manager de Cuenta Corriente puede editar el precio unitario. "
+             "Campo técnico para controlar el readonly de price_unit en la vista: no se "
+             "duplica el <field> de price_unit con groups complementarios porque Odoo no "
+             "resuelve bien dos nodos con el mismo nombre dentro de una misma lista "
+             "editable (el campo quedaba sin trackear y disparaba un falso 'obligatorio').",
+    )
+
+    @api.depends_context("uid")
+    def _compute_caw_price_editable(self):
+        """True solo para un Manager de Cuenta Corriente."""
+        is_manager = self.env.user.has_group("checking_account_withdrawals.group_cc_manager")
+        for line in self:
+            line.caw_price_editable = is_manager
 
     @api.depends("quantity", "price_unit")
     def _compute_price_subtotal(self):
