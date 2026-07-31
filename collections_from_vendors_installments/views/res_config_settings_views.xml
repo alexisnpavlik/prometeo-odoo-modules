@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_cvi" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.cvi</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Venta en cuotas" string="Venta en cuotas"
+                     name="collections_from_vendors_installments"
+                     groups="collections_from_vendors_installments.group_cvi_manager">
+                    <block title="Parámetros de venta" name="cvi_sale_block">
+                        <setting string="Cuotas por defecto"
+                                 help="Cantidad de cuotas propuesta al cargar una venta nueva">
+                            <field name="cvi_default_installments"/>
+                        </setting>
+                        <setting string="Frecuencias permitidas"
+                                 help="Qué frecuencias de cobro puede elegir el vendedor">
+                            <field name="cvi_allowed_frequencies"/>
+                        </setting>
+                    </block>
+                    <block title="Cobranza" name="cvi_collection_block">
+                        <setting string="Días de tolerancia de mora"
+                                 help="Días de atraso tolerados antes de marcar una cuota como vencida">
+                            <field name="cvi_overdue_days"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
