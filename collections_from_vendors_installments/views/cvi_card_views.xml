@@ -169,6 +169,9 @@
                         </page>
                     </notebook>
                 </sheet>
+                <!-- Barra fija con Guardar y Cancelar, visible solo en celular. Odoo ya
+                     ofrece las dos acciones, pero como íconos chicos arriba de todo. -->
+                <widget name="cvi_mobile_save_bar"/>
                 <chatter/>
             </form>
         </field>
@@ -201,7 +204,9 @@
         <field name="name">cvi.card.kanban</field>
         <field name="model">cvi.card</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_mobile" default_order="next_due_date">
+            <!-- o_cvi_fab: la hoja de estilos convierte el botón "Nuevo" del panel de
+                 control en un flotante cuando la pantalla es chica. -->
+            <kanban class="o_kanban_mobile o_cvi_fab" default_order="next_due_date">
                 <field name="state"/>
                 <field name="currency_id"/>
                 <templates>

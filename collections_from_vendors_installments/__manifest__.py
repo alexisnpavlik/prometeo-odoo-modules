@@ -37,6 +37,7 @@
     ],
     "assets": {
         "web.assets_backend": [
+            "collections_from_vendors_installments/static/src/scss/*.scss",
             "collections_from_vendors_installments/static/src/js/*.js",
             "collections_from_vendors_installments/static/src/xml/*.xml",
         ],
