@@ -32,6 +32,15 @@
     <menuitem id="menu_cvi_vendor_stock" name="Mercadería en la calle"
               parent="menu_cvi_stock" action="action_cvi_vendor_stock" sequence="20"/>
 
+    <menuitem id="menu_cvi_supervision" name="Supervisión" parent="menu_cvi_root"
+              sequence="35"
+              groups="collections_from_vendors_installments.group_cvi_supervisor,collections_from_vendors_installments.group_cvi_manager"/>
+    <menuitem id="menu_cvi_visits" name="Visitas" parent="menu_cvi_supervision"
+              action="action_cvi_visits" sequence="10"/>
+    <menuitem id="menu_cvi_assignments" name="Asignaciones" parent="menu_cvi_supervision"
+              action="action_cvi_assignments" sequence="20"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
+
     <menuitem id="menu_cvi_admin" name="Administración" parent="menu_cvi_root" sequence="40"
               groups="collections_from_vendors_installments.group_cvi_manager"/>
     <menuitem id="menu_cvi_all_cards" name="Todas las tarjetas" parent="menu_cvi_admin"

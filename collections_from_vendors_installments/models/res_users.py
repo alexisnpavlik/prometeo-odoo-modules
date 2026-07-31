@@ -14,6 +14,29 @@ class ResUsers(models.Model):
              "Se crea sola la primera vez que se le entrega mercadería.",
     )
 
+    cvi_supervised_collector_ids = fields.Many2many(
+        "res.users",
+        "cvi_supervised_rel", "supervisor_id", "collector_id",
+        string="Cobradores supervisados",
+        compute="_compute_cvi_supervised_collectors",
+        help="Cobradores con asignación vigente hoy. Lo usan las reglas de registro "
+             "del supervisor, que no pueden llamar a un método (HU-21).",
+    )
+
+    def _compute_cvi_supervised_collectors(self):
+        """Cobradores que este usuario supervisa hoy.
+
+        Se calcula en vez de guardarse porque depende de la fecha de hoy, que no es un
+        campo: una asignación vencida tiene que dejar de contar sola.
+        """
+        assignment = self.env["cvi.supervision.assignment"].sudo()
+        current = assignment._cvi_current_domain()
+        for user in self:
+            assignments = assignment.search(
+                [("supervisor_id", "=", user.id)] + current
+            )
+            user.cvi_supervised_collector_ids = assignments.mapped("collector_id")
+
     def _cvi_get_location(self):
         """Devuelve la ubicación de stock del vendedor, creándola si todavía no existe.
 
