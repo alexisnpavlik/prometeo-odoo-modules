@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_template_form_cvi_plans" model="ir.ui.view">
+        <field name="name">product.template.form.inherit.cvi.plans</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Planes de cuotas" name="cvi_plans"
+                      groups="collections_from_vendors_installments.group_cvi_manager">
+                    <field name="cvi_plan_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name"/>
+                            <field name="installment_count"/>
+                            <field name="installment_amount"/>
+                            <field name="frequency"/>
+                            <field name="amount_total" readonly="1"/>
+                            <field name="active" column_invisible="True"/>
+                            <field name="company_id" column_invisible="True"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                    <p class="text-muted">
+                        El precio total de cada plan se calcula solo: cantidad de cuotas por
+                        importe de cuota. El interés va incluido en el importe de la cuota,
+                        así que el total no es una división del precio de contado. El precio
+                        de lista del producto no interviene en el cálculo.
+                    </p>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

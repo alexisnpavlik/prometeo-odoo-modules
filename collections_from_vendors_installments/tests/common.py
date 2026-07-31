@@ -31,6 +31,27 @@ class CviCommon(TransactionCase):
             # de cuotas llevan su propio importe, con el interés ya incluido.
             "list_price": 95000.0,
         })
+        cls.plan_12 = cls.env["cvi.product.plan"].create({
+            "product_tmpl_id": cls.product.product_tmpl_id.id,
+            "name": "12 cuotas",
+            "installment_count": 12,
+            "installment_amount": 10000.0,
+            "frequency": "monthly",
+        })
+        cls.plan_3 = cls.env["cvi.product.plan"].create({
+            "product_tmpl_id": cls.product.product_tmpl_id.id,
+            "name": "3 cuotas",
+            "installment_count": 3,
+            "installment_amount": 10000.0,
+            "frequency": "monthly",
+        })
+        cls.plan_weekly = cls.env["cvi.product.plan"].create({
+            "product_tmpl_id": cls.product.product_tmpl_id.id,
+            "name": "4 semanas",
+            "installment_count": 4,
+            "installment_amount": 5000.0,
+            "frequency": "weekly",
+        })
         cls.warehouse = cls.env["stock.warehouse"].search(
             [("company_id", "=", cls.company.id)], limit=1
         )

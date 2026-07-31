@@ -1,1 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cvi_product_plan_vendor,cvi.product.plan vendedor,model_cvi_product_plan,collections_from_vendors_installments.group_cvi_vendor,1,0,0,0
+access_cvi_product_plan_collector,cvi.product.plan cobrador,model_cvi_product_plan,collections_from_vendors_installments.group_cvi_collector,1,0,0,0
+access_cvi_product_plan_manager,cvi.product.plan administrador,model_cvi_product_plan,collections_from_vendors_installments.group_cvi_manager,1,1,1,1
