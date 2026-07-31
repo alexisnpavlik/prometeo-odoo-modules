@@ -13,7 +13,7 @@ STATE_SELECTION = [
 class CviPayment(models.Model):
     _name = "cvi.payment"
     _description = "Cobro de cuotas de una tarjeta"
-    _inherit = ["mail.thread"]
+    _inherit = ["mail.thread", "cvi.audit.mixin"]
     _order = "date desc, id desc"
 
     name = fields.Char(
@@ -126,7 +126,7 @@ class CviPayment(models.Model):
                     card=payment.card_id.name,
                     left=leftover,
                 ))
-            payment.card_id.message_post(body=_(
+            payment.card_id._cvi_log(_(
                 "Cobro %(name)s por %(amount)s registrado por %(user)s.",
                 name=payment.name, amount=payment.amount, user=payment.user_id.name,
             ))
@@ -143,7 +143,7 @@ class CviPayment(models.Model):
                 ))
             payment.allocation_ids.unlink()
             payment.state = "cancel"
-            payment.card_id.message_post(body=_(
+            payment.card_id._cvi_log(_(
                 "Cobro %(name)s por %(amount)s ANULADO por %(user)s.",
                 name=payment.name, amount=payment.amount, user=self.env.user.name,
             ))

@@ -55,7 +55,7 @@ CVI_FROZEN_FIELDS = (
 class CviCard(models.Model):
     _name = "cvi.card"
     _description = "Tarjeta de venta domiciliaria en cuotas"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "cvi.audit.mixin"]
     _order = "date_sale desc, id desc"
 
     name = fields.Char(
@@ -442,7 +442,7 @@ class CviCard(models.Model):
             card._cvi_generate_installments()
             card._cvi_charge_commission()
             card.state = "routed" if card.collector_id else "sold"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Venta confirmada por %(user)s: %(count)s cuotas de %(amount)s.",
                 user=card.vendor_id.name,
                 count=card.installment_count,
@@ -460,7 +460,7 @@ class CviCard(models.Model):
                     state=dict(STATE_SELECTION)[card.state],
                 ))
             card.state = "cancel"
-            card.message_post(body=_("Tarjeta anulada por %s.", self.env.user.name))
+            card._cvi_log(_("Tarjeta anulada por %s.", self.env.user.name))
         return True
 
     @api.depends(
@@ -497,10 +497,10 @@ class CviCard(models.Model):
         settled = float_is_zero(self.amount_residual, precision_rounding=rounding)
         if settled and self.state in ("sold", "routed", "active"):
             self.state = "done"
-            self.message_post(body=_("Tarjeta saldada: pasa a Finalizada."))
+            self._cvi_log(_("Tarjeta saldada: pasa a Finalizada."))
         elif not settled and self.state == "done":
             self.state = "active"
-            self.message_post(body=_(
+            self._cvi_log(_(
                 "La tarjeta vuelve a cobranza: quedó saldo pendiente tras anular un cobro."
             ))
 
@@ -521,7 +521,7 @@ class CviCard(models.Model):
                 ))
             card.state = "routed"
             card.reject_reason = False
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta enrutada a %(collector)s por %(user)s.",
                 collector=card.collector_id.name, user=self.env.user.name,
             ))
@@ -546,7 +546,7 @@ class CviCard(models.Model):
                     card=card.name, collector=card.collector_id.name,
                 ))
             card.state = "active"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
                 card.collector_id.name,
             ))
@@ -568,7 +568,7 @@ class CviCard(models.Model):
             card.state = "sold"
             card.collector_id = False
             card.reject_reason = reason.strip()
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta RECHAZADA por %(collector)s: %(reason)s. Vuelve al vendedor %(vendor)s.",
                 collector=previous.name, reason=card.reject_reason, vendor=card.vendor_id.name,
             ))

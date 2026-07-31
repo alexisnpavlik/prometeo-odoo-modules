@@ -7,3 +7,4 @@ from . import test_payment
 from . import test_card_confirm
 from . import test_card_state
 from . import test_routing
+from . import test_audit_log

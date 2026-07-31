@@ -17,6 +17,7 @@ STATE_SELECTION = [
 
 class CviInstallment(models.Model):
     _name = "cvi.installment"
+    _inherit = ["cvi.audit.mixin"]
     _description = "Cuota de una tarjeta de venta en cuotas"
     _order = "date_due, card_id, sequence, id"
 
@@ -124,7 +125,7 @@ class CviInstallment(models.Model):
             ))
         old_date = self.date_due
         self.date_due = new_date
-        self.card_id.message_post(body=_(
+        self.card_id._cvi_log(_(
             "Cuota %(seq)s reprogramada de %(old)s a %(new)s.",
             seq=self.sequence, old=old_date, new=new_date,
         ))
