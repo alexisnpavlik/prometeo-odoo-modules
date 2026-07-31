@@ -15,6 +15,7 @@ from . import test_geolocation
 from . import test_photos
 from . import test_settlement
 from . import test_supervision
+from . import test_recovery
 from . import test_delivery_reversal
 from . import test_sale_picking
 from . import test_security

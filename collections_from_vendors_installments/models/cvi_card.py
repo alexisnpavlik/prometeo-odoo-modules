@@ -20,6 +20,7 @@ STATE_SELECTION = [
     ("routed", "Enrutada"),
     ("active", "En cobranza"),
     ("done", "Finalizada"),
+    ("recovered", "Retirada"),
     ("cancel", "Anulada"),
 ]
 
@@ -246,6 +247,34 @@ class CviCard(models.Model):
         readonly=True,
         copy=False,
         help="Motivo por el que el cobrador devolvió la tarjeta al vendedor.",
+    )
+    # Mora y recupero (E7). "A retirar" es una marca y no un estado porque la tarjeta
+    # sigue en cobranza mientras tanto: si el cliente aparece y paga, se salva.
+    # "Retirada" sí es un estado: ahí la cobranza termina (HU-25, HU-26).
+    to_recover = fields.Boolean(
+        string="A retirar", default=False, copy=False, tracking=True,
+        help="Marcada para recuperar la mercadería (HU-25).",
+    )
+    to_recover_reason = fields.Char(string="Motivo del retiro", copy=False)
+    to_recover_date = fields.Datetime(string="Marcada el", readonly=True, copy=False)
+    to_recover_user_id = fields.Many2one(
+        "res.users", string="Marcada por", readonly=True, copy=False,
+    )
+    amount_paid_at_recovery = fields.Monetary(
+        string="Cobrado hasta el retiro", readonly=True, copy=False,
+        currency_field="currency_id",
+        help="Cuánto había pagado el cliente cuando se retiró el mueble (HU-26).",
+    )
+    recovery_picking_id = fields.Many2one(
+        "stock.picking", string="Albarán de retiro", readonly=True, copy=False,
+    )
+    days_overdue = fields.Integer(
+        string="Días de atraso", compute="_compute_overdue_info", store=True,
+        help="Días desde el vencimiento de la cuota impaga más vieja (HU-24).",
+    )
+    amount_overdue = fields.Monetary(
+        string="Deuda vencida", compute="_compute_overdue_info", store=True,
+        currency_field="currency_id",
     )
     picking_id = fields.Many2one(
         "stock.picking",
@@ -678,6 +707,145 @@ class CviCard(models.Model):
                 amount=card.installment_amount,
             ))
         return True
+
+    @api.depends(
+        "installment_ids.state",
+        "installment_ids.date_due",
+        "installment_ids.amount_residual",
+    )
+    def _compute_overdue_info(self):
+        """Antigüedad y monto de la deuda vencida, para el listado de morosos (HU-24)."""
+        today = fields.Date.context_today(self)
+        for card in self:
+            overdue = card.installment_ids.filtered(
+                lambda i: i.state == "overdue" and not i.is_commission
+            )
+            card.amount_overdue = sum(overdue.mapped("amount_residual"))
+            if overdue:
+                oldest = min(overdue.mapped("date_due"))
+                card.days_overdue = (today - oldest).days
+            else:
+                card.days_overdue = 0
+
+    def action_mark_to_recover(self):
+        """Marca la tarjeta para recuperar la mercadería (HU-25).
+
+        Es una marca y no un estado: la tarjeta sigue en cobranza. Si el cliente
+        aparece y paga antes del retiro, se salva sin tener que deshacer nada.
+        """
+        self.ensure_one()
+        if self.state not in ("active", "routed"):
+            raise UserError(_(
+                "Solo se marca para retiro una tarjeta en cobranza. %(card)s está en "
+                "%(state)s.",
+                card=self.name, state=dict(STATE_SELECTION)[self.state],
+            ))
+        if self.to_recover:
+            raise UserError(_("La tarjeta %s ya está marcada para retiro.", self.name))
+        if not self.to_recover_reason:
+            raise UserError(_(
+                "Cargá el motivo antes de marcar %s para retiro.", self.name
+            ))
+        self.write({
+            "to_recover": True,
+            "to_recover_date": fields.Datetime.now(),
+            "to_recover_user_id": self.env.user.id,
+        })
+        self._cvi_log(_(
+            "Tarjeta marcada PARA RETIRO por %(user)s. Motivo: %(reason)s.",
+            user=self.env.user.name, reason=self.to_recover_reason,
+        ))
+        return True
+
+    def action_unmark_to_recover(self):
+        """Levanta la marca de retiro, por ejemplo si el cliente se puso al día."""
+        self.ensure_one()
+        if not self.to_recover:
+            raise UserError(_("La tarjeta %s no está marcada para retiro.", self.name))
+        self.write({"to_recover": False, "to_recover_date": False,
+                    "to_recover_user_id": False})
+        self._cvi_log(_("Marca de retiro levantada por %s.", self.env.user.name))
+        return True
+
+    def action_register_recovery(self):
+        """Registra que el mueble se retiró y cierra la cobranza (HU-26).
+
+        Deja asentado cuánto había pagado el cliente hasta ese momento: es el dato que
+        después se discute, y las cuotas quedan impagas para siempre.
+        """
+        self.ensure_one()
+        if not self.to_recover:
+            raise UserError(_(
+                "Marcá %s para retiro antes de registrar la recuperación.", self.name
+            ))
+        if self.state == "recovered":
+            raise UserError(_("El mueble de %s ya fue retirado.", self.name))
+        picking = self._cvi_create_recovery_picking()
+        self.write({
+            "state": "recovered",
+            "amount_paid_at_recovery": self.amount_paid,
+            "recovery_picking_id": picking.id,
+        })
+        self._cvi_log(_(
+            "Mueble RETIRADO por %(user)s. El cliente había pagado %(paid)s de "
+            "%(total)s. Albarán %(picking)s.",
+            user=self.env.user.name,
+            paid=self.amount_paid,
+            total=self.amount_total,
+            picking=picking.name,
+        ))
+        _logger.info(
+            "Tarjeta %s retirada: cobrado %s de %s",
+            self.name, self.amount_paid, self.amount_total,
+        )
+        return True
+
+    def _cvi_create_recovery_picking(self):
+        """Reingresa la unidad retirada a la ubicación de recuperados (HU-26).
+
+        No vuelve al stock vendible: un mueble usado no es el mismo producto que uno
+        nuevo, y mezclarlos falsearía la disponibilidad de fábrica.
+        """
+        self.ensure_one()
+        warehouse = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id)], limit=1
+        )
+        if not warehouse:
+            raise UserError(_(
+                "No hay un almacén configurado para la empresa %s.", self.company_id.name
+            ))
+        source = self.env.ref("stock.stock_location_customers")
+        destination = self.env.ref(
+            "collections_from_vendors_installments.stock_location_recovered"
+        )
+        # Mismo criterio que la venta: el administrador no es operario de depósito.
+        picking = self.env["stock.picking"].sudo().create({
+            "picking_type_id": warehouse.in_type_id.id,
+            "location_id": source.id,
+            "location_dest_id": destination.id,
+            "partner_id": self.partner_id.id,
+            "origin": _("Retiro de %s", self.name),
+            "move_ids": [(0, 0, {
+                "name": self.product_id.display_name,
+                "product_id": self.product_id.id,
+                "product_uom_qty": self.quantity,
+                "product_uom": self.product_id.uom_id.id,
+                "location_id": source.id,
+                "location_dest_id": destination.id,
+            })],
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+        picking.button_validate()
+        if picking.state != "done":
+            raise UserError(_(
+                "No se pudo validar el albarán de retiro de %(card)s: quedó en "
+                "%(state)s.",
+                card=self.name, state=picking.state,
+            ))
+        return picking
 
     def action_cancel(self):
         """Anula la tarjeta. Solo desde borrador o vendida, antes de entrar en cobranza."""

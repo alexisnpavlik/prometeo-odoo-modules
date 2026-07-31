@@ -29,6 +29,19 @@
                             groups="collections_from_vendors_installments.group_cvi_collector"/>
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="state not in ('draft', 'sold')"/>
+                    <button name="action_mark_to_recover" type="object"
+                            string="Marcar para retiro"
+                            invisible="to_recover or state not in ('active', 'routed')"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <button name="action_unmark_to_recover" type="object"
+                            string="Levantar marca de retiro"
+                            invisible="not to_recover or state == 'recovered'"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <button name="action_register_recovery" type="object"
+                            string="Registrar retiro" class="btn-primary"
+                            confirm="Se va a reingresar el mueble a la ubicación de recuperados y la tarjeta deja de generar cobranza. ¿Confirmás?"
+                            invisible="not to_recover or state == 'recovered'"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,sold,routed,active,done"/>
                 </header>
@@ -54,6 +67,12 @@
                     </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not to_recover">
+                        Tarjeta marcada para retiro del mueble:
+                        <field name="to_recover_reason" readonly="state == 'recovered'"/>
+                        (<field name="to_recover_user_id" readonly="1"/>,
+                        <field name="to_recover_date" readonly="1"/>)
                     </div>
                     <div class="alert alert-warning" role="alert" invisible="not reject_reason">
                         Rechazada por el cobrador: <field name="reject_reason" readonly="1"/>
@@ -140,7 +159,12 @@
                                    readonly="state not in ('draft', 'sold')"/>
                         </div>
                         <field name="has_photos" invisible="1"/>
+                        <field name="to_recover" invisible="1"/>
                     </div>
+                    <group string="Retiro" invisible="state != 'recovered'">
+                        <field name="amount_paid_at_recovery" readonly="1"/>
+                        <field name="recovery_picking_id" readonly="1"/>
+                    </group>
                     <group string="Saldo" invisible="state == 'draft'">
                         <group>
                             <field name="amount_paid"/>
@@ -217,6 +241,9 @@
                 <field name="collector_id" optional="show"/>
                 <field name="state"/>
                 <field name="overdue_installment_count" column_invisible="True"/>
+                <field name="days_overdue" optional="hide"/>
+                <field name="amount_overdue" optional="hide"/>
+                <field name="to_recover" optional="hide"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
         </field>
@@ -280,6 +307,10 @@
                         domain="[('collector_id', '=', False)]"/>
                 <filter name="filter_overdue" string="Con cuotas vencidas"
                         domain="[('overdue_installment_count', '&gt;', 0)]"/>
+                <filter name="filter_to_recover" string="A retirar"
+                        domain="[('to_recover', '=', True)]"/>
+                <filter name="filter_recovered" string="Retiradas"
+                        domain="[('state', '=', 'recovered')]"/>
                 <group expand="0" string="Agrupar por">
                     <filter name="group_by_vendor" string="Vendedor"
                             context="{'group_by': 'vendor_id'}"/>
@@ -344,5 +375,41 @@
         <field name="res_model">cvi.card</field>
         <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_cvi_card_search"/>
+    </record>
+    <record id="view_cvi_overdue_list" model="ir.ui.view">
+        <field name="name">cvi.card.overdue.list</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <list string="Clientes en mora" create="false"
+                  default_order="days_overdue desc"
+                  decoration-danger="to_recover">
+                <field name="partner_id"/>
+                <field name="collector_id"/>
+                <field name="vendor_id" optional="show"/>
+                <field name="overdue_installment_count" string="Cuotas vencidas"/>
+                <field name="amount_overdue" sum="Deuda vencida"/>
+                <field name="amount_residual" sum="Saldo total" optional="show"/>
+                <field name="days_overdue"/>
+                <field name="to_recover"/>
+                <field name="state" widget="badge"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- HU-24. Ordenado por antigüedad de deuda, que es el criterio con el que se
+         decide sobre quién accionar primero. El filtro por zona que pide la historia
+         queda pendiente: no existe el concepto de zona en el módulo. -->
+    <record id="action_cvi_overdue_cards" model="ir.actions.act_window">
+        <field name="name">Clientes en mora</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_cvi_overdue_list"/>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+        <field name="domain">[('overdue_installment_count', '&gt;', 0), ('state', 'in', ('active', 'routed'))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ningún cliente está en mora</p>
+            <p>Acá aparecen las tarjetas con cuotas vencidas, de la más atrasada a la más nueva.</p>
+        </field>
     </record>
 </odoo>
