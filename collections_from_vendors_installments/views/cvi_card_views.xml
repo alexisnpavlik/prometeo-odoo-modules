@@ -4,7 +4,15 @@
         <field name="name">cvi.card.form</field>
         <field name="model">cvi.card</field>
         <field name="arch" type="xml">
-            <form string="Tarjeta">
+            <!--
+                create="false" saca el botón "Nuevo" del panel de control DE ESTE
+                formulario: mientras se carga una venta no tiene sentido, y en el celular
+                compite con "Confirmar venta" por el lugar de arriba. La creación sigue
+                disponible desde la lista y el kanban, que tienen su propio botón.
+                canCreate sale de activeActions.create del arch (form_controller.js:177),
+                así que esto no toca las otras vistas.
+            -->
+            <form string="Tarjeta" create="false">
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar venta"
                             class="btn-primary" invisible="state != 'draft'"/>
