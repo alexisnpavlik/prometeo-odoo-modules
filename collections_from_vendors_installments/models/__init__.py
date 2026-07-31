@@ -8,6 +8,7 @@ from . import cvi_allocation
 from . import cvi_settlement
 from . import cvi_supervision
 from . import product_template
+from . import res_partner
 from . import res_company
 from . import res_users
 from . import stock_location

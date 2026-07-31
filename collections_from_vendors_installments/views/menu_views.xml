@@ -55,6 +55,8 @@
               parent="menu_cvi_admin" action="action_cvi_settlement_differences" sequence="50"/>
     <menuitem id="menu_cvi_overdue" name="Clientes en mora" parent="menu_cvi_admin"
               action="action_cvi_overdue_cards" sequence="60"/>
+    <menuitem id="menu_cvi_problematic" name="Clientes problemáticos" parent="menu_cvi_admin"
+              action="action_cvi_problematic_partners" sequence="70"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>

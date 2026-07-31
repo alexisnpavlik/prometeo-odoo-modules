@@ -146,6 +146,23 @@ class CviCard(models.Model):
         copy=False,
         help="Fachada del domicilio, para que el cobrador la reconozca. Opcional.",
     )
+    # HU-28: la alerta advierte, no bloquea. Fue decisión del cliente cuando se
+    # planificó el MVP (punto abierto 8 del spec).
+    partner_alert = fields.Text(
+        string="Antecedentes del cliente",
+        compute="_compute_partner_alert",
+    )
+    partner_history_ids = fields.Many2many(
+        "cvi.card",
+        "cvi_card_history_rel", "card_id", "history_id",
+        string="Compras anteriores",
+        compute="_compute_partner_alert",
+        help="Tarjetas previas del mismo cliente, incluidas las cargadas con otro "
+             "nombre pero el mismo DNI (HU-29).",
+    )
+    has_partner_alert = fields.Boolean(
+        string="Tiene antecedentes", compute="_compute_partner_alert",
+    )
     has_photos = fields.Boolean(
         string="Tiene fotos",
         compute="_compute_has_photos",
@@ -521,6 +538,53 @@ class CviCard(models.Model):
                     card=locked[0].name,
                 ))
         return super().write(vals)
+
+    @api.depends("partner_id")
+    def _compute_partner_alert(self):
+        """Antecedentes del cliente al que se le está por vender (HU-28, HU-29).
+
+        Mira también a los contactos que comparten DNI: cargar al mismo cliente dos
+        veces con el nombre escrito distinto es justamente lo que esta historia quiere
+        detectar. Advierte y no bloquea, por decisión del cliente.
+        """
+        for card in self:
+            card.partner_alert = False
+            card.partner_history_ids = False
+            card.has_partner_alert = False
+            if not card.partner_id:
+                continue
+            people = card.partner_id._cvi_same_person()
+            history = self.sudo().search([
+                ("partner_id", "in", people.ids),
+                ("id", "!=", card.id or 0),
+                ("state", "not in", ("draft", "cancel")),
+            ])
+            card.partner_history_ids = history
+            avisos = []
+            for person in people.filtered("cvi_problematic"):
+                avisos.append(_(
+                    "Marcado como problemático el %(date)s por %(user)s: %(reason)s",
+                    date=person.cvi_problematic_date or _("sin fecha"),
+                    user=person.cvi_problematic_user_id.name or _("sin usuario"),
+                    reason=person.cvi_problematic_reason or _("sin motivo"),
+                ))
+            for previous in history.filtered(lambda c: c.state == "recovered"):
+                avisos.append(_(
+                    "Se le retiró el mueble de %(card)s (vendedor %(vendor)s).",
+                    card=previous.name, vendor=previous.vendor_id.name,
+                ))
+            for previous in history.filtered(
+                lambda c: c.overdue_installment_count > 0 and c.state != "recovered"
+            ):
+                avisos.append(_(
+                    "Tiene %(count)s cuotas vencidas en %(card)s (vendedor %(vendor)s).",
+                    count=previous.overdue_installment_count,
+                    card=previous.name,
+                    vendor=previous.vendor_id.name,
+                ))
+            if avisos:
+                card.partner_alert = "\n".join(avisos)
+                card.has_partner_alert = True
 
     @api.depends("photo_dni", "photo_house")
     def _compute_has_photos(self):

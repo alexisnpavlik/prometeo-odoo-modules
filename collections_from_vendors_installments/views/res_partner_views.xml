@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_partner_form" model="ir.ui.view">
+        <field name="name">res.partner.form.cvi</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="cvi_dni"
+                       groups="collections_from_vendors_installments.group_cvi_vendor"/>
+            </xpath>
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-danger m-0" role="alert"
+                     invisible="not cvi_problematic"
+                     groups="collections_from_vendors_installments.group_cvi_vendor">
+                    Cliente marcado como problemático:
+                    <field name="cvi_problematic_reason" readonly="1"/>
+                    (<field name="cvi_problematic_date" readonly="1"/>)
+                </div>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_mark_problematic" type="object"
+                        class="oe_stat_button" icon="fa-exclamation-triangle"
+                        invisible="cvi_problematic"
+                        groups="collections_from_vendors_installments.group_cvi_manager">
+                    <span class="o_stat_text">Marcar problemático</span>
+                </button>
+                <button name="action_unmark_problematic" type="object"
+                        class="oe_stat_button" icon="fa-check"
+                        invisible="not cvi_problematic"
+                        groups="collections_from_vendors_installments.group_cvi_manager">
+                    <span class="o_stat_text">Quitar marca</span>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Venta en cuotas" name="cvi"
+                      groups="collections_from_vendors_installments.group_cvi_vendor">
+                    <group>
+                        <group string="Antecedentes">
+                            <field name="cvi_card_count"/>
+                            <field name="cvi_overdue_card_count"/>
+                            <field name="cvi_recovered_count"/>
+                            <field name="cvi_suggest_problematic"/>
+                        </group>
+                        <group string="Marca"
+                               groups="collections_from_vendors_installments.group_cvi_manager">
+                            <field name="cvi_problematic"/>
+                            <field name="cvi_problematic_reason"
+                                   placeholder="Por qué es mala paga"/>
+                            <field name="cvi_problematic_user_id" readonly="1"
+                                   invisible="not cvi_problematic"/>
+                        </group>
+                    </group>
+                    <!-- HU-29: el historial con el estado final de cada compra. -->
+                    <field name="cvi_card_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="date_sale"/>
+                            <field name="product_id"/>
+                            <field name="vendor_id"/>
+                            <field name="amount_total"/>
+                            <field name="amount_paid"/>
+                            <field name="amount_residual"/>
+                            <field name="state" widget="badge"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_cvi_partner_search" model="ir.ui.view">
+        <field name="name">res.partner.search.cvi</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="cvi_dni" string="DNI"/>
+            </xpath>
+            <xpath expr="//filter[1]" position="before">
+                <filter name="filter_cvi_problematic" string="Problemáticos"
+                        domain="[('cvi_problematic', '=', True)]"
+                        groups="collections_from_vendors_installments.group_cvi_vendor"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_cvi_problematic_partners" model="ir.actions.act_window">
+        <field name="name">Clientes problemáticos</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('cvi_problematic', '=', True)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ningún cliente está marcado</p>
+            <p>Acá aparecen los clientes marcados como mala paga, con su motivo.</p>
+        </field>
+    </record>
+</odoo>
