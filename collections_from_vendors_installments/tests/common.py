@@ -61,6 +61,7 @@ class CviCommon(TransactionCase):
         cls.vendor_user = cls.env["res.users"].create({
             "name": "Vendedor Test",
             "login": "cvi_vendor_test",
+            "email": "vendor@test.local",
             "company_id": cls.company.id,
             "company_ids": [(6, 0, [cls.company.id])],
             "groups_id": [(6, 0, [
@@ -71,6 +72,7 @@ class CviCommon(TransactionCase):
         cls.collector_user = cls.env["res.users"].create({
             "name": "Cobrador Test",
             "login": "cvi_collector_test",
+            "email": "collector@test.local",
             "company_id": cls.company.id,
             "company_ids": [(6, 0, [cls.company.id])],
             "groups_id": [(6, 0, [

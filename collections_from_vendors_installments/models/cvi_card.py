@@ -180,6 +180,12 @@ class CviCard(models.Model):
         tracking=True,
         index=True,
     )
+    reject_reason = fields.Char(
+        string="Motivo del rechazo",
+        readonly=True,
+        copy=False,
+        help="Motivo por el que el cobrador devolvió la tarjeta al vendedor.",
+    )
     installment_ids = fields.One2many(
         "cvi.installment", "card_id", string="Cuotas", copy=False
     )
@@ -498,8 +504,34 @@ class CviCard(models.Model):
                 "La tarjeta vuelve a cobranza: quedó saldo pendiente tras anular un cobro."
             ))
 
+    def action_route(self):
+        """Envía la tarjeta al cobrador elegido, a la espera de que la acepte (HU-10)."""
+        for card in self:
+            if card.state != "sold":
+                raise UserError(_(
+                    "Solo se puede enrutar una tarjeta vendida (la tarjeta %(card)s "
+                    "está en estado %(state)s).",
+                    card=card.name,
+                    state=dict(STATE_SELECTION)[card.state],
+                ))
+            if not card.collector_id:
+                raise UserError(_(
+                    "Elegí a qué cobrador enviar la tarjeta %s antes de enrutarla.",
+                    card.name,
+                ))
+            card.state = "routed"
+            card.reject_reason = False
+            card.message_post(body=_(
+                "Tarjeta enrutada a %(collector)s por %(user)s.",
+                collector=card.collector_id.name, user=self.env.user.name,
+            ))
+        return True
+
     def action_accept(self):
         """El cobrador acepta la tarjeta enrutada y se hace responsable (RN-02, HU-12)."""
+        is_manager = self.env.user.has_group(
+            "collections_from_vendors_installments.group_cvi_manager"
+        )
         for card in self:
             if card.state != "routed":
                 raise UserError(_(
@@ -508,9 +540,47 @@ class CviCard(models.Model):
                     card=card.name,
                     state=dict(STATE_SELECTION)[card.state],
                 ))
+            if not is_manager and card.collector_id != self.env.user:
+                raise UserError(_(
+                    "La tarjeta %(card)s fue enrutada a %(collector)s: no la podés aceptar.",
+                    card=card.name, collector=card.collector_id.name,
+                ))
             card.state = "active"
             card.message_post(body=_(
                 "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
                 card.collector_id.name,
             ))
         return True
+
+    def action_reject(self, reason):
+        """El cobrador devuelve la tarjeta al vendedor indicando un motivo (HU-13)."""
+        if not reason or not reason.strip():
+            raise UserError(_("Indicá el motivo del rechazo."))
+        for card in self:
+            if card.state != "routed":
+                raise UserError(_(
+                    "Solo se puede rechazar una tarjeta enrutada (la tarjeta %(card)s "
+                    "está en estado %(state)s).",
+                    card=card.name,
+                    state=dict(STATE_SELECTION)[card.state],
+                ))
+            previous = card.collector_id
+            card.state = "sold"
+            card.collector_id = False
+            card.reject_reason = reason.strip()
+            card.message_post(body=_(
+                "Tarjeta RECHAZADA por %(collector)s: %(reason)s. Vuelve al vendedor %(vendor)s.",
+                collector=previous.name, reason=card.reject_reason, vendor=card.vendor_id.name,
+            ))
+        return True
+
+    def action_open_reject_wizard(self):
+        """Abre el wizard que pide el motivo antes de rechazar (HU-13)."""
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Rechazar tarjetas"),
+            "res_model": "cvi.reject.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_card_ids": [(6, 0, self.ids)]},
+        }
