@@ -6,6 +6,7 @@ from odoo.exceptions import UserError
 class CviRouteWizard(models.TransientModel):
     _name = "cvi.route.wizard"
     _description = "Enrutamiento en lote de tarjetas a un cobrador"
+    _inherit = ["cvi.wizard.mixin"]
 
     card_ids = fields.Many2many(
         "cvi.card",
@@ -16,10 +17,7 @@ class CviRouteWizard(models.TransientModel):
         "res.users",
         string="Cobrador",
         required=True,
-        domain=lambda self: [(
-            "groups_id", "in",
-            self.env.ref("collections_from_vendors_installments.group_cvi_collector").id,
-        )],
+        domain=lambda self: self._cvi_group_domain("group_cvi_collector"),
     )
     card_count = fields.Integer(string="Tarjetas seleccionadas", compute="_compute_card_count")
 

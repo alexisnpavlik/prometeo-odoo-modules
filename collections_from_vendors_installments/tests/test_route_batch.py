@@ -87,3 +87,25 @@ class TestCviRouteBatch(CviCommon):
             ("collector_id", "=", self.collector_user.id), ("state", "=", "routed"),
         ])
         self.assertEqual(len(pending & cards), 4)
+
+    def test_group_domain_degrades_on_missing_group(self):
+        """El helper de dominio devuelve [] si el grupo no existe, sin romper el formulario."""
+        wizard = self.env["cvi.route.wizard"].create({
+            "card_ids": [(6, 0, [])],
+            "collector_id": self.collector_user.id,
+        })
+        result = wizard._cvi_group_domain("group_that_does_not_exist")
+        self.assertEqual(result, [])
+
+    def test_group_domain_returns_real_group_id(self):
+        """El helper de dominio devuelve el dominio correcto para un grupo existente."""
+        wizard = self.env["cvi.route.wizard"].create({
+            "card_ids": [(6, 0, [])],
+            "collector_id": self.collector_user.id,
+        })
+        domain = wizard._cvi_group_domain("group_cvi_collector")
+        self.assertEqual(len(domain), 1)
+        self.assertEqual(domain[0][0], "groups_id")
+        self.assertEqual(domain[0][1], "in")
+        group = self.env.ref("collections_from_vendors_installments.group_cvi_collector")
+        self.assertEqual(domain[0][2], group.id)
