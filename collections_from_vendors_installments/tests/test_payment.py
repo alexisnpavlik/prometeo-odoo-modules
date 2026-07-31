@@ -135,3 +135,70 @@ class TestCviPayment(CviCommon):
         payment = self._pay(10000.0)
         self.assertEqual(payment.user_id, self.env.user)
         self.assertEqual(str(payment.date), "2026-02-10")
+
+
+@tagged("post_install", "-at_install")
+class TestCviInstallmentCollectedBy(CviCommon):
+
+    def setUp(self):
+        super().setUp()
+        self.company.cvi_overdue_days = 3650
+        self.card = self.env["cvi.card"].create({
+            "partner_id": self.partner.id,
+            "vendor_id": self.vendor_user.id,
+            "product_id": self.product.id,
+            "date_sale": "2026-01-15",
+            "plan_id": self.plan_12.id,
+            "charge_day_month": 10,
+        })
+        self.card._cvi_generate_installments()
+        self.installment = self.card.installment_ids.filtered(
+            lambda i: not i.is_commission
+        )[0]
+
+    def _collect(self, user):
+        payment = self.env["cvi.payment"].create({
+            "card_id": self.card.id,
+            "date": self.installment.date_due,
+            "amount": self.installment.amount,
+            "user_id": user.id,
+        })
+        payment.action_post()
+        return payment
+
+    def test_collected_by_is_empty_before_payment(self):
+        """Una cuota impaga no tiene todavía quién la haya cobrado."""
+        self.assertFalse(self.installment.collected_by_ids)
+
+    def test_collected_by_names_who_registered_the_payment(self):
+        """La cuota muestra quién registró el cobro."""
+        self._collect(self.collector_user)
+        self.assertEqual(self.installment.collected_by_ids, self.collector_user)
+
+    def test_collected_by_ignores_cancelled_payments(self):
+        """Un cobro anulado no cuenta como cobrado por nadie."""
+        payment = self._collect(self.collector_user)
+        payment.action_cancel()
+        self.assertFalse(self.installment.collected_by_ids)
+
+    def test_collected_by_survives_a_portfolio_transfer(self):
+        """Transferir la cartera cambia el cobrador asignado, no quién cobró.
+
+        Es la razón de que collected_by_ids exista: collector_id es un related a
+        card_id.collector_id y se reescribe entero al transferir.
+        """
+        self._collect(self.collector_user)
+        other_collector = self.env["res.users"].create({
+            "name": "Cobrador Nuevo Test",
+            "login": "cvi_collector_after_transfer",
+            "email": "collector_after@test.local",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_collector").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        self.card.collector_id = other_collector
+        self.assertEqual(self.installment.collector_id, other_collector)
+        self.assertEqual(self.installment.collected_by_ids, self.collector_user)

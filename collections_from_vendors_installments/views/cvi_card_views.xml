@@ -89,6 +89,8 @@
                                     <field name="amount"/>
                                     <field name="amount_paid"/>
                                     <field name="amount_residual"/>
+                                    <field name="collected_by_ids" widget="many2many_tags"
+                                           string="Cobrado por"/>
                                     <field name="is_commission"/>
                                     <field name="state"/>
                                     <field name="currency_id" column_invisible="True"/>

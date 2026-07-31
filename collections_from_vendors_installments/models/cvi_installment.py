@@ -64,6 +64,15 @@ class CviInstallment(models.Model):
     allocation_ids = fields.One2many(
         "cvi.allocation", "installment_id", string="Imputaciones"
     )
+    # Distinto de collector_id, que es el cobrador ASIGNADO a la tarjeta hoy. Cuando una
+    # cartera se transfiere, el asignado cambia pero quien cobró cada cuota no.
+    collected_by_ids = fields.Many2many(
+        "res.users",
+        string="Cobrado por",
+        compute="_compute_collected_by",
+        help="Quién registró efectivamente el cobro de esta cuota. Puede diferir del "
+             "cobrador asignado si la cartera se transfirió después.",
+    )
     amount_paid = fields.Monetary(
         string="Cobrado",
         compute="_compute_amounts",
@@ -104,6 +113,16 @@ class CviInstallment(models.Model):
             )
             installment.amount_paid = paid
             installment.amount_residual = max(installment.amount - paid, 0.0)
+
+    @api.depends("allocation_ids.payment_id.state", "allocation_ids.payment_id.user_id")
+    def _compute_collected_by(self):
+        """Usuarios que registraron los cobros publicados imputados a esta cuota."""
+        for installment in self:
+            installment.collected_by_ids = (
+                installment.allocation_ids
+                .filtered(lambda a: a.payment_id.state == "posted")
+                .mapped("payment_id.user_id")
+            )
 
     @api.depends("amount", "amount_paid", "amount_residual", "date_due", "company_id.cvi_overdue_days")
     def _compute_state(self):

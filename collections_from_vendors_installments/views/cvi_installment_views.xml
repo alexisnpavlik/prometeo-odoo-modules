@@ -13,6 +13,8 @@
                 <field name="date_due"/>
                 <field name="amount_residual" sum="A cobrar"/>
                 <field name="card_residual" optional="show"/>
+                <field name="collected_by_ids" widget="many2many_tags"
+                       string="Cobrado por" optional="show"/>
                 <field name="state"/>
                 <button name="action_open_map" type="object" icon="fa-map-marker"
                         title="Abrir en el mapa" invisible="not map_url"/>
