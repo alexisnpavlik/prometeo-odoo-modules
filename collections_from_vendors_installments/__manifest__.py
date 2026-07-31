@@ -22,6 +22,7 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
+        "data/ir_sequence.xml",
         "views/product_template_views.xml",
         "views/res_config_settings_views.xml",
     ],
