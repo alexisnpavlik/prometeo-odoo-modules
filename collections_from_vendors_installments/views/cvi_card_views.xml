@@ -8,6 +8,9 @@
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar venta"
                             class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_charge_first_installment" type="object"
+                            string="Pago de primera cuota" class="btn-primary"
+                            invisible="state in ('draft', 'cancel') or first_installment_paid"/>
                     <button name="action_route" type="object" string="Enviar al cobrador"
                             class="btn-primary" invisible="state != 'sold'"/>
                     <button name="action_accept" type="object" string="Aceptar"
@@ -32,6 +35,9 @@
                         <group string="Cliente">
                             <field name="partner_id" readonly="state != 'draft'"/>
                             <field name="date_sale" readonly="state != 'draft'"/>
+                            <field name="first_installment_paid" invisible="1"/>
+                            <field name="date_first_payment" invisible="state == 'draft'"
+                                   readonly="first_installment_paid"/>
                         </group>
                         <group string="Mercadería">
                             <field name="product_id" readonly="state != 'draft'"/>

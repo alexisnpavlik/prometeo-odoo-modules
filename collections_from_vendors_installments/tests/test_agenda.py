@@ -24,6 +24,7 @@ class TestCviAgenda(CviCommon):
             "collector_id": self.collector_user.id,
         })
         self.card.action_confirm()
+        self.card.action_charge_first_installment()
         self.card.action_accept()
 
     def _agenda(self):

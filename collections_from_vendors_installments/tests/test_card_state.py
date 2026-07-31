@@ -24,6 +24,9 @@ class TestCviCardState(CviCommon):
             "collector_id": self.collector_user.id,
         })
         self.card.action_confirm()
+        # La entrega ya no se cobra sola al confirmar: estos tests miden saldos que
+        # la incluyen, así que la registran explícitamente.
+        self.card.action_charge_first_installment()
         self.card.action_accept()
 
     def _pay(self, amount):
@@ -92,4 +95,5 @@ class TestCviCardState(CviCommon):
             "charge_day_month": 10,
         })
         old.action_confirm()
+        old.action_charge_first_installment()
         self.assertEqual(old.overdue_installment_count, 2)

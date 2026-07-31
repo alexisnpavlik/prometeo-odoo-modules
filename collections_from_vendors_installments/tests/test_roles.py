@@ -37,6 +37,7 @@ class TestCviRoles(CviCommon):
         card.with_user(self.vendor_user).action_confirm()
         self.assertEqual(card.state, "sold")
         self.assertTrue(card.installment_ids)
+        card.with_user(self.vendor_user).action_charge_first_installment()
         commission = card.payment_ids.filtered("is_commission")
         self.assertTrue(commission)
         self.assertEqual(commission.state, "posted")
@@ -53,6 +54,7 @@ class TestCviRoles(CviCommon):
             "collector_id": self.collector_user.id,
         })
         card.action_confirm()  # collector_id ya seteado: action_confirm enruta directo
+        card.action_charge_first_installment()
         card.with_user(self.collector_user).action_accept()
 
         second = card.installment_ids.filtered(lambda i: i.sequence == 2)

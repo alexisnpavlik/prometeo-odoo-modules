@@ -49,10 +49,16 @@ class TestCviFullFlow(CviCommon):
         self.assertEqual(card.state, "sold")
         self.assertEqual(len(card.installment_ids), 3)
 
-        # 4. La primera cuota es la comisión del vendedor (HU-09, RN-01).
+        # 4. La primera cuota es la comisión del vendedor, que la cobra a mano y
+        #    puede hacerlo otro día (HU-09, RN-01).
         first = card.installment_ids.filtered(lambda i: i.sequence == 1)
+        self.assertEqual(first.state, "pending")
+        card.date_first_payment = "2026-01-17"
+        card.action_charge_first_installment()
         self.assertEqual(first.state, "paid")
-        self.assertTrue(card.payment_ids.filtered("is_commission"))
+        commission = card.payment_ids.filtered("is_commission")
+        self.assertTrue(commission)
+        self.assertEqual(str(commission.date), "2026-01-17")
 
         # 5. El mueble salió del stock del vendedor (HU-03).
         self.assertEqual(

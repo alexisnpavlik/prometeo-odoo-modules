@@ -50,6 +50,7 @@ class TestCviSecurity(CviCommon):
             "charge_day_month": 10,
         })
         card.action_confirm()
+        card.action_charge_first_installment()
         return card
 
     def test_vendor_sees_only_own_cards(self):

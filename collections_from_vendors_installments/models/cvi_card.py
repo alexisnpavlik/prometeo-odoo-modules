@@ -124,6 +124,18 @@ class CviCard(models.Model):
         default=fields.Date.context_today,
         tracking=True,
     )
+    # No es CVI_FROZEN_FIELDS a propósito: se carga después de confirmar la venta.
+    date_first_payment = fields.Date(
+        string="Fecha de cobro de la entrega",
+        tracking=True,
+        copy=False,
+        help="Día en que el vendedor cobró la primera cuota. Puede ser distinto al de "
+             "la venta. Si se deja vacío, se toma el día en que se registre el cobro.",
+    )
+    first_installment_paid = fields.Boolean(
+        string="Entrega cobrada",
+        compute="_compute_first_installment_paid",
+    )
     installment_count = fields.Integer(
         string="Cantidad de cuotas",
         compute="_compute_installment_count",
@@ -422,19 +434,51 @@ class CviCard(models.Model):
                 ))
         return super().write(vals)
 
-    def _cvi_charge_commission(self):
-        """Registra el cobro de la primera cuota, que se lleva el vendedor (RN-01, HU-09)."""
+    @api.depends("installment_ids.is_commission", "installment_ids.state")
+    def _compute_first_installment_paid(self):
+        """Si la primera cuota, la que cobra el vendedor, ya está saldada."""
+        for card in self:
+            first = card.installment_ids.filtered(lambda i: i.is_commission)
+            card.first_installment_paid = bool(first) and first[0].state == "paid"
+
+    def action_charge_first_installment(self):
+        """Registra el cobro de la primera cuota, que se lleva el vendedor (RN-01, HU-09).
+
+        No se dispara al confirmar la venta: el vendedor cobra la entrega cuando
+        efectivamente la cobra, que puede ser otro día. La fecha sale de
+        date_first_payment; si está vacía se usa hoy y se deja registrada.
+        """
         self.ensure_one()
+        if self.state in ("draft", "cancel"):
+            raise UserError(_(
+                "Confirmá la venta de %s antes de registrar el cobro de la entrega.",
+                self.name,
+            ))
         first = self.installment_ids.filtered(lambda i: i.is_commission)
+        if not first:
+            raise UserError(_(
+                "La tarjeta %s no tiene primera cuota generada.", self.name
+            ))
+        if first[0].state == "paid":
+            raise UserError(_(
+                "La entrega de %s ya fue cobrada.", self.name
+            ))
+        if not self.date_first_payment:
+            self.date_first_payment = fields.Date.context_today(self)
         payment = self.env["cvi.payment"].create({
             "card_id": self.id,
-            "date": self.date_sale,
-            "amount": first.amount,
+            "date": self.date_first_payment,
+            "amount": first[0].amount_residual,
             "user_id": self.vendor_id.id,
             "is_commission": True,
             "note": _("Primera cuota cobrada por el vendedor (comisión)."),
         })
         payment.action_post()
+        self._cvi_log(_(
+            "Cobro de la entrega registrado por %(user)s con fecha %(date)s.",
+            user=self.env.user.name,
+            date=self.date_first_payment,
+        ))
         return payment
 
     def _cvi_create_sale_picking(self):
@@ -503,7 +547,11 @@ class CviCard(models.Model):
         return picking
 
     def action_confirm(self):
-        """Confirma la venta: descuenta stock, genera las cuotas y cobra la comisión."""
+        """Confirma la venta: descuenta stock y genera las cuotas.
+
+        No cobra la primera cuota: eso lo hace el vendedor a mano con
+        action_charge_first_installment, porque puede cobrarla otro día.
+        """
         for card in self:
             if card.state != "draft":
                 raise UserError(_(
@@ -513,7 +561,6 @@ class CviCard(models.Model):
                 ))
             card._cvi_create_sale_picking()
             card._cvi_generate_installments()
-            card._cvi_charge_commission()
             card.state = "routed" if card.collector_id else "sold"
             card._cvi_log(_(
                 "Venta confirmada por %(user)s: %(count)s cuotas de %(amount)s.",
