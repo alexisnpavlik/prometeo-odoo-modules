@@ -4,6 +4,7 @@ import logging
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
+from werkzeug.urls import url_encode
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +35,20 @@ class CviInstallment(models.Model):
     collector_id = fields.Many2one(
         related="card_id.collector_id", store=True, index=True, string="Cobrador"
     )
+    street = fields.Char(
+        related="partner_id.street", store=True, string="Dirección"
+    )
+    city = fields.Char(related="partner_id.city", store=True, string="Ciudad")
+    phone = fields.Char(related="partner_id.phone", string="Teléfono")
+    card_residual = fields.Monetary(
+        related="card_id.amount_residual",
+        string="Saldo de la tarjeta",
+        currency_field="currency_id",
+    )
+    card_state = fields.Selection(
+        related="card_id.state", store=True, string="Estado de la tarjeta"
+    )
+    map_url = fields.Char(string="Mapa", compute="_compute_map_url")
     company_id = fields.Many2one(related="card_id.company_id", store=True, index=True)
     currency_id = fields.Many2one(related="card_id.currency_id", readonly=True)
     sequence = fields.Integer(string="Nº de cuota", default=1, required=True)
@@ -148,3 +163,29 @@ class CviInstallment(models.Model):
         candidates._compute_state()
         _logger.info("Cron de cuotas vencidas: %s cuotas revisadas", len(candidates))
         return True
+
+    @api.depends("partner_id.street", "partner_id.city", "partner_id.zip")
+    def _compute_map_url(self):
+        """Link a Google Maps con la dirección del cliente, para armar el recorrido (HU-14)."""
+        for installment in self:
+            partner = installment.partner_id
+            parts = [partner.street, partner.city, partner.zip]
+            address = ", ".join(part for part in parts if part)
+            if address:
+                query = url_encode({"api": "1", "query": address})
+                installment.map_url = "https://www.google.com/maps/search/?%s" % query
+            else:
+                installment.map_url = False
+
+    def action_open_map(self):
+        """Abre la ubicación del cliente en el mapa, en una pestaña nueva (HU-14)."""
+        self.ensure_one()
+        if not self.map_url:
+            raise UserError(_(
+                "El cliente %s no tiene dirección cargada.", self.partner_id.display_name
+            ))
+        return {
+            "type": "ir.actions.act_url",
+            "url": self.map_url,
+            "target": "new",
+        }
