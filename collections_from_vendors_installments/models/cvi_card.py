@@ -112,14 +112,14 @@ class CviCard(models.Model):
     )
     installment_count = fields.Integer(
         string="Cantidad de cuotas",
-        compute="_compute_from_plan",
+        compute="_compute_installment_count",
         store=True,
         readonly=False,
         tracking=True,
     )
     installment_amount = fields.Monetary(
         string="Importe de cuota",
-        compute="_compute_from_plan",
+        compute="_compute_installment_amount",
         store=True,
         readonly=False,
         currency_field="currency_id",
@@ -128,7 +128,7 @@ class CviCard(models.Model):
     frequency = fields.Selection(
         selection=FREQUENCY_SELECTION,
         string="Frecuencia",
-        compute="_compute_from_plan",
+        compute="_compute_frequency",
         store=True,
         readonly=False,
         tracking=True,
@@ -176,22 +176,25 @@ class CviCard(models.Model):
     ]
 
     @api.depends("plan_id")
-    def _compute_from_plan(self):
-        """Elegir el plan fija cuotas, importe y frecuencia (HU-05, HU-06).
-
-        Es un compute editable (`readonly=False`): el administrador puede pisar los
-        valores, y `_check_plan_values` valida que nadie más lo haga.
-        """
+    def _compute_installment_count(self):
+        """Cantidad de cuotas del plan elegido (HU-05)."""
         for card in self:
-            plan = card.plan_id
-            if plan:
-                card.installment_count = plan.installment_count
-                card.installment_amount = plan.installment_amount
-                card.frequency = plan.frequency
+            if card.plan_id:
+                card.installment_count = card.plan_id.installment_count
             else:
                 card.installment_count = card.company_id.cvi_default_installments
-                card.installment_amount = 0.0
-                card.frequency = "monthly"
+
+    @api.depends("plan_id")
+    def _compute_installment_amount(self):
+        """Importe de cuota del plan elegido, con el interés ya incluido (HU-05)."""
+        for card in self:
+            card.installment_amount = card.plan_id.installment_amount if card.plan_id else 0.0
+
+    @api.depends("plan_id")
+    def _compute_frequency(self):
+        """Modalidad de cobro del plan elegido (HU-06)."""
+        for card in self:
+            card.frequency = card.plan_id.frequency if card.plan_id else "monthly"
 
     @api.depends("installment_count", "installment_amount")
     def _compute_amount_total(self):
@@ -294,34 +297,8 @@ class CviCard(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Asigna la referencia desde la secuencia al crear.
-
-        Maneja valores explícitos de campos computed editables (installment_count,
-        installment_amount, frequency) para permitir que los administradores los
-        sobrescriban. Sin esto, el compute los pisaría antes de que la validación
-        pueda verificar permisos.
-        """
-        # Guardar cualquier valor explícito de campos computed editables
-        overrides = []
+        """Asigna la referencia desde la secuencia al crear."""
         for vals in vals_list:
-            override = {}
-            for field in ("installment_count", "installment_amount", "frequency"):
-                if field in vals:
-                    override[field] = vals.pop(field)
-            overrides.append(override)
-
             if vals.get("name", _("Nuevo")) == _("Nuevo"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("cvi.card") or _("Nuevo")
-
-        records = super().create(vals_list)
-
-        # Restaurar los valores sobrescritos y validar
-        for record, override in zip(records, overrides):
-            if override:
-                # Actualizar campos con valores sobrescritos
-                for field, value in override.items():
-                    setattr(record, field, value)
-                # La validación (constraints) se ejecutará ahora
-                record._check_plan_values()
-
-        return records
+        return super().create(vals_list)
