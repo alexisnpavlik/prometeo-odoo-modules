@@ -25,5 +25,91 @@
             <field name="comment">Configura el módulo, transfiere carteras y ve toda la operación.</field>
             <field name="implied_ids" eval="[(4, ref('group_cvi_vendor')), (4, ref('group_cvi_collector')), (4, ref('stock.group_stock_user'))]"/>
         </record>
+
+        <!-- Multi-empresa: nadie ve registros de empresas que no le corresponden -->
+        <record id="rule_cvi_card_company" model="ir.rule">
+            <field name="name">Tarjeta: multi-empresa</field>
+            <field name="model_id" ref="model_cvi_card"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_cvi_installment_company" model="ir.rule">
+            <field name="name">Cuota: multi-empresa</field>
+            <field name="model_id" ref="model_cvi_installment"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_cvi_payment_company" model="ir.rule">
+            <field name="name">Cobro: multi-empresa</field>
+            <field name="model_id" ref="model_cvi_payment"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <!-- RN-07: cada rol ve exclusivamente su propia información -->
+        <record id="rule_cvi_card_vendor" model="ir.rule">
+            <field name="name">Tarjeta: el vendedor ve sus ventas</field>
+            <field name="model_id" ref="model_cvi_card"/>
+            <field name="domain_force">[('vendor_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_vendor'))]"/>
+        </record>
+
+        <record id="rule_cvi_card_collector" model="ir.rule">
+            <field name="name">Tarjeta: el cobrador ve su cartera</field>
+            <field name="model_id" ref="model_cvi_card"/>
+            <field name="domain_force">[('collector_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_collector'))]"/>
+        </record>
+
+        <record id="rule_cvi_card_manager" model="ir.rule">
+            <field name="name">Tarjeta: el administrador ve todo</field>
+            <field name="model_id" ref="model_cvi_card"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
+        </record>
+
+        <record id="rule_cvi_installment_vendor" model="ir.rule">
+            <field name="name">Cuota: el vendedor ve las de sus ventas</field>
+            <field name="model_id" ref="model_cvi_installment"/>
+            <field name="domain_force">[('card_id.vendor_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_vendor'))]"/>
+        </record>
+
+        <record id="rule_cvi_installment_collector" model="ir.rule">
+            <field name="name">Cuota: el cobrador ve las de su cartera</field>
+            <field name="model_id" ref="model_cvi_installment"/>
+            <field name="domain_force">[('card_id.collector_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_collector'))]"/>
+        </record>
+
+        <record id="rule_cvi_installment_manager" model="ir.rule">
+            <field name="name">Cuota: el administrador ve todo</field>
+            <field name="model_id" ref="model_cvi_installment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
+        </record>
+
+        <record id="rule_cvi_payment_vendor" model="ir.rule">
+            <field name="name">Cobro: el vendedor ve los de sus ventas</field>
+            <field name="model_id" ref="model_cvi_payment"/>
+            <field name="domain_force">[('card_id.vendor_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_vendor'))]"/>
+        </record>
+
+        <record id="rule_cvi_payment_collector" model="ir.rule">
+            <field name="name">Cobro: el cobrador ve los de su cartera</field>
+            <field name="model_id" ref="model_cvi_payment"/>
+            <field name="domain_force">[('card_id.collector_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_collector'))]"/>
+        </record>
+
+        <record id="rule_cvi_payment_manager" model="ir.rule">
+            <field name="name">Cobro: el administrador ve todo</field>
+            <field name="model_id" ref="model_cvi_payment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
+        </record>
     </data>
 </odoo>
