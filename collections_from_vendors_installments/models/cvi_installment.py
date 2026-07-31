@@ -146,6 +146,43 @@ class CviInstallment(models.Model):
             else:
                 installment.state = "pending"
 
+    def action_register_payment(self):
+        """Abre el asistente de cobro con el monto de esta cuota ya cargado (HU-15).
+
+        El monto viene sugerido, no impuesto: el cliente paga lo que puede y el
+        asistente deja cambiarlo antes de registrar.
+        """
+        self.ensure_one()
+        if self.state == "paid":
+            raise UserError(_(
+                "La cuota %(seq)s de %(card)s ya está pagada.",
+                seq=self.sequence, card=self.card_id.name,
+            ))
+        if self.card_id.state in ("draft", "cancel"):
+            raise UserError(_(
+                "La tarjeta %s no está en cobranza: no se le pueden registrar cobros.",
+                self.card_id.name,
+            ))
+        context = {
+            "default_card_id": self.card_id.id,
+            "default_installment_id": self.id,
+            "default_amount": self.amount_residual,
+            "default_is_commission": self.is_commission,
+        }
+        # La fecha de cobro de la entrega puede haberse anotado al cargar la venta.
+        # Solo se pasa si tiene valor: un default False dejaría el campo vacío.
+        if self.is_commission and self.card_id.date_first_payment:
+            context["default_date"] = self.card_id.date_first_payment
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Registrar cobro"),
+            "res_model": "cvi.payment.wizard",
+            "view_mode": "form",
+            "views": [[False, "form"]],
+            "target": "new",
+            "context": context,
+        }
+
     def action_postpone(self, new_date):
         """Corre el vencimiento de una cuota impaga a pedido del cliente.
 

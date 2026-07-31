@@ -146,4 +146,48 @@
         <field name="view_mode">form</field>
         <field name="target">current</field>
     </record>
+
+    <record id="view_cvi_payment_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.payment.wizard.form</field>
+        <field name="model">cvi.payment.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Registrar cobro">
+                <group>
+                    <field name="customer_id"/>
+                    <field name="installment_id"/>
+                    <field name="amount_installment"/>
+                    <field name="amount_due_before" invisible="not amount_due_before"/>
+                    <field name="amount_max"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="card_id" invisible="1"/>
+                    <field name="is_commission" invisible="1"/>
+                </group>
+
+                <div class="alert alert-warning" role="alert"
+                     invisible="not amount_due_before">
+                    El cliente arrastra <field name="amount_due_before" readonly="1"
+                                                nolabel="1" class="oe_inline"/>
+                    de cuotas anteriores impagas. Lo que cobres se imputa primero a la
+                    deuda más vieja.
+                </div>
+
+                <group string="Cobro">
+                    <field name="date"/>
+                    <!-- Grande y solo: es el único dato que el cobrador carga parado en
+                         la vereda, muchas veces con una mano. -->
+                    <field name="amount" class="oe_inline fs-4"/>
+                    <field name="note" placeholder="Observación (opcional)"/>
+                </group>
+
+                <footer>
+                    <button name="action_confirm_payment" type="object"
+                            string="Registrar cobro" class="btn-primary"/>
+                    <button name="action_charge_everything_due" type="object"
+                            string="Cobrar todo lo adeudado" class="btn-secondary"
+                            invisible="not amount_due_before"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
 </odoo>

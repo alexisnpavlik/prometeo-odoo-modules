@@ -29,6 +29,13 @@ class TestCviCardLines(CviCommon):
             "installment_amount": 2000.0,
             "frequency": "weekly",
         })
+        # El vendedor tiene que tener la mesa a cargo igual que el ropero: sin stock,
+        # confirmar la venta falla por RN-04 y el test no llega a probar lo suyo.
+        self.env["stock.quant"].with_context(inventory_mode=True).create({
+            "product_id": self.table.id,
+            "location_id": self.vendor_location.id,
+            "inventory_quantity": 500,
+        }).action_apply_inventory()
 
     def _card(self, lines):
         return self.env["cvi.card"].create({

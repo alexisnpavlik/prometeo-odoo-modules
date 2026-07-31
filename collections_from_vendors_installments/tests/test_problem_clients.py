@@ -14,6 +14,11 @@ class TestCviProblemClients(CviCommon):
         self.company.cvi_overdue_days = 0
 
     def _card(self, customer=None, date_sale="2020-01-15", confirm=True):
+        """Deja la tarjeta en cobranza, que es donde se la puede marcar para retiro.
+
+        Sin cobrador la venta queda en Vendida y action_mark_to_recover la rechaza:
+        no se retira mercadería de una tarjeta que todavía no salió a cobrar.
+        """
         card = self.env["cvi.card"].create({
             "customer_id": (customer or self.customer).id,
             "vendor_id": self.vendor_user.id,
@@ -21,9 +26,11 @@ class TestCviProblemClients(CviCommon):
             "date_sale": date_sale,
             "plan_id": self.plan_3.id,
             "charge_day_month": 10,
+            "collector_id": self.collector_user.id,
         })
         if confirm:
             card.action_confirm()
+            card.action_accept()
         return card
 
     # --- identidad por DNI ---
@@ -126,7 +133,7 @@ class TestCviProblemClients(CviCommon):
         card = self._card(confirm=False)
         self.assertTrue(card.has_partner_alert)
         card.action_confirm()
-        self.assertEqual(card.state, "sold")
+        self.assertEqual(card.state, "routed")
 
     # --- historial (HU-29) ---
 
@@ -185,13 +192,25 @@ class TestCviSaleStartWizard(CviCommon):
         self.assertTrue(wizard.has_alert)
         self.assertIn("problemático", wizard.alert)
 
-    def test_starting_a_sale_with_an_existing_customer(self):
+    def test_starting_a_sale_opens_the_form_with_the_customer_loaded(self):
         wizard = self._wizard("20111111")
         wizard.action_search()
         action = wizard.action_start_sale()
-        card = self.env["cvi.card"].browse(action["res_id"])
-        self.assertEqual(card.customer_id, self.customer)
-        self.assertEqual(card.vendor_id, self.env.user)
+        self.assertEqual(action["res_model"], "cvi.card")
+        self.assertEqual(action["context"]["default_customer_id"], self.customer.id)
+        self.assertEqual(action["context"]["default_vendor_id"], self.env.user.id)
+
+    def test_starting_a_sale_does_not_create_an_empty_card(self):
+        """Una venta sin mercadería tiene total cero y el constraint la rechaza.
+
+        El asistente identifica al cliente; la venta se graba recién cuando el
+        vendedor le carga los muebles.
+        """
+        before = self.env["cvi.card"].search_count([])
+        wizard = self._wizard("20111111")
+        wizard.action_search()
+        wizard.action_start_sale()
+        self.assertEqual(self.env["cvi.card"].search_count([]), before)
 
     def test_starting_a_sale_creates_the_customer_when_the_dni_is_new(self):
         wizard = self._wizard("77.777.777")
@@ -199,9 +218,11 @@ class TestCviSaleStartWizard(CviCommon):
         wizard.name = "Cliente Nuevo Test"
         wizard.street = "Los Álamos 100"
         action = wizard.action_start_sale()
-        card = self.env["cvi.card"].browse(action["res_id"])
-        self.assertEqual(card.customer_id.dni, "77777777")
-        self.assertEqual(card.customer_id.street, "Los Álamos 100")
+        customer = self.env["cvi.customer"].browse(
+            action["context"]["default_customer_id"]
+        )
+        self.assertEqual(customer.dni, "77777777")
+        self.assertEqual(customer.street, "Los Álamos 100")
 
     def test_a_new_customer_needs_a_name(self):
         wizard = self._wizard("66666666")

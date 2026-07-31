@@ -5,6 +5,7 @@ from . import test_card
 from . import test_card_lines
 from . import test_installment_schedule
 from . import test_payment
+from . import test_payment_wizard
 from . import test_card_confirm
 from . import test_card_state
 from . import test_routing

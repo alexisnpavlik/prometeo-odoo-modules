@@ -16,7 +16,7 @@
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar venta"
                             class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_charge_first_installment" type="object"
+                    <button name="action_open_first_payment_wizard" type="object"
                             string="Pago de primera cuota" class="btn-primary"
                             invisible="state in ('draft', 'cancel') or first_installment_paid"/>
                     <button name="action_route" type="object" string="Enviar al cobrador"
@@ -56,7 +56,7 @@
                     <div class="d-md-none d-grid gap-2 mb-3">
                         <button name="action_confirm" type="object" string="Confirmar venta"
                                 class="btn btn-primary btn-lg" invisible="state != 'draft'"/>
-                        <button name="action_charge_first_installment" type="object"
+                        <button name="action_open_first_payment_wizard" type="object"
                                 string="Pago de primera cuota" class="btn btn-primary btn-lg"
                                 invisible="state in ('draft', 'cancel') or first_installment_paid"/>
                         <button name="action_accept" type="object" string="Aceptar"
@@ -215,6 +215,9 @@
                                            string="Cobrado por"/>
                                     <field name="is_commission"/>
                                     <field name="state"/>
+                                    <button name="action_register_payment" type="object"
+                                            string="Cobrar" class="btn-primary"
+                                            invisible="state == 'paid'"/>
                                     <field name="currency_id" column_invisible="True"/>
                                 </list>
                             </field>
@@ -283,6 +286,39 @@
                 <field name="days_overdue" optional="hide"/>
                 <field name="amount_overdue" optional="hide"/>
                 <field name="to_recover" optional="hide"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <!--
+        Lista propia para "Pendientes de aceptar". Los botones del <header> aparecen al
+        tildar filas y actúan sobre todas las seleccionadas de una vez: aceptar la
+        cartera del día es una sola operación, no una tarjeta por vez.
+
+        Va aparte de view_cvi_card_list a propósito: ahí Aceptar sería ruido, porque esa
+        lista también muestra tarjetas que no están enrutadas.
+    -->
+    <record id="view_cvi_card_pending_list" model="ir.ui.view">
+        <field name="name">cvi.card.pending.list</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <list string="Pendientes de aceptar" create="false">
+                <header>
+                    <button name="action_accept" type="object" string="Aceptar"
+                            class="btn-primary"/>
+                    <button name="action_open_reject_wizard" type="object"
+                            string="Rechazar" class="btn-secondary"/>
+                </header>
+                <field name="name"/>
+                <field name="customer_id"/>
+                <field name="product_id" optional="show"/>
+                <field name="installment_amount"/>
+                <field name="installment_count" optional="hide"/>
+                <field name="charge_day_display" optional="show"/>
+                <field name="amount_residual" sum="Saldo total"/>
+                <field name="vendor_id"/>
+                <field name="date_sale" optional="hide"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
         </field>
@@ -391,10 +427,24 @@
         <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_cvi_card_search"/>
         <field name="domain">[('state', '=', 'routed')]</field>
+        <!--
+            En el celular esta pantalla también abre en lista, no en kanban: el kanban no
+            tiene casillas de selección, así que aceptar en lote sería imposible justo
+            donde más falta hace.
+        -->
+        <field name="mobile_view_mode">list</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No tenés tarjetas para aceptar</p>
-            <p>Cuando un vendedor te envíe tarjetas, aparecen acá para que las aceptes.</p>
+            <p>Cuando un vendedor te envíe tarjetas, aparecen acá para que las aceptes.
+               Tildá varias y aceptalas todas juntas.</p>
         </field>
+    </record>
+
+    <record id="action_cvi_card_pending_accept_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_cvi_card_pending_list"/>
+        <field name="act_window_id" ref="action_cvi_card_pending_accept"/>
     </record>
 
     <record id="action_cvi_card_portfolio" model="ir.actions.act_window">

@@ -668,12 +668,34 @@ class CviCard(models.Model):
             first = card.installment_ids.filtered(lambda i: i.is_commission)
             card.first_installment_paid = bool(first) and first[0].state == "paid"
 
-    def action_charge_first_installment(self):
+    def action_open_first_payment_wizard(self):
+        """Abre el asistente para cobrar la entrega, con su monto ya cargado (HU-09).
+
+        La entrega también puede pagarse en partes, así que el vendedor tiene que poder
+        corregir el monto antes de registrarlo.
+        """
+        self.ensure_one()
+        if self.state in ("draft", "cancel"):
+            raise UserError(_(
+                "Confirmá la venta de %s antes de registrar el cobro de la entrega.",
+                self.name,
+            ))
+        first = self.installment_ids.filtered(lambda i: i.is_commission)
+        if not first:
+            raise UserError(_(
+                "La tarjeta %s no tiene primera cuota generada.", self.name
+            ))
+        return first[0].action_register_payment()
+
+    def action_charge_first_installment(self, amount=None, date=None):
         """Registra el cobro de la primera cuota, que se lleva el vendedor (RN-01, HU-09).
 
         No se dispara al confirmar la venta: el vendedor cobra la entrega cuando
         efectivamente la cobra, que puede ser otro día. La fecha sale de
         date_first_payment; si está vacía se usa hoy y se deja registrada.
+
+        Sin monto cobra lo que falta de la entrega. Con monto cobra eso: la entrega
+        también se paga en partes, y el resto queda pendiente en la misma cuota.
         """
         self.ensure_one()
         if self.state in ("draft", "cancel"):
@@ -690,12 +712,14 @@ class CviCard(models.Model):
             raise UserError(_(
                 "La entrega de %s ya fue cobrada.", self.name
             ))
+        if date:
+            self.date_first_payment = date
         if not self.date_first_payment:
             self.date_first_payment = fields.Date.context_today(self)
         payment = self.env["cvi.payment"].create({
             "card_id": self.id,
             "date": self.date_first_payment,
-            "amount": first[0].amount_residual,
+            "amount": amount or first[0].amount_residual,
             "user_id": self.vendor_id.id,
             "is_commission": True,
             "note": _("Primera cuota cobrada por el vendedor (comisión)."),
@@ -1025,7 +1049,12 @@ class CviCard(models.Model):
         return True
 
     def action_accept(self):
-        """El cobrador acepta la tarjeta enrutada y se hace responsable (RN-02, HU-12)."""
+        """El cobrador acepta las tarjetas enrutadas y se hace responsable (RN-02, HU-12).
+
+        Trabaja sobre todo el recordset: desde la lista de pendientes se aceptan varias
+        de una vez, sin abrir una por una. Si alguna no corresponde no se acepta ninguna,
+        porque la excepción revierte la transacción entera.
+        """
         is_manager = self.env.user.has_group(
             "collections_from_vendors_installments.group_cvi_manager"
         )
@@ -1047,7 +1076,19 @@ class CviCard(models.Model):
                 "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
                 card.collector_id.name,
             ))
-        return True
+        # El aviso confirma cuántas entraron a la cartera. Sin él, aceptar en lote es
+        # una lista que se vacía sin explicar qué pasó. El next fuerza el refresco.
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success",
+                "message": _("%s tarjetas aceptadas: ya están en tu cartera.", len(self))
+                if len(self) > 1
+                else _("Tarjeta aceptada: ya está en tu cartera."),
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
 
     def action_reject(self, reason):
         """El cobrador devuelve la tarjeta al vendedor indicando un motivo (HU-13)."""

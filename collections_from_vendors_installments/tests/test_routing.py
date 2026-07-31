@@ -117,6 +117,46 @@ class TestCviRouting(CviCommon):
         self.assertEqual(set(cards.mapped("state")), {"sold"})
         self.assertEqual(set(cards.mapped("reject_reason")), {"Ruta discontinuada"})
 
+    def test_accepting_several_cards_at_once(self):
+        """La cartera del día se acepta en una operación, no tarjeta por tarjeta."""
+        cards = self._confirmed_card(collector_id=self.collector_user.id)
+        cards |= self._confirmed_card(collector_id=self.collector_user.id)
+        cards |= self._confirmed_card(collector_id=self.collector_user.id)
+        cards.with_user(self.collector_user).action_accept()
+        self.assertEqual(set(cards.mapped("state")), {"active"})
+
+    def test_accepting_in_bulk_confirms_how_many_entered(self):
+        """Una lista que se vacía sin decir nada no es confirmación de nada."""
+        cards = self._confirmed_card(collector_id=self.collector_user.id)
+        cards |= self._confirmed_card(collector_id=self.collector_user.id)
+        action = cards.with_user(self.collector_user).action_accept()
+        self.assertEqual(action["tag"], "display_notification")
+        self.assertIn("2", action["params"]["message"])
+
+    def test_one_foreign_card_blocks_the_whole_batch(self):
+        """O entran todas o no entra ninguna: aceptar media selección se descubre tarde.
+
+        El rollback lo hace la transacción, así que el test lo prueba con un savepoint;
+        en producción lo hace el propio request cuando la excepción sube.
+        """
+        other = self.env["res.users"].create({
+            "name": "Cobrador Lote Ajeno",
+            "login": "cvi_collector_batch_foreign",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_collector").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        mine = self._confirmed_card(collector_id=self.collector_user.id)
+        theirs = self._confirmed_card(collector_id=other.id)
+        with self.assertRaises(UserError):
+            with self.env.cr.savepoint():
+                (mine | theirs).with_user(self.collector_user).action_accept()
+        self.assertEqual(mine.state, "routed")
+        self.assertEqual(theirs.state, "routed")
+
     def test_rerouting_after_reject_clears_the_reason(self):
         """Al volver a enrutar, el motivo del rechazo anterior se limpia."""
         card = self._confirmed_card(collector_id=self.collector_user.id)

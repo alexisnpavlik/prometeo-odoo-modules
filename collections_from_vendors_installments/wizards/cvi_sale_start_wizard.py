@@ -72,16 +72,18 @@ class CviSaleStartWizard(models.TransientModel):
                 "street": self.street,
                 "city": self.city,
             })
-        card = self.env["cvi.card"].create({
-            "customer_id": customer.id,
-            "vendor_id": self.env.user.id,
-        })
+        # La tarjeta no se crea acá: se abre el formulario con el cliente puesto y se
+        # graba cuando tenga mercadería. Una venta sin muebles tiene total cero y el
+        # constraint amount_total > 0 la rechaza, que es justamente lo que queremos.
         return {
             "type": "ir.actions.act_window",
             "name": _("Venta"),
             "res_model": "cvi.card",
-            "res_id": card.id,
             "view_mode": "form",
             "views": [[False, "form"]],
             "target": "current",
+            "context": {
+                "default_customer_id": customer.id,
+                "default_vendor_id": self.env.user.id,
+            },
         }
