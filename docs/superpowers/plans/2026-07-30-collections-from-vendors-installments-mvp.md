@@ -23,7 +23,8 @@
 - Traducciones estilo Odoo 18: `_("texto %s", arg)` con coma, nunca `%`.
 - RN-05: precio, cantidad de cuotas e importe de cuota son inmutables una vez confirmada la venta.
 - RN-06: los cobros no se borran, solo se anulan dejando registro.
-- RN-08: toda operación relevante queda auditada — los modelos principales heredan `mail.thread`.
+- RN-08: toda operación relevante queda auditada — los modelos principales heredan `mail.thread` **y `cvi.audit.mixin`**.
+- **Nunca llamar `message_post` directamente.** Toda entrada de auditoría va por `self._cvi_log(body)` (definido en `models/cvi_audit_mixin.py`). En Odoo 18 `message_post` levanta `UserError` cuando el partner del usuario actuante no tiene email, y los vendedores y cobradores de calle habitualmente no lo tienen: el helper hace el post normal si hay email y cae a `sudo()` con `author_id` explícito si no, preservando la atribución real. Verificado contra la base.
 - Base de datos de pruebas: `calidad`. Contenedor Odoo: `odoo-odoo-1` (docker corre sin sudo).
 - Todo comando `odoo` dentro del contenedor requiere `--no-http` (el puerto 8069 ya está tomado por el proceso principal).
 
@@ -39,6 +40,7 @@ collections_from_vendors_installments/
   models/
     __init__.py
     cvi_product_plan.py                # planes de cuotas de cada modelo de mueble
+    cvi_audit_mixin.py                 # _cvi_log: auditoría RN-08 tolerante a usuarios sin email
     cvi_card.py                        # la tarjeta: venta en cuotas + máquina de estados
     cvi_installment.py                 # cuota: vencimiento, monto, residual, estado
     cvi_payment.py                     # cobro registrado por vendedor o cobrador
@@ -1888,7 +1890,7 @@ class CviInstallment(models.Model):
             ))
         old_date = self.date_due
         self.date_due = new_date
-        self.card_id.message_post(body=_(
+        self.card_id._cvi_log(_(
             "Cuota %(seq)s reprogramada de %(old)s a %(new)s.",
             seq=self.sequence, old=old_date, new=new_date,
         ))
@@ -2465,7 +2467,7 @@ y agregar estos métodos al final de la clase `CviPayment`:
                     card=payment.card_id.name,
                     left=leftover,
                 ))
-            payment.card_id.message_post(body=_(
+            payment.card_id._cvi_log(_(
                 "Cobro %(name)s por %(amount)s registrado por %(user)s.",
                 name=payment.name, amount=payment.amount, user=payment.user_id.name,
             ))
@@ -2481,7 +2483,7 @@ y agregar estos métodos al final de la clase `CviPayment`:
                 ))
             payment.allocation_ids.unlink()
             payment.state = "cancel"
-            payment.card_id.message_post(body=_(
+            payment.card_id._cvi_log(_(
                 "Cobro %(name)s por %(amount)s ANULADO por %(user)s.",
                 name=payment.name, amount=payment.amount, user=self.env.user.name,
             ))
@@ -2745,7 +2747,7 @@ Y agregar estos métodos al final de la clase:
             card._cvi_generate_installments()
             card._cvi_charge_commission()
             card.state = "routed" if card.collector_id else "sold"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Venta confirmada por %(user)s: %(count)s cuotas de %(amount)s.",
                 user=card.vendor_id.name,
                 count=card.installment_count,
@@ -2763,7 +2765,7 @@ Y agregar estos métodos al final de la clase:
                     state=dict(STATE_SELECTION)[card.state],
                 ))
             card.state = "cancel"
-            card.message_post(body=_("Tarjeta anulada por %s.", self.env.user.name))
+            card._cvi_log(_("Tarjeta anulada por %s.", self.env.user.name))
         return True
 ```
 
@@ -2990,10 +2992,10 @@ Y estos métodos al final de la clase:
         settled = float_is_zero(self.amount_residual, precision_rounding=rounding)
         if settled and self.state in ("sold", "routed", "active"):
             self.state = "done"
-            self.message_post(body=_("Tarjeta saldada: pasa a Finalizada."))
+            self._cvi_log(_("Tarjeta saldada: pasa a Finalizada."))
         elif not settled and self.state == "done":
             self.state = "active"
-            self.message_post(body=_(
+            self._cvi_log(_(
                 "La tarjeta vuelve a cobranza: quedó saldo pendiente tras anular un cobro."
             ))
 
@@ -3008,7 +3010,7 @@ Y estos métodos al final de la clase:
                     state=dict(STATE_SELECTION)[card.state],
                 ))
             card.state = "active"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
                 card.collector_id.name,
             ))
@@ -3022,13 +3024,13 @@ Y estos métodos al final de la clase:
 
 - [ ] **Step 4: Conectar el cierre automático al registro y a la anulación de cobros**
 
-En `models/cvi_payment.py`, agregar la llamada al final del `for` de `action_post`, después del `message_post`:
+En `models/cvi_payment.py`, agregar la llamada al final del `for` de `action_post`, después del `_cvi_log`:
 
 ```python
             payment.card_id._cvi_check_settlement()
 ```
 
-Y lo mismo al final del `for` de `action_cancel`, después de su `message_post`:
+Y lo mismo al final del `for` de `action_cancel`, después de su `_cvi_log`:
 
 ```python
             payment.card_id._cvi_check_settlement()
@@ -3258,7 +3260,7 @@ Reemplazar el `action_accept()` que dejó la Task 7 por esta versión completa, 
                 ))
             card.state = "routed"
             card.reject_reason = False
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta enrutada a %(collector)s por %(user)s.",
                 collector=card.collector_id.name, user=self.env.user.name,
             ))
@@ -3283,7 +3285,7 @@ Reemplazar el `action_accept()` que dejó la Task 7 por esta versión completa, 
                     card=card.name, collector=card.collector_id.name,
                 ))
             card.state = "active"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
                 card.collector_id.name,
             ))
@@ -3305,7 +3307,7 @@ Reemplazar el `action_accept()` que dejó la Task 7 por esta versión completa, 
             card.state = "sold"
             card.collector_id = False
             card.reject_reason = reason.strip()
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta RECHAZADA por %(collector)s: %(reason)s. Vuelve al vendedor %(vendor)s.",
                 collector=previous.name, reason=card.reject_reason, vendor=card.vendor_id.name,
             ))
@@ -3620,7 +3622,7 @@ Cubre HU-30 (transferir individual o masivamente, con registro) y RN-04 (solo el
 - Test: `collections_from_vendors_installments/tests/test_transfer.py`
 
 **Interfaces:**
-- Consumes: `cvi.card.collector_id`, `cvi.card.state`, `cvi.card.message_post` (Tasks 3 y 8); grupo `group_cvi_manager` (Task 1).
+- Consumes: `cvi.card.collector_id`, `cvi.card.state`, `cvi.card._cvi_log` (Tasks 3 y 8); grupo `group_cvi_manager` (Task 1).
 - Produces: modelo transitorio `cvi.transfer.wizard` con `card_ids` (Many2many), `collector_dest_id` (Many2one `res.users`, required), `reason` (Char required), `card_count` (Integer compute); método `action_confirm_transfer()`.
 
 **Regla:** la transferencia mantiene el estado `active` de la tarjeta — el cobrador destino la recibe ya aceptada, porque es una decisión de la administración, no un ofrecimiento.
@@ -3832,7 +3834,7 @@ class CviTransferWizard(models.TransientModel):
         for card in self.card_ids:
             origin = card.collector_id
             card.collector_id = self.collector_dest_id
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Tarjeta transferida de %(origin)s a %(dest)s por %(user)s. Motivo: %(reason)s",
                 origin=origin.name or _("sin cobrador"),
                 dest=self.collector_dest_id.name,
@@ -4570,7 +4572,7 @@ En `action_confirm`, agregar la llamada **antes** de generar las cuotas, para qu
             card._cvi_generate_installments()
             card._cvi_charge_commission()
             card.state = "routed" if card.collector_id else "sold"
-            card.message_post(body=_(
+            card._cvi_log(_(
                 "Venta confirmada por %(user)s: %(count)s cuotas de %(amount)s.",
                 user=card.vendor_id.name,
                 count=card.installment_count,
@@ -6190,7 +6192,7 @@ git commit -m "feat(collections_from_vendors_installments): icono, README y test
 | RN-05 Campos congelados | 3, 6 | El plan fija el precio y el vendedor no lo edita; tras confirmar, `write` bloquea `CVI_FROZEN_FIELDS` |
 | RN-06 Cobros no se borran | 5 | `unlink` bloqueado + `action_cancel` |
 | RN-07 Cada rol ve lo suyo | 13 | `ir.rule` por grupo |
-| RN-08 Auditoría | 3, 4, 5 | `mail.thread` + `message_post` en cada acción |
+| RN-08 Auditoría | 3, 4, 5 | `mail.thread` + `cvi.audit.mixin._cvi_log` en cada acción |
 | RNF-01 Uso móvil | 15 | Kanban `o_kanban_mobile`, form por grupos cortos |
 | RNF-05 Enrutamiento de 100+ | 9 | Un `write` sobre el recordset completo |
 
