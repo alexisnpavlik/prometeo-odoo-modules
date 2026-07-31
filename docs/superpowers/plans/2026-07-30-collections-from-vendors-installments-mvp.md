@@ -500,7 +500,7 @@ del mueble. Cada producto lleva su propia tabla de planes con los valores exacto
 - Produces:
   - Modelo `cvi.product.plan` con `product_tmpl_id` (Many2one `product.template`), `sequence` (Integer), `name` (Char), `installment_count` (Integer), `installment_amount` (Monetary), `frequency` (Selection `monthly`/`weekly`), `amount_total` (Monetary compute store), `active` (Boolean), `company_id`, `currency_id`.
   - Campos en `product.template`: `cvi_plan_ids` (One2many), `cvi_plan_count` (Integer compute).
-  - Constantes de módulo `FREQUENCY_SELECTION` y `WEEKDAY_SELECTION` en `cvi_product_plan.py`, reutilizadas por `cvi.card` en la Task 3.
+  - Constante de módulo `FREQUENCY_SELECTION` en `cvi_product_plan.py`, reutilizada por `cvi.card` en la Task 3. El día de la semana **no** vive acá: un plan define la modalidad (mensual o semanal), no el día concreto de cobro, que el vendedor elige en cada venta. Su `WEEKDAY_SELECTION` es local a `cvi_card.py`.
 
 **Modelo de precios** (fijado acá): el plan define **cantidad de cuotas**, **importe de
 cuota** y **modalidad** (mensual o semanal); el total es cuotas × importe, calculado,
