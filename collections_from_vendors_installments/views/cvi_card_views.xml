@@ -85,18 +85,6 @@
                                     invisible="not has_geolocation or state not in ('draft', 'sold')"
                                     groups="collections_from_vendors_installments.group_cvi_manager"/>
                         </group>
-                        <group string="Fotos (opcional)">
-                            <!-- widget="image": en el celular el selector de archivo
-                                 ofrece la cámara. Las dos son opcionales, la venta se
-                                 confirma sin ellas. -->
-                            <field name="photo_dni" widget="image"
-                                   options="{'size': [0, 180]}"
-                                   readonly="state not in ('draft', 'sold')"/>
-                            <field name="photo_house" widget="image"
-                                   options="{'size': [0, 180]}"
-                                   readonly="state not in ('draft', 'sold')"/>
-                            <field name="has_photos" invisible="1"/>
-                        </group>
                         <group string="Mercadería">
                             <field name="product_id" readonly="state != 'draft'"/>
                             <field name="product_tmpl_id" invisible="1"/>
@@ -131,6 +119,28 @@
                             <field name="collector_id" readonly="state in ('done', 'cancel')"/>
                         </group>
                     </group>
+                    <!--
+                        Fuera del grid de dos columnas: adentro, cada imagen queda en una
+                        celda angosta con la etiqueta al costado y las dos apiladas, que
+                        come media pantalla. Acá van lado a lado, con el rótulo arriba.
+                        widget="image": en el celular el selector ofrece la cámara.
+                    -->
+                    <separator string="Fotos (opcional)"/>
+                    <div class="d-flex flex-wrap gap-4 mb-3">
+                        <div>
+                            <div class="text-muted small mb-1">Foto del DNI</div>
+                            <field name="photo_dni" widget="image" nolabel="1"
+                                   options="{'size': [140, 140]}"
+                                   readonly="state not in ('draft', 'sold')"/>
+                        </div>
+                        <div>
+                            <div class="text-muted small mb-1">Foto de la vivienda</div>
+                            <field name="photo_house" widget="image" nolabel="1"
+                                   options="{'size': [140, 140]}"
+                                   readonly="state not in ('draft', 'sold')"/>
+                        </div>
+                        <field name="has_photos" invisible="1"/>
+                    </div>
                     <group string="Saldo" invisible="state == 'draft'">
                         <group>
                             <field name="amount_paid"/>
