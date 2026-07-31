@@ -36,6 +36,8 @@
               action="action_cvi_card_all" sequence="10"/>
     <menuitem id="menu_cvi_transfer" name="Transferir cartera" parent="menu_cvi_admin"
               action="action_cvi_transfer_wizard" sequence="20"/>
+    <menuitem id="menu_cvi_vendor_pickings" name="Entregas a vendedores" parent="menu_cvi_admin"
+              action="action_cvi_vendor_pickings" sequence="30"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>

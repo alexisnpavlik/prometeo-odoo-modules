@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_vendor_picking_list" model="ir.ui.view">
+        <field name="name">cvi.vendor.picking.list</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <list string="Entregas a vendedores" create="false">
+                <field name="date_done" string="Fecha"/>
+                <field name="name" string="Albarán"/>
+                <field name="partner_id" string="Vendedor"/>
+                <field name="location_id" string="Desde"/>
+                <field name="location_dest_id" string="Hacia"/>
+                <field name="cvi_reversal_id" string="Anulada por"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'cancel'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_vendor_picking_search" model="ir.ui.view">
+        <field name="name">cvi.vendor.picking.search</field>
+        <field name="model">stock.picking</field>
+        <field name="arch" type="xml">
+            <search string="Entregas a vendedores">
+                <field name="name" string="Albarán"/>
+                <field name="partner_id" string="Vendedor"/>
+                <filter name="filter_done" string="Hechas"
+                        domain="[('state', '=', 'done')]"/>
+                <filter name="filter_not_reversed" string="Sin anular"
+                        domain="[('cvi_reversal_id', '=', False)]"/>
+                <separator/>
+                <filter name="filter_out" string="Entregas"
+                        domain="[('location_dest_id.cvi_is_vendor_location', '=', True)]"/>
+                <filter name="filter_in" string="Devoluciones"
+                        domain="[('location_id.cvi_is_vendor_location', '=', True)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_partner" string="Vendedor"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_state" string="Estado"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_by_date" string="Fecha"
+                            context="{'group_by': 'date_done'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!--
+        El dominio filtra por ubicación y no por un campo marcador en el albarán: un
+        campo calculado almacenado sobre stock.picking obligaría a recalcular todos los
+        albaranes históricos en cada actualización del módulo.
+    -->
+    <record id="action_cvi_vendor_pickings" model="ir.actions.act_window">
+        <field name="name">Entregas a vendedores</field>
+        <field name="res_model">stock.picking</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cvi_vendor_picking_search"/>
+        <field name="domain">['|', ('location_id.cvi_is_vendor_location', '=', True), ('location_dest_id.cvi_is_vendor_location', '=', True)]</field>
+        <field name="context">{'search_default_filter_done': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no se entregó mercadería a ningún vendedor</p>
+            <p>Acá ves cada entrega y devolución, y podés anular las que se cargaron mal.</p>
+        </field>
+    </record>
+
+    <record id="view_cvi_picking_form" model="ir.ui.view">
+        <field name="name">cvi.picking.form.reverse</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_cvi_reverse_delivery" type="object"
+                        string="Anular entrega" class="btn-secondary"
+                        groups="collections_from_vendors_installments.group_cvi_manager"
+                        confirm="Se va a generar el albarán inverso para devolver la mercadería a su origen. Las dos operaciones quedan registradas. ¿Confirmás?"
+                        invisible="not cvi_is_vendor_move or state != 'done' or cvi_reversal_id or cvi_reversed_id"/>
+            </xpath>
+            <!-- Anclado en origin, que aparece una sola vez: location_id y
+                 location_dest_id están también en la lista de movimientos anidada. -->
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="cvi_is_vendor_move" invisible="1"/>
+                <field name="cvi_reversal_id" invisible="not cvi_reversal_id"
+                       readonly="1"/>
+                <field name="cvi_reversed_id" invisible="not cvi_reversed_id"
+                       readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
