@@ -12,6 +12,7 @@ from . import test_route_batch
 from . import test_transfer
 from . import test_vendor_stock
 from . import test_geolocation
+from . import test_photos
 from . import test_delivery_reversal
 from . import test_sale_picking
 from . import test_security

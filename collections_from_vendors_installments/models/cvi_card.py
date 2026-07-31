@@ -125,6 +125,31 @@ class CviCard(models.Model):
         default=fields.Date.context_today,
         tracking=True,
     )
+    # Fotos que el vendedor saca en el domicilio (HU-08). Opcionales: la venta se
+    # confirma sin ellas.
+    #
+    # max_width/max_height hacen que Odoo redimensione al guardar. Sin eso, cada foto de
+    # un celular moderno entra al filestore con varios megas: dos por venta, miles de
+    # ventas. 1600 px alcanza de sobra para leer un documento o reconocer una casa.
+    photo_dni = fields.Image(
+        string="Foto del DNI",
+        max_width=1600,
+        max_height=1600,
+        copy=False,
+        help="Documento del cliente. Opcional.",
+    )
+    photo_house = fields.Image(
+        string="Foto de la vivienda",
+        max_width=1600,
+        max_height=1600,
+        copy=False,
+        help="Fachada del domicilio, para que el cobrador la reconozca. Opcional.",
+    )
+    has_photos = fields.Boolean(
+        string="Tiene fotos",
+        compute="_compute_has_photos",
+        store=True,
+    )
     # Coordenadas tomadas del GPS del dispositivo en el momento de cargar la venta
     # (HU-07). No salen de la dirección del contacto: en estos barrios la dirección
     # nominal suele no coincidir con dónde está realmente la casa.
@@ -467,6 +492,12 @@ class CviCard(models.Model):
                     card=locked[0].name,
                 ))
         return super().write(vals)
+
+    @api.depends("photo_dni", "photo_house")
+    def _compute_has_photos(self):
+        """Si la venta tiene alguna de las dos fotos cargadas."""
+        for card in self:
+            card.has_photos = bool(card.photo_dni or card.photo_house)
 
     @api.depends("cvi_latitude", "cvi_longitude")
     def _compute_has_geolocation(self):
