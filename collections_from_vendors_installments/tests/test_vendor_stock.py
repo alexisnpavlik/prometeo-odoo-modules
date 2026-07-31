@@ -49,11 +49,21 @@ class TestCviVendorStock(CviCommon):
 
     def test_vendor_location_is_created_on_demand(self):
         """La ubicación del vendedor se crea la primera vez que se la necesita."""
-        self.assertFalse(self.vendor_user.cvi_stock_location_id)
-        location = self.vendor_user._cvi_get_location()
+        fresh_vendor = self.env["res.users"].create({
+            "name": "Vendedor Sin Ubicación",
+            "login": "cvi_vendor_fresh_location",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        self.assertFalse(fresh_vendor.cvi_stock_location_id)
+        location = fresh_vendor._cvi_get_location()
         self.assertTrue(location)
         self.assertEqual(location.usage, "internal")
-        self.assertEqual(self.vendor_user.cvi_stock_location_id, location)
+        self.assertEqual(fresh_vendor.cvi_stock_location_id, location)
 
     def test_vendor_location_is_reused(self):
         """La segunda llamada devuelve la misma ubicación, no crea otra."""
@@ -83,10 +93,11 @@ class TestCviVendorStock(CviCommon):
 
     def test_delivery_moves_stock_from_factory_to_vendor(self):
         """Entregar mercadería la pasa de fábrica al vendedor (HU-02)."""
+        vendor_location = self.vendor_user._cvi_get_location()
+        before = self._available(vendor_location)
         self._receive(10)
         self._deliver(3)
-        vendor_location = self.vendor_user._cvi_get_location()
-        self.assertEqual(self._available(vendor_location), 3)
+        self.assertEqual(self._available(vendor_location), before + 3)
 
     def test_delivery_reduces_factory_stock(self):
         """Lo entregado deja de estar disponible en fábrica (HU-02)."""
@@ -124,11 +135,12 @@ class TestCviVendorStock(CviCommon):
 
     def test_return_moves_stock_back_to_factory(self):
         """La devolución del vendedor reingresa el stock a fábrica (HU-04)."""
+        vendor_location = self.vendor_user._cvi_get_location()
+        before = self._available(vendor_location)
         self._receive(10)
         self._deliver(4)
-        vendor_location = self.vendor_user._cvi_get_location()
         self._deliver(4, direction="in")
-        self.assertEqual(self._available(vendor_location), 0)
+        self.assertEqual(self._available(vendor_location), before)
 
     def test_return_increases_factory_stock(self):
         """Lo devuelto vuelve a estar disponible en fábrica (HU-04)."""
@@ -140,7 +152,17 @@ class TestCviVendorStock(CviCommon):
 
     def test_returning_more_than_the_vendor_holds_is_rejected(self):
         """El vendedor no puede devolver más de lo que tiene a cargo (HU-04)."""
+        fresh_vendor = self.env["res.users"].create({
+            "name": "Vendedor Devolución Test",
+            "login": "cvi_vendor_return_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
         self._receive(10)
-        self._deliver(2)
+        self._deliver(2, vendor=fresh_vendor)
         with self.assertRaises(UserError):
-            self._deliver(5, direction="in")
+            self._deliver(5, direction="in", vendor=fresh_vendor)

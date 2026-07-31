@@ -186,6 +186,13 @@ class CviCard(models.Model):
         copy=False,
         help="Motivo por el que el cobrador devolvió la tarjeta al vendedor.",
     )
+    picking_id = fields.Many2one(
+        "stock.picking",
+        string="Albarán de venta",
+        readonly=True,
+        copy=False,
+        help="Albarán que descontó el mueble del stock del vendedor al confirmar la venta.",
+    )
     installment_ids = fields.One2many(
         "cvi.installment", "card_id", string="Cuotas", copy=False
     )
@@ -430,8 +437,57 @@ class CviCard(models.Model):
         payment.action_post()
         return payment
 
+    def _cvi_create_sale_picking(self):
+        """Descuenta el mueble vendido del stock del vendedor hacia el cliente.
+
+        Usa el tipo de operación de salida del almacén forzando la ubicación origen a la
+        del vendedor: la mercadería sale de la calle, no del depósito.
+        """
+        self.ensure_one()
+        warehouse = self.env["stock.warehouse"].search(
+            [("company_id", "=", self.company_id.id)], limit=1
+        )
+        if not warehouse:
+            raise UserError(_(
+                "No hay un almacén configurado para la empresa %s.", self.company_id.name
+            ))
+        source = self.vendor_id._cvi_get_location()
+        destination = self.env.ref("stock.stock_location_customers")
+        available = self.env["stock.quant"]._get_available_quantity(self.product_id, source)
+        if self.quantity > available:
+            raise UserError(_(
+                "%(vendor)s no tiene %(asked)s unidades de %(product)s a cargo "
+                "(disponibles: %(available)s). Registrá la entrega de mercadería primero.",
+                vendor=self.vendor_id.name,
+                asked=self.quantity,
+                product=self.product_id.display_name,
+                available=available,
+            ))
+        picking = self.env["stock.picking"].create({
+            "picking_type_id": warehouse.out_type_id.id,
+            "location_id": source.id,
+            "location_dest_id": destination.id,
+            "partner_id": self.partner_id.id,
+            "origin": self.name,
+            "move_ids": [(0, 0, {
+                "name": self.product_id.display_name,
+                "product_id": self.product_id.id,
+                "product_uom_qty": self.quantity,
+                "product_uom": self.product_id.uom_id.id,
+                "location_id": source.id,
+                "location_dest_id": destination.id,
+            })],
+        })
+        picking.action_confirm()
+        picking.action_assign()
+        for move in picking.move_ids:
+            move.quantity = move.product_uom_qty
+        picking.button_validate()
+        self.picking_id = picking
+        return picking
+
     def action_confirm(self):
-        """Confirma la venta: genera las cuotas y cobra la primera como comisión."""
+        """Confirma la venta: descuenta stock, genera las cuotas y cobra la comisión."""
         for card in self:
             if card.state != "draft":
                 raise UserError(_(
@@ -439,6 +495,7 @@ class CviCard(models.Model):
                     card=card.name,
                     state=dict(STATE_SELECTION)[card.state],
                 ))
+            card._cvi_create_sale_picking()
             card._cvi_generate_installments()
             card._cvi_charge_commission()
             card.state = "routed" if card.collector_id else "sold"

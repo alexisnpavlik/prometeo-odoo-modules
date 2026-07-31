@@ -77,3 +77,9 @@ class CviCommon(TransactionCase):
                 cls.env.ref("base.group_user").id,
             ])],
         })
+        cls.vendor_location = cls.vendor_user._cvi_get_location()
+        cls.env["stock.quant"].with_context(inventory_mode=True).create({
+            "product_id": cls.product.id,
+            "location_id": cls.vendor_location.id,
+            "inventory_quantity": 500,
+        }).action_apply_inventory()

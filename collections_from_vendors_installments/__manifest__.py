@@ -27,6 +27,7 @@
         "data/ir_cron.xml",
         "views/product_template_views.xml",
         "views/res_config_settings_views.xml",
+        "views/stock_quant_views.xml",
     ],
     "installable": True,
     "auto_install": False,
