@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from odoo import _, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+from odoo.tools import float_compare, float_is_zero
 
 STATE_SELECTION = [
     ("draft", "Borrador"),
@@ -56,3 +58,92 @@ class CviPayment(models.Model):
             "El monto cobrado debe ser mayor a cero.",
         ),
     ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Asigna la referencia desde la secuencia al crear."""
+        for vals in vals_list:
+            if vals.get("name", _("Nuevo")) == _("Nuevo"):
+                vals["name"] = self.env["ir.sequence"].next_by_code("cvi.payment") or _("Nuevo")
+        return super().create(vals_list)
+
+    def unlink(self):
+        """Un cobro publicado o anulado nunca se borra: queda como registro (RN-06)."""
+        if any(payment.state != "draft" for payment in self):
+            raise UserError(_(
+                "Un cobro registrado no se puede eliminar. Anulalo con el botón Anular "
+                "para que quede constancia."
+            ))
+        return super().unlink()
+
+    def _cvi_target_installments(self):
+        """Cuotas candidatas a recibir esta imputación, en orden FIFO por vencimiento.
+
+        Un cobro de comisión solo toca la cuota del vendedor; un cobro normal solo toca
+        las cuotas de cobranza. Así el cobrador nunca ve la comisión como pendiente (HU-09).
+        """
+        self.ensure_one()
+        return self.card_id.installment_ids.filtered(
+            lambda i: i.amount_residual > 0 and i.is_commission == self.is_commission
+        ).sorted(lambda i: (i.date_due, i.sequence))
+
+    def _cvi_allocate(self):
+        """Reparte el monto del cobro sobre las cuotas candidatas. Devuelve el sobrante."""
+        self.ensure_one()
+        rounding = self.currency_id.rounding or 0.01
+        remaining = self.amount
+        vals_list = []
+        for installment in self._cvi_target_installments():
+            if float_is_zero(remaining, precision_rounding=rounding):
+                break
+            applied = min(remaining, installment.amount_residual)
+            vals_list.append({
+                "payment_id": self.id,
+                "installment_id": installment.id,
+                "amount": applied,
+            })
+            remaining -= applied
+        if vals_list:
+            self.env["cvi.allocation"].create(vals_list)
+        return remaining
+
+    def action_post(self):
+        """Publica el cobro e imputa su monto sobre las cuotas impagas (HU-15)."""
+        for payment in self:
+            if payment.state != "draft":
+                raise UserError(_(
+                    "El cobro %s ya fue registrado: no se puede volver a registrar.",
+                    payment.name,
+                ))
+            payment.state = "posted"
+            leftover = payment._cvi_allocate()
+            rounding = payment.currency_id.rounding or 0.01
+            if float_compare(leftover, 0.0, precision_rounding=rounding) > 0:
+                raise UserError(_(
+                    "El cobro de %(amount)s supera lo que adeuda la tarjeta %(card)s: "
+                    "sobran %(left)s sin imputar.",
+                    amount=payment.amount,
+                    card=payment.card_id.name,
+                    left=leftover,
+                ))
+            payment.card_id.message_post(body=_(
+                "Cobro %(name)s por %(amount)s registrado por %(user)s.",
+                name=payment.name, amount=payment.amount, user=payment.user_id.name,
+            ))
+        return True
+
+    def action_cancel(self):
+        """Anula el cobro y libera las cuotas que había imputado (RN-06)."""
+        for payment in self:
+            if payment.state != "posted":
+                raise UserError(_(
+                    "Solo se puede anular un cobro registrado (el cobro %s está en estado %s).",
+                    payment.name, payment.state,
+                ))
+            payment.allocation_ids.unlink()
+            payment.state = "cancel"
+            payment.card_id.message_post(body=_(
+                "Cobro %(name)s por %(amount)s ANULADO por %(user)s.",
+                name=payment.name, amount=payment.amount, user=self.env.user.name,
+            ))
+        return True
