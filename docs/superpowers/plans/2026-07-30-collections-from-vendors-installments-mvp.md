@@ -3399,6 +3399,38 @@ git commit -m "feat(collections_from_vendors_installments): enrutamiento de tarj
 
 ## Task 9: Enrutamiento en lote
 
+> **Helper de dominio por grupo.** Los tres wizards de este plan (enrutamiento en lote,
+> transferencia y entrega de mercadería) restringen un `Many2one` a `res.users` por grupo.
+> Resolver el grupo con `self.env.ref("...")` a secas dentro del `domain=lambda` revienta
+> con `ValueError` no capturado si el xmlid no resuelve (base a medio actualizar, datos sin
+> cargar), y rompe el formulario entero en vez de degradar. Definí el helper UNA vez, en
+> `wizards/cvi_wizard_mixin.py`, y usalo en los tres:
+>
+> ```python
+> # -*- coding: utf-8 -*-
+> from odoo import models
+>
+>
+> class CviWizardMixin(models.AbstractModel):
+>     _name = "cvi.wizard.mixin"
+>     _description = "Utilidades compartidas por los asistentes del módulo"
+>
+>     def _cvi_group_domain(self, group_name):
+>         """Dominio que restringe un campo de usuarios a los de un grupo del módulo.
+>
+>         Si el xmlid del grupo no resuelve (base a medio actualizar), devuelve un dominio
+>         vacío en vez de romper el formulario con un ValueError.
+>         """
+>         group = self.env.ref(
+>             "collections_from_vendors_installments.%s" % group_name,
+>             raise_if_not_found=False,
+>         )
+>         return [("groups_id", "in", group.id)] if group else []
+> ```
+>
+> Cada wizard hereda con `_inherit = ["cvi.wizard.mixin"]` y declara el campo como
+> `domain=lambda self: self._cvi_group_domain("group_cvi_collector")`.
+
 Cubre HU-11 (seleccionar varias tarjetas y enviarlas juntas a un cobrador) y RNF-05 (100+ tarjetas en una sola operación).
 
 **Files:**
@@ -3543,10 +3575,7 @@ class CviRouteWizard(models.TransientModel):
         "res.users",
         string="Cobrador",
         required=True,
-        domain=lambda self: [(
-            "groups_id", "in",
-            self.env.ref("collections_from_vendors_installments.group_cvi_collector").id,
-        )],
+        domain=lambda self: self._cvi_group_domain("group_cvi_collector"),
     )
     card_count = fields.Integer(string="Tarjetas seleccionadas", compute="_compute_card_count")
 
@@ -3792,10 +3821,7 @@ class CviTransferWizard(models.TransientModel):
         "res.users",
         string="Cobrador destino",
         required=True,
-        domain=lambda self: [(
-            "groups_id", "in",
-            self.env.ref("collections_from_vendors_installments.group_cvi_collector").id,
-        )],
+        domain=lambda self: self._cvi_group_domain("group_cvi_collector"),
     )
     reason = fields.Char(string="Motivo de la transferencia", required=True)
     card_count = fields.Integer(string="Tarjetas seleccionadas", compute="_compute_card_count")
@@ -4160,10 +4186,7 @@ class CviVendorDeliveryWizard(models.TransientModel):
         "res.users",
         string="Vendedor",
         required=True,
-        domain=lambda self: [(
-            "groups_id", "in",
-            self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
-        )],
+        domain=lambda self: self._cvi_group_domain("group_cvi_vendor"),
     )
     direction = fields.Selection(
         selection=[("out", "Entrega al vendedor"), ("in", "Devolución a fábrica")],
