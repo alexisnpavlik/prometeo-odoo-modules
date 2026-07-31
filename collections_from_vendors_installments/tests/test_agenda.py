@@ -27,11 +27,16 @@ class TestCviAgenda(CviCommon):
         self.card.action_accept()
 
     def _agenda(self):
-        """Cuotas que el cobrador tiene que cobrar hasta hoy (HU-14)."""
+        """Cuotas que el cobrador tiene que cobrar hasta hoy (HU-14).
+
+        Usa los mismos términos que la acción real de la agenda (Task 15), para que
+        estos tests fijen el comportamiento de producción y no una consulta paralela.
+        """
         today = fields.Date.context_today(self.env.user)
         return self.env["cvi.installment"].search([
             ("card_id.collector_id", "=", self.collector_user.id),
-            ("card_id.state", "=", "active"),
+            ("card_state", "=", "active"),
+            ("is_commission", "=", False),
             ("state", "in", ("pending", "partial", "overdue")),
             ("date_due", "<=", today),
         ])
@@ -46,6 +51,17 @@ class TestCviAgenda(CviCommon):
         """La cuota que cobró el vendedor no aparece en la agenda del cobrador (HU-09)."""
         agenda = self._agenda()
         self.assertNotIn(1, agenda.mapped("sequence"))
+
+    def test_commission_stays_out_of_agenda_after_payment_cancelled(self):
+        """Anular el cobro de comisión no la hace aparecer en la agenda del cobrador (HU-09).
+
+        La cuota 1 vuelve a estar impaga, pero es del vendedor: el cobrador no la cobra.
+        """
+        commission = self.card.payment_ids.filtered("is_commission")
+        commission.action_cancel()
+        first = self.card.installment_ids.filtered(lambda i: i.sequence == 1)
+        self.assertNotEqual(first.state, "paid")
+        self.assertNotIn(first, self._agenda())
 
     def test_agenda_excludes_paid_installments(self):
         """Una cuota ya cobrada sale de la agenda."""
