@@ -463,7 +463,11 @@ class CviCard(models.Model):
                 product=self.product_id.display_name,
                 available=available,
             ))
-        picking = self.env["stock.picking"].create({
+        # El vendedor no es operario de depósito y no debe recibir el grupo completo de
+        # Inventario: el albarán es una consecuencia interna de una acción que ya está
+        # autorizado a hacer. El chequeo de disponibilidad de arriba corre como el
+        # usuario real; solo el alta y validación del albarán van con sudo.
+        picking = self.env["stock.picking"].sudo().create({
             "picking_type_id": warehouse.out_type_id.id,
             "location_id": source.id,
             "location_dest_id": destination.id,

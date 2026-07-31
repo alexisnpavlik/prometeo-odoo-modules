@@ -15,3 +15,4 @@ from . import test_sale_picking
 from . import test_security
 from . import test_agenda
 from . import test_full_flow
+from . import test_roles

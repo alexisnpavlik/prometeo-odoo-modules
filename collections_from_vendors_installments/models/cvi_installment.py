@@ -18,7 +18,6 @@ STATE_SELECTION = [
 
 class CviInstallment(models.Model):
     _name = "cvi.installment"
-    _inherit = ["cvi.audit.mixin"]
     _description = "Cuota de una tarjeta de venta en cuotas"
     _order = "date_due, card_id, sequence, id"
 

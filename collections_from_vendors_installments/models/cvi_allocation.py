@@ -17,6 +17,9 @@ class CviAllocation(models.Model):
         related="installment_id.card_id", store=True, index=True, string="Tarjeta"
     )
     currency_id = fields.Many2one(related="installment_id.currency_id", readonly=True)
+    company_id = fields.Many2one(
+        related="installment_id.company_id", store=True, index=True, string="Empresa"
+    )
     amount = fields.Monetary(
         string="Monto imputado", required=True, currency_field="currency_id"
     )
