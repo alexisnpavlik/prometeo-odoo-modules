@@ -10,3 +10,4 @@ from . import test_routing
 from . import test_audit_log
 from . import test_route_batch
 from . import test_transfer
+from . import test_vendor_stock

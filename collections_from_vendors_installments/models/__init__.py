@@ -7,4 +7,6 @@ from . import cvi_payment
 from . import cvi_allocation
 from . import product_template
 from . import res_company
+from . import res_users
+from . import stock_location
 from . import res_config_settings
