@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_card_form" model="ir.ui.view">
+        <field name="name">cvi.card.form</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <form string="Tarjeta">
+                <header>
+                    <button name="action_confirm" type="object" string="Confirmar venta"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_route" type="object" string="Enviar al cobrador"
+                            class="btn-primary" invisible="state != 'sold'"/>
+                    <button name="action_accept" type="object" string="Aceptar"
+                            class="btn-primary" invisible="state != 'routed'"
+                            groups="collections_from_vendors_installments.group_cvi_collector"/>
+                    <button name="action_open_reject_wizard" type="object" string="Rechazar"
+                            invisible="state != 'routed'"
+                            groups="collections_from_vendors_installments.group_cvi_collector"/>
+                    <button name="action_cancel" type="object" string="Anular"
+                            invisible="state not in ('draft', 'sold')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sold,routed,active,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not reject_reason">
+                        Rechazada por el cobrador: <field name="reject_reason" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Cliente">
+                            <field name="partner_id" readonly="state != 'draft'"/>
+                            <field name="date_sale" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Mercadería">
+                            <field name="product_id" readonly="state != 'draft'"/>
+                            <field name="product_tmpl_id" invisible="1"/>
+                            <field name="quantity" readonly="state != 'draft'"/>
+                            <field name="plan_id" readonly="state != 'draft'"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                        <group string="Financiación">
+                            <!-- El plan fija estos valores. Para el vendedor son de solo
+                                 lectura; el administrador ve la versión editable. -->
+                            <field name="installment_count" readonly="1"
+                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_amount" readonly="1"
+                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_count" readonly="state != 'draft'"
+                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_amount" readonly="state != 'draft'"
+                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="amount_total" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Cobranza">
+                            <field name="frequency" readonly="1"
+                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="frequency" readonly="state != 'draft'"
+                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="charge_day_month" readonly="state != 'draft'"
+                                   invisible="frequency != 'monthly'"/>
+                            <field name="charge_day_week" readonly="state != 'draft'"
+                                   invisible="frequency != 'weekly'"/>
+                            <field name="vendor_id" readonly="state != 'draft'"/>
+                            <field name="collector_id" readonly="state in ('done', 'cancel')"/>
+                        </group>
+                    </group>
+                    <group string="Saldo" invisible="state == 'draft'">
+                        <group>
+                            <field name="amount_paid"/>
+                            <field name="amount_residual"/>
+                            <field name="next_due_date"/>
+                        </group>
+                        <group>
+                            <field name="paid_installment_count"/>
+                            <field name="pending_installment_count"/>
+                            <field name="overdue_installment_count"/>
+                        </group>
+                    </group>
+                    <notebook invisible="state == 'draft'">
+                        <page string="Cuotas" name="installments">
+                            <field name="installment_ids" readonly="1">
+                                <list decoration-danger="state == 'overdue'"
+                                      decoration-success="state == 'paid'">
+                                    <field name="sequence"/>
+                                    <field name="date_due"/>
+                                    <field name="amount"/>
+                                    <field name="amount_paid"/>
+                                    <field name="amount_residual"/>
+                                    <field name="is_commission"/>
+                                    <field name="state"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Cobros" name="payments">
+                            <field name="payment_ids" readonly="1">
+                                <list decoration-muted="state == 'cancel'">
+                                    <field name="name"/>
+                                    <field name="date"/>
+                                    <field name="amount"/>
+                                    <field name="user_id"/>
+                                    <field name="is_commission"/>
+                                    <field name="state"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Albarán" name="picking">
+                            <group>
+                                <field name="picking_id"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cvi_card_list" model="ir.ui.view">
+        <field name="name">cvi.card.list</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <list string="Tarjetas" decoration-danger="overdue_installment_count > 0"
+                  decoration-muted="state == 'cancel'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="product_id" optional="show"/>
+                <field name="plan_id" optional="show"/>
+                <field name="installment_amount"/>
+                <field name="charge_day_display" optional="show"/>
+                <field name="next_due_date"/>
+                <field name="amount_residual" sum="Saldo total"/>
+                <field name="vendor_id" optional="hide"/>
+                <field name="collector_id" optional="show"/>
+                <field name="state"/>
+                <field name="overdue_installment_count" column_invisible="True"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_card_kanban" model="ir.ui.view">
+        <field name="name">cvi.card.kanban</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_order="next_due_date">
+                <field name="state"/>
+                <field name="currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="row">
+                            <div class="col-8">
+                                <strong><field name="partner_id"/></strong>
+                                <div class="text-muted">
+                                    <field name="product_id"/> — <field name="plan_id"/>
+                                </div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <field name="installment_amount" widget="monetary"/>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-7">
+                                <field name="charge_day_display"/>
+                            </div>
+                            <div class="col-5 text-end">
+                                <field name="state" widget="label_selection"
+                                       options="{'classes': {'draft': 'default', 'done': 'success', 'cancel': 'danger'}}"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_cvi_card_search" model="ir.ui.view">
+        <field name="name">cvi.card.search</field>
+        <field name="model">cvi.card</field>
+        <field name="arch" type="xml">
+            <search string="Tarjetas">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="vendor_id"/>
+                <field name="collector_id"/>
+                <field name="product_id"/>
+                <field name="plan_id"/>
+                <filter name="filter_draft" string="Borrador" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_sold" string="Vendidas" domain="[('state', '=', 'sold')]"/>
+                <filter name="filter_routed" string="Enrutadas" domain="[('state', '=', 'routed')]"/>
+                <filter name="filter_active" string="En cobranza" domain="[('state', '=', 'active')]"/>
+                <filter name="filter_done" string="Finalizadas" domain="[('state', '=', 'done')]"/>
+                <separator/>
+                <filter name="filter_no_collector" string="Sin cobrador"
+                        domain="[('collector_id', '=', False)]"/>
+                <filter name="filter_overdue" string="Con cuotas vencidas"
+                        domain="[('overdue_installment_count', '&gt;', 0)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_vendor" string="Vendedor"
+                            context="{'group_by': 'vendor_id'}"/>
+                    <filter name="group_by_collector" string="Cobrador"
+                            context="{'group_by': 'collector_id'}"/>
+                    <filter name="group_by_state" string="Estado"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_card_my_sales" model="ir.actions.act_window">
+        <field name="name">Mis ventas</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Cargá tu primera venta</p>
+            <p>Elegí el cliente, el mueble y en cuántas cuotas lo vendés.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_card_to_route" model="ir.actions.act_window">
+        <field name="name">Tarjetas sin cobrador</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+        <field name="domain">[('state', '=', 'sold'), ('collector_id', '=', False)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No tenés tarjetas para enviar</p>
+            <p>Acá aparecen las ventas confirmadas que todavía no asignaste a un cobrador.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_card_pending_accept" model="ir.actions.act_window">
+        <field name="name">Pendientes de aceptar</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+        <field name="domain">[('state', '=', 'routed')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No tenés tarjetas para aceptar</p>
+            <p>Cuando un vendedor te envíe tarjetas, aparecen acá para que las aceptes.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_card_portfolio" model="ir.actions.act_window">
+        <field name="name">Mi cartera</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+        <field name="domain">[('state', '=', 'active')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Tu cartera está vacía</p>
+            <p>Acá ves las tarjetas que aceptaste y estás cobrando.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_card_all" model="ir.actions.act_window">
+        <field name="name">Todas las tarjetas</field>
+        <field name="res_model">cvi.card</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_card_search"/>
+    </record>
+</odoo>

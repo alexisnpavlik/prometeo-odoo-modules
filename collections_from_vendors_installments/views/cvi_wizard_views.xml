@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_route_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.route.wizard.form</field>
+        <field name="model">cvi.route.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Enviar tarjetas a un cobrador">
+                <group>
+                    <field name="collector_id"/>
+                    <field name="card_count" readonly="1"/>
+                </group>
+                <field name="card_ids" nolabel="1">
+                    <list>
+                        <field name="name"/>
+                        <field name="partner_id"/>
+                        <field name="plan_id"/>
+                        <field name="installment_amount"/>
+                        <field name="charge_day_display"/>
+                        <field name="currency_id" column_invisible="True"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_route" type="object" string="Enviar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cvi_route_wizard" model="ir.actions.act_window">
+        <field name="name">Enviar al cobrador</field>
+        <field name="res_model">cvi.route.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="model_cvi_card"/>
+        <field name="binding_view_types">list</field>
+        <field name="context">{'default_card_ids': active_ids}</field>
+    </record>
+
+    <record id="view_cvi_reject_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.reject.wizard.form</field>
+        <field name="model">cvi.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Rechazar tarjetas">
+                <group>
+                    <field name="reason" placeholder="Por qué devolvés estas tarjetas"/>
+                </group>
+                <field name="card_ids" nolabel="1" readonly="1">
+                    <list>
+                        <field name="name"/>
+                        <field name="partner_id"/>
+                        <field name="vendor_id"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_reject" type="object" string="Rechazar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cvi_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.transfer.wizard.form</field>
+        <field name="model">cvi.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Transferir tarjetas entre cobradores">
+                <group>
+                    <field name="collector_dest_id"/>
+                    <field name="reason" placeholder="Motivo de la transferencia"/>
+                    <field name="card_count" readonly="1"/>
+                </group>
+                <field name="card_ids" nolabel="1">
+                    <list>
+                        <field name="name"/>
+                        <field name="partner_id"/>
+                        <field name="collector_id" string="Cobrador actual"/>
+                        <field name="amount_residual"/>
+                        <field name="currency_id" column_invisible="True"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_transfer" type="object" string="Transferir"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cvi_transfer_wizard" model="ir.actions.act_window">
+        <field name="name">Transferir a otro cobrador</field>
+        <field name="res_model">cvi.transfer.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="model_cvi_card"/>
+        <field name="binding_view_types">list</field>
+        <field name="context">{'default_card_ids': active_ids}</field>
+        <field name="groups_id" eval="[(4, ref('group_cvi_manager'))]"/>
+    </record>
+
+    <record id="view_cvi_vendor_delivery_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.vendor.delivery.wizard.form</field>
+        <field name="model">cvi.vendor.delivery.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Mercadería de vendedores">
+                <group>
+                    <group>
+                        <field name="vendor_id"/>
+                        <field name="direction" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="warehouse_id"/>
+                    </group>
+                </group>
+                <field name="line_ids" nolabel="1">
+                    <list editable="bottom">
+                        <field name="product_id"/>
+                        <field name="quantity"/>
+                    </list>
+                </field>
+                <footer>
+                    <button name="action_confirm_delivery" type="object" string="Confirmar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cvi_vendor_delivery" model="ir.actions.act_window">
+        <field name="name">Entrega y devolución de mercadería</field>
+        <field name="res_model">cvi.vendor.delivery.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_installment_list" model="ir.ui.view">
+        <field name="name">cvi.installment.list</field>
+        <field name="model">cvi.installment</field>
+        <field name="arch" type="xml">
+            <list string="Cuotas" create="false"
+                  decoration-danger="state == 'overdue'" decoration-success="state == 'paid'">
+                <field name="partner_id"/>
+                <field name="street" optional="show"/>
+                <field name="phone" optional="show"/>
+                <field name="sequence" string="Cuota"/>
+                <field name="date_due"/>
+                <field name="amount_residual" sum="A cobrar"/>
+                <field name="card_residual" optional="show"/>
+                <field name="state"/>
+                <button name="action_open_map" type="object" icon="fa-map-marker"
+                        title="Abrir en el mapa" invisible="not map_url"/>
+                <field name="map_url" column_invisible="True"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_installment_search" model="ir.ui.view">
+        <field name="name">cvi.installment.search</field>
+        <field name="model">cvi.installment</field>
+        <field name="arch" type="xml">
+            <search string="Cuotas">
+                <field name="partner_id"/>
+                <field name="card_id"/>
+                <field name="collector_id"/>
+                <filter name="filter_due_today" string="Vencen hoy o antes"
+                        domain="[('date_due', '&lt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="filter_unpaid" string="Impagas"
+                        domain="[('state', 'in', ('pending', 'partial', 'overdue'))]"/>
+                <filter name="filter_overdue" string="Vencidas"
+                        domain="[('state', '=', 'overdue')]"/>
+                <filter name="filter_collection" string="De cobranza"
+                        domain="[('is_commission', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_partner" string="Cliente"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_by_due" string="Vencimiento"
+                            context="{'group_by': 'date_due'}"/>
+                    <filter name="group_by_collector" string="Cobrador"
+                            context="{'group_by': 'collector_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_agenda" model="ir.actions.act_window">
+        <field name="name">Agenda de cobro</field>
+        <field name="res_model">cvi.installment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cvi_installment_search"/>
+        <field name="domain">[('card_state', '=', 'active'), ('is_commission', '=', False)]</field>
+        <field name="context">{'search_default_filter_due_today': 1, 'search_default_filter_unpaid': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No tenés cobros pendientes para hoy</p>
+            <p>Acá aparecen las cuotas de tu cartera que vencen hoy o que quedaron atrasadas.</p>
+        </field>
+    </record>
+</odoo>
