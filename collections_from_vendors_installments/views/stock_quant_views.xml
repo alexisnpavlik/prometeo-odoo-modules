@@ -13,6 +13,20 @@
         </field>
     </record>
 
+    <!-- Igual que la anterior pero sin la columna del vendedor: el vendedor solo ve la
+         suya, así que repetir su nombre en cada fila no aporta nada. -->
+    <record id="view_cvi_my_stock_list" model="ir.ui.view">
+        <field name="name">cvi.my.stock.list</field>
+        <field name="model">stock.quant</field>
+        <field name="arch" type="xml">
+            <list string="Mi mercadería" create="false" edit="false">
+                <field name="product_id" string="Modelo"/>
+                <field name="quantity" string="En mi poder" sum="Total"/>
+                <field name="company_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
     <record id="view_cvi_vendor_stock_search" model="ir.ui.view">
         <field name="name">cvi.vendor.stock.search</field>
         <field name="model">stock.quant</field>
@@ -43,5 +57,13 @@
             <p class="o_view_nocontent_smiling_face">Ningún vendedor tiene mercadería en la calle</p>
             <p>Acá ves lo que cada vendedor retiró de fábrica y todavía no vendió ni devolvió.</p>
         </field>
+    </record>
+
+    <!-- Server action y no act_window porque el dominio depende del usuario que la abre. -->
+    <record id="action_cvi_my_stock" model="ir.actions.server">
+        <field name="name">Mi mercadería</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="state">code</field>
+        <field name="code">action = env["stock.quant"].cvi_action_my_stock()</field>
     </record>
 </odoo>

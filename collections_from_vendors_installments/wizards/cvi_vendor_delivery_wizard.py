@@ -114,13 +114,30 @@ class CviVendorDeliveryWizard(models.TransientModel):
             "Mercadería %s: albarán %s de %s a %s",
             self.direction, picking.name, source.complete_name, destination.complete_name,
         )
+        # Notificación + navegación al albarán: el usuario necesita una señal explícita
+        # de que la entrega se concretó, no solo un cambio de pantalla.
         return {
-            "type": "ir.actions.act_window",
-            "name": _("Albarán generado"),
-            "res_model": "stock.picking",
-            "res_id": picking.id,
-            "view_mode": "form",
-            "target": "current",
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success",
+                "title": _("Entrega confirmada"),
+                "message": _(
+                    "Albarán %(picking)s: %(direction)s de %(vendor)s por %(units)s unidades.",
+                    picking=picking.name,
+                    direction=dict(self._fields["direction"].selection)[self.direction],
+                    vendor=self.vendor_id.name,
+                    units=sum(self.line_ids.mapped("quantity")),
+                ),
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "name": _("Albarán generado"),
+                    "res_model": "stock.picking",
+                    "res_id": picking.id,
+                    "view_mode": "form",
+                    "target": "current",
+                },
+            },
         }
 
 

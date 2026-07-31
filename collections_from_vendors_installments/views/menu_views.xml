@@ -5,6 +5,8 @@
 
     <menuitem id="menu_cvi_vendor" name="Vendedor" parent="menu_cvi_root" sequence="10"
               groups="collections_from_vendors_installments.group_cvi_vendor"/>
+    <menuitem id="menu_cvi_my_stock" name="Mi mercadería" parent="menu_cvi_vendor"
+              action="action_cvi_my_stock" sequence="5"/>
     <menuitem id="menu_cvi_my_sales" name="Mis ventas" parent="menu_cvi_vendor"
               action="action_cvi_card_my_sales" sequence="10"/>
     <menuitem id="menu_cvi_to_route" name="Sin cobrador" parent="menu_cvi_vendor"

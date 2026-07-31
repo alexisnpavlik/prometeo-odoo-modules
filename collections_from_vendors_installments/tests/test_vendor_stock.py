@@ -35,9 +35,14 @@ class TestCviVendorStock(CviCommon):
             "direction": direction,
             "line_ids": [(0, 0, {"product_id": self.product.id, "quantity": quantity})],
         })
-        action = wizard.action_confirm_delivery()
-        self.assertEqual(action["res_model"], "stock.picking")
-        return self.env["stock.picking"].browse(action["res_id"])
+        return self._picking_from_action(wizard.action_confirm_delivery())
+
+    def _picking_from_action(self, action):
+        """Extrae el albarán de la notificación que devuelve el wizard."""
+        self.assertEqual(action["tag"], "display_notification")
+        nxt = action["params"]["next"]
+        self.assertEqual(nxt["res_model"], "stock.picking")
+        return self.env["stock.picking"].browse(nxt["res_id"])
 
     def test_production_intake_increases_factory_stock(self):
         """Ingresar producción actualiza el stock disponible de fábrica (HU-01)."""
@@ -168,3 +173,49 @@ class TestCviVendorStock(CviCommon):
         self._deliver(2, vendor=fresh_vendor)
         with self.assertRaises(UserError):
             self._deliver(5, direction="in", vendor=fresh_vendor)
+
+    def test_vendor_sees_only_his_own_stock(self):
+        """El vendedor ve la mercadería de su ubicación, no la de otros (HU-02)."""
+        other_vendor = self.env["res.users"].create({
+            "name": "Otro Vendedor Test",
+            "login": "cvi_vendor_other_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        self._receive(10)
+        self._deliver(3, vendor=other_vendor)
+
+        action = self.env["stock.quant"].with_user(self.vendor_user).cvi_action_my_stock()
+        self.assertEqual(action["domain"], [("location_id", "=", self.vendor_location.id)])
+        # El vendedor no es stock.group_stock_user: esta búsqueda falla si le falta
+        # el permiso de lectura sobre stock.quant.
+        quants = self.env["stock.quant"].with_user(self.vendor_user).search(action["domain"])
+        self.assertEqual(quants.mapped("location_id"), self.vendor_location)
+        self.assertNotIn(
+            other_vendor.cvi_stock_location_id, quants.mapped("location_id")
+        )
+
+    def test_opening_my_stock_does_not_create_a_location(self):
+        """Abrir el listado no provisiona la ubicación del vendedor (HU-02)."""
+        fresh_vendor = self.env["res.users"].create({
+            "name": "Vendedor Sin Retiro Test",
+            "login": "cvi_vendor_nostock_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        self.assertFalse(fresh_vendor.cvi_stock_location_id)
+
+        action = self.env["stock.quant"].with_user(fresh_vendor).cvi_action_my_stock()
+        self.assertFalse(
+            self.env["stock.quant"].with_user(fresh_vendor).search(action["domain"])
+        )
+        fresh_vendor.invalidate_recordset(["cvi_stock_location_id"])
+        self.assertFalse(fresh_vendor.cvi_stock_location_id)
