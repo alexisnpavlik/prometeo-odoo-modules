@@ -28,6 +28,7 @@
         "views/cvi_card_views.xml",
         "views/cvi_installment_views.xml",
         "views/cvi_payment_views.xml",
+        "views/cvi_settlement_views.xml",
         "views/cvi_wizard_views.xml",
         "views/stock_quant_views.xml",
         "views/stock_picking_views.xml",

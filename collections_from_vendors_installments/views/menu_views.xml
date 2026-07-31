@@ -22,6 +22,8 @@
               action="action_cvi_card_portfolio" sequence="30"/>
     <menuitem id="menu_cvi_payments" name="Cobros" parent="menu_cvi_collector"
               action="action_cvi_payment" sequence="40"/>
+    <menuitem id="menu_cvi_my_settlements" name="Mis rendiciones" parent="menu_cvi_collector"
+              action="action_cvi_my_settlements" sequence="50"/>
 
     <menuitem id="menu_cvi_stock" name="Depósito" parent="menu_cvi_root" sequence="30"
               groups="stock.group_stock_user"/>
@@ -38,6 +40,10 @@
               action="action_cvi_transfer_wizard" sequence="20"/>
     <menuitem id="menu_cvi_vendor_pickings" name="Entregas a vendedores" parent="menu_cvi_admin"
               action="action_cvi_vendor_pickings" sequence="30"/>
+    <menuitem id="menu_cvi_settlements" name="Rendiciones" parent="menu_cvi_admin"
+              action="action_cvi_all_settlements" sequence="40"/>
+    <menuitem id="menu_cvi_settlement_differences" name="Diferencias por cobrador"
+              parent="menu_cvi_admin" action="action_cvi_settlement_differences" sequence="50"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>

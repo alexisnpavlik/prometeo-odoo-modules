@@ -15,6 +15,17 @@ class ResCompany(models.Model):
         default=0,
         help="Días de atraso que se toleran antes de marcar una cuota como vencida.",
     )
+    cvi_settlement_frequency = fields.Selection(
+        selection=[
+            ("daily", "Diaria"),
+            ("weekly", "Semanal"),
+            ("monthly", "Mensual"),
+        ],
+        string="Frecuencia de rendición",
+        default="daily",
+        required=True,
+        help="Cada cuánto los cobradores rinden la caja (HU-18).",
+    )
     cvi_allowed_frequencies = fields.Selection(
         selection=[
             ("both", "Mensual y semanal"),

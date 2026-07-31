@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_settlement_form" model="ir.ui.view">
+        <field name="name">cvi.settlement.form</field>
+        <field name="model">cvi.settlement</field>
+        <field name="arch" type="xml">
+            <form string="Rendición">
+                <header>
+                    <button name="action_collect" type="object" string="Recolectar cobros"
+                            invisible="state != 'draft'"/>
+                    <button name="action_submit" type="object" string="Entregar caja"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Aprobar"
+                            class="btn-primary" invisible="state != 'submitted'"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <button name="action_flag_difference" type="object"
+                            string="Aprobar con diferencia"
+                            invisible="state != 'submitted' or not has_difference"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <button name="action_reset_draft" type="object" string="Reabrir"
+                            invisible="state == 'draft'"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,approved"/>
+                </header>
+                <sheet>
+                    <div class="d-md-none d-grid gap-2 mb-3">
+                        <button name="action_submit" type="object" string="Entregar caja"
+                                class="btn btn-primary btn-lg" invisible="state != 'draft'"/>
+                        <button name="action_approve" type="object" string="Aprobar"
+                                class="btn btn-primary btn-lg" invisible="state != 'submitted'"
+                                groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Período">
+                            <field name="collector_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="frequency" readonly="state != 'draft'"/>
+                            <field name="date_from" readonly="1"/>
+                            <field name="date_to" readonly="state != 'draft'"/>
+                            <field name="company_id" invisible="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Caja">
+                            <field name="amount_expected" readonly="1"/>
+                            <field name="amount_delivered"
+                                   readonly="state not in ('draft', 'submitted')"/>
+                            <field name="amount_difference" readonly="1"
+                                   invisible="state == 'draft'"/>
+                            <field name="has_difference" invisible="1"/>
+                            <field name="payment_count" readonly="1"/>
+                            <field name="late_payment_count" readonly="1"
+                                   invisible="late_payment_count == 0"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert"
+                         invisible="late_payment_count == 0">
+                        Esta rendición incluye <field name="late_payment_count" readonly="1"/>
+                        cobros con fecha anterior al período: se cargaron tarde y no se
+                        habían rendido.
+                    </div>
+                    <group string="Observación">
+                        <field name="note" nolabel="1"
+                               placeholder="Explicación de la diferencia, si la hay"
+                               readonly="state in ('approved', 'difference')"/>
+                    </group>
+                    <group string="Revisión" invisible="state in ('draft', 'submitted')">
+                        <field name="approved_by_id" readonly="1"/>
+                        <field name="approved_date" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Cobros incluidos" name="payments">
+                            <field name="payment_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date"/>
+                                    <field name="partner_id"/>
+                                    <field name="card_id"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cvi_settlement_list" model="ir.ui.view">
+        <field name="name">cvi.settlement.list</field>
+        <field name="model">cvi.settlement</field>
+        <field name="arch" type="xml">
+            <list string="Rendiciones" decoration-danger="has_difference"
+                  decoration-success="state == 'approved'">
+                <field name="name"/>
+                <field name="collector_id"/>
+                <field name="date_from" optional="show"/>
+                <field name="date_to"/>
+                <field name="payment_count" optional="show"/>
+                <field name="amount_expected" sum="A rendir"/>
+                <field name="amount_delivered" sum="Entregado"/>
+                <field name="amount_difference" sum="Diferencia"/>
+                <field name="state" widget="badge"/>
+                <field name="has_difference" column_invisible="True"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_settlement_kanban" model="ir.ui.view">
+        <field name="name">cvi.settlement.kanban</field>
+        <field name="model">cvi.settlement</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_order="date_to desc">
+                <field name="state"/>
+                <field name="currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="row">
+                            <div class="col-8">
+                                <strong><field name="collector_id"/></strong>
+                                <div class="text-muted small">
+                                    <field name="name"/> · <field name="date_to"/>
+                                </div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <strong><field name="amount_expected" widget="monetary"/></strong>
+                                <div class="text-muted small">a rendir</div>
+                            </div>
+                        </div>
+                        <div class="row mt-2 align-items-center">
+                            <div class="col-7">
+                                <field name="payment_count"/> cobros
+                            </div>
+                            <div class="col-5 text-end">
+                                <field name="state" widget="label_selection"
+                                       options="{'classes': {'draft': 'default', 'submitted': 'warning', 'approved': 'success', 'difference': 'danger'}}"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_cvi_settlement_search" model="ir.ui.view">
+        <field name="name">cvi.settlement.search</field>
+        <field name="model">cvi.settlement</field>
+        <field name="arch" type="xml">
+            <search string="Rendiciones">
+                <field name="name"/>
+                <field name="collector_id"/>
+                <filter name="filter_open" string="Sin cerrar"
+                        domain="[('state', 'in', ('draft', 'submitted'))]"/>
+                <filter name="filter_difference" string="Con diferencia"
+                        domain="[('has_difference', '=', True)]"/>
+                <separator/>
+                <filter name="filter_mine" string="Mías"
+                        domain="[('collector_id', '=', uid)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_collector" string="Cobrador"
+                            context="{'group_by': 'collector_id'}"/>
+                    <filter name="group_by_state" string="Estado"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_by_date" string="Cierre"
+                            context="{'group_by': 'date_to'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_my_settlements" model="ir.actions.act_window">
+        <field name="name">Mis rendiciones</field>
+        <field name="res_model">cvi.settlement</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_settlement_search"/>
+        <field name="domain">[('collector_id', '=', uid)]</field>
+        <field name="context">{'default_collector_id': uid}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no rendiste ninguna caja</p>
+            <p>Creá una rendición para entregar lo que cobraste en el período.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_all_settlements" model="ir.actions.act_window">
+        <field name="name">Rendiciones</field>
+        <field name="res_model">cvi.settlement</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_settlement_search"/>
+        <field name="context">{'search_default_filter_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No hay rendiciones cargadas</p>
+            <p>Acá revisás y aprobás el efectivo que entregan los cobradores.</p>
+        </field>
+    </record>
+
+    <!-- Reporte de diferencias acumuladas por cobrador que pide HU-20: es la misma
+         lista agrupada por cobrador y filtrada por diferencia, sin modelo aparte. -->
+    <record id="action_cvi_settlement_differences" model="ir.actions.act_window">
+        <field name="name">Diferencias por cobrador</field>
+        <field name="res_model">cvi.settlement</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cvi_settlement_search"/>
+        <field name="domain">[('has_difference', '=', True)]</field>
+        <field name="context">{'search_default_group_by_collector': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ninguna rendición tuvo diferencias</p>
+        </field>
+    </record>
+</odoo>

@@ -17,3 +17,7 @@ class ResConfigSettings(models.TransientModel):
         related="company_id.cvi_allowed_frequencies",
         readonly=False,
     )
+    cvi_settlement_frequency = fields.Selection(
+        related="company_id.cvi_settlement_frequency",
+        readonly=False,
+    )
