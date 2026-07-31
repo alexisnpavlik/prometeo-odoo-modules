@@ -93,6 +93,8 @@ class TestCviSalePicking(CviCommon):
         with self.assertRaises(UserError):
             card.action_confirm()
         self.assertEqual(card.state, "draft")
+        self.assertFalse(card.installment_ids)
+        self.assertFalse(card.payment_ids)
 
     def test_multiple_units_are_discounted(self):
         """Una venta de 2 unidades descuenta 2 del stock del vendedor."""

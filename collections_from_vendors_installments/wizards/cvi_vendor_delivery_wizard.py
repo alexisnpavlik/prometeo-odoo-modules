@@ -99,6 +99,17 @@ class CviVendorDeliveryWizard(models.TransientModel):
         for move in picking.move_ids:
             move.quantity = move.product_uom_qty
         picking.button_validate()
+        # button_validate() puede devolver un wizard de backorder en lugar de dejar
+        # el albarán en "done". No lo damos por hecho: si no quedó validado, la
+        # entrega/devolución no se puede dar por concretada.
+        if picking.state != "done":
+            raise UserError(_(
+                "No se pudo validar el albarán de %(direction)s de %(vendor)s: quedó "
+                "en estado %(state)s. Revisá el stock antes de reintentar.",
+                direction=dict(self._fields["direction"].selection)[self.direction],
+                vendor=self.vendor_id.name,
+                state=picking.state,
+            ))
         _logger.info(
             "Mercadería %s: albarán %s de %s a %s",
             self.direction, picking.name, source.complete_name, destination.complete_name,

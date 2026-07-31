@@ -483,6 +483,18 @@ class CviCard(models.Model):
         for move in picking.move_ids:
             move.quantity = move.product_uom_qty
         picking.button_validate()
+        # button_validate() puede devolver un wizard de backorder en lugar de dejar
+        # el albarán en "done" (aunque hoy no debería pasar: cantidad completa y
+        # producto sin trazabilidad). No lo damos por hecho: si no quedó validado,
+        # no hay que confirmar la venta como si el mueble ya hubiera salido.
+        if picking.state != "done":
+            raise UserError(_(
+                "No se pudo validar el albarán de la venta %(card)s: quedó en estado "
+                "%(state)s. Revisá el stock de %(vendor)s antes de confirmar.",
+                card=self.name,
+                state=picking.state,
+                vendor=self.vendor_id.name,
+            ))
         self.picking_id = picking
         return picking
 
