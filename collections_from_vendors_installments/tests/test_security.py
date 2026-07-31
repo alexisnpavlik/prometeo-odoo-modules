@@ -25,6 +25,17 @@ class TestCviSecurity(CviCommon):
             "location_id": self.other_vendor.cvi_stock_location_id.id,
             "inventory_quantity": 50,
         }).action_apply_inventory()
+        self.manager_user = self.env["res.users"].create({
+            "name": "Administrador Test",
+            "login": "cvi_manager_sec",
+            "email": "manager@test.local",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_manager").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
         self.my_card = self._card(self.vendor_user)
         self.other_card = self._card(self.other_vendor)
 
@@ -95,7 +106,7 @@ class TestCviSecurity(CviCommon):
 
     def test_manager_sees_everything(self):
         """El administrador ve todas las tarjetas, de todos los vendedores (RN-07)."""
-        visible = self.env["cvi.card"].search([])
+        visible = self.env["cvi.card"].with_user(self.manager_user).search([])
         self.assertIn(self.my_card, visible)
         self.assertIn(self.other_card, visible)
 
