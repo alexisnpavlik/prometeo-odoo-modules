@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="collections_from_vendors_installments.CviGeolocationField">
+        <div class="o_cvi_geolocation d-flex align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-secondary btn-sm"
+                    t-on-click="capture"
+                    t-att-disabled="state.busy or props.readonly">
+                <i class="fa fa-crosshairs me-1" role="img" aria-label="GPS"/>
+                <t t-if="state.busy">Tomando ubicación…</t>
+                <t t-elif="hasCoordinates">Volver a tomar</t>
+                <t t-else="">Tomar ubicación GPS</t>
+            </button>
+            <span t-if="hasCoordinates" class="text-muted small">
+                <t t-esc="coordinatesLabel"/>
+                <t t-if="accuracyLabel"> · <t t-esc="accuracyLabel"/></t>
+            </span>
+            <span t-else="" class="text-warning small">Sin ubicación tomada</span>
+        </div>
+    </t>
+
+</templates>

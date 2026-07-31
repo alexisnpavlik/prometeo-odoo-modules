@@ -39,6 +39,25 @@
                             <field name="date_first_payment" invisible="state == 'draft'"
                                    readonly="first_installment_paid"/>
                         </group>
+                        <group string="Ubicación de la venta">
+                            <!-- El widget escribe latitud, longitud y precisión de una
+                                 sola vez; por eso los tres campos van invisibles. -->
+                            <field name="cvi_latitude" widget="cvi_geolocation"
+                                   nolabel="1" colspan="2"
+                                   readonly="state not in ('draft', 'sold')"/>
+                            <field name="cvi_longitude" invisible="1"/>
+                            <field name="cvi_geo_accuracy" invisible="1"/>
+                            <field name="has_geolocation" invisible="1"/>
+                            <field name="map_url" invisible="1"/>
+                            <field name="cvi_geo_date" invisible="not has_geolocation"/>
+                            <button name="action_open_map" type="object" string="Ver en el mapa"
+                                    icon="fa-map-marker" class="btn-link"
+                                    invisible="not has_geolocation"/>
+                            <button name="action_clear_geolocation" type="object"
+                                    string="Borrar ubicación" class="btn-link text-danger"
+                                    invisible="not has_geolocation or state not in ('draft', 'sold')"
+                                    groups="collections_from_vendors_installments.group_cvi_manager"/>
+                        </group>
                         <group string="Mercadería">
                             <field name="product_id" readonly="state != 'draft'"/>
                             <field name="product_tmpl_id" invisible="1"/>

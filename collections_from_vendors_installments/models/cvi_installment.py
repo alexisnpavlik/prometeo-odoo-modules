@@ -48,6 +48,12 @@ class CviInstallment(models.Model):
         related="card_id.state", store=True, string="Estado de la tarjeta"
     )
     map_url = fields.Char(string="Mapa", compute="_compute_map_url")
+    map_is_gps = fields.Boolean(
+        string="Ubicación GPS",
+        compute="_compute_map_url",
+        help="Verdadero si el mapa apunta a las coordenadas tomadas al vender. "
+             "Falso si cae de vuelta a la dirección cargada en el contacto.",
+    )
     company_id = fields.Many2one(related="card_id.company_id", store=True, index=True)
     currency_id = fields.Many2one(related="card_id.currency_id", readonly=True)
     sequence = fields.Integer(string="Nº de cuota", default=1, required=True)
@@ -182,10 +188,29 @@ class CviInstallment(models.Model):
         _logger.info("Cron de cuotas vencidas: %s cuotas revisadas", len(candidates))
         return True
 
-    @api.depends("partner_id.street", "partner_id.city", "partner_id.zip")
+    @api.depends(
+        "card_id.has_geolocation",
+        "card_id.map_url",
+        "partner_id.street",
+        "partner_id.city",
+        "partner_id.zip",
+    )
     def _compute_map_url(self):
-        """Link a Google Maps con la dirección del cliente, para armar el recorrido (HU-14)."""
+        """Link al mapa para armar el recorrido (HU-07, HU-14).
+
+        Prioriza las coordenadas GPS tomadas al vender sobre la dirección del contacto:
+        la dirección nominal suele no coincidir con dónde está la casa. La dirección
+        queda como respaldo para las ventas cargadas antes de que existiera el GPS; el
+        campo map_is_gps dice cuál de las dos se está usando, para que el cobrador no
+        confunda un respaldo con una ubicación tomada en el lugar.
+        """
         for installment in self:
+            card = installment.card_id
+            if card.has_geolocation:
+                installment.map_url = card.map_url
+                installment.map_is_gps = True
+                continue
+            installment.map_is_gps = False
             partner = installment.partner_id
             parts = [partner.street, partner.city, partner.zip]
             address = ", ".join(part for part in parts if part)

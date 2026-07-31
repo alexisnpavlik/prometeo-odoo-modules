@@ -8,6 +8,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_is_zero
+from werkzeug.urls import url_encode
 
 from .cvi_product_plan import FREQUENCY_SELECTION
 
@@ -124,6 +125,29 @@ class CviCard(models.Model):
         default=fields.Date.context_today,
         tracking=True,
     )
+    # Coordenadas tomadas del GPS del dispositivo en el momento de cargar la venta
+    # (HU-07). No salen de la dirección del contacto: en estos barrios la dirección
+    # nominal suele no coincidir con dónde está realmente la casa.
+    cvi_latitude = fields.Float(string="Latitud", digits=(10, 7), copy=False)
+    cvi_longitude = fields.Float(string="Longitud", digits=(10, 7), copy=False)
+    cvi_geo_accuracy = fields.Float(
+        string="Precisión (m)",
+        digits=(6, 1),
+        copy=False,
+        help="Radio de error que informó el GPS del dispositivo, en metros.",
+    )
+    cvi_geo_date = fields.Datetime(
+        string="Ubicación tomada el",
+        readonly=True,
+        copy=False,
+        help="Se completa sola cada vez que se graban coordenadas nuevas.",
+    )
+    has_geolocation = fields.Boolean(
+        string="Tiene ubicación GPS",
+        compute="_compute_has_geolocation",
+        store=True,
+    )
+    map_url = fields.Char(string="Mapa", compute="_compute_map_url")
     # No es CVI_FROZEN_FIELDS a propósito: se carga después de confirmar la venta.
     date_first_payment = fields.Date(
         string="Fecha de cobro de la entrega",
@@ -420,7 +444,17 @@ class CviCard(models.Model):
         return True
 
     def write(self, vals):
-        """Congela precio, cuotas y mercadería una vez confirmada la venta (RN-05)."""
+        """Congela precio, cuotas y mercadería una vez confirmada la venta (RN-05).
+
+        También sella cvi_geo_date: la fecha de la ubicación se pone acá y no en el
+        cliente, para que valga sin importar quién grabe las coordenadas.
+        """
+        coords = ("cvi_latitude", "cvi_longitude")
+        if any(name in vals for name in coords) and "cvi_geo_date" not in vals:
+            # Poner las coordenadas en cero es borrarlas (ver action_clear_geolocation):
+            # eso no es una toma nueva y no debe sellar fecha.
+            if any(vals.get(name) for name in coords):
+                vals = dict(vals, cvi_geo_date=fields.Datetime.now())
         frozen = [name for name in CVI_FROZEN_FIELDS if name in vals]
         if frozen:
             locked = self.filtered(lambda c: c.state not in ("draft", "cancel"))
@@ -433,6 +467,50 @@ class CviCard(models.Model):
                     card=locked[0].name,
                 ))
         return super().write(vals)
+
+    @api.depends("cvi_latitude", "cvi_longitude")
+    def _compute_has_geolocation(self):
+        """Una venta tiene ubicación cuando el GPS dejó coordenadas distintas de cero.
+
+        (0, 0) es el punto nulo en medio del Atlántico: en la práctica significa que el
+        campo nunca se completó, no que la venta ocurrió ahí.
+        """
+        for card in self:
+            card.has_geolocation = bool(card.cvi_latitude or card.cvi_longitude)
+
+    @api.depends("cvi_latitude", "cvi_longitude")
+    def _compute_map_url(self):
+        """Link al mapa con las coordenadas tomadas al vender (HU-07)."""
+        for card in self:
+            if card.has_geolocation:
+                query = url_encode({
+                    "api": "1",
+                    "query": "%s,%s" % (card.cvi_latitude, card.cvi_longitude),
+                })
+                card.map_url = "https://www.google.com/maps/search/?%s" % query
+            else:
+                card.map_url = False
+
+    def action_open_map(self):
+        """Abre en el mapa el punto donde se cargó la venta (HU-07)."""
+        self.ensure_one()
+        if not self.map_url:
+            raise UserError(_(
+                "La venta %s no tiene ubicación GPS registrada.", self.name
+            ))
+        return {"type": "ir.actions.act_url", "url": self.map_url, "target": "new"}
+
+    def action_clear_geolocation(self):
+        """Borra las coordenadas para poder volver a tomarlas."""
+        self.ensure_one()
+        self.write({
+            "cvi_latitude": 0.0,
+            "cvi_longitude": 0.0,
+            "cvi_geo_accuracy": 0.0,
+            "cvi_geo_date": False,
+        })
+        self._cvi_log(_("Ubicación GPS borrada por %s.", self.env.user.name))
+        return True
 
     @api.depends("installment_ids.is_commission", "installment_ids.state")
     def _compute_first_installment_paid(self):

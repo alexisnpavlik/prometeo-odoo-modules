@@ -35,6 +35,12 @@
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "collections_from_vendors_installments/static/src/js/*.js",
+            "collections_from_vendors_installments/static/src/xml/*.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,
