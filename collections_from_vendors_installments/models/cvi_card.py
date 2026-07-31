@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import float_is_zero
 
 from .cvi_product_plan import FREQUENCY_SELECTION
 
@@ -184,6 +185,30 @@ class CviCard(models.Model):
     )
     payment_ids = fields.One2many(
         "cvi.payment", "card_id", string="Cobros", copy=False
+    )
+    amount_paid = fields.Monetary(
+        string="Cobrado",
+        compute="_compute_balance",
+        store=True,
+        currency_field="currency_id",
+    )
+    amount_residual = fields.Monetary(
+        string="Saldo",
+        compute="_compute_balance",
+        store=True,
+        currency_field="currency_id",
+    )
+    paid_installment_count = fields.Integer(
+        string="Cuotas pagadas", compute="_compute_balance", store=True
+    )
+    pending_installment_count = fields.Integer(
+        string="Cuotas pendientes", compute="_compute_balance", store=True
+    )
+    overdue_installment_count = fields.Integer(
+        string="Cuotas vencidas", compute="_compute_balance", store=True
+    )
+    next_due_date = fields.Date(
+        string="Próximo vencimiento", compute="_compute_balance", store=True, index=True
     )
 
     _sql_constraints = [
@@ -430,4 +455,62 @@ class CviCard(models.Model):
                 ))
             card.state = "cancel"
             card.message_post(body=_("Tarjeta anulada por %s.", self.env.user.name))
+        return True
+
+    @api.depends(
+        "amount_total",
+        "installment_ids.amount_paid",
+        "installment_ids.amount_residual",
+        "installment_ids.state",
+        "installment_ids.date_due",
+    )
+    def _compute_balance(self):
+        """Resume el estado de cobranza de la tarjeta a partir de sus cuotas (HU-16)."""
+        for card in self:
+            installments = card.installment_ids
+            card.amount_paid = sum(installments.mapped("amount_paid"))
+            card.amount_residual = sum(installments.mapped("amount_residual"))
+            card.paid_installment_count = len(
+                installments.filtered(lambda i: i.state == "paid")
+            )
+            card.pending_installment_count = len(
+                installments.filtered(lambda i: i.state in ("pending", "partial"))
+            )
+            card.overdue_installment_count = len(
+                installments.filtered(lambda i: i.state == "overdue")
+            )
+            upcoming = installments.filtered(
+                lambda i: not i.is_commission and i.amount_residual > 0
+            ).sorted("date_due")
+            card.next_due_date = upcoming[0].date_due if upcoming else False
+
+    def _cvi_check_settlement(self):
+        """Cierra la tarjeta al saldarse y la reabre si un cobro se anula (HU-17)."""
+        self.ensure_one()
+        rounding = self.currency_id.rounding or 0.01
+        settled = float_is_zero(self.amount_residual, precision_rounding=rounding)
+        if settled and self.state in ("sold", "routed", "active"):
+            self.state = "done"
+            self.message_post(body=_("Tarjeta saldada: pasa a Finalizada."))
+        elif not settled and self.state == "done":
+            self.state = "active"
+            self.message_post(body=_(
+                "La tarjeta vuelve a cobranza: quedó saldo pendiente tras anular un cobro."
+            ))
+
+    def action_accept(self):
+        """El cobrador acepta la tarjeta enrutada y se hace responsable (RN-02, HU-12)."""
+        for card in self:
+            if card.state != "routed":
+                raise UserError(_(
+                    "Solo se puede aceptar una tarjeta enrutada (la tarjeta %(card)s "
+                    "está en estado %(state)s).",
+                    card=card.name,
+                    state=dict(STATE_SELECTION)[card.state],
+                ))
+            card.state = "active"
+            card.message_post(body=_(
+                "Tarjeta aceptada por %s: se hace responsable de la cobranza.",
+                card.collector_id.name,
+            ))
         return True

@@ -130,6 +130,7 @@ class CviPayment(models.Model):
                 "Cobro %(name)s por %(amount)s registrado por %(user)s.",
                 name=payment.name, amount=payment.amount, user=payment.user_id.name,
             ))
+            payment.card_id._cvi_check_settlement()
         return True
 
     def action_cancel(self):
@@ -146,4 +147,5 @@ class CviPayment(models.Model):
                 "Cobro %(name)s por %(amount)s ANULADO por %(user)s.",
                 name=payment.name, amount=payment.amount, user=self.env.user.name,
             ))
+            payment.card_id._cvi_check_settlement()
         return True
