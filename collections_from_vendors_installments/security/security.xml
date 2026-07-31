@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <!--
+        Los grupos van fuera de noupdate para que un `-u` del módulo propague cambios
+        de jerarquía a las instalaciones existentes.
+
+        La categoría se renderiza como lista desplegable en lugar de casillas porque los
+        tres grupos forman una cadena lineal de implicación: Cobrador ⊂ Vendedor ⊂
+        Administrador. Odoo exige ese orden total (res.users.get_groups_by_application);
+        si se rompe la cadena, la categoría vuelve a mostrarse como casillas.
+
+        La cadena refleja la operación real: el vendedor ya cobra la primera cuota, así
+        que todo vendedor es también un cobrador. La dirección inversa habilitaría a los
+        cobradores de calle a crear ventas.
+    -->
+    <data>
         <record id="module_category_cvi" model="ir.module.category">
             <field name="name">Venta en cuotas</field>
             <field name="description">Venta domiciliaria financiada y cobranza</field>
             <field name="sequence">20</field>
-        </record>
-
-        <record id="group_cvi_vendor" model="res.groups">
-            <field name="name">Vendedor</field>
-            <field name="category_id" ref="module_category_cvi"/>
-            <field name="comment">Retira mercadería, vende en el domicilio, cobra la primera cuota y enruta la tarjeta. Solo ve sus propias ventas.</field>
         </record>
 
         <record id="group_cvi_collector" model="res.groups">
@@ -19,13 +26,22 @@
             <field name="comment">Acepta tarjetas enrutadas y cobra las cuotas. Solo ve su propia cartera.</field>
         </record>
 
+        <record id="group_cvi_vendor" model="res.groups">
+            <field name="name">Vendedor</field>
+            <field name="category_id" ref="module_category_cvi"/>
+            <field name="comment">Retira mercadería, vende en el domicilio, cobra la primera cuota y enruta la tarjeta. Ve sus propias ventas y, si además tiene cartera asignada, las tarjetas que cobra.</field>
+            <field name="implied_ids" eval="[(4, ref('group_cvi_collector'))]"/>
+        </record>
+
         <record id="group_cvi_manager" model="res.groups">
             <field name="name">Administrador de cobranzas</field>
             <field name="category_id" ref="module_category_cvi"/>
             <field name="comment">Configura el módulo, transfiere carteras y ve toda la operación.</field>
-            <field name="implied_ids" eval="[(4, ref('group_cvi_vendor')), (4, ref('group_cvi_collector')), (4, ref('stock.group_stock_user'))]"/>
+            <field name="implied_ids" eval="[(4, ref('group_cvi_vendor')), (4, ref('stock.group_stock_user'))]"/>
         </record>
+    </data>
 
+    <data noupdate="1">
         <!-- Multi-empresa: nadie ve registros de empresas que no le corresponden -->
         <record id="rule_cvi_card_company" model="ir.rule">
             <field name="name">Tarjeta: multi-empresa</field>
