@@ -2,6 +2,7 @@
 from . import cvi_audit_mixin
 from . import cvi_product_plan
 from . import cvi_card
+from . import cvi_card_line
 from . import cvi_installment
 from . import cvi_payment
 from . import cvi_allocation

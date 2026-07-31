@@ -68,6 +68,30 @@
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
+                    <separator string="Mercadería"/>
+                    <field name="line_ids" readonly="state != 'draft'">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="product_id" options="{'no_create': True}"/>
+                            <field name="product_tmpl_id" column_invisible="True"/>
+                            <field name="quantity"/>
+                            <field name="plan_id"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="installment_count" readonly="1"
+                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_amount" readonly="1"
+                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_count"
+                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="installment_amount"
+                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                            <field name="frequency" optional="hide"/>
+                            <field name="amount_per_installment" readonly="1"/>
+                            <field name="amount_subtotal" readonly="1" sum="Total"/>
+                            <field name="currency_id" column_invisible="True"/>
+                        </list>
+                    </field>
+
                     <!-- HU-28: advierte, no bloquea. -->
                     <div class="alert alert-warning" role="alert"
                          invisible="not has_partner_alert">
@@ -111,25 +135,18 @@
                                     invisible="not has_geolocation or state not in ('draft', 'sold')"
                                     groups="collections_from_vendors_installments.group_cvi_manager"/>
                         </group>
-                        <group string="Mercadería">
-                            <field name="product_id" readonly="state != 'draft'"/>
-                            <field name="product_tmpl_id" invisible="1"/>
-                            <field name="quantity" readonly="state != 'draft'"/>
-                            <field name="plan_id" readonly="state != 'draft'"
-                                   options="{'no_create': True, 'no_open': True}"/>
-                        </group>
                         <group string="Financiación">
-                            <!-- El plan fija estos valores. Para el vendedor son de solo
-                                 lectura; el administrador ve la versión editable. -->
+                            <!-- Los tres salen de las líneas: con varios muebles el
+                                 calendario los combina, así que no se cargan a mano. -->
                             <field name="installment_count" readonly="1"
-                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
+                                   string="Cuotas (plazo más largo)"/>
                             <field name="installment_amount" readonly="1"
-                                   groups="!collections_from_vendors_installments.group_cvi_manager"/>
-                            <field name="installment_count" readonly="state != 'draft'"
-                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
-                            <field name="installment_amount" readonly="state != 'draft'"
-                                   groups="collections_from_vendors_installments.group_cvi_manager"/>
+                                   string="Primera cuota"/>
                             <field name="amount_total" readonly="1"/>
+                            <field name="line_count" invisible="1"/>
+                            <field name="product_id" invisible="1"/>
+                            <field name="quantity" invisible="1"/>
+                            <field name="plan_id" invisible="1"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group string="Cobranza">

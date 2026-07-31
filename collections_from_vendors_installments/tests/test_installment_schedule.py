@@ -134,7 +134,7 @@ class TestCviInstallmentSchedule(CviCommon):
         """Regenerar el calendario en borrador reemplaza las cuotas anteriores."""
         card = self._card(count=3)
         card._cvi_generate_installments()
-        card.plan_id = self.plan_12
+        card.line_ids[0].plan_id = self.plan_12
         card._cvi_generate_installments()
         self.assertEqual(len(card.installment_ids), 12)
 

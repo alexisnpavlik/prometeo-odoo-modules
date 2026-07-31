@@ -44,13 +44,10 @@ WEEKDAY_PLURAL = {
     "6": "domingos",
 }
 
+# amount_total queda afuera a propósito: se calcula desde las líneas, así que
+# protegerlo sería redundante y rompería el propio recálculo.
 CVI_FROZEN_FIELDS = (
-    "plan_id",
-    "installment_count",
-    "installment_amount",
-    "frequency",
-    "product_id",
-    "quantity",
+    "line_ids",
 )
 
 
@@ -102,24 +99,30 @@ class CviCard(models.Model):
         help="En estado Enrutada es el destinatario pendiente de aceptar; "
              "en En cobranza es el responsable de la cobranza.",
     )
+    line_ids = fields.One2many(
+        "cvi.card.line", "card_id", string="Mercadería", copy=True,
+    )
+    # Los tres campos siguientes son de la PRIMERA línea. Existen para que las listas,
+    # los filtros y el código que venía de la venta de un solo mueble sigan andando;
+    # la fuente de verdad son las líneas. El create() traduce la terna vieja en una
+    # línea, así que cargar una venta de un solo mueble sigue funcionando igual.
     product_id = fields.Many2one(
-        "product.product",
-        string="Modelo de mueble",
-        required=True,
-        domain="[('is_storable', '=', True)]",
+        "product.product", string="Modelo de mueble",
+        compute="_compute_from_lines", store=True, index=True,
     )
     product_tmpl_id = fields.Many2one(
         related="product_id.product_tmpl_id", string="Ficha del mueble", readonly=True
     )
     plan_id = fields.Many2one(
-        "cvi.product.plan",
-        string="Plan de cuotas",
-        required=True,
-        tracking=True,
-        domain="[('product_tmpl_id', '=', product_tmpl_id)]",
-        help="Los planes se definen en la ficha del mueble, pestaña Planes de cuotas.",
+        "cvi.product.plan", string="Plan de cuotas",
+        compute="_compute_from_lines", store=True,
     )
-    quantity = fields.Float(string="Cantidad", default=1.0, required=True)
+    quantity = fields.Float(
+        string="Cantidad", compute="_compute_from_lines", store=True,
+    )
+    line_count = fields.Integer(
+        string="Muebles", compute="_compute_from_lines", store=True,
+    )
     date_sale = fields.Date(
         string="Fecha de venta",
         required=True,
@@ -339,32 +342,53 @@ class CviCard(models.Model):
         ),
     ]
 
-    @api.depends("plan_id")
+    # Los computes van uno por campo a propósito: la protección de Odoo contra pisar
+    # valores explícitos es a nivel de MÉTODO, así que uno compartido se saltearía
+    # entero cuando el create trae solo uno de los campos.
+    @api.depends("line_ids.product_id", "line_ids.plan_id", "line_ids.quantity")
+    def _compute_from_lines(self):
+        """Refleja la primera línea, para las vistas y los filtros que venían de antes."""
+        for card in self:
+            first = card.line_ids[:1]
+            card.product_id = first.product_id
+            card.plan_id = first.plan_id
+            card.quantity = sum(card.line_ids.mapped("quantity"))
+            card.line_count = len(card.line_ids)
+
+    @api.depends("line_ids.installment_count")
     def _compute_installment_count(self):
-        """Cantidad de cuotas del plan elegido (HU-05)."""
+        """Largo del calendario: el plazo de la línea que más tarda (HU-05)."""
         for card in self:
-            if card.plan_id:
-                card.installment_count = card.plan_id.installment_count
-            else:
-                card.installment_count = card.company_id.cvi_default_installments
+            counts = card.line_ids.mapped("installment_count")
+            card.installment_count = (
+                max(counts) if counts else card.company_id.cvi_default_installments
+            )
 
-    @api.depends("plan_id")
+    @api.depends("line_ids.amount_per_installment")
     def _compute_installment_amount(self):
-        """Importe de cuota del plan elegido, con el interés ya incluido (HU-05)."""
-        for card in self:
-            card.installment_amount = card.plan_id.installment_amount if card.plan_id else 0.0
+        """Importe de la PRIMERA cuota, que es la más alta (HU-05).
 
-    @api.depends("plan_id")
+        Con varias líneas las cuotas dejan de ser todas iguales: a medida que cada plan
+        se termina, la cuota baja. Este es el número que el vendedor pronuncia en la
+        calle, no un valor uniforme del calendario.
+        """
+        for card in self:
+            card.installment_amount = sum(
+                card.line_ids.mapped("amount_per_installment")
+            )
+
+    @api.depends("line_ids.frequency")
     def _compute_frequency(self):
-        """Modalidad de cobro del plan elegido (HU-06)."""
+        """Modalidad de cobro. Todas las líneas comparten frecuencia (HU-06)."""
         for card in self:
-            card.frequency = card.plan_id.frequency if card.plan_id else "monthly"
+            frequencies = set(card.line_ids.mapped("frequency"))
+            card.frequency = frequencies.pop() if len(frequencies) == 1 else "monthly"
 
-    @api.depends("installment_count", "installment_amount")
+    @api.depends("line_ids.amount_subtotal")
     def _compute_amount_total(self):
-        """El precio total de la venta es cuotas por importe: nunca se carga a mano."""
+        """Suma de los subtotales de las líneas. Nunca se carga a mano."""
         for card in self:
-            card.amount_total = card.installment_count * card.installment_amount
+            card.amount_total = sum(card.line_ids.mapped("amount_subtotal"))
 
     @api.depends("frequency", "charge_day_month", "charge_day_week")
     def _compute_charge_day_display(self):
@@ -376,42 +400,30 @@ class CviCard(models.Model):
             else:
                 card.charge_day_display = _("Día %s de cada mes", card.charge_day_month)
 
-    @api.constrains("plan_id", "product_id")
-    def _check_plan_belongs_to_product(self):
-        """El plan elegido tiene que ser uno de los cargados en la ficha de ese mueble."""
+    @api.constrains("line_ids")
+    def _check_single_frequency(self):
+        """Todas las líneas comparten frecuencia.
+
+        Una tarjeta que cobrara parte mensual y parte semanal no tendría un calendario
+        único: cada cuota necesita una fecha, y dos ritmos dan dos calendarios.
+        """
         for card in self:
-            if card.plan_id.product_tmpl_id != card.product_id.product_tmpl_id:
+            frequencies = set(card.line_ids.mapped("frequency"))
+            if len(frequencies) > 1:
                 raise ValidationError(_(
-                    "El plan %(plan)s pertenece a %(plan_product)s, no a %(product)s.",
-                    plan=card.plan_id.name,
-                    plan_product=card.plan_id.product_tmpl_id.display_name,
-                    product=card.product_id.display_name,
+                    "La tarjeta %(card)s mezcla planes mensuales y semanales. Todos "
+                    "los muebles de una venta tienen que cobrarse con la misma "
+                    "frecuencia.",
+                    card=card.name,
                 ))
 
-    @api.constrains("plan_id", "installment_count", "installment_amount", "frequency")
-    def _check_plan_values(self):
-        """Solo el administrador puede vender con valores distintos a los del plan (RN-05)."""
-        if self.env.user.has_group(
-            "collections_from_vendors_installments.group_cvi_manager"
-        ):
-            return
+    @api.constrains("line_ids", "state")
+    def _check_has_lines(self):
+        """Una venta confirmada sin mercadería no es una venta."""
         for card in self:
-            plan = card.plan_id
-            currency = card.currency_id
-            differs = (
-                card.installment_count != plan.installment_count
-                or currency.compare_amounts(
-                    card.installment_amount, plan.installment_amount
-                ) != 0
-                or card.frequency != plan.frequency
-            )
-            if differs:
+            if card.state not in ("draft", "cancel") and not card.line_ids:
                 raise ValidationError(_(
-                    "El plan %(plan)s se vende en %(count)s cuotas de %(amount)s. "
-                    "Solo un administrador puede vender con otros valores.",
-                    plan=plan.name,
-                    count=plan.installment_count,
-                    amount=plan.installment_amount,
+                    "La tarjeta %s no tiene ningún mueble cargado.", card.name
                 ))
 
     @api.constrains("frequency", "charge_day_month", "charge_day_week")
@@ -459,12 +471,33 @@ class CviCard(models.Model):
         if self.frequency == "weekly" and not self.charge_day_week:
             self.charge_day_week = str(fields.Date.context_today(self).weekday())
 
+    # Campos de la terna vieja que se aceptan en el create como atajo de una línea.
+    _CVI_SINGLE_LINE_KEYS = ("product_id", "plan_id", "quantity")
+
     @api.model_create_multi
     def create(self, vals_list):
-        """Asigna la referencia desde la secuencia al crear."""
+        """Asigna la referencia y admite la carga de un solo mueble sin líneas.
+
+        product_id, plan_id y quantity son calculados desde las líneas, así que pasarlos
+        al create no crearía nada. Se los traduce en una línea: así una venta de un solo
+        mueble se sigue cargando como siempre, y el código que ya existía no se rompe.
+        """
         for vals in vals_list:
             if vals.get("name", _("Nuevo")) == _("Nuevo"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("cvi.card") or _("Nuevo")
+            if not vals.get("line_ids") and vals.get("product_id") and vals.get("plan_id"):
+                line = {
+                    "product_id": vals.pop("product_id"),
+                    "plan_id": vals.pop("plan_id"),
+                    "quantity": vals.pop("quantity", 1.0),
+                }
+                for key in ("installment_count", "installment_amount", "frequency"):
+                    if key in vals:
+                        line[key] = vals.pop(key)
+                vals["line_ids"] = [(0, 0, line)]
+            else:
+                for key in self._CVI_SINGLE_LINE_KEYS:
+                    vals.pop(key, None)
         return super().create(vals_list)
 
     def _cvi_due_dates(self, count):
@@ -498,19 +531,33 @@ class CviCard(models.Model):
         """Genera el calendario completo de cuotas, reemplazando el anterior si existe.
 
         La cuota 1 es la comisión del vendedor y vence el día de la venta (RN-01).
-        Todas las cuotas valen lo mismo: el importe que fija el plan. No hay resto que
-        repartir, porque el precio total de la tarjeta es cuotas por importe.
+
+        El importe de cada cuota es la suma de lo que aporta cada línea que todavía
+        tiene cuotas pendientes en ese período. No hay resto que repartir: el total
+        sale de los planes, nunca de una división.
         """
         self.ensure_one()
         self.installment_ids.unlink()
         due_dates = [self.date_sale] + self._cvi_due_dates(self.installment_count - 1)
-        vals_list = [{
-            "card_id": self.id,
-            "sequence": index,
-            "date_due": due,
-            "amount": self.installment_amount,
-            "is_commission": index == 1,
-        } for index, due in enumerate(due_dates, start=1)]
+        vals_list = []
+        for index, due in enumerate(due_dates, start=1):
+            # Cada línea aporta a las cuotas 1..N de SU plan. Cuando un plan corto se
+            # termina, deja de sumar y la cuota baja: por eso las cuotas no son todas
+            # iguales cuando la venta tiene muebles con planes distintos.
+            amount = sum(
+                line.amount_per_installment
+                for line in self.line_ids
+                if index <= line.installment_count
+            )
+            if not amount:
+                continue
+            vals_list.append({
+                "card_id": self.id,
+                "sequence": index,
+                "date_due": due,
+                "amount": amount,
+                "is_commission": index == 1,
+            })
         self.env["cvi.installment"].create(vals_list)
         return True
 
@@ -699,16 +746,25 @@ class CviCard(models.Model):
             ))
         source = self.vendor_id._cvi_get_location()
         destination = self.env.ref("stock.stock_location_customers")
-        available = self.env["stock.quant"]._get_available_quantity(self.product_id, source)
-        if self.quantity > available:
-            raise UserError(_(
-                "%(vendor)s no tiene %(asked)s unidades de %(product)s a cargo "
-                "(disponibles: %(available)s). Registrá la entrega de mercadería primero.",
-                vendor=self.vendor_id.name,
-                asked=self.quantity,
-                product=self.product_id.display_name,
-                available=available,
-            ))
+        # Se agrupa por producto antes de chequear: dos líneas del mismo mueble se
+        # descuentan del mismo stock, y mirarlas por separado dejaría pasar una venta
+        # que en conjunto no tiene existencias.
+        needed = {}
+        for line in self.line_ids:
+            needed[line.product_id] = needed.get(line.product_id, 0.0) + line.quantity
+        quant = self.env["stock.quant"]
+        for product, asked in needed.items():
+            available = quant._get_available_quantity(product, source)
+            if asked > available:
+                raise UserError(_(
+                    "%(vendor)s no tiene %(asked)s unidades de %(product)s a cargo "
+                    "(disponibles: %(available)s). Registrá la entrega de mercadería "
+                    "primero.",
+                    vendor=self.vendor_id.name,
+                    asked=asked,
+                    product=product.display_name,
+                    available=available,
+                ))
         # El vendedor no es operario de depósito y no debe recibir el grupo completo de
         # Inventario: el albarán es una consecuencia interna de una acción que ya está
         # autorizado a hacer. El chequeo de disponibilidad de arriba corre como el
@@ -720,13 +776,13 @@ class CviCard(models.Model):
             "partner_id": self.partner_id.id,
             "origin": self.name,
             "move_ids": [(0, 0, {
-                "name": self.product_id.display_name,
-                "product_id": self.product_id.id,
-                "product_uom_qty": self.quantity,
-                "product_uom": self.product_id.uom_id.id,
+                "name": product.display_name,
+                "product_id": product.id,
+                "product_uom_qty": asked,
+                "product_uom": product.uom_id.id,
                 "location_id": source.id,
                 "location_dest_id": destination.id,
-            })],
+            }) for product, asked in needed.items()],
         })
         picking.action_confirm()
         picking.action_assign()
@@ -890,13 +946,13 @@ class CviCard(models.Model):
             "partner_id": self.partner_id.id,
             "origin": _("Retiro de %s", self.name),
             "move_ids": [(0, 0, {
-                "name": self.product_id.display_name,
-                "product_id": self.product_id.id,
-                "product_uom_qty": self.quantity,
-                "product_uom": self.product_id.uom_id.id,
+                "name": line.product_id.display_name,
+                "product_id": line.product_id.id,
+                "product_uom_qty": line.quantity,
+                "product_uom": line.product_id.uom_id.id,
                 "location_id": source.id,
                 "location_dest_id": destination.id,
-            })],
+            }) for line in self.line_ids],
         })
         picking.action_confirm()
         picking.action_assign()

@@ -238,5 +238,40 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
         </record>
+
+        <record id="rule_cvi_card_line_company" model="ir.rule">
+            <field name="name">Línea de venta: multi-empresa</field>
+            <field name="model_id" ref="model_cvi_card_line"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="rule_cvi_card_line_vendor" model="ir.rule">
+            <field name="name">Línea de venta: el vendedor ve las de sus ventas</field>
+            <field name="model_id" ref="model_cvi_card_line"/>
+            <field name="domain_force">[('card_id.vendor_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_vendor'))]"/>
+        </record>
+
+        <record id="rule_cvi_card_line_collector" model="ir.rule">
+            <field name="name">Línea de venta: el cobrador ve las de su cartera</field>
+            <field name="model_id" ref="model_cvi_card_line"/>
+            <field name="domain_force">[('card_id.collector_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_collector'))]"/>
+        </record>
+
+        <record id="rule_cvi_card_line_supervisor" model="ir.rule">
+            <field name="name">Línea de venta: el supervisor ve la cartera que audita</field>
+            <field name="model_id" ref="model_cvi_card_line"/>
+            <field name="domain_force">[('card_id.collector_id', 'in', user.cvi_supervised_collector_ids.ids)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_supervisor'))]"/>
+        </record>
+
+        <record id="rule_cvi_card_line_manager" model="ir.rule">
+            <field name="name">Línea de venta: el administrador ve todo</field>
+            <field name="model_id" ref="model_cvi_card_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
+        </record>
     </data>
 </odoo>

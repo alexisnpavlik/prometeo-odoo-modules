@@ -86,21 +86,21 @@ class TestCviCardConfirm(CviCommon):
         card = self._card()
         card.action_confirm()
         with self.assertRaises(UserError):
-            card.plan_id = self.plan_3.id
+            card.line_ids[0].plan_id = self.plan_3.id
 
     def test_price_is_frozen_after_confirm(self):
         """Tras confirmar no se puede cambiar el importe de cuota (RN-05)."""
         card = self._card()
         card.action_confirm()
         with self.assertRaises(UserError):
-            card.installment_amount = 20000.0
+            card.line_ids[0].installment_amount = 20000.0
 
     def test_installment_count_is_frozen_after_confirm(self):
         """Tras confirmar no se puede cambiar la cantidad de cuotas (RN-05)."""
         card = self._card()
         card.action_confirm()
         with self.assertRaises(UserError):
-            card.installment_count = 6
+            card.line_ids[0].installment_count = 6
 
     def test_product_is_frozen_after_confirm(self):
         """Tras confirmar no se puede cambiar el modelo de mueble vendido (RN-05)."""
@@ -110,7 +110,7 @@ class TestCviCardConfirm(CviCommon):
             "name": "Mesa de luz", "type": "consu", "is_storable": True,
         })
         with self.assertRaises(UserError):
-            card.product_id = other.id
+            card.line_ids[0].product_id = other.id
 
     def test_collector_can_still_be_changed_after_confirm(self):
         """El cobrador sí se puede cambiar tras confirmar: es el enrutamiento (HU-11, HU-30)."""
@@ -122,7 +122,7 @@ class TestCviCardConfirm(CviCommon):
     def test_plan_can_be_changed_while_draft(self):
         """En borrador el vendedor todavía puede cambiar de plan y reprecia la venta."""
         card = self._card()
-        card.plan_id = self.plan_3.id
+        card.line_ids[0].plan_id = self.plan_3.id
         self.assertEqual(card.installment_count, 3)
         self.assertEqual(card.amount_total, 30000.0)
 
