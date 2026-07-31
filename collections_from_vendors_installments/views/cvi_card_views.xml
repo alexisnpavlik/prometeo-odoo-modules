@@ -25,6 +25,25 @@
                            statusbar_visible="draft,sold,routed,active,done"/>
                 </header>
                 <sheet>
+                    <!--
+                        En pantalla chica Odoo no renderiza los botones del <header>: los
+                        manda al menú de engranaje (form_compiler compileHeader los pasa a
+                        StatusBarDropdownItems cuando env.isSmall). El vendedor trabaja en
+                        el celular, así que las acciones principales se repiten acá con
+                        d-md-none, que las muestra solo en móvil.
+                    -->
+                    <div class="d-md-none d-grid gap-2 mb-3">
+                        <button name="action_confirm" type="object" string="Confirmar venta"
+                                class="btn btn-primary btn-lg" invisible="state != 'draft'"/>
+                        <button name="action_charge_first_installment" type="object"
+                                string="Pago de primera cuota" class="btn btn-primary btn-lg"
+                                invisible="state in ('draft', 'cancel') or first_installment_paid"/>
+                        <button name="action_accept" type="object" string="Aceptar"
+                                class="btn btn-primary btn-lg" invisible="state != 'routed'"
+                                groups="collections_from_vendors_installments.group_cvi_collector"/>
+                        <button name="action_route" type="object" string="Enviar al cobrador"
+                                class="btn btn-secondary btn-lg" invisible="state != 'sold'"/>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>

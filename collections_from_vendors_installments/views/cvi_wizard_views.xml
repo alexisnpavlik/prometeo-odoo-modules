@@ -115,6 +115,12 @@
                     <button name="action_confirm_delivery" type="object" string="Confirmar"
                             class="btn-primary"/>
                 </header>
+                <!-- Ver la nota en cvi_card_views: en móvil los botones del <header> se
+                     esconden en el menú de engranaje. -->
+                <div class="d-md-none d-grid mb-3">
+                    <button name="action_confirm_delivery" type="object" string="Confirmar"
+                            class="btn btn-primary btn-lg"/>
+                </div>
                 <group>
                     <group>
                         <field name="vendor_id"/>
