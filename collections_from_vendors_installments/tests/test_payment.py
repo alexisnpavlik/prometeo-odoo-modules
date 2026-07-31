@@ -10,6 +10,10 @@ class TestCviPayment(CviCommon):
 
     def setUp(self):
         super().setUp()
+        # date_sale fija en el pasado; sin tolerancia las cuotas de cobranza
+        # quedarían "overdue" en vez de "pending"/"partial", rompiendo asserts
+        # que no tienen que ver con mora.
+        self.company.cvi_overdue_days = 3650  # ~10 años
         self.card = self.env["cvi.card"].create({
             "partner_id": self.partner.id,
             "vendor_id": self.vendor_user.id,

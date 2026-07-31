@@ -8,6 +8,13 @@ from .common import CviCommon
 @tagged("post_install", "-at_install")
 class TestCviCardConfirm(CviCommon):
 
+    def setUp(self):
+        super().setUp()
+        # Los tests de esta clase usan una date_sale fija en el pasado; sin
+        # tolerancia, las cuotas de cobranza aparecerían "overdue" en vez de
+        # "pending" y romperían asserts que no tienen nada que ver con mora.
+        self.company.cvi_overdue_days = 3650  # ~10 años
+
     def _card(self, **kwargs):
         """Tarjeta en borrador con valores mínimos, sobreescribibles."""
         vals = {

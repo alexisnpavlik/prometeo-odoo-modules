@@ -8,6 +8,13 @@ from .common import CviCommon
 @tagged("post_install", "-at_install")
 class TestCviInstallmentSchedule(CviCommon):
 
+    def setUp(self):
+        super().setUp()
+        # date_sale fija en el pasado; sin tolerancia las cuotas quedarían
+        # "overdue" en vez de "pending", rompiendo asserts que no tienen que
+        # ver con mora. Los tests que sí ejercitan mora pisan este valor.
+        self.company.cvi_overdue_days = 3650  # ~10 años
+
     def _card(self, count=12, amount=10000.0, frequency="monthly", **kwargs):
         """Tarjeta en borrador con un plan creado a medida para el caso bajo prueba.
 

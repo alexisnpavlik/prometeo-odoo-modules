@@ -14,9 +14,6 @@ class CviCommon(TransactionCase):
         # no la reconoce como empresa permitida y rompe la creación de usuarios de test.
         # Se reactiva dentro de la transacción; el rollback lo revierte.
         cls.company.sudo().active = True
-        # Set a default tolerance so test data with old dates doesn't get marked as overdue.
-        # Individual tests can override this value.
-        cls.company.cvi_overdue_days = 3650  # ~10 years
         cls.env.user.company_ids = [(4, cls.company.id)]
         cls.env.user.groups_id = [
             (4, cls.env.ref("collections_from_vendors_installments.group_cvi_manager").id)
