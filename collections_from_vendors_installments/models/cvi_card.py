@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import calendar
 import logging
+from datetime import date
+
+from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
@@ -166,6 +170,9 @@ class CviCard(models.Model):
         tracking=True,
         index=True,
     )
+    installment_ids = fields.One2many(
+        "cvi.installment", "card_id", string="Cuotas", copy=False
+    )
 
     _sql_constraints = [
         (
@@ -302,3 +309,50 @@ class CviCard(models.Model):
             if vals.get("name", _("Nuevo")) == _("Nuevo"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("cvi.card") or _("Nuevo")
         return super().create(vals_list)
+
+    def _cvi_due_dates(self, count):
+        """Vencimientos de las `count` cuotas de cobranza (las que cobra el cobrador).
+
+        La cuota 1 no entra acá: vence el día de la venta porque la cobra el vendedor.
+        Mensual: la primera cae el día de cobro del mes SIGUIENTE al de la venta,
+        recortada al último día si el mes no llega (31 en febrero -> 28).
+        Semanal: la primera cae en la próxima ocurrencia estricta del día elegido.
+        """
+        self.ensure_one()
+        dates = []
+        if self.frequency == "weekly":
+            target = int(self.charge_day_week)
+            delta = (target - self.date_sale.weekday()) % 7 or 7
+            current = self.date_sale + relativedelta(days=delta)
+            for _index in range(count):
+                dates.append(current)
+                current = current + relativedelta(days=7)
+        else:
+            cursor = self.date_sale + relativedelta(months=1)
+            for _index in range(count):
+                last_day = calendar.monthrange(cursor.year, cursor.month)[1]
+                dates.append(
+                    date(cursor.year, cursor.month, min(self.charge_day_month, last_day))
+                )
+                cursor = cursor + relativedelta(months=1)
+        return dates
+
+    def _cvi_generate_installments(self):
+        """Genera el calendario completo de cuotas, reemplazando el anterior si existe.
+
+        La cuota 1 es la comisión del vendedor y vence el día de la venta (RN-01).
+        Todas las cuotas valen lo mismo: el importe que fija el plan. No hay resto que
+        repartir, porque el precio total de la tarjeta es cuotas por importe.
+        """
+        self.ensure_one()
+        self.installment_ids.unlink()
+        due_dates = [self.date_sale] + self._cvi_due_dates(self.installment_count - 1)
+        vals_list = [{
+            "card_id": self.id,
+            "sequence": index,
+            "date_due": due,
+            "amount": self.installment_amount,
+            "is_commission": index == 1,
+        } for index, due in enumerate(due_dates, start=1)]
+        self.env["cvi.installment"].create(vals_list)
+        return True

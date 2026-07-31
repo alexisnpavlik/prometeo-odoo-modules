@@ -2,3 +2,4 @@
 from . import test_config
 from . import test_product_plan
 from . import test_card
+from . import test_installment_schedule
