@@ -61,6 +61,21 @@ class TestCviVendorStock(CviCommon):
         second = self.vendor_user._cvi_get_location()
         self.assertEqual(first, second)
 
+    def test_vendor_location_creation_is_idempotent(self):
+        """Llamar dos veces seguidas no deja ubicaciones huérfanas marcadas.
+
+        No es un test de concurrencia real (no se pueden lanzar threads en
+        TransactionCase): cubre que el path sea idempotente. La protección
+        contra la carrera concurrente es el FOR UPDATE en _cvi_get_location.
+        """
+        self.vendor_user._cvi_get_location()
+        self.vendor_user._cvi_get_location()
+        vendor_locations = self.env["stock.location"].search([
+            ("cvi_is_vendor_location", "=", True),
+            ("name", "=", self.vendor_user.name),
+        ])
+        self.assertEqual(len(vendor_locations), 1)
+
     def test_vendor_location_hangs_from_vendors_parent(self):
         """La ubicación del vendedor cuelga de la ubicación vista Vendedores."""
         parent = self.env.ref("collections_from_vendors_installments.stock_location_vendors")

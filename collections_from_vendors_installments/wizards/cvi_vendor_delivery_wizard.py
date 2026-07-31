@@ -72,6 +72,11 @@ class CviVendorDeliveryWizard(models.TransientModel):
                 "Estas líneas tienen cantidad cero o negativa: %s",
                 ", ".join(invalid.mapped("product_id.display_name")),
             ))
+        # _cvi_locations() necesita resolver la ubicación del vendedor (via
+        # _cvi_get_location()) para saber origen/destino antes de poder chequear
+        # disponibilidad, así que una entrega rechazada por falta de stock igual
+        # puede provisionar la ubicación del vendedor como efecto colateral. Es
+        # inofensivo e idempotente: no crea una ubicación nueva si ya existe.
         source, destination = self._cvi_locations()
         self._cvi_check_availability(source)
         picking = self.env["stock.picking"].create({

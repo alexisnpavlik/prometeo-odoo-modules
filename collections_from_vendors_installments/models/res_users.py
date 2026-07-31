@@ -21,6 +21,14 @@ class ResUsers(models.Model):
         de empezar a operar.
         """
         self.ensure_one()
+        # Bloqueo de la fila del usuario: sin esto, dos entregas simultáneas al mismo
+        # vendedor crean dos ubicaciones y una queda huérfana pero marcada, ensuciando
+        # el reporte de mercadería en la calle.
+        self.env.cr.execute(
+            "SELECT cvi_stock_location_id FROM res_users WHERE id = %s FOR UPDATE",
+            (self.id,),
+        )
+        self.invalidate_recordset(["cvi_stock_location_id"])
         if self.cvi_stock_location_id:
             return self.cvi_stock_location_id
         parent = self.env.ref("collections_from_vendors_installments.stock_location_vendors")
