@@ -30,7 +30,8 @@ class TestCviFullFlow(CviCommon):
             "direction": "out",
             "line_ids": [(0, 0, {"product_id": self.product.id, "quantity": 3})],
         })
-        picking = delivery.action_confirm_delivery()
+        action = delivery.action_confirm_delivery()
+        picking = self.env["stock.picking"].browse(action["res_id"])
         self.assertEqual(picking.state, "done")
         vendor_location = self.vendor_user.cvi_stock_location_id
 

@@ -29,13 +29,15 @@ class TestCviVendorStock(CviCommon):
         return self.env["stock.quant"]._get_available_quantity(product, location)
 
     def _deliver(self, quantity, direction="out", vendor=None):
-        """Corre el wizard de entrega/devolución de mercadería."""
+        """Corre el wizard de entrega/devolución y devuelve el albarán generado."""
         wizard = self.env["cvi.vendor.delivery.wizard"].create({
             "vendor_id": (vendor or self.vendor_user).id,
             "direction": direction,
             "line_ids": [(0, 0, {"product_id": self.product.id, "quantity": quantity})],
         })
-        return wizard.action_confirm_delivery()
+        action = wizard.action_confirm_delivery()
+        self.assertEqual(action["res_model"], "stock.picking")
+        return self.env["stock.picking"].browse(action["res_id"])
 
     def test_production_intake_increases_factory_stock(self):
         """Ingresar producción actualiza el stock disponible de fábrica (HU-01)."""

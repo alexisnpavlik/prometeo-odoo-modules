@@ -114,7 +114,14 @@ class CviVendorDeliveryWizard(models.TransientModel):
             "Mercadería %s: albarán %s de %s a %s",
             self.direction, picking.name, source.complete_name, destination.complete_name,
         )
-        return picking
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Albarán generado"),
+            "res_model": "stock.picking",
+            "res_id": picking.id,
+            "view_mode": "form",
+            "target": "current",
+        }
 
 
 class CviVendorDeliveryLine(models.TransientModel):
