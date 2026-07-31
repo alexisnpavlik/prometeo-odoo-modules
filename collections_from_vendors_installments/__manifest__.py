@@ -1,0 +1,30 @@
+# -*- coding: utf-8 -*-
+{
+    "name": "Cobranza a vendedores y cuotas",
+    "version": "18.0.1.0.0",
+    "category": "Sales/Sales",
+    "summary": "Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza",
+    "description": """
+        Soporta el circuito de venta domiciliaria financiada de una fábrica de muebles.
+
+        El vendedor retira mercadería de fábrica, la vende en cuotas en el domicilio del
+        cliente y cobra la primera cuota como comisión. Luego enruta la tarjeta a un
+        cobrador, que la acepta y gestiona la cobranza de las cuotas restantes.
+
+        No genera asientos contables ni comprobantes fiscales: usa modelos propios
+        (prefijo cvi.). El stock en poder de cada vendedor se lleva con ubicaciones
+        internas nativas de Odoo, una por vendedor.
+    """,
+    "author": "Alexis Medina",
+    "website": "alexis.medn@gmail.com",
+    "license": "LGPL-3",
+    "depends": ["base", "mail", "stock", "product", "web"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "views/res_config_settings_views.xml",
+    ],
+    "installable": True,
+    "auto_install": False,
+    "application": True,
+}
