@@ -25,6 +25,7 @@
         "data/ir_sequence.xml",
         "data/stock_location.xml",
         "data/ir_cron.xml",
+        "views/dashboard_views.xml",
         "views/cvi_card_views.xml",
         "views/cvi_installment_views.xml",
         "views/cvi_payment_views.xml",
@@ -40,6 +41,7 @@
     ],
     "assets": {
         "web.assets_backend": [
+            "collections_from_vendors_installments/static/src/css/*.css",
             "collections_from_vendors_installments/static/src/scss/*.scss",
             "collections_from_vendors_installments/static/src/js/*.js",
             "collections_from_vendors_installments/static/src/xml/*.xml",

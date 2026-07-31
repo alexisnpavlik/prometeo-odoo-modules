@@ -3,6 +3,10 @@
     <menuitem id="menu_cvi_root" name="Venta en cuotas" sequence="45"
               web_icon="collections_from_vendors_installments,static/description/icon.png"/>
 
+    <menuitem id="menu_cvi_dashboard" name="Tablero" parent="menu_cvi_root" sequence="5"
+              action="action_cvi_dashboard"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
+
     <menuitem id="menu_cvi_vendor" name="Vendedor" parent="menu_cvi_root" sequence="10"
               groups="collections_from_vendors_installments.group_cvi_vendor"/>
     <menuitem id="menu_cvi_my_stock" name="Mi mercadería" parent="menu_cvi_vendor"

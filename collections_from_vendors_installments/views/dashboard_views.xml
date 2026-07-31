@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_cvi_dashboard" model="ir.actions.client">
+        <field name="name">Tablero de Venta en Cuotas</field>
+        <field name="tag">collections_from_vendors_installments.dashboard</field>
+    </record>
+</odoo>
