@@ -964,6 +964,15 @@ y frecuencia; el precio total es el producto de los dos primeros. Esos tres camp
 editables **solo por el administrador**: si un vendedor los cambia respecto del plan, la
 validación lo rechaza.
 
+> **Un compute por campo, y no se fusionan.** `installment_count`, `installment_amount` y
+> `frequency` se copian del plan con tres métodos `@api.depends("plan_id")` separados, uno
+> por campo. Es obligatorio: la protección de Odoo para campos `compute + store +
+> readonly=False` pasados explícitos en `create()` se aplica **al método compute entero**,
+> no al campo. Con un solo método que calcule los tres, pasar `installment_amount` explícito
+> (el override del administrador) saltea el método completo y deja `installment_count` en 0
+> y `frequency` en False — `amount_total` termina en 0. Verificado contra la base real.
+> No los unifiques ni metas un helper compartido.
+
 - [ ] **Step 1: Escribir el test que falla**
 
 `collections_from_vendors_installments/tests/test_card.py`:
@@ -1249,14 +1258,14 @@ class CviCard(models.Model):
     )
     installment_count = fields.Integer(
         string="Cantidad de cuotas",
-        compute="_compute_from_plan",
+        compute="_compute_installment_count",
         store=True,
         readonly=False,
         tracking=True,
     )
     installment_amount = fields.Monetary(
         string="Importe de cuota",
-        compute="_compute_from_plan",
+        compute="_compute_installment_amount",
         store=True,
         readonly=False,
         currency_field="currency_id",
@@ -1265,7 +1274,7 @@ class CviCard(models.Model):
     frequency = fields.Selection(
         selection=FREQUENCY_SELECTION,
         string="Frecuencia",
-        compute="_compute_from_plan",
+        compute="_compute_frequency",
         store=True,
         readonly=False,
         tracking=True,
@@ -1313,22 +1322,25 @@ class CviCard(models.Model):
     ]
 
     @api.depends("plan_id")
-    def _compute_from_plan(self):
-        """Elegir el plan fija cuotas, importe y frecuencia (HU-05, HU-06).
-
-        Es un compute editable (`readonly=False`): el administrador puede pisar los
-        valores, y `_check_plan_values` valida que nadie más lo haga.
-        """
+    def _compute_installment_count(self):
+        """Cantidad de cuotas del plan elegido (HU-05)."""
         for card in self:
-            plan = card.plan_id
-            if plan:
-                card.installment_count = plan.installment_count
-                card.installment_amount = plan.installment_amount
-                card.frequency = plan.frequency
+            if card.plan_id:
+                card.installment_count = card.plan_id.installment_count
             else:
                 card.installment_count = card.company_id.cvi_default_installments
-                card.installment_amount = 0.0
-                card.frequency = "monthly"
+
+    @api.depends("plan_id")
+    def _compute_installment_amount(self):
+        """Importe de cuota del plan elegido, con el interés ya incluido (HU-05)."""
+        for card in self:
+            card.installment_amount = card.plan_id.installment_amount if card.plan_id else 0.0
+
+    @api.depends("plan_id")
+    def _compute_frequency(self):
+        """Modalidad de cobro del plan elegido (HU-06)."""
+        for card in self:
+            card.frequency = card.plan_id.frequency if card.plan_id else "monthly"
 
     @api.depends("installment_count", "installment_amount")
     def _compute_amount_total(self):
