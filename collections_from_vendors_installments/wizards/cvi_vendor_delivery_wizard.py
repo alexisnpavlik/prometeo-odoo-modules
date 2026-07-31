@@ -129,12 +129,17 @@ class CviVendorDeliveryWizard(models.TransientModel):
                     vendor=self.vendor_id.name,
                     units=sum(self.line_ids.mapped("quantity")),
                 ),
+                # "views" va explícito: clean_action() solo lo genera para la acción de
+                # nivel superior, y acá la de arriba es ir.actions.client. Sin esto la
+                # act_window anidada llega al navegador sin views y el cliente web
+                # revienta en action.views.map().
                 "next": {
                     "type": "ir.actions.act_window",
                     "name": _("Albarán generado"),
                     "res_model": "stock.picking",
                     "res_id": picking.id,
                     "view_mode": "form",
+                    "views": [[False, "form"]],
                     "target": "current",
                 },
             },
