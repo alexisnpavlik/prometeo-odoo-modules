@@ -13,7 +13,7 @@
 - Módulo: `collections_from_vendors_installments`, en `/home/alexis/Documents/Github/prometeo-odoo-modules/`.
 - Prefijo de modelos: `cvi.` — todos los modelos nuevos lo usan.
 - Versión de manifest: `18.0.1.0.0`. Autor `Alexis Medina`, website `alexis.medn@gmail.com`, licencia `LGPL-3`.
-- `depends: ["base", "mail", "stock", "product", "web"]`.
+- `depends: ["base", "base_setup", "mail", "stock", "product", "web"]`. `base_setup` es necesario porque el menú de Ajustes referencia `base_setup.action_general_configuration`; sin declararlo, el xmlid no resuelve y el módulo no carga.
 - Alcance de este plan: **solo MVP** — HU-01 a HU-06, HU-09 a HU-17, HU-30, HU-31. Las etapas 2 (HU-18 a HU-29) y 3 (HU-07, HU-08, HU-32) se planifican por separado y **no** se implementan acá.
 - Decisión del punto abierto 8 del spec: el sistema **solo advierte, nunca bloquea** (aplica a GPS, fotos y clientes problemáticos, todos de etapas posteriores; se deja registrado acá para que los planes siguientes lo respeten).
 - Sin operación offline (RNF-02): el MVP requiere conectividad. Se asume backend web de Odoo sobre HTTPS.
@@ -187,7 +187,7 @@ from . import res_config_settings
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["base", "mail", "stock", "product", "web"],
+    "depends": ["base", "base_setup", "mail", "stock", "product", "web"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
