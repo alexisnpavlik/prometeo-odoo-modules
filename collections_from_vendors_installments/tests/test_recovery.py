@@ -14,7 +14,7 @@ class TestCviRecovery(CviCommon):
         # Venta vieja y sin tolerancia: las cuotas quedan vencidas de verdad.
         self.company.cvi_overdue_days = 0
         self.card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2020-01-15",
@@ -56,7 +56,7 @@ class TestCviRecovery(CviCommon):
 
     def test_a_card_up_to_date_has_no_overdue_days(self):
         current = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2099-01-15",
@@ -94,7 +94,7 @@ class TestCviRecovery(CviCommon):
 
     def test_cannot_mark_a_card_that_is_not_in_collection(self):
         draft = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

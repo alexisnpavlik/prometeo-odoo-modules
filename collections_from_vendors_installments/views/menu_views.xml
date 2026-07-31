@@ -9,6 +9,10 @@
 
     <menuitem id="menu_cvi_vendor" name="Vendedor" parent="menu_cvi_root" sequence="10"
               groups="collections_from_vendors_installments.group_cvi_vendor"/>
+    <menuitem id="menu_cvi_sale_start" name="Nueva venta" parent="menu_cvi_vendor"
+              action="action_cvi_sale_start" sequence="1"/>
+    <menuitem id="menu_cvi_customers" name="Clientes" parent="menu_cvi_vendor"
+              action="action_cvi_customers" sequence="2"/>
     <menuitem id="menu_cvi_my_stock" name="Mi mercadería" parent="menu_cvi_vendor"
               action="action_cvi_my_stock" sequence="5"/>
     <menuitem id="menu_cvi_my_sales" name="Mis ventas" parent="menu_cvi_vendor"
@@ -60,7 +64,7 @@
     <menuitem id="menu_cvi_overdue" name="Clientes en mora" parent="menu_cvi_admin"
               action="action_cvi_overdue_cards" sequence="60"/>
     <menuitem id="menu_cvi_problematic" name="Clientes problemáticos" parent="menu_cvi_admin"
-              action="action_cvi_problematic_partners" sequence="70"/>
+              action="action_cvi_problematic_customers" sequence="70"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>

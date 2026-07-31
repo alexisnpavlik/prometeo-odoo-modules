@@ -11,7 +11,7 @@ class TestCviCard(CviCommon):
     def _card(self, **kwargs):
         """Tarjeta en borrador con valores mínimos, sobreescribibles."""
         vals = {
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "plan_id": self.plan_12.id,
@@ -87,7 +87,7 @@ class TestCviCard(CviCommon):
         """Un vendedor no puede cambiar el precio que fija el plan."""
         with self.assertRaises(ValidationError):
             self.env["cvi.card"].with_user(self.vendor_user).create({
-                "partner_id": self.partner.id,
+                "customer_id": self.customer.id,
                 "vendor_id": self.vendor_user.id,
                 "product_id": self.product.id,
                 "plan_id": self.plan_12.id,
@@ -100,7 +100,7 @@ class TestCviCard(CviCommon):
         """Un vendedor tampoco puede cambiar en cuántas cuotas vende."""
         with self.assertRaises(ValidationError):
             self.env["cvi.card"].with_user(self.vendor_user).create({
-                "partner_id": self.partner.id,
+                "customer_id": self.customer.id,
                 "vendor_id": self.vendor_user.id,
                 "product_id": self.product.id,
                 "plan_id": self.plan_12.id,
@@ -112,7 +112,7 @@ class TestCviCard(CviCommon):
     def test_vendor_selling_at_the_plan_price_is_accepted(self):
         """Vendiendo al precio del plan, el vendedor carga la venta sin problemas."""
         card = self.env["cvi.card"].with_user(self.vendor_user).create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "plan_id": self.plan_12.id,

@@ -273,5 +273,18 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('group_cvi_manager'))]"/>
         </record>
+
+        <!--
+            El cliente es del negocio, no del vendedor: cualquiera de ellos tiene que
+            poder encontrarlo por DNI, porque el punto de HU-28 es justamente detectar
+            que otro vendedor ya tuvo problemas con esa persona. Se limita por empresa
+            y nada más.
+        -->
+        <record id="rule_cvi_customer_company" model="ir.rule">
+            <field name="name">Cliente: multi-empresa</field>
+            <field name="model_id" ref="model_cvi_customer"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
     </data>
 </odoo>

@@ -18,10 +18,10 @@ class CviCommon(TransactionCase):
         cls.env.user.groups_id = [
             (4, cls.env.ref("collections_from_vendors_installments.group_cvi_manager").id)
         ]
-        cls.partner = cls.env["res.partner"].create({
+        cls.customer = cls.env["cvi.customer"].create({
             "name": "Cliente CVI Test",
-            "vat": "20111111112",
-            "company_id": False,
+            "dni": "20111111",
+            "company_id": cls.company.id,
         })
         cls.product = cls.env["product.product"].create({
             "name": "Ropero 3 puertas",

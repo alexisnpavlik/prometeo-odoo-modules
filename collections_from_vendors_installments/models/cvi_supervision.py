@@ -207,8 +207,8 @@ class CviSupervisionLine(models.Model):
     card_id = fields.Many2one(
         "cvi.card", string="Tarjeta", required=True, ondelete="cascade", index=True,
     )
-    partner_id = fields.Many2one(
-        related="card_id.partner_id", store=True, string="Cliente",
+    customer_id = fields.Many2one(
+        related="card_id.customer_id", store=True, string="Cliente",
     )
     amount_residual = fields.Monetary(
         related="card_id.amount_residual", string="Saldo",

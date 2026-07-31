@@ -23,8 +23,8 @@ class CviPayment(models.Model):
     card_id = fields.Many2one(
         "cvi.card", string="Tarjeta", required=True, ondelete="restrict", index=True
     )
-    partner_id = fields.Many2one(
-        related="card_id.partner_id", store=True, index=True, string="Cliente"
+    customer_id = fields.Many2one(
+        related="card_id.customer_id", store=True, index=True, string="Cliente"
     )
     company_id = fields.Many2one(related="card_id.company_id", store=True, index=True)
     currency_id = fields.Many2one(related="card_id.currency_id", readonly=True)

@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list string="Cuotas" create="false"
                   decoration-danger="state == 'overdue'" decoration-success="state == 'paid'">
-                <field name="partner_id"/>
+                <field name="customer_id"/>
                 <field name="street" optional="show"/>
                 <field name="phone" optional="show"/>
                 <field name="sequence" string="Cuota"/>
@@ -48,7 +48,7 @@
                     <t t-name="card">
                         <div class="row">
                             <div class="col-8">
-                                <strong><field name="partner_id"/></strong>
+                                <strong><field name="customer_id"/></strong>
                                 <div class="text-muted small">
                                     Cuota <field name="sequence"/> · vence
                                     <field name="date_due"/>
@@ -104,7 +104,7 @@
                 <sheet>
                     <group>
                         <group string="Cliente">
-                            <field name="partner_id" readonly="1"/>
+                            <field name="customer_id" readonly="1"/>
                             <field name="phone" widget="phone" readonly="1"/>
                             <field name="street" readonly="1"/>
                             <field name="city" readonly="1"/>
@@ -133,7 +133,7 @@
         <field name="model">cvi.installment</field>
         <field name="arch" type="xml">
             <search string="Cuotas">
-                <field name="partner_id"/>
+                <field name="customer_id"/>
                 <field name="card_id"/>
                 <field name="collector_id"/>
                 <filter name="filter_due_today" string="Vencen hoy o antes"
@@ -146,7 +146,7 @@
                         domain="[('is_commission', '=', False)]"/>
                 <group expand="0" string="Agrupar por">
                     <filter name="group_by_partner" string="Cliente"
-                            context="{'group_by': 'partner_id'}"/>
+                            context="{'group_by': 'customer_id'}"/>
                     <filter name="group_by_due" string="Vencimiento"
                             context="{'group_by': 'date_due'}"/>
                     <filter name="group_by_collector" string="Cobrador"

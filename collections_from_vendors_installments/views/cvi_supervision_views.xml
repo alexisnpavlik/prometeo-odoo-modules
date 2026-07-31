@@ -88,7 +88,7 @@
                             <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
                                     <field name="card_id" options="{'no_create': True}"/>
-                                    <field name="partner_id" readonly="1"/>
+                                    <field name="customer_id" readonly="1"/>
                                     <field name="amount_residual" readonly="1"/>
                                     <field name="verified"/>
                                     <field name="has_issue"/>

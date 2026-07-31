@@ -27,7 +27,7 @@ class TestCviRoles(CviCommon):
         ir.model.access.csv de `stock`, que solo da create a group_stock_user/manager.
         """
         card = self.env["cvi.card"].with_user(self.vendor_user).create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",
@@ -45,7 +45,7 @@ class TestCviRoles(CviCommon):
     def test_collector_can_post_payment_on_accepted_card(self):
         """Un cobrador real cobra una cuota de una tarjeta que aceptó (HU-16)."""
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",
@@ -87,7 +87,7 @@ class TestCviRoles(CviCommon):
             ])],
         })
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

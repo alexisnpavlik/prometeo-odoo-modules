@@ -303,14 +303,14 @@ class CviDashboardController(http.Controller):
         where, params = self._cvi_where(env, start_date, end_date, company)
         env.cr.execute(f"""
             SELECT c.id, c.name, c.cvi_latitude, c.cvi_longitude, c.state,
-                   c.amount_residual, c.partner_id, c.vendor_id
+                   c.amount_residual, c.customer_id, c.vendor_id
             FROM cvi_card c
             WHERE {where} AND c.has_geolocation
             LIMIT 1000
         """, params)
         rows = env.cr.dictfetchall()
-        partner_names = self._resolve_names(
-            env, "res.partner", [r["partner_id"] for r in rows]
+        customer_names = self._resolve_names(
+            env, "cvi.customer", [r["customer_id"] for r in rows]
         )
         vendor_names = self._resolve_names(
             env, "res.users", [r["vendor_id"] for r in rows]
@@ -322,7 +322,7 @@ class CviDashboardController(http.Controller):
             "lng": float(r["cvi_longitude"]),
             "state": CARD_STATES.get(r["state"], r["state"]),
             "residual": float(r["amount_residual"] or 0),
-            "partner": partner_names.get(r["partner_id"], "N/D"),
+            "partner": customer_names.get(r["customer_id"], "N/D"),
             "vendor": vendor_names.get(r["vendor_id"], "N/D"),
         } for r in rows]
 
@@ -370,7 +370,7 @@ class CviDashboardController(http.Controller):
         if end_date:
             domain.append((date_field, "<=", end_date))
         if search:
-            domain.append(("partner_id", "ilike", search))
+            domain.append(("customer_id", "ilike", search))
         return domain, record_model, date_field
 
     @http.route("/collections_from_vendors_installments/records", type="json", auth="user")
@@ -401,7 +401,7 @@ class CviDashboardController(http.Controller):
         if model == "installments":
             return {
                 "id": record.id,
-                "partner": record.partner_id.display_name,
+                "partner": record.customer_id.display_name,
                 "card": record.card_id.name,
                 "sequence": record.sequence,
                 "date_due": str(record.date_due or ""),
@@ -415,7 +415,7 @@ class CviDashboardController(http.Controller):
             "id": record.id,
             "name": record.name,
             "date": str(record.date_sale or ""),
-            "partner": record.partner_id.display_name,
+            "partner": record.customer_id.display_name,
             "vendor": record.vendor_id.display_name,
             "collector": record.collector_id.display_name or "",
             "amount_total": record.amount_total,

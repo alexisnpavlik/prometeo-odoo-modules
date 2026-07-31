@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_customer_form" model="ir.ui.view">
+        <field name="name">cvi.customer.form</field>
+        <field name="model">cvi.customer</field>
+        <field name="arch" type="xml">
+            <form string="Cliente">
+                <header>
+                    <button name="action_mark_problematic" type="object"
+                            string="Marcar problemático" class="btn-secondary"
+                            invisible="problematic"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                    <button name="action_unmark_problematic" type="object"
+                            string="Quitar marca" class="btn-secondary"
+                            invisible="not problematic"
+                            groups="collections_from_vendors_installments.group_cvi_manager"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert" invisible="not problematic">
+                        Cliente marcado como problemático:
+                        <field name="problematic_reason" readonly="1"/>
+                        (<field name="problematic_date" readonly="1"/>,
+                        <field name="problematic_user_id" readonly="1"/>)
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="problematic or not suggest_problematic">
+                        Este cliente tiene mora o muebles retirados. Revisá si corresponde
+                        marcarlo como problemático.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nombre y apellido"/></h1>
+                        <h3><field name="dni" placeholder="DNI"/></h3>
+                    </div>
+                    <group>
+                        <group string="Contacto">
+                            <field name="phone" widget="phone"/>
+                            <field name="mobile" widget="phone"/>
+                            <field name="street"/>
+                            <field name="city"/>
+                            <field name="zip"/>
+                        </group>
+                        <group string="Antecedentes">
+                            <field name="card_count"/>
+                            <field name="overdue_card_count"/>
+                            <field name="recovered_count"/>
+                            <field name="amount_residual"/>
+                            <field name="suggest_problematic" invisible="1"/>
+                            <field name="problematic" invisible="1"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Marca"
+                           groups="collections_from_vendors_installments.group_cvi_manager">
+                        <field name="problematic_reason" nolabel="1"
+                               placeholder="Por qué es mala paga"/>
+                    </group>
+                    <notebook>
+                        <page string="Compras" name="cards">
+                            <field name="card_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date_sale"/>
+                                    <field name="vendor_id"/>
+                                    <field name="collector_id"/>
+                                    <field name="amount_total"/>
+                                    <field name="amount_paid"/>
+                                    <field name="amount_residual"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Observaciones" name="note">
+                            <field name="note" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cvi_customer_list" model="ir.ui.view">
+        <field name="name">cvi.customer.list</field>
+        <field name="model">cvi.customer</field>
+        <field name="arch" type="xml">
+            <list string="Clientes" decoration-danger="problematic">
+                <field name="dni"/>
+                <field name="name"/>
+                <field name="phone" optional="show"/>
+                <field name="street" optional="show"/>
+                <field name="city" optional="show"/>
+                <field name="card_count"/>
+                <field name="amount_residual" sum="Saldo"/>
+                <field name="problematic"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_customer_kanban" model="ir.ui.view">
+        <field name="name">cvi.customer.kanban</field>
+        <field name="model">cvi.customer</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="problematic"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="row">
+                            <div class="col-8">
+                                <strong><field name="name"/></strong>
+                                <div class="text-muted small">
+                                    DNI <field name="dni"/>
+                                </div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <field name="phone" widget="phone"/>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-8 text-truncate text-muted small">
+                                <field name="street"/>
+                            </div>
+                            <div class="col-4 text-end">
+                                <span t-if="record.problematic.raw_value"
+                                      class="badge text-bg-danger">Problemático</span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_cvi_customer_search" model="ir.ui.view">
+        <field name="name">cvi.customer.search</field>
+        <field name="model">cvi.customer</field>
+        <field name="arch" type="xml">
+            <search string="Clientes">
+                <field name="dni"/>
+                <field name="name"/>
+                <field name="phone"/>
+                <filter name="filter_problematic" string="Problemáticos"
+                        domain="[('problematic', '=', True)]"/>
+                <filter name="filter_with_overdue" string="Con mora"
+                        domain="[('card_ids.overdue_installment_count', '&gt;', 0)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_customers" model="ir.actions.act_window">
+        <field name="name">Clientes</field>
+        <field name="res_model">cvi.customer</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_customer_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no hay clientes cargados</p>
+            <p>Los clientes se dan de alta al empezar una venta, identificados por DNI.</p>
+        </field>
+    </record>
+
+    <record id="action_cvi_problematic_customers" model="ir.actions.act_window">
+        <field name="name">Clientes problemáticos</field>
+        <field name="res_model">cvi.customer</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('problematic', '=', True)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ningún cliente está marcado</p>
+        </field>
+    </record>
+
+    <!-- Inicio de venta por DNI (HU-28). -->
+    <record id="view_cvi_sale_start_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.sale.start.wizard.form</field>
+        <field name="model">cvi.sale.start.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Nueva venta">
+                <group>
+                    <field name="dni" placeholder="Documento del cliente"
+                           readonly="searched"/>
+                    <field name="searched" invisible="1"/>
+                    <field name="found" invisible="1"/>
+                    <field name="has_alert" invisible="1"/>
+                    <field name="customer_id" invisible="1"/>
+                </group>
+
+                <div class="alert alert-info" role="alert"
+                     invisible="not searched or not found">
+                    Cliente encontrado: <field name="name" readonly="1" nolabel="1"/>
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not searched or not has_alert">
+                    <strong>Este cliente tiene antecedentes.</strong>
+                    <field name="alert" readonly="1" nolabel="1"/>
+                </div>
+                <div class="alert alert-secondary" role="alert"
+                     invisible="not searched or found">
+                    No hay ningún cliente con ese DNI. Cargá los datos para darlo de alta.
+                </div>
+
+                <group invisible="not searched or found" string="Cliente nuevo">
+                    <field name="name" placeholder="Nombre y apellido"/>
+                    <field name="phone"/>
+                    <field name="mobile"/>
+                    <field name="street"/>
+                    <field name="city"/>
+                </group>
+
+                <footer>
+                    <button name="action_search" type="object" string="Buscar"
+                            class="btn-primary" invisible="searched"/>
+                    <button name="action_start_sale" type="object"
+                            string="Continuar con la venta"
+                            class="btn-primary" invisible="not searched"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cvi_sale_start" model="ir.actions.act_window">
+        <field name="name">Nueva venta</field>
+        <field name="res_model">cvi.sale.start.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

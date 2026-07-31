@@ -14,9 +14,9 @@ class TestCviGeolocation(CviCommon):
 
     def setUp(self):
         super().setUp()
-        self.partner.write({"street": "Av. Siempreviva 742", "city": "Resistencia"})
+        self.customer.write({"street": "Av. Siempreviva 742", "city": "Resistencia"})
         self.card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

@@ -77,7 +77,7 @@
                                 <list>
                                     <field name="name"/>
                                     <field name="date"/>
-                                    <field name="partner_id"/>
+                                    <field name="customer_id"/>
                                     <field name="card_id"/>
                                     <field name="amount" sum="Total"/>
                                     <field name="currency_id" column_invisible="True"/>

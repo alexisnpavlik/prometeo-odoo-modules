@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Cobranza a vendedores y cuotas",
-    "version": "18.0.2.0.0",
+    "version": "18.0.3.0.0",
     "category": "Sales/Sales",
     "summary": "Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza",
     "description": """
@@ -34,7 +34,7 @@
         "views/cvi_wizard_views.xml",
         "views/stock_quant_views.xml",
         "views/stock_picking_views.xml",
-        "views/res_partner_views.xml",
+        "views/cvi_customer_views.xml",
         "views/product_template_views.xml",
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",

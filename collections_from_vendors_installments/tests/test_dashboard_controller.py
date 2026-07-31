@@ -17,7 +17,7 @@ class TestCviDashboardController(CviCommon):
         self.controller = CviDashboardController()
         self.company.cvi_overdue_days = 0
         self.card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2020-01-15",
@@ -65,7 +65,7 @@ class TestCviDashboardController(CviCommon):
     def test_draft_cards_are_not_business(self):
         """Una venta sin confirmar no es negocio: no entra en los indicadores."""
         self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2020-01-15",

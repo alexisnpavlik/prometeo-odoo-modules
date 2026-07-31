@@ -37,7 +37,7 @@ class TestCviFullFlow(CviCommon):
 
         # 3. El vendedor carga la venta en el domicilio (HU-05, HU-06).
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "quantity": 1.0,

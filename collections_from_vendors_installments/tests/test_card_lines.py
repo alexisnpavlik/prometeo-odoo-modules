@@ -32,7 +32,7 @@ class TestCviCardLines(CviCommon):
 
     def _card(self, lines):
         return self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "date_sale": "2026-01-15",
             "charge_day_month": 10,
@@ -199,7 +199,7 @@ class TestCviCardLines(CviCommon):
         el caso más común en la calle.
         """
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "plan_id": self.plan_12.id,

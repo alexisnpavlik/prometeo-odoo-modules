@@ -12,7 +12,7 @@
                 <field name="card_ids" nolabel="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="plan_id"/>
                         <field name="installment_amount"/>
                         <field name="charge_day_display"/>
@@ -49,7 +49,7 @@
                 <field name="card_ids" nolabel="1" readonly="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="vendor_id"/>
                     </list>
                 </field>
@@ -75,7 +75,7 @@
                 <field name="card_ids" nolabel="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="collector_id" string="Cobrador actual"/>
                         <field name="amount_residual"/>
                         <field name="currency_id" column_invisible="True"/>

@@ -23,7 +23,7 @@ class TestCviSupervision(CviCommon):
             ])],
         })
         self.card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",
@@ -114,7 +114,7 @@ class TestCviSupervision(CviCommon):
             ])],
         })
         other_card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

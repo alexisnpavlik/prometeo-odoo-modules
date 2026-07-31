@@ -27,7 +27,7 @@ class TestCviSalePicking(CviCommon):
 
     def _card(self, **kwargs):
         vals = {
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "quantity": 1.0,

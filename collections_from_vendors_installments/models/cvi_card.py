@@ -75,12 +75,13 @@ class CviCard(models.Model):
         string="Moneda",
         readonly=True,
     )
-    partner_id = fields.Many2one(
-        "res.partner",
+    customer_id = fields.Many2one(
+        "cvi.customer",
         string="Cliente",
         required=True,
         tracking=True,
         index=True,
+        ondelete="restrict",
     )
     vendor_id = fields.Many2one(
         "res.users",
@@ -586,49 +587,26 @@ class CviCard(models.Model):
                 ))
         return super().write(vals)
 
-    @api.depends("partner_id")
+    @api.depends("customer_id")
     def _compute_partner_alert(self):
         """Antecedentes del cliente al que se le está por vender (HU-28, HU-29).
 
-        Mira también a los contactos que comparten DNI: cargar al mismo cliente dos
-        veces con el nombre escrito distinto es justamente lo que esta historia quiere
-        detectar. Advierte y no bloquea, por decisión del cliente.
+        Con el DNI como identidad no hay que cruzar homónimos: si es el mismo
+        documento es el mismo cliente, así que los antecedentes son los suyos.
+        Advierte y no bloquea, por decisión del cliente.
         """
         for card in self:
             card.partner_alert = False
             card.partner_history_ids = False
             card.has_partner_alert = False
-            if not card.partner_id:
+            if not card.customer_id:
                 continue
-            people = card.partner_id._cvi_same_person()
-            history = self.sudo().search([
-                ("partner_id", "in", people.ids),
+            card.partner_history_ids = self.sudo().search([
+                ("customer_id", "=", card.customer_id.id),
                 ("id", "!=", card.id or 0),
                 ("state", "not in", ("draft", "cancel")),
             ])
-            card.partner_history_ids = history
-            avisos = []
-            for person in people.filtered("cvi_problematic"):
-                avisos.append(_(
-                    "Marcado como problemático el %(date)s por %(user)s: %(reason)s",
-                    date=person.cvi_problematic_date or _("sin fecha"),
-                    user=person.cvi_problematic_user_id.name or _("sin usuario"),
-                    reason=person.cvi_problematic_reason or _("sin motivo"),
-                ))
-            for previous in history.filtered(lambda c: c.state == "recovered"):
-                avisos.append(_(
-                    "Se le retiró el mueble de %(card)s (vendedor %(vendor)s).",
-                    card=previous.name, vendor=previous.vendor_id.name,
-                ))
-            for previous in history.filtered(
-                lambda c: c.overdue_installment_count > 0 and c.state != "recovered"
-            ):
-                avisos.append(_(
-                    "Tiene %(count)s cuotas vencidas en %(card)s (vendedor %(vendor)s).",
-                    count=previous.overdue_installment_count,
-                    card=previous.name,
-                    vendor=previous.vendor_id.name,
-                ))
+            avisos = card.customer_id._cvi_alerts()
             if avisos:
                 card.partner_alert = "\n".join(avisos)
                 card.has_partner_alert = True
@@ -773,8 +751,10 @@ class CviCard(models.Model):
             "picking_type_id": warehouse.out_type_id.id,
             "location_id": source.id,
             "location_dest_id": destination.id,
-            "partner_id": self.partner_id.id,
-            "origin": self.name,
+            # Sin contacto: el cliente dejó de ser un res.partner. Va en el origen,
+            # que es lo que se lee en el albarán impreso.
+            "origin": _("%(card)s - %(customer)s", card=self.name,
+                        customer=self.customer_id.display_name),
             "move_ids": [(0, 0, {
                 "name": product.display_name,
                 "product_id": product.id,
@@ -943,8 +923,8 @@ class CviCard(models.Model):
             "picking_type_id": warehouse.in_type_id.id,
             "location_id": source.id,
             "location_dest_id": destination.id,
-            "partner_id": self.partner_id.id,
-            "origin": _("Retiro de %s", self.name),
+            "origin": _("Retiro de %(card)s - %(customer)s", card=self.name,
+                        customer=self.customer_id.display_name),
             "move_ids": [(0, 0, {
                 "name": line.product_id.display_name,
                 "product_id": line.product_id.id,
