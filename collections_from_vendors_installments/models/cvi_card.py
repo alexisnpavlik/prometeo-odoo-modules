@@ -6,7 +6,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 from .cvi_product_plan import FREQUENCY_SELECTION
 
@@ -40,6 +40,15 @@ WEEKDAY_PLURAL = {
     "5": "sábados",
     "6": "domingos",
 }
+
+CVI_FROZEN_FIELDS = (
+    "plan_id",
+    "installment_count",
+    "installment_amount",
+    "frequency",
+    "product_id",
+    "quantity",
+)
 
 
 class CviCard(models.Model):
@@ -172,6 +181,9 @@ class CviCard(models.Model):
     )
     installment_ids = fields.One2many(
         "cvi.installment", "card_id", string="Cuotas", copy=False
+    )
+    payment_ids = fields.One2many(
+        "cvi.payment", "card_id", string="Cobros", copy=False
     )
 
     _sql_constraints = [
@@ -355,4 +367,67 @@ class CviCard(models.Model):
             "is_commission": index == 1,
         } for index, due in enumerate(due_dates, start=1)]
         self.env["cvi.installment"].create(vals_list)
+        return True
+
+    def write(self, vals):
+        """Congela precio, cuotas y mercadería una vez confirmada la venta (RN-05)."""
+        frozen = [name for name in CVI_FROZEN_FIELDS if name in vals]
+        if frozen:
+            locked = self.filtered(lambda c: c.state not in ("draft", "cancel"))
+            if locked:
+                labels = ", ".join(self._fields[name].string for name in frozen)
+                raise UserError(_(
+                    "No se puede modificar %(fields)s en la tarjeta %(card)s: "
+                    "la venta ya está confirmada.",
+                    fields=labels,
+                    card=locked[0].name,
+                ))
+        return super().write(vals)
+
+    def _cvi_charge_commission(self):
+        """Registra el cobro de la primera cuota, que se lleva el vendedor (RN-01, HU-09)."""
+        self.ensure_one()
+        first = self.installment_ids.filtered(lambda i: i.is_commission)
+        payment = self.env["cvi.payment"].create({
+            "card_id": self.id,
+            "date": self.date_sale,
+            "amount": first.amount,
+            "user_id": self.vendor_id.id,
+            "is_commission": True,
+            "note": _("Primera cuota cobrada por el vendedor (comisión)."),
+        })
+        payment.action_post()
+        return payment
+
+    def action_confirm(self):
+        """Confirma la venta: genera las cuotas y cobra la primera como comisión."""
+        for card in self:
+            if card.state != "draft":
+                raise UserError(_(
+                    "La tarjeta %(card)s ya fue confirmada (estado: %(state)s).",
+                    card=card.name,
+                    state=dict(STATE_SELECTION)[card.state],
+                ))
+            card._cvi_generate_installments()
+            card._cvi_charge_commission()
+            card.state = "routed" if card.collector_id else "sold"
+            card.message_post(body=_(
+                "Venta confirmada por %(user)s: %(count)s cuotas de %(amount)s.",
+                user=card.vendor_id.name,
+                count=card.installment_count,
+                amount=card.installment_amount,
+            ))
+        return True
+
+    def action_cancel(self):
+        """Anula la tarjeta. Solo desde borrador o vendida, antes de entrar en cobranza."""
+        for card in self:
+            if card.state not in ("draft", "sold"):
+                raise UserError(_(
+                    "La tarjeta %(card)s no se puede anular en estado %(state)s.",
+                    card=card.name,
+                    state=dict(STATE_SELECTION)[card.state],
+                ))
+            card.state = "cancel"
+            card.message_post(body=_("Tarjeta anulada por %s.", self.env.user.name))
         return True
