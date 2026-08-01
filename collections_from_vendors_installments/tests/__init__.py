@@ -26,3 +26,4 @@ from . import test_security
 from . import test_agenda
 from . import test_full_flow
 from . import test_roles
+from . import test_menus

@@ -4,14 +4,16 @@
         Los grupos van fuera de noupdate para que un `-u` del módulo propague cambios
         de jerarquía a las instalaciones existentes.
 
-        La categoría se renderiza como lista desplegable en lugar de casillas porque los
-        tres grupos forman una cadena lineal de implicación: Cobrador ⊂ Vendedor ⊂
-        Administrador. Odoo exige ese orden total (res.users.get_groups_by_application);
-        si se rompe la cadena, la categoría vuelve a mostrarse como casillas.
+        Vendedor y Cobrador son independientes: hay quien solo vende, quien solo cobra y
+        quien hace las dos cosas. El perfil híbrido se arma tildando los dos.
 
-        La cadena refleja la operación real: el vendedor ya cobra la primera cuota, así
-        que todo vendedor es también un cobrador. La dirección inversa habilitaría a los
-        cobradores de calle a crear ventas.
+        Por eso la categoría se muestra con casillas y no con una lista desplegable. Odoo
+        solo dibuja el desplegable cuando los grupos forman una cadena de implicación
+        (res.users.get_groups_by_application exige un orden total), y dos roles
+        independientes no forman ninguna cadena: un desplegable obligaría a que el
+        vendedor incluya al cobrador, que es justo lo que hay que poder separar.
+
+        El Administrador sí implica a los dos: administra la operación completa.
     -->
     <data>
         <record id="module_category_cvi" model="ir.module.category">
@@ -23,21 +25,28 @@
         <record id="group_cvi_collector" model="res.groups">
             <field name="name">Cobrador</field>
             <field name="category_id" ref="module_category_cvi"/>
-            <field name="comment">Acepta tarjetas enrutadas y cobra las cuotas. Solo ve su propia cartera.</field>
+            <field name="comment">Acepta tarjetas enrutadas y cobra las cuotas. Solo ve su propia cartera. No puede cargar ventas. Para un perfil híbrido, tildar también Vendedor.</field>
         </record>
 
         <record id="group_cvi_vendor" model="res.groups">
             <field name="name">Vendedor</field>
             <field name="category_id" ref="module_category_cvi"/>
-            <field name="comment">Retira mercadería, vende en el domicilio, cobra la primera cuota y enruta la tarjeta. Ve sus propias ventas y, si además tiene cartera asignada, las tarjetas que cobra.</field>
-            <field name="implied_ids" eval="[(4, ref('group_cvi_collector'))]"/>
+            <field name="comment">Retira mercadería, vende en el domicilio, cobra la entrega y enruta la tarjeta al cobrador. Solo ve sus propias ventas. Para que además cobre cuotas, tildar también Cobrador.</field>
+            <!--
+                Hasta la 18.0.3.1.0 el vendedor implicaba al cobrador. Sacar el campo del
+                XML no alcanza para deshacerlo: un `-u` solo aplica lo que el registro
+                declara, así que la implicación vieja sobreviviría en las bases ya
+                instaladas. El (3, ...) la borra de forma explícita y es inocuo en una
+                instalación nueva.
+            -->
+            <field name="implied_ids" eval="[(3, ref('group_cvi_collector'))]"/>
         </record>
 
         <record id="group_cvi_manager" model="res.groups">
             <field name="name">Administrador de cobranzas</field>
             <field name="category_id" ref="module_category_cvi"/>
             <field name="comment">Configura el módulo, transfiere carteras y ve toda la operación.</field>
-            <field name="implied_ids" eval="[(4, ref('group_cvi_vendor')), (4, ref('stock.group_stock_user'))]"/>
+            <field name="implied_ids" eval="[(4, ref('group_cvi_vendor')), (4, ref('group_cvi_collector')), (4, ref('stock.group_stock_user'))]"/>
         </record>
         <!--
             Categoría aparte a propósito. Odoo solo renderiza una categoría como
