@@ -219,6 +219,8 @@ class PosControlMetricsController(http.Controller):
             kpis["n_refund"] = int(rf_row.get("n_refund") or 0)
             kpis["refund_amount"] = float(rf_row.get("refund_amount") or 0.0)
             kpis["refund_units"] = float(rf_row.get("refund_units") or 0.0)
+            # El total de operaciones auditadas incluye los reembolsos.
+            kpis["total"] += kpis["n_refund"]
 
         # --- Tasa de eliminación: órdenes eliminadas / órdenes del período ---
         allowed = tuple(request.env.companies.ids) or (0,)

@@ -10,9 +10,11 @@ patch(PosStore.prototype, {
     /**
      * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
      * unitario 0 (producto sin precio cargado) o negativo, cada uno con su
-     * propio toggle de configuración. Se excluyen los hijos de combo, que
-     * legítimamente van en 0 porque el precio lo lleva la línea padre, y las
-     * líneas de recompensa.
+     * propio toggle de configuración. Se excluyen las líneas que legítimamente
+     * van en 0 o negativo: hijos de combo (el precio lo lleva la línea padre),
+     * líneas de recompensa (loyalty) y la línea del producto de descuento global
+     * (pos_discount la agrega a precio negativo) — si no se excluyera, aplicar un
+     * descuento global dejaría la orden imposible de cobrar.
      */
     async pay() {
         // Resolver acá los cambios pendientes de la línea seleccionada (cantidad,
@@ -24,8 +26,12 @@ patch(PosStore.prototype, {
         await this._resolvePendingLineChanges(this.get_order());
 
         const order = this.get_order();
+        const discountProduct = this.config.discount_product_id;
         const lines = (order?.get_orderlines() || []).filter(
-            (line) => !line.combo_parent_id && !line.is_reward_line
+            (line) =>
+                !line.combo_parent_id &&
+                !line.is_reward_line &&
+                line.get_product() !== discountProduct
         );
         const blockZero = this.config.block_zero_price_payment;
         const blockNegative = this.config.block_negative_price_payment;

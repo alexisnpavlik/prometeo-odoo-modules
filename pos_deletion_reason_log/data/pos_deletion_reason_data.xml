@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- noupdate: se siembran una sola vez. Así el usuario puede editar/renombrar
+         o agregar motivos sin que un -u los pise, y el upgrade no reescribe estas
+         filas (evita conflictos de escritura concurrente con el POS en vivo). -->
+    <data noupdate="1">
     <record id="reason_error_carga" model="pos.deletion.reason">
         <field name="name">Error de carga</field>
         <field name="sequence">10</field>
@@ -20,4 +24,5 @@
         <field name="name">Autorización de gerencia</field>
         <field name="sequence">50</field>
     </record>
+    </data>
 </odoo>

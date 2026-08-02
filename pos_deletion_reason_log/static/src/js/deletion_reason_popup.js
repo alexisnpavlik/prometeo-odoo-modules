@@ -63,7 +63,11 @@ export class DeletionReasonPopup extends Component {
     }
 
     confirm() {
-        if (!this.state.reasonId) {
+        // Solo se exige elegir un motivo si hay motivos disponibles. Si no hay
+        // ninguno (todos borrados/desactivados) y no se permite cancelar, exigir
+        // un motivo inexistente dejaría al cajero atrapado; en ese caso se deja
+        // confirmar sin motivo.
+        if (this.reasons.length && !this.state.reasonId) {
             this.state.warning = _t("Seleccioná un motivo.");
             return;
         }
