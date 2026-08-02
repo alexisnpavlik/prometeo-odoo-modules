@@ -18,6 +18,7 @@ class PosControlLog(models.Model):
             ("high_discount", "Descuento alto"),
             ("price_reduction", "Reducción de precio"),
             ("price_increase", "Aumento de precio"),
+            ("refund", "Reembolso"),
         ],
         string="Tipo",
         required=True,
@@ -27,6 +28,11 @@ class PosControlLog(models.Model):
     session_id = fields.Many2one("pos.session", string="Sesión")
     order_ref = fields.Char(string="Referencia de orden")
     product_id = fields.Many2one("product.product", string="Producto")
+    products_summary = fields.Text(
+        string="Productos",
+        help="Lista de productos (cantidad × nombre) de la orden eliminada. "
+             "Se completa al eliminar una orden con varias líneas.",
+    )
     qty_removed = fields.Float(string="Cantidad quitada")
     amount_removed = fields.Float(string="Importe afectado")
     discount_percent = fields.Float(string="Descuento (%)")
@@ -54,6 +60,7 @@ class PosControlLog(models.Model):
             "session_id",
             "order_ref",
             "product_id",
+            "products_summary",
             "qty_removed",
             "amount_removed",
             "discount_percent",

@@ -55,6 +55,30 @@ patch(PosStore.prototype, {
             });
             return;
         }
+
+        // Motivo de reembolso (si está activo): una sola justificación por
+        // reembolso, pedida al cobrar. Se registra como evento 'refund' en el
+        // log; el conteo de reembolsos del dashboard sigue saliendo de la data
+        // nativa — este evento solo aporta el motivo. El flag evita re-preguntar
+        // si se vuelve a Cobrar sobre la misma orden.
+        if (
+            this.config.require_reason_refund &&
+            order?._isRefundOrder?.() &&
+            !order._refundReasonLogged
+        ) {
+            const reason = await askReason(this, _t("Motivo — Reembolso"));
+            if (!reason) {
+                return; // cancelado (si se permite cancelar): no se cobra
+            }
+            order._refundReasonLogged = true;
+            await logEvent(this, {
+                event_type: "refund",
+                order_ref: order.uuid || order.name || "",
+                amount_removed: order.get_total_with_tax ? order.get_total_with_tax() : 0,
+                reason_id: reason.reason_id,
+                reason_note: reason.reason_note,
+            });
+        }
         return super.pay(...arguments);
     },
 

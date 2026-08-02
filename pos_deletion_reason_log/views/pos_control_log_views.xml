@@ -11,6 +11,7 @@
                 <field name="pos_config_id"/>
                 <field name="order_ref"/>
                 <field name="product_id"/>
+                <field name="products_summary" optional="hide"/>
                 <field name="qty_removed"/>
                 <field name="discount_percent" optional="show"/>
                 <field name="old_price" optional="hide"/>
@@ -39,6 +40,7 @@
                         <group>
                             <field name="order_ref"/>
                             <field name="product_id"/>
+                            <field name="products_summary"/>
                             <field name="qty_removed"/>
                             <field name="discount_percent"/>
                             <field name="old_price"/>

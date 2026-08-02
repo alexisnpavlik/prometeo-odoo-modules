@@ -73,6 +73,14 @@ class PosConfig(models.Model):
         help="Exige que el cajero escriba una nota además de elegir el motivo "
              "de la lista. Si se desactiva, la nota queda opcional.",
     )
+    require_reason_refund = fields.Boolean(
+        string="Motivo al hacer un reembolso",
+        default=False,
+        help="Pide un motivo cuando el cajero cobra un reembolso (orden con "
+             "líneas devueltas). Desactivado por defecto: los reembolsos ya "
+             "quedan registrados de forma nativa; activalo para exigir además "
+             "una justificación.",
+    )
     block_reason_cancel = fields.Boolean(
         string="No permitir cancelar el aviso de motivo",
         default=True,

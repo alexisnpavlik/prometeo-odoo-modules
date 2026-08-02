@@ -23,13 +23,16 @@ class ReportSaleDetails(models.AbstractModel):
             **kwargs,
         )
 
+        # Se excluyen los eventos 'refund' del log: los reembolsos se listan
+        # aparte desde la data nativa; el evento 'refund' solo aporta el motivo.
         if session_ids:
-            domain = [("session_id", "in", session_ids)]
+            domain = [("session_id", "in", session_ids), ("event_type", "!=", "refund")]
         else:
             start, stop = self._get_date_start_and_date_stop(date_start, date_stop)
             domain = [
                 ("event_datetime", ">=", start),
                 ("event_datetime", "<=", stop),
+                ("event_type", "!=", "refund"),
             ]
             if config_ids:
                 domain += [("pos_config_id", "in", config_ids)]
@@ -53,7 +56,7 @@ class ReportSaleDetails(models.AbstractModel):
                     "datetime": log.event_datetime,
                     "user_name": log.user_id.name or "",
                     "type_label": type_labels.get(log.event_type, log.event_type),
-                    "product_name": log.product_id.display_name or "",
+                    "product_name": log.product_id.display_name or log.products_summary or "",
                     "qty": log.qty_removed,
                     "discount": log.discount_percent,
                     "old_price": log.old_price,
@@ -80,12 +83,29 @@ class ReportSaleDetails(models.AbstractModel):
                 refund_domain += [("order_id.config_id", "in", config_ids)]
 
         refund_lines = self.env["pos.order.line"].sudo().search(refund_domain)
+
+        # Motivo del reembolso (si se capturó): un evento 'refund' por orden en
+        # el log, referenciado por el uuid de la orden. Se mapea para enriquecer
+        # cada línea del reembolso con su motivo.
+        refund_uuids = [o.uuid for o in refund_lines.order_id if o.uuid]
+        reason_by_ref = {}
+        if refund_uuids:
+            for cl in self.env["pos.control.log"].sudo().search(
+                [("event_type", "=", "refund"), ("order_ref", "in", refund_uuids)]
+            ):
+                reason_by_ref[cl.order_ref] = (
+                    cl.reason_id.name or "", cl.reason_note or ""
+                )
+
         refund_amount = 0.0
         refund_order_ids = set()
         for line in refund_lines:
             refund_amount += line.price_subtotal_incl
             order = line.order_id
             refund_order_ids.add(order.id)
+            rname, rnote = reason_by_ref.get(order.uuid, ("", ""))
+            ref = order.pos_reference or order.name or ""
+            note = f"{ref} — {rnote}" if rnote else ref
             events.append(
                 {
                     "datetime": order.date_order,
@@ -96,8 +116,8 @@ class ReportSaleDetails(models.AbstractModel):
                     "discount": 0.0,
                     "old_price": 0.0,
                     "new_price": 0.0,
-                    "reason": "",
-                    "note": order.pos_reference or order.name or "",
+                    "reason": rname,
+                    "note": note,
                 }
             )
 

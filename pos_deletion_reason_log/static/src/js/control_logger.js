@@ -65,9 +65,23 @@ export function snapshotOrder(order) {
     } catch (e) {
         amount = 0;
     }
+    // Lista "cantidad× producto" de todas las líneas, para saber qué se eliminó
+    // en órdenes con varios productos (product_id solo alcanza para una línea).
+    const products_summary = lines
+        .map((l) => {
+            const name =
+                (l.get_full_product_name && l.get_full_product_name()) ||
+                (l.get_product && l.get_product() && l.get_product().display_name) ||
+                "";
+            const qty = l.get_quantity ? l.get_quantity() : 0;
+            return name ? `${qty}× ${name}` : "";
+        })
+        .filter(Boolean)
+        .join(", ");
     return {
         order_ref: order.uuid || order.name || "",
         product_id: lines.length === 1 && lines[0].get_product() ? lines[0].get_product().id : false,
+        products_summary: products_summary,
         qty_removed: lines.reduce((s, l) => s + (l.get_quantity ? l.get_quantity() : 0), 0),
         amount_removed: amount,
     };

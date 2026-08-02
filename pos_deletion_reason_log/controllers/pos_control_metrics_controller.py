@@ -26,9 +26,15 @@ class PosControlMetricsController(http.Controller):
         self, start_date=None, end_date=None, pos="all", cashier="all",
         company="all", dtype="all",
     ):
-        """WHERE compartido sobre pos_control_log (alias dl)."""
+        """WHERE compartido sobre pos_control_log (alias dl).
+
+        Excluye los eventos 'refund': los reembolsos se miden desde la data
+        nativa (pos_order_line), y el evento 'refund' del log solo guarda el
+        motivo. Contarlos acá los duplicaría en KPIs, ranking, tendencia y
+        detalle.
+        """
         allowed = tuple(request.env.companies.ids) or (0,)
-        where = "dl.company_id IN %s"
+        where = "dl.company_id IN %s AND dl.event_type != 'refund'"
         params = [allowed]
         tz = self._get_timezone()
 
@@ -373,6 +379,7 @@ class PosControlMetricsController(http.Controller):
                    rp.name AS cajero,
                    dl.event_type AS tipo,
                    COALESCE(pt.name->>%s, pt.name->>'en_US', '') AS producto,
+                   COALESCE(dl.products_summary, '') AS products_summary,
                    dl.qty_removed AS qty,
                    dl.discount_percent AS discount,
                    dl.old_price AS old_price,
@@ -393,7 +400,9 @@ class PosControlMetricsController(http.Controller):
                 "fecha": r["fecha"],
                 "cajero": r["cajero"] or "—",
                 "tipo": r["tipo"],
-                "producto": r["producto"] or "",
+                # En eliminación de orden con varias líneas no hay product_id;
+                # se muestra la lista de productos de la orden eliminada.
+                "producto": r["producto"] or r["products_summary"] or "",
                 "qty": float(r["qty"] or 0.0),
                 "discount": float(r["discount"] or 0.0),
                 "old_price": float(r["old_price"] or 0.0),
@@ -407,36 +416,55 @@ class PosControlMetricsController(http.Controller):
         ]
 
         # Filas de reembolso (fuente nativa) mezcladas en el mismo detalle.
+        # Una fila POR ORDEN de reembolso (no por línea): un reembolso de varios
+        # productos es una sola operación. Si se listara por línea, la misma orden
+        # aparecería repetida una vez por producto devuelto.
         if include_refunds:
             cr.execute(
                 f"""
                 SELECT to_char((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s), 'YYYY-MM-DD HH24:MI') AS fecha,
                        rp.name AS cajero,
-                       COALESCE(pt.name->>%s, pt.name->>'en_US', '') AS producto,
-                       pol.qty AS qty,
-                       pol.price_subtotal_incl AS amount,
+                       COUNT(*) AS n_lineas,
+                       COALESCE(SUM(pol.qty), 0) AS qty,
+                       COALESCE(SUM(pol.price_subtotal_incl), 0) AS amount,
                        COALESCE(po.pos_reference, po.name, '') AS nota,
-                       pc.name AS caja
-                {self._REFUND_JOINS}
+                       pc.name AS caja,
+                       MAX(COALESCE(rdr.name->>%s, rdr.name->>'en_US', '')) AS motivo,
+                       MAX(COALESCE(cl.reason_note, '')) AS reason_note
+                FROM pos_order_line pol
+                JOIN pos_order po ON po.id = pol.order_id
+                LEFT JOIN pos_config pc ON pc.id = po.config_id
+                LEFT JOIN res_users ru ON ru.id = po.user_id
+                LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+                LEFT JOIN res_company rc ON rc.id = po.company_id
+                LEFT JOIN pos_control_log cl ON cl.order_ref = po.uuid AND cl.event_type = 'refund'
+                LEFT JOIN pos_deletion_reason rdr ON rdr.id = cl.reason_id
                 WHERE {rf_where}
+                GROUP BY po.id, po.date_order, rp.name, po.pos_reference, po.name, pc.name
                 ORDER BY po.date_order DESC
                 LIMIT 500
                 """,
                 [tz, lang] + rf_params,
             )
             for r in cr.dictfetchall():
+                n = int(r["n_lineas"] or 0)
+                # La nota lleva la referencia de la orden y, si se capturó, la
+                # nota del motivo del reembolso.
+                nota = r["nota"] or ""
+                if r["reason_note"]:
+                    nota = f"{nota} — {r['reason_note']}" if nota else r["reason_note"]
                 detail.append({
                     "fecha": r["fecha"],
                     "cajero": r["cajero"] or "—",
                     "tipo": "refund",
-                    "producto": r["producto"] or "",
+                    "producto": f"{n} ítem(s)",
                     "qty": float(r["qty"] or 0.0),
                     "discount": 0.0,
                     "old_price": 0.0,
                     "new_price": 0.0,
                     "amount": float(r["amount"] or 0.0),
-                    "motivo": "",
-                    "nota": r["nota"] or "",
+                    "motivo": r["motivo"] or "",
+                    "nota": nota,
                     "caja": r["caja"] or "",
                 })
             # El formato 'YYYY-MM-DD HH24:MI' ordena cronológicamente como texto.
