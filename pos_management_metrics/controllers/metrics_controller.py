@@ -22,6 +22,19 @@ class PosMetricsController(http.Controller):
     def _get_lang(self):
         return request.env.context.get('lang') or 'es_AR'
 
+    def _normalize_multi(self, value):
+        """Normaliza un filtro que puede llegar como string simple o como lista (multi-selección).
+
+        Devuelve None cuando el filtro equivale a "todas/todos" (sin filtrar),
+        o una tupla de valores lista para usar con el operador SQL IN.
+        """
+        if not value or value == 'all':
+            return None
+        if isinstance(value, str):
+            value = [value]
+        values = [v for v in value if v and v != 'all']
+        return tuple(values) if values else None
+
     def _build_where_clause(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', search=None):
         # Filtro multi-compañía nativo de Odoo
         allowed_companies = tuple(request.env.companies.ids)
@@ -38,18 +51,22 @@ class PosMetricsController(http.Controller):
             where_clause += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             params.extend([f"{end_date} 23:59:59", tz])
 
-        if pos and pos != 'all':
-            where_clause += " AND pc.name = %s"
-            params.append(pos)
+        pos_configs = self._normalize_multi(pos)
+        if pos_configs:
+            where_clause += " AND pc.name IN %s"
+            params.append(pos_configs)
         if cashier and cashier != 'all':
             where_clause += " AND COALESCE(emp.name, ru.login) = %s"
             params.append(cashier)
-        if company and company != 'all':
-            where_clause += " AND rc.name = %s"
-            params.append(company)
+        companies = self._normalize_multi(company)
+        if companies:
+            where_clause += " AND rc.name IN %s"
+            params.append(companies)
 
         # Filtros de línea (Categoría o Producto) mediante EXISTS para optimizar y evitar duplicados a nivel orden
-        if (category and category != 'all') or (product and product != 'all'):
+        categories = self._normalize_multi(category)
+        products = self._normalize_multi(product)
+        if categories or products:
             where_clause += """ AND EXISTS (
                 SELECT 1 FROM pos_order_line pol2
                 JOIN product_product pp2 ON pp2.id = pol2.product_id
@@ -57,12 +74,12 @@ class PosMetricsController(http.Controller):
                 LEFT JOIN product_category ic2 ON ic2.id = pt2.categ_id
                 WHERE pol2.order_id = po.id AND pp2.active = TRUE AND pt2.active = TRUE
             """
-            if category and category != 'all':
-                where_clause += " AND ic2.name = %s"
-                params.append(category)
-            if product and product != 'all':
-                where_clause += " AND COALESCE(pt2.name->>%s, pt2.name->>'en_US') = %s"
-                params.extend([lang, product])
+            if categories:
+                where_clause += " AND ic2.name IN %s"
+                params.append(categories)
+            if products:
+                where_clause += " AND COALESCE(pt2.name->>%s, pt2.name->>'en_US') IN %s"
+                params.extend([lang, products])
             where_clause += ")"
 
         # Búsqueda difusa
@@ -90,12 +107,14 @@ class PosMetricsController(http.Controller):
     def _build_line_filters(self, category='all', product='all', lang='es_AR'):
         clauses = []
         params = []
-        if category and category != 'all':
-            clauses.append("ic.name = %s")
-            params.append(category)
-        if product and product != 'all':
-            clauses.append("COALESCE(pt.name->>%s, pt.name->>'en_US') = %s")
-            params.extend([lang, product])
+        categories = self._normalize_multi(category)
+        if categories:
+            clauses.append("ic.name IN %s")
+            params.append(categories)
+        products = self._normalize_multi(product)
+        if products:
+            clauses.append("COALESCE(pt.name->>%s, pt.name->>'en_US') IN %s")
+            params.extend([lang, products])
         return clauses, params
 
     @http.route('/pos_management_metrics/filters', type='json', auth='user')
@@ -227,9 +246,8 @@ class PosMetricsController(http.Controller):
         
         lang = self._get_lang()
         line_clauses, line_params = self._build_line_filters(category, product, lang)
-        for clause, val in zip(line_clauses, line_params):
-            query += f" AND {clause}"
-            params_list.append(val)
+        query += "".join(f" AND {c}" for c in line_clauses)
+        params_list.extend(line_params)
             
         cr.execute(query, params_list)
         res = cr.dictfetchone() or {}
@@ -319,9 +337,8 @@ class PosMetricsController(http.Controller):
             WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         kpi_params = [order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            kpi_query += f" AND {clause}"
-            kpi_params.append(val)
+        kpi_query += "".join(f" AND {c}" for c in line_clauses)
+        kpi_params.extend(line_params)
             
         cr.execute(kpi_query, kpi_params)
         kpi_row = cr.dictfetchone()
@@ -362,12 +379,14 @@ class PosMetricsController(http.Controller):
         if end_date:
             sessions_sql += " AND ps.stop_at <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             session_params.extend([f"{end_date} 23:59:59", tz])
-        if pos and pos != 'all':
-            sessions_sql += " AND pc.name = %s"
-            session_params.append(pos)
-        if company and company != 'all':
-            sessions_sql += " AND rc.name = %s"
-            session_params.append(company)
+        session_pos = self._normalize_multi(pos)
+        if session_pos:
+            sessions_sql += " AND pc.name IN %s"
+            session_params.append(session_pos)
+        session_companies = self._normalize_multi(company)
+        if session_companies:
+            sessions_sql += " AND rc.name IN %s"
+            session_params.append(session_companies)
         if cashier and cashier != 'all':
             sessions_sql += " AND COALESCE(emp.name, ru.login) = %s"
             session_params.append(cashier)
@@ -410,9 +429,8 @@ class PosMetricsController(http.Controller):
                 WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             trend_params = [tz, order_ids_tuple]
-            for clause, val in zip(line_clauses, line_params):
-                trend_query += f" AND {clause}"
-                trend_params.append(val)
+            trend_query += "".join(f" AND {c}" for c in line_clauses)
+            trend_params.extend(line_params)
                 
             trend_query += """
                 GROUP BY hora, rc.name
@@ -439,9 +457,8 @@ class PosMetricsController(http.Controller):
                 WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             trend_params = [tz, order_ids_tuple]
-            for clause, val in zip(line_clauses, line_params):
-                trend_query += f" AND {clause}"
-                trend_params.append(val)
+            trend_query += "".join(f" AND {c}" for c in line_clauses)
+            trend_params.extend(line_params)
                 
             trend_query += """
                 GROUP BY fecha, rc.name
@@ -487,9 +504,8 @@ class PosMetricsController(http.Controller):
             WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         pos_params = [order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            pos_query += f" AND {clause}"
-            pos_params.append(val)
+        pos_query += "".join(f" AND {c}" for c in line_clauses)
+        pos_params.extend(line_params)
             
         pos_query += """
             GROUP BY pc.name
@@ -532,9 +548,8 @@ class PosMetricsController(http.Controller):
             WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         prod_params = [lang, order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            prod_query += f" AND {clause}"
-            prod_params.append(val)
+        prod_query += "".join(f" AND {c}" for c in line_clauses)
+        prod_params.extend(line_params)
             
         prod_query += """
             GROUP BY producto
@@ -563,9 +578,8 @@ class PosMetricsController(http.Controller):
               AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         cat_params = [order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            cat_query += f" AND {clause}"
-            cat_params.append(val)
+        cat_query += "".join(f" AND {c}" for c in line_clauses)
+        cat_params.extend(line_params)
             
         cat_query += """
             GROUP BY ic.name
@@ -593,9 +607,8 @@ class PosMetricsController(http.Controller):
             WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         dow_params = [tz, order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            dow_query += f" AND {clause}"
-            dow_params.append(val)
+        dow_query += "".join(f" AND {c}" for c in line_clauses)
+        dow_params.extend(line_params)
             
         dow_query += " GROUP BY dow"
         cr.execute(dow_query, dow_params)
@@ -618,9 +631,8 @@ class PosMetricsController(http.Controller):
             WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         hour_params = [tz, order_ids_tuple]
-        for clause, val in zip(line_clauses, line_params):
-            hour_query += f" AND {clause}"
-            hour_params.append(val)
+        hour_query += "".join(f" AND {c}" for c in line_clauses)
+        hour_params.extend(line_params)
             
         hour_query += """
             GROUP BY hora
@@ -712,9 +724,8 @@ class PosMetricsController(http.Controller):
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         prod_margin_params = [lang] + list(params)
-        for clause, val in zip(line_clauses, line_params):
-            prod_margin_query += f" AND {clause}"
-            prod_margin_params.append(val)
+        prod_margin_query += "".join(f" AND {c}" for c in line_clauses)
+        prod_margin_params.extend(line_params)
             
         prod_margin_query += """
             GROUP BY producto
@@ -751,9 +762,8 @@ class PosMetricsController(http.Controller):
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
         """
         cat_margin_params = list(params)
-        for clause, val in zip(line_clauses, line_params):
-            cat_margin_query += f" AND {clause}"
-            cat_margin_params.append(val)
+        cat_margin_query += "".join(f" AND {c}" for c in line_clauses)
+        cat_margin_params.extend(line_params)
             
         cat_margin_query += """
             GROUP BY ic.name
@@ -815,12 +825,14 @@ class PosMetricsController(http.Controller):
         if end_date:
             session_filters += " AND ps.start_at <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             extra_params.extend([f"{end_date} 23:59:59", tz])
-        if pos and pos != 'all':
-            session_filters += " AND pc.name = %s"
-            extra_params.append(pos)
-        if company and company != 'all':
-            session_filters += " AND rc.name = %s"
-            extra_params.append(company)
+        pos_configs = self._normalize_multi(pos)
+        if pos_configs:
+            session_filters += " AND pc.name IN %s"
+            extra_params.append(pos_configs)
+        companies = self._normalize_multi(company)
+        if companies:
+            session_filters += " AND rc.name IN %s"
+            extra_params.append(companies)
         if cashier and cashier != 'all':
             session_filters += " AND COALESCE(emp_open.name, ru_o.login) = %s"
             extra_params.append(cashier)
@@ -928,9 +940,8 @@ class PosMetricsController(http.Controller):
         params_list = [lang] + list(params) + [lang, '%recargo%', lang, '%cancha%']
 
         line_clauses, line_params = self._build_line_filters(category, product, lang)
-        for clause, val in zip(line_clauses, line_params):
-            query += f" AND {clause}"
-            params_list.append(val)
+        query += "".join(f" AND {c}" for c in line_clauses)
+        params_list.extend(line_params)
 
         query += " GROUP BY 1, 2"
 
@@ -976,9 +987,8 @@ class PosMetricsController(http.Controller):
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         count_params = list(params)
-        for clause, val in zip(line_clauses, line_params):
-            count_query += f" AND {clause}"
-            count_params.append(val)
+        count_query += "".join(f" AND {c}" for c in line_clauses)
+        count_params.extend(line_params)
 
         cr.execute(count_query, count_params)
         total_rows = cr.fetchone()[0] or 0
@@ -1013,9 +1023,8 @@ class PosMetricsController(http.Controller):
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
         """
         sales_params = [tz, lang] + list(params)
-        for clause, val in zip(line_clauses, line_params):
-            sales_query += f" AND {clause}"
-            sales_params.append(val)
+        sales_query += "".join(f" AND {c}" for c in line_clauses)
+        sales_params.extend(line_params)
 
         sales_query += f"""
             ORDER BY po.date_order DESC, pol.id DESC
@@ -1165,9 +1174,8 @@ class PosMetricsController(http.Controller):
                 WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
             """
             sales_params = [tz, lang] + list(params)
-            for clause, val in zip(line_clauses, line_params):
-                sales_query += f" AND {clause}"
-                sales_params.append(val)
+            sales_query += "".join(f" AND {c}" for c in line_clauses)
+            sales_params.extend(line_params)
 
             sales_query += """
                 ORDER BY po.date_order DESC, pol.id DESC

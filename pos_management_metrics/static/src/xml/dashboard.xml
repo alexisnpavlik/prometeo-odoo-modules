@@ -54,50 +54,130 @@
                     
                     <div class="input-group">
                         <label>Punto de Venta (Caja)</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.pos">
-                                <option value="all">Todas las cajas</option>
-                                <t t-foreach="filtersData.pos_configs" t-as="pos" t-key="pos">
-                                    <option t-att-value="pos"><t t-esc="pos"/></option>
-                                </t>
-                            </select>
+                        <div class="multiselect" t-on-click.stop="() => {}">
+                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('pos')">
+                                <span class="multiselect-label" t-esc="posLabel"/>
+                                <span class="multiselect-caret">▾</span>
+                            </button>
+                            <div class="multiselect-panel" t-if="state.openFilter === 'pos'">
+                                <input type="text" class="multiselect-search" placeholder="Buscar..."
+                                       t-att-value="state.posSearch"
+                                       t-on-input="(ev) => this.onFilterSearchInput('posSearch', ev)"/>
+                                <label class="multiselect-option multiselect-all">
+                                    <input type="checkbox" t-if="state.pos.length === 0" checked="checked"
+                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
+                                    <input type="checkbox" t-else=""
+                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
+                                    <span>Todas las cajas</span>
+                                </label>
+                                <div class="multiselect-list">
+                                    <t t-foreach="visiblePosConfigs" t-as="posCfg" t-key="posCfg + '|' + isFilterSelected('pos', posCfg)">
+                                        <label class="multiselect-option">
+                                            <input type="checkbox" t-att-checked="isFilterSelected('pos', posCfg)"
+                                                   t-on-change="() => this.toggleFilterValue('pos', posCfg)"/>
+                                            <span t-esc="posCfg"/>
+                                        </label>
+                                    </t>
+                                    <div class="multiselect-empty" t-if="visiblePosConfigs.length === 0">Sin resultados</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     
                     <div class="input-group">
                         <label>Empresa</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.company">
-                                <option value="all">Todas las empresas</option>
-                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
-                                    <option t-att-value="company"><t t-esc="company"/></option>
-                                </t>
-                            </select>
+                        <div class="multiselect" t-on-click.stop="() => {}">
+                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('company')">
+                                <span class="multiselect-label" t-esc="companyLabel"/>
+                                <span class="multiselect-caret">▾</span>
+                            </button>
+                            <div class="multiselect-panel" t-if="state.openFilter === 'company'">
+                                <input type="text" class="multiselect-search" placeholder="Buscar empresa..."
+                                       t-att-value="state.companySearch"
+                                       t-on-input="(ev) => this.onFilterSearchInput('companySearch', ev)"/>
+                                <label class="multiselect-option multiselect-all">
+                                    <input type="checkbox" t-if="state.company.length === 0" checked="checked"
+                                           t-on-change="() => this.selectAllFilterValues('company')"/>
+                                    <input type="checkbox" t-else=""
+                                           t-on-change="() => this.selectAllFilterValues('company')"/>
+                                    <span>Todas las empresas</span>
+                                </label>
+                                <div class="multiselect-list">
+                                    <t t-foreach="visibleCompanies" t-as="company" t-key="company + '|' + isFilterSelected('company', company)">
+                                        <label class="multiselect-option">
+                                            <input type="checkbox" t-att-checked="isFilterSelected('company', company)"
+                                                   t-on-change="() => this.toggleFilterValue('company', company)"/>
+                                            <span t-esc="company"/>
+                                        </label>
+                                    </t>
+                                    <div class="multiselect-empty" t-if="visibleCompanies.length === 0">Sin resultados</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    
+
                     <div class="input-group">
                         <label>Categoría</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.category" t-on-change="onCategoryChange">
-                                <option value="all">Todas las categorías</option>
-                                <t t-foreach="filtersData.categories" t-as="cat" t-key="cat">
-                                    <option t-att-value="cat"><t t-esc="cat"/></option>
-                                </t>
-                            </select>
+                        <div class="multiselect" t-on-click.stop="() => {}">
+                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('category')">
+                                <span class="multiselect-label" t-esc="categoryLabel"/>
+                                <span class="multiselect-caret">▾</span>
+                            </button>
+                            <div class="multiselect-panel" t-if="state.openFilter === 'category'">
+                                <input type="text" class="multiselect-search" placeholder="Buscar categoría..."
+                                       t-att-value="state.categorySearch"
+                                       t-on-input="(ev) => this.onFilterSearchInput('categorySearch', ev)"/>
+                                <label class="multiselect-option multiselect-all">
+                                    <input type="checkbox" t-if="state.category.length === 0" checked="checked"
+                                           t-on-change="() => this.selectAllFilterValues('category')"/>
+                                    <input type="checkbox" t-else=""
+                                           t-on-change="() => this.selectAllFilterValues('category')"/>
+                                    <span>Todas las categorías</span>
+                                </label>
+                                <div class="multiselect-list">
+                                    <t t-foreach="visibleCategories" t-as="cat" t-key="cat + '|' + isFilterSelected('category', cat)">
+                                        <label class="multiselect-option">
+                                            <input type="checkbox" t-att-checked="isFilterSelected('category', cat)"
+                                                   t-on-change="() => this.toggleFilterValue('category', cat)"/>
+                                            <span t-esc="cat"/>
+                                        </label>
+                                    </t>
+                                    <div class="multiselect-empty" t-if="visibleCategories.length === 0">Sin resultados</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="input-group">
                         <label>Producto</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.product">
-                                <option value="all">Todos los productos</option>
-                                <t t-foreach="currentProductsList" t-as="prod" t-key="prod">
-                                    <option t-att-value="prod"><t t-esc="prod"/></option>
-                                </t>
-                            </select>
+                        <div class="multiselect" t-on-click.stop="() => {}">
+                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('product')">
+                                <span class="multiselect-label" t-esc="productLabel"/>
+                                <span class="multiselect-caret">▾</span>
+                            </button>
+                            <div class="multiselect-panel" t-if="state.openFilter === 'product'">
+                                <input type="text" class="multiselect-search" placeholder="Buscar..."
+                                       t-att-value="state.productSearch"
+                                       t-on-input="(ev) => this.onFilterSearchInput('productSearch', ev)"/>
+                                <label class="multiselect-option multiselect-all">
+                                    <input type="checkbox" t-if="state.product.length === 0" checked="checked"
+                                           t-on-change="() => this.selectAllFilterValues('product')"/>
+                                    <input type="checkbox" t-else=""
+                                           t-on-change="() => this.selectAllFilterValues('product')"/>
+                                    <span>Todos los productos</span>
+                                </label>
+                                <div class="multiselect-list">
+                                    <t t-foreach="visibleProducts" t-as="prod" t-key="prod + '|' + isFilterSelected('product', prod)">
+                                        <label class="multiselect-option">
+                                            <input type="checkbox" t-att-checked="isFilterSelected('product', prod)"
+                                                   t-on-change="() => this.toggleFilterValue('product', prod)"/>
+                                            <span t-esc="prod"/>
+                                        </label>
+                                    </t>
+                                    <div class="multiselect-empty" t-if="visibleProducts.length === 0">Sin resultados</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
