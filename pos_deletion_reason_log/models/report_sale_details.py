@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, models
+from odoo import api, fields, models
 
 
 class ReportSaleDetails(models.AbstractModel):
@@ -43,6 +43,7 @@ class ReportSaleDetails(models.AbstractModel):
         counts = {
             "order": 0, "line": 0, "qty_reduction": 0,
             "high_discount": 0, "price_reduction": 0, "price_increase": 0,
+            "refund": 0,
         }
         for log in logs:
             if log.event_type in counts:
@@ -62,6 +63,48 @@ class ReportSaleDetails(models.AbstractModel):
                 }
             )
 
+        # Reembolsos: fuente nativa (líneas con refunded_orderline_id). Mismo
+        # alcance (sesión o rango+config). Se suman al detalle y al resumen.
+        refund_domain = [
+            ("refunded_orderline_id", "!=", False),
+            ("order_id.state", "in", ("paid", "done", "invoiced")),
+        ]
+        if session_ids:
+            refund_domain += [("order_id.session_id", "in", session_ids)]
+        else:
+            refund_domain += [
+                ("order_id.date_order", ">=", start),
+                ("order_id.date_order", "<=", stop),
+            ]
+            if config_ids:
+                refund_domain += [("order_id.config_id", "in", config_ids)]
+
+        refund_lines = self.env["pos.order.line"].sudo().search(refund_domain)
+        refund_amount = 0.0
+        refund_order_ids = set()
+        for line in refund_lines:
+            refund_amount += line.price_subtotal_incl
+            order = line.order_id
+            refund_order_ids.add(order.id)
+            events.append(
+                {
+                    "datetime": order.date_order,
+                    "user_name": order.user_id.name or "",
+                    "type_label": "Reembolso",
+                    "product_name": line.product_id.display_name or "",
+                    "qty": line.qty,
+                    "discount": 0.0,
+                    "old_price": 0.0,
+                    "new_price": 0.0,
+                    "reason": "",
+                    "note": order.pos_reference or order.name or "",
+                }
+            )
+
+        counts["refund"] = len(refund_order_ids)
+        events.sort(key=lambda e: e["datetime"] or fields.Datetime.now())
+
         res["control_events"] = events
         res["control_counts"] = counts
+        res["refund_amount"] = refund_amount
         return res

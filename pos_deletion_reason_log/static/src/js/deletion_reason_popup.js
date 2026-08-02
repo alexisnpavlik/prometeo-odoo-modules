@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUnmount } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { _t } from "@web/core/l10n/translation";
@@ -23,6 +23,24 @@ export class DeletionReasonPopup extends Component {
                 this.state.reasonId = reasons[0].id;
             }
         });
+
+        // Cuando NO se permite cancelar, el popup solo se cierra confirmando un
+        // motivo: se ocultan Cancelar y la X, y además bloqueamos el Escape. El
+        // hotkey service escucha en window en fase bubble, así que un listener
+        // en fase capture lo intercepta antes y evita que cierre el diálogo
+        // (bypass del control). Si se permite cancelar, no tocamos nada.
+        this._blockEscape = (ev) => {
+            if (ev.key === "Escape") {
+                ev.stopPropagation();
+                ev.preventDefault();
+            }
+        };
+        onMounted(() => {
+            if (!this.allowCancel) {
+                window.addEventListener("keydown", this._blockEscape, true);
+            }
+        });
+        onWillUnmount(() => window.removeEventListener("keydown", this._blockEscape, true));
     }
 
     get reasons() {
@@ -31,6 +49,13 @@ export class DeletionReasonPopup extends Component {
 
     get noteRequired() {
         return Boolean(this.pos.config.require_reason_note);
+    }
+
+    get allowCancel() {
+        // Por defecto NO se permite cancelar (block=true): solo se habilita si el
+        // toggle está explícitamente en false. Si el campo no llegara, se asume
+        // bloqueado (comportamiento seguro).
+        return this.pos.config.block_reason_cancel === false;
     }
 
     onReasonChange(ev) {

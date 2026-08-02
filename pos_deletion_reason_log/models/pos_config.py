@@ -73,3 +73,11 @@ class PosConfig(models.Model):
         help="Exige que el cajero escriba una nota además de elegir el motivo "
              "de la lista. Si se desactiva, la nota queda opcional.",
     )
+    block_reason_cancel = fields.Boolean(
+        string="No permitir cancelar el aviso de motivo",
+        default=True,
+        help="Si está activo (por defecto), el cajero NO puede cancelar ni "
+             "cerrar el aviso de motivo: no hay botón Cancelar ni X y la tecla "
+             "Escape queda bloqueada; debe elegir un motivo y confirmar sí o sí. "
+             "Desactivalo para permitir cancelar (se revierte la operación).",
+    )

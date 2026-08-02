@@ -2,6 +2,13 @@
 <templates id="template" xml:space="preserve">
     <t t-name="pos_deletion_reason_log.DeletionReasonPopup" owl="1">
         <Dialog size="'md'" title="props.title || 'Motivo de eliminación'">
+            <t t-set-slot="header" t-slot-scope="scope">
+                <h4 class="modal-title text-break flex-grow-1">
+                    <t t-esc="props.title || 'Motivo de eliminación'"/>
+                </h4>
+                <button t-if="allowCancel" type="button" class="btn-close" aria-label="Close"
+                        tabindex="-1" t-on-click="() => scope.close()"/>
+            </t>
             <div class="deletion-reason-popup">
                 <div class="mb-3">
                     <label class="form-label">Motivo</label>
@@ -25,7 +32,7 @@
             </div>
             <t t-set-slot="footer">
                 <button class="btn btn-primary" t-on-click="confirm">Confirmar</button>
-                <button class="btn btn-secondary" t-on-click="cancel">Cancelar</button>
+                <button t-if="allowCancel" class="btn btn-secondary" t-on-click="cancel">Cancelar</button>
             </t>
         </Dialog>
     </t>

@@ -38,3 +38,6 @@ class ResConfigSettings(models.TransientModel):
     require_reason_note = fields.Boolean(
         related="pos_config_id.require_reason_note", readonly=False
     )
+    block_reason_cancel = fields.Boolean(
+        related="pos_config_id.block_reason_cancel", readonly=False
+    )

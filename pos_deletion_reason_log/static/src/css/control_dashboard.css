@@ -27,6 +27,8 @@
     --color-pink-glow: rgba(236, 72, 153, 0.2);
     --color-teal: #14b8a6;
     --color-teal-glow: rgba(20, 184, 166, 0.2);
+    --color-orange: #f97316;
+    --color-orange-glow: rgba(249, 115, 22, 0.2);
 
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -352,6 +354,7 @@
 .pos-dashboard-wrap .kpi-card.red:hover { box-shadow: 0 8px 24px -8px var(--color-red-glow); border-color: rgba(239, 68, 68, 0.4); }
 .pos-dashboard-wrap .kpi-card.pink:hover { box-shadow: 0 8px 24px -8px var(--color-pink-glow); border-color: rgba(236, 72, 153, 0.4); }
 .pos-dashboard-wrap .kpi-card.teal:hover { box-shadow: 0 8px 24px -8px var(--color-teal-glow); border-color: rgba(20, 184, 166, 0.4); }
+.pos-dashboard-wrap .kpi-card.orange:hover { box-shadow: 0 8px 24px -8px var(--color-orange-glow); border-color: rgba(249, 115, 22, 0.4); }
 
 .pos-dashboard-wrap .kpi-card-inner { display: flex; flex-direction: column; gap: 8px; }
 .pos-dashboard-wrap .kpi-meta { display: flex; justify-content: space-between; align-items: center; }
@@ -371,6 +374,7 @@
 .pos-dashboard-wrap .red .kpi-icon { color: var(--color-red); background: var(--color-red-glow); }
 .pos-dashboard-wrap .pink .kpi-icon { color: var(--color-pink); background: var(--color-pink-glow); }
 .pos-dashboard-wrap .teal .kpi-icon { color: var(--color-teal); background: var(--color-teal-glow); }
+.pos-dashboard-wrap .orange .kpi-icon { color: var(--color-orange); background: var(--color-orange-glow); }
 .pos-dashboard-wrap .kpi-icon svg { width: 16px; height: 16px; }
 
 .pos-dashboard-wrap .kpi-value { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #fff; }
@@ -437,6 +441,7 @@
 .pos-dashboard-wrap .status-pill.t-high_discount { background: var(--color-purple-glow); color: var(--color-purple); border: 1px solid rgba(139, 92, 246, 0.3); }
 .pos-dashboard-wrap .status-pill.t-price_reduction { background: var(--color-pink-glow); color: var(--color-pink); border: 1px solid rgba(236, 72, 153, 0.3); }
 .pos-dashboard-wrap .status-pill.t-price_increase { background: var(--color-teal-glow); color: var(--color-teal); border: 1px solid rgba(20, 184, 166, 0.3); }
+.pos-dashboard-wrap .status-pill.t-refund { background: var(--color-orange-glow); color: var(--color-orange); border: 1px solid rgba(249, 115, 22, 0.3); }
 
 .pos-dashboard-wrap .text-muted { color: var(--text-muted) !important; }
 

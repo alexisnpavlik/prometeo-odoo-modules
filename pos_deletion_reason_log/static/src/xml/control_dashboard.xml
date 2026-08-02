@@ -80,6 +80,7 @@
                                 <option value="high_discount">Descuento alto</option>
                                 <option value="price_reduction">Reducción precio</option>
                                 <option value="price_increase">Aumento precio</option>
+                                <option value="refund">Reembolso</option>
                             </select>
                         </div>
                     </div>
@@ -255,6 +256,38 @@
                             </div>
                             <div class="kpi-value" t-esc="data.kpis.n_price_up"/>
                             <div class="kpi-footer"><span class="kpi-subtext">Precio subido en línea</span></div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card shadow-glow orange">
+                        <div class="kpi-card-inner">
+                            <div class="kpi-meta">
+                                <span class="kpi-title">Reembolsos</span>
+                                <div class="kpi-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="1 4 1 10 7 10"></polyline>
+                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value" t-esc="data.kpis.n_refund"/>
+                            <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="data.kpis.refund_units"/> unidades devueltas</span></div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card shadow-glow orange">
+                        <div class="kpi-card-inner">
+                            <div class="kpi-meta">
+                                <span class="kpi-title">Importe reembolsado</span>
+                                <div class="kpi-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value">$ <t t-esc="money(data.kpis.refund_amount)"/></div>
+                            <div class="kpi-footer"><span class="kpi-subtext">Dinero devuelto a clientes</span></div>
                         </div>
                     </div>
 

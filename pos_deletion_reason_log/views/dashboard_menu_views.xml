@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_pos_deletion_dashboard" model="ir.actions.client">
-        <field name="name">Métricas de Cajeros</field>
+        <field name="name">Métricas de Auditoría Cajeros</field>
         <field name="tag">pos_deletion_reason_log.dashboard</field>
     </record>
 
     <menuitem id="menu_pos_deletion_dashboard"
-              name="Métricas de Cajeros"
+              name="Métricas de Auditoría Cajeros"
               action="action_pos_deletion_dashboard"
               groups="pos_deletion_reason_log.group_pos_deletion_audit"
               web_icon="pos_deletion_reason_log,static/description/icon.png"
