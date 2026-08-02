@@ -5,6 +5,7 @@ from odoo.exceptions import AccessError
 import datetime
 import csv
 import io
+import json
 import logging
 import xlsxwriter
 
@@ -23,14 +24,26 @@ class PosMetricsController(http.Controller):
         return request.env.context.get('lang') or 'es_AR'
 
     def _normalize_multi(self, value):
-        """Normaliza un filtro que puede llegar como string simple o como lista (multi-selección).
+        """Normaliza un filtro que puede llegar como string simple, como lista o como JSON.
 
-        Devuelve None cuando el filtro equivale a "todas/todos" (sin filtrar),
-        o una tupla de valores lista para usar con el operador SQL IN.
+        El dashboard envía las multi-selecciones serializadas en JSON (también en los
+        export por GET, donde una lista se aplanaría con comas y rompería los nombres
+        que ya contienen comas). Devuelve None cuando el filtro equivale a "todas/todos"
+        (sin filtrar), o una tupla de valores lista para usar con el operador SQL IN.
         """
         if not value or value == 'all':
             return None
         if isinstance(value, str):
+            value = value.strip()
+            if value.startswith('['):
+                try:
+                    value = json.loads(value)
+                except ValueError:
+                    _logger.warning("Filtro multi-selección con JSON inválido: %s", value)
+                    return None
+            else:
+                value = [value]
+        if not isinstance(value, (list, tuple)):
             value = [value]
         values = [v for v in value if v and v != 'all']
         return tuple(values) if values else None
