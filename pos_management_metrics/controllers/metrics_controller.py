@@ -510,7 +510,7 @@ class PosMetricsController(http.Controller):
             FROM pos_payment pay
             JOIN pos_payment_method pm ON pm.id = pay.payment_method_id
             WHERE pay.pos_order_id IN %s
-            GROUP BY pm.name, pm.id
+            GROUP BY 1
             ORDER BY subtotal DESC
         """, (lang, order_ids_tuple))
         pay_rows = cr.fetchall()
