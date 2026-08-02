@@ -1137,3 +1137,118 @@
     border: 1px solid rgba(15, 23, 42, 0.1);
     box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1);
 }
+
+/* ===== Filtros multi-selección (checkbox) ===== */
+.pos-dashboard-wrap .multiselect {
+    position: relative;
+    width: 100%;
+}
+
+.pos-dashboard-wrap .multiselect-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .multiselect-toggle:hover {
+    border-color: var(--color-blue);
+}
+
+.pos-dashboard-wrap .multiselect-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pos-dashboard-wrap .multiselect-caret {
+    color: var(--text-secondary);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.pos-dashboard-wrap .multiselect-panel {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-premium);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pos-dashboard-wrap .multiselect-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.pos-dashboard-wrap .input-group .multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+    color: var(--text-primary);
+}
+
+.pos-dashboard-wrap .input-group .multiselect-option:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.pos-dashboard-wrap .multiselect-option input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    accent-color: var(--color-blue);
+    cursor: pointer;
+}
+
+.pos-dashboard-wrap .input-group .multiselect-all {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.pos-dashboard-wrap .multiselect-empty {
+    padding: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.pos-dashboard-wrap.theme-light .multiselect-toggle {
+    background: rgba(255, 255, 255, 0.8);
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+.pos-dashboard-wrap.theme-light .multiselect-panel {
+    background: #ffffff;
+}
+
+.pos-dashboard-wrap.theme-light .input-group .multiselect-option:hover {
+    background: rgba(15, 23, 42, 0.05);
+}

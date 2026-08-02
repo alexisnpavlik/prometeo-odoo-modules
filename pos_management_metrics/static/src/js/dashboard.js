@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, useState, onWillUnmount } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useState, onWillUnmount, useExternalListener } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 import { loadJS } from "@web/core/assets";
 
@@ -14,11 +14,17 @@ class PosDashboardMetrics extends Component {
             preset: "30days",
             startDate: "",
             endDate: "",
-            pos: "all",
             cashier: "all",
-            company: "all",
-            category: "all",
-            product: "all",
+            // Multi-selección: lista vacía = "todas"
+            pos: [],
+            company: [],
+            category: [],
+            product: [],
+            openFilter: null,
+            posSearch: "",
+            companySearch: "",
+            categorySearch: "",
+            productSearch: "",
             search: "",
             profitabilitySearch: "",
             page: 1,
@@ -97,6 +103,11 @@ class PosDashboardMetrics extends Component {
             this.renderAllCharts();
         });
 
+        // Cierra el panel de checkboxes al hacer clic fuera del filtro
+        useExternalListener(window, "click", () => {
+            this.state.openFilter = null;
+        });
+
         onWillUnmount(() => {
             Object.values(this.charts).forEach(chart => {
                 if (chart) {
@@ -108,11 +119,110 @@ class PosDashboardMetrics extends Component {
 
     // --- Getters Reactivos ---
     get currentProductsList() {
-        const cat = this.state.category;
-        if (cat && cat !== "all" && this.filtersData.products_by_category[cat]) {
-            return this.filtersData.products_by_category[cat];
+        const cats = this.state.category;
+        if (!cats.length) {
+            return this.filtersData.products;
         }
-        return this.filtersData.products;
+        const productos = new Set();
+        for (const cat of cats) {
+            (this.filtersData.products_by_category[cat] || []).forEach(p => productos.add(p));
+        }
+        return [...productos].sort((a, b) => a.localeCompare(b));
+    }
+
+    // --- Filtros multi-selección (checkbox) ---
+    get posFilter() {
+        return [...this.state.pos];
+    }
+
+    get productFilter() {
+        return [...this.state.product];
+    }
+
+    get companyFilter() {
+        return [...this.state.company];
+    }
+
+    get categoryFilter() {
+        return [...this.state.category];
+    }
+
+    get visiblePosConfigs() {
+        const term = (this.state.posSearch || "").toLowerCase().trim();
+        const lista = this.filtersData.pos_configs || [];
+        return term ? lista.filter(c => c.toLowerCase().includes(term)) : lista;
+    }
+
+    get visibleProducts() {
+        const term = (this.state.productSearch || "").toLowerCase().trim();
+        const lista = this.currentProductsList;
+        return term ? lista.filter(p => p.toLowerCase().includes(term)) : lista;
+    }
+
+    get visibleCompanies() {
+        const term = (this.state.companySearch || "").toLowerCase().trim();
+        const lista = this.filtersData.companies || [];
+        return term ? lista.filter(c => c.toLowerCase().includes(term)) : lista;
+    }
+
+    get visibleCategories() {
+        const term = (this.state.categorySearch || "").toLowerCase().trim();
+        const lista = this.filtersData.categories || [];
+        return term ? lista.filter(c => c.toLowerCase().includes(term)) : lista;
+    }
+
+    get posLabel() {
+        return this._multiLabel(this.state.pos, "Todas las cajas", "cajas seleccionadas");
+    }
+
+    get productLabel() {
+        return this._multiLabel(this.state.product, "Todos los productos", "productos seleccionados");
+    }
+
+    get companyLabel() {
+        return this._multiLabel(this.state.company, "Todas las empresas", "empresas seleccionadas");
+    }
+
+    get categoryLabel() {
+        return this._multiLabel(this.state.category, "Todas las categorías", "categorías seleccionadas");
+    }
+
+    _multiLabel(selection, emptyLabel, pluralLabel) {
+        if (!selection.length) return emptyLabel;
+        if (selection.length === 1) return selection[0];
+        return `${selection.length} ${pluralLabel}`;
+    }
+
+    toggleFilterPanel(field) {
+        this.state.openFilter = this.state.openFilter === field ? null : field;
+    }
+
+    isFilterSelected(field, value) {
+        return this.state[field].includes(value);
+    }
+
+    toggleFilterValue(field, value) {
+        const selection = this.state[field];
+        const idx = selection.indexOf(value);
+        if (idx === -1) {
+            selection.push(value);
+        } else {
+            selection.splice(idx, 1);
+        }
+        if (field === "category") {
+            this.onCategoryChange();
+        }
+    }
+
+    selectAllFilterValues(field) {
+        this.state[field] = [];
+        if (field === "category") {
+            this.onCategoryChange();
+        }
+    }
+
+    onFilterSearchInput(field, ev) {
+        this.state[field] = ev.target.value;
     }
 
     get filteredProductMargins() {
@@ -143,11 +253,9 @@ class PosDashboardMetrics extends Component {
     }
 
     onCategoryChange() {
-        // Al cambiar de categoría, reseteamos el producto a "all" si ya no está en la lista filtrada
+        // Al cambiar de categoría, descartamos los productos que ya no están en la lista filtrada
         const currentProds = this.currentProductsList;
-        if (this.state.product !== "all" && !currentProds.includes(this.state.product)) {
-            this.state.product = "all";
-        }
+        this.state.product = this.state.product.filter(p => currentProds.includes(p));
     }
 
     switchTab(tab) {
@@ -187,11 +295,16 @@ class PosDashboardMetrics extends Component {
     async clearFilters() {
         this.state.preset = "30days";
         this.setPresetDates("30days");
-        this.state.pos = "all";
+        this.state.pos = [];
         this.state.cashier = "all";
-        this.state.company = "all";
-        this.state.category = "all";
-        this.state.product = "all";
+        this.state.company = [];
+        this.state.category = [];
+        this.state.product = [];
+        this.state.posSearch = "";
+        this.state.companySearch = "";
+        this.state.categorySearch = "";
+        this.state.productSearch = "";
+        this.state.openFilter = null;
         this.state.search = "";
         this.state.profitabilitySearch = "";
         this.state.page = 1;
@@ -277,11 +390,11 @@ class PosDashboardMetrics extends Component {
             const metrics = await rpc("/pos_management_metrics/metrics", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                pos: this.state.pos,
+                pos: JSON.stringify(this.posFilter),
                 cashier: this.state.cashier,
-                company: this.state.company,
-                category: this.state.category,
-                product: this.state.product
+                company: JSON.stringify(this.companyFilter),
+                category: JSON.stringify(this.categoryFilter),
+                product: JSON.stringify(this.productFilter)
             });
 
             Object.assign(this.metricsData, metrics);
@@ -310,9 +423,9 @@ class PosDashboardMetrics extends Component {
             const data = await rpc("/pos_management_metrics/sessions", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                pos: this.state.pos,
+                pos: JSON.stringify(this.posFilter),
                 cashier: this.state.cashier,
-                company: this.state.company
+                company: JSON.stringify(this.companyFilter)
             });
             this.sessionsData.length = 0;
             this.sessionsData.push(...data.sessions);
@@ -339,11 +452,11 @@ class PosDashboardMetrics extends Component {
             const data = await rpc("/pos_management_metrics/top_articles", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                pos: this.state.pos,
+                pos: JSON.stringify(this.posFilter),
                 cashier: this.state.cashier,
-                company: this.state.company,
-                category: this.state.category,
-                product: this.state.product,
+                company: JSON.stringify(this.companyFilter),
+                category: JSON.stringify(this.categoryFilter),
+                product: JSON.stringify(this.productFilter),
                 limit: 50
             });
             Object.assign(this.topArticlesData, data);
@@ -358,11 +471,11 @@ class PosDashboardMetrics extends Component {
             const data = await rpc("/pos_management_metrics/raw_sales", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                pos: this.state.pos,
+                pos: JSON.stringify(this.posFilter),
                 cashier: this.state.cashier,
-                company: this.state.company,
-                category: this.state.category,
-                product: this.state.product,
+                company: JSON.stringify(this.companyFilter),
+                category: JSON.stringify(this.categoryFilter),
+                product: JSON.stringify(this.productFilter),
                 search: this.state.search,
                 page: this.state.page,
                 per_page: this.state.perPage
@@ -403,11 +516,11 @@ class PosDashboardMetrics extends Component {
         const params = new URLSearchParams({
             start_date: this.state.startDate || '',
             end_date: this.state.endDate || '',
-            pos: this.state.pos,
+            pos: JSON.stringify(this.posFilter),
             cashier: this.state.cashier,
-            company: this.state.company,
-            category: this.state.category,
-            product: this.state.product,
+            company: JSON.stringify(this.companyFilter),
+            category: JSON.stringify(this.categoryFilter),
+            product: JSON.stringify(this.productFilter),
             limit: 50
         });
         window.open(`/pos_management_metrics/export_top_articles?${params.toString()}`, '_blank');
@@ -418,11 +531,11 @@ class PosDashboardMetrics extends Component {
         const params = new URLSearchParams({
             start_date: this.state.startDate || '',
             end_date: this.state.endDate || '',
-            pos: this.state.pos,
+            pos: JSON.stringify(this.posFilter),
             cashier: this.state.cashier,
-            company: this.state.company,
-            category: this.state.category,
-            product: this.state.product
+            company: JSON.stringify(this.companyFilter),
+            category: JSON.stringify(this.categoryFilter),
+            product: JSON.stringify(this.productFilter)
         });
         window.open(`/pos_management_metrics/export?${params.toString()}`, '_blank');
     }
