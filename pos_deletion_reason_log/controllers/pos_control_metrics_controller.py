@@ -400,9 +400,13 @@ class PosControlMetricsController(http.Controller):
                 "fecha": r["fecha"],
                 "cajero": r["cajero"] or "—",
                 "tipo": r["tipo"],
-                # En eliminación de orden con varias líneas no hay product_id;
-                # se muestra la lista de productos de la orden eliminada.
-                "producto": r["producto"] or r["products_summary"] or "",
+                # producto: nombre único (línea/desc/precio). Para órdenes con
+                # varias líneas se manda la lista en `productos` y el frontend
+                # muestra un botón "Ver" en vez de volcar todo en la celda.
+                "producto": r["producto"] or "",
+                "productos": [
+                    p for p in (r["products_summary"] or "").split("\n") if p
+                ],
                 "qty": float(r["qty"] or 0.0),
                 "discount": float(r["discount"] or 0.0),
                 "old_price": float(r["old_price"] or 0.0),

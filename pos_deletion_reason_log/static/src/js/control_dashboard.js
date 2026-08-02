@@ -42,6 +42,7 @@ class PosControlDashboard extends Component {
             cashier: "all",
             company: "all",
             dtype: "all",
+            productsModal: { open: false, subtitle: "", items: [] },
         });
         this.filtersData = useState({ cajas: [], cajeros: [], empresas: [] });
         this.data = useState({
@@ -159,6 +160,17 @@ class PosControlDashboard extends Component {
     toggleTheme() {
         this.state.theme = this.state.theme === "dark" ? "light" : "dark";
         this.renderCharts();
+    }
+
+    openProducts(d) {
+        this.state.productsModal = {
+            open: true,
+            subtitle: [d.fecha, d.cajero, d.caja].filter(Boolean).join(" · "),
+            items: d.productos || [],
+        };
+    }
+    closeProducts() {
+        this.state.productsModal = { open: false, subtitle: "", items: [] };
     }
 
     typeLabel(t) { return TYPE_LABELS[t] || t; }

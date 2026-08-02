@@ -77,7 +77,7 @@ export function snapshotOrder(order) {
             return name ? `${qty}× ${name}` : "";
         })
         .filter(Boolean)
-        .join(", ");
+        .join("\n");
     return {
         order_ref: order.uuid || order.name || "",
         product_id: lines.length === 1 && lines[0].get_product() ? lines[0].get_product().id : false,

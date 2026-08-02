@@ -380,7 +380,19 @@
                                     <td t-esc="d.fecha"/>
                                     <td t-esc="d.cajero"/>
                                     <td><span t-att-class="'status-pill t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
-                                    <td t-esc="d.producto"/>
+                                    <td>
+                                        <t t-if="d.productos and d.productos.length > 1">
+                                            <button class="btn-link-products" t-on-click="() => this.openProducts(d)">
+                                                <t t-esc="d.productos.length"/> productos — Ver
+                                            </button>
+                                        </t>
+                                        <t t-elif="d.productos and d.productos.length === 1">
+                                            <t t-esc="d.productos[0]"/>
+                                        </t>
+                                        <t t-else="">
+                                            <t t-esc="d.producto"/>
+                                        </t>
+                                    </td>
                                     <td class="num" t-esc="d.qty"/>
                                     <td class="num">
                                         <t t-if="d.tipo === 'high_discount'"><t t-esc="d.discount"/>%</t>
@@ -402,6 +414,20 @@
                 </section>
                 </div>
             </main>
+
+            <!-- Modal: productos de una orden eliminada -->
+            <div t-if="state.productsModal.open" class="products-modal-overlay" t-on-click="() => this.closeProducts()">
+                <div class="products-modal" t-on-click.stop="() => {}">
+                    <div class="products-modal-header">
+                        <h3>Productos eliminados</h3>
+                        <button class="btn-close-modal" t-on-click="() => this.closeProducts()">✕</button>
+                    </div>
+                    <div class="products-modal-sub" t-esc="state.productsModal.subtitle"/>
+                    <ul class="products-modal-list">
+                        <li t-foreach="state.productsModal.items" t-as="it" t-key="it_index" t-esc="it"/>
+                    </ul>
+                </div>
+            </div>
         </div>
     </t>
 </templates>
