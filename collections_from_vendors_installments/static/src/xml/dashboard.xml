@@ -75,7 +75,7 @@
             <main class="main-content">
                 <header class="main-header">
                     <div class="header-left">
-                        <h1>Tablero de Venta en Cuotas</h1>
+                        <h1>Dashboard de Venta en Cuotas</h1>
                     </div>
                     <div class="header-right">
                         <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme"

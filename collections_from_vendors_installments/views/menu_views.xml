@@ -3,7 +3,7 @@
     <menuitem id="menu_cvi_root" name="Venta en cuotas" sequence="45"
               web_icon="collections_from_vendors_installments,static/description/icon.png"/>
 
-    <menuitem id="menu_cvi_dashboard" name="Tablero" parent="menu_cvi_root" sequence="5"
+    <menuitem id="menu_cvi_dashboard" name="Dashboard" parent="menu_cvi_root" sequence="5"
               action="action_cvi_dashboard"
               groups="collections_from_vendors_installments.group_cvi_manager"/>
 
@@ -71,6 +71,13 @@
               action="action_cvi_overdue_cards" sequence="60"/>
     <menuitem id="menu_cvi_problematic" name="Clientes problemáticos" parent="menu_cvi_admin"
               action="action_cvi_problematic_customers" sequence="70"/>
+
+    <!-- Los planes de cuotas se cargan en la ficha del mueble: sin este acceso hay que
+         salir del módulo e ir a Inventario para tocarlos. Cuelga del menú raíz y no de
+         Configuración porque se usa seguido, no solo al poner el sistema en marcha. -->
+    <menuitem id="menu_cvi_products" name="Muebles" parent="menu_cvi_root" sequence="50"
+              action="action_cvi_products"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>

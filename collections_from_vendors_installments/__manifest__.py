@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Cobranza a vendedores y cuotas",
-    "version": "18.0.3.1.0",
+    "version": "18.0.3.1.2",
     "category": "Sales/Sales",
     "summary": "Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza",
     "description": """
