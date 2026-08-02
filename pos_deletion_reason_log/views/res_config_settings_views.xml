@@ -7,6 +7,9 @@
         <field name="arch" type="xml">
             <xpath expr="//block[@id='product_and_category_block']" position="after">
                 <block id="pos_deletion_reason_block" title="Trazabilidad de operaciones POS">
+                    <setting string="Nota de justificación obligatoria" help="Exige escribir una nota además de elegir el motivo de la lista. Si se desactiva, la nota queda opcional.">
+                        <field name="require_reason_note"/>
+                    </setting>
                     <setting string="Motivo al eliminar orden" help="Pide un motivo cuando se elimina una orden completa.">
                         <field name="require_reason_order_deletion"/>
                     </setting>

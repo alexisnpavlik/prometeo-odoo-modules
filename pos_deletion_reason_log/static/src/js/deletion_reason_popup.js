@@ -29,6 +29,10 @@ export class DeletionReasonPopup extends Component {
         return this.pos.data.models["pos.deletion.reason"].getAll();
     }
 
+    get noteRequired() {
+        return Boolean(this.pos.config.require_reason_note);
+    }
+
     onReasonChange(ev) {
         this.state.reasonId = parseInt(ev.target.value, 10) || false;
     }
@@ -36,6 +40,10 @@ export class DeletionReasonPopup extends Component {
     confirm() {
         if (!this.state.reasonId) {
             this.state.warning = _t("Seleccioná un motivo.");
+            return;
+        }
+        if (this.noteRequired && !this.state.note.trim()) {
+            this.state.warning = _t("Escribí una nota de justificación.");
             return;
         }
         this.props.getPayload({

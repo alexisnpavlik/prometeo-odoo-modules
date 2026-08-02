@@ -67,3 +67,9 @@ class PosConfig(models.Model):
              "unitario negativo. Desactivalo si tu flujo de devoluciones usa "
              "precios negativos de forma legítima.",
     )
+    require_reason_note = fields.Boolean(
+        string="Nota de justificación obligatoria",
+        default=True,
+        help="Exige que el cajero escriba una nota además de elegir el motivo "
+             "de la lista. Si se desactiva, la nota queda opcional.",
+    )

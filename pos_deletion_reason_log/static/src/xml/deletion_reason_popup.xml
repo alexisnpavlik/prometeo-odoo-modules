@@ -14,9 +14,12 @@
                     </select>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label">Nota (opcional)</label>
+                    <label class="form-label">
+                        Nota <t t-if="noteRequired">(obligatoria)</t><t t-else="">(opcional)</t>
+                    </label>
                     <textarea class="form-control" rows="3"
-                              t-model="state.note" placeholder="Detalle opcional..."/>
+                              t-model="state.note"
+                              t-att-placeholder="noteRequired ? 'Escribí la justificación...' : 'Detalle opcional...'"/>
                 </div>
                 <p t-if="state.warning" class="text-danger small mb-0" t-esc="state.warning"/>
             </div>
