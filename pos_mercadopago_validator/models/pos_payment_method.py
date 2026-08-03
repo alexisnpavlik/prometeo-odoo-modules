@@ -58,7 +58,27 @@ class PosPaymentMethod(models.Model):
         if not self.env.user.has_group("point_of_sale.group_pos_user"):
             raise AccessError(_("No tenés acceso a la bandeja de Mercado Pago."))
 
-    STALE_AFTER_SECONDS = 60
+    # Piso real del ingestor: `ir.cron` no baja de 1 minuto, así que por más
+    # que `poll_interval_seconds` sea 10, la bandeja no se refresca más seguido
+    # que eso (ver `mercadopago.account._is_due_for_polling`).
+    CRON_FLOOR_SECONDS = 60
+    # Cuántos períodos de ingesta sin noticias hacen falta para avisar que la
+    # bandeja está desactualizada. Con 1 el aviso se prende y se apaga en cada
+    # ciclo -la edad de `last_sync_at` oscila entre 0 y un período completo- y
+    # el cajero aprende a ignorarlo justo antes de que la API se caiga en serio.
+    STALE_PERIODS = 3
+
+    def _stale_after_seconds(self):
+        """Cuánto puede envejecer `last_sync_at` antes de avisar degradación.
+
+        Se mide contra el período real de ingesta -el mayor entre el piso del
+        cron y el intervalo configurado-, no contra un número fijo: subir
+        `poll_interval_seconds` sin mover esto haría que el aviso quede prendido
+        de forma permanente.
+        """
+        self.ensure_one()
+        period = max(self.CRON_FLOOR_SECONDS, self.poll_interval_seconds or 0)
+        return period * self.STALE_PERIODS
 
     def _inbox_ownership_domain(self):
         """Pertenencia: qué pagos son de esta caja, sin mirar la hora.
@@ -137,7 +157,7 @@ class PosPaymentMethod(models.Model):
         last_sync = account.last_sync_at
         stale = not last_sync or (
             fields.Datetime.now() - last_sync
-        ).total_seconds() > self.STALE_AFTER_SECONDS
+        ).total_seconds() > self._stale_after_seconds()
 
         return {
             "matching": [self._serialize_inbox_line(p, amount) for p in matching],
@@ -270,8 +290,10 @@ class PosPaymentMethod(models.Model):
         deshacer de la imputación automática.
 
         Tres cierres, porque el uuid lo elige el navegador y no es un secreto:
-        se acota a la cuenta de esta caja, al QR de esta caja, y a quien hizo la
-        reserva. Sin el último, un cajero que leyera el `pos_payment_uuid` de
+        se acota a la cuenta de esta caja, al canal/QR de esta caja
+        (`_channel_domain()`, el mismo criterio que usa `pos.payment.create()`
+        para cerrar la reserva), y a quien hizo la reserva. Sin el último, un
+        cajero que leyera el `pos_payment_uuid` de
         una reserva en vuelo de otra caja de la misma cuenta podría liberarla y
         quedársela, dejando la otra línea en `done` contra un pago que ya no
         tiene. `pos_payment_uuid` además dejó de ser legible para el cajero.
@@ -283,7 +305,7 @@ class PosPaymentMethod(models.Model):
             ("pos_payment_uuid", "=", pos_payment_uuid),
             ("state", "=", "matched"),
             ("pos_payment_id", "=", False),
-        ], limit=1)
+        ] + self._channel_domain(), limit=1)
         if not payment:
             return {
                 "ok": False,
@@ -303,10 +325,19 @@ class PosPaymentMethod(models.Model):
         return {"ok": True}
 
     def register_manual_approval(self, pos_payment_uuid, reason):
-        """Registra una aprobación manual sobre una línea del navegador."""
+        """Registra una aprobación manual sobre una línea del navegador.
+
+        El uuid se valida igual que en el resto de las entradas por RPC: una
+        aprobación creada con uuid vacío -o con algo que no sea un string- no
+        la puede cerrar nunca `pos.payment.create()`, y queda para siempre sin
+        monto, sin venta y sin sesión, es decir inservible justo para el
+        control de §9 que justifica su existencia.
+        """
         self.ensure_one()
         self._check_pos_access()
-        if not reason or not reason.strip():
+        if not isinstance(pos_payment_uuid, str) or not pos_payment_uuid.strip():
+            raise UserError(_("La aprobación manual necesita la línea de cobro."))
+        if not isinstance(reason, str) or not reason.strip():
             raise UserError(_("La aprobación manual necesita un motivo."))
         self.env["mercadopago.manual.approval"].sudo().create({
             "payment_method_id": self.id,

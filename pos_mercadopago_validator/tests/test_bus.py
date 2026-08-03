@@ -90,6 +90,33 @@ class TestBusNotification(TransactionCase):
         self.assertIn(config_alias.id, notified)
         self.assertNotIn(config_no_alias.id, notified)
 
+    def test_a_method_with_another_terminal_is_not_notified(self):
+        """I-6: sólo se avisa a los métodos de este módulo.
+
+        `get_mercadopago_unmatched()` ya filtraba por `use_payment_terminal`;
+        el bus no. Un método con `mp_account_id` cargado pero otra terminal
+        -o ninguna- recibía avisos de una bandeja que su caja no consulta.
+        """
+        foreign_method = self.env["pos.payment.method"].create({
+            "name": "Efectivo con cuenta MP cargada", "journal_id": self.journal.id,
+            "mp_account_id": self.account.id, "mp_pos_id": "64365871",
+        })
+        foreign_config = self.env["pos.config"].create({"name": "Caja otra terminal"})
+        foreign_config.write({"payment_method_ids": [(6, 0, [foreign_method.id])]})
+        foreign_config.open_ui()
+
+        payment = self.env["mercadopago.payment"].create({
+            "mp_payment_id": "170951482381", "account_id": self.account.id,
+            "amount": 1500.0, "date_approved": "2026-08-03 15:26:00",
+            "source": "qr", "mp_pos_id": "64365871", "state": "available",
+        })
+        notified, patched = self._spy_on_notify()
+        with patched:
+            payment._notify_open_sessions()
+
+        self.assertIn(self.config.id, notified)
+        self.assertNotIn(foreign_config.id, notified)
+
     def test_batch_groups_by_account_and_qr_instead_of_per_payment(self):
         """Varios pagos del mismo QR en un lote comparten la búsqueda de métodos.
 

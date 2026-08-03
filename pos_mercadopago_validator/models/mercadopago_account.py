@@ -79,6 +79,45 @@ class MercadoPagoAccount(models.Model):
         methods = self.env["pos.payment.method"].search([("mp_account_id", "=", self.id)])
         return max(methods.mapped("search_window_minutes") or [5])
 
+    def _poll_interval_seconds(self):
+        """Cada cuánto debe consultar esta cuenta, según sus métodos de pago.
+
+        `poll_interval_seconds` se configura por método de pago (spec §5.3) y
+        una cuenta puede estar compartida por varias cajas: manda la más
+        exigente, porque si una caja pidió refrescar cada 10 segundos, hacerla
+        esperar el intervalo de la otra sería incumplir su configuración.
+
+        Sin métodos configurados no hay a quién servirle la bandeja: se usa el
+        default del campo.
+        """
+        self.ensure_one()
+        methods = self.env["pos.payment.method"].sudo().search([
+            ("use_payment_terminal", "=", "mercadopago_validator"),
+            ("mp_account_id", "=", self.id),
+        ])
+        intervals = [i for i in methods.mapped("poll_interval_seconds") if i and i > 0]
+        return min(intervals or [10])
+
+    def _is_due_for_polling(self):
+        """Decide si a esta cuenta le toca consultar en esta corrida del cron.
+
+        Spec §6.3: "consulta la ventana a la frecuencia configurada". `ir.cron`
+        no baja de 1 minuto de granularidad, así que el intervalo no puede
+        vivir en el cron: el cron corre seguido -cada minuto- y cada cuenta
+        decide acá si ya pasó su `poll_interval_seconds` desde el último sync.
+
+        La consecuencia, y es la que hay que tener presente en producción: un
+        intervalo **menor** a 60 segundos no acelera nada -el piso lo pone el
+        cron- pero uno **mayor** sí frena de verdad. Es lo que se necesita para
+        no quemar la cuota de la API con muchas cuentas configuradas, sin
+        agregar un scheduler propio.
+        """
+        self.ensure_one()
+        if not self.last_sync_at:
+            return True
+        elapsed = (fields.Datetime.now() - self.last_sync_at).total_seconds()
+        return elapsed >= self._poll_interval_seconds()
+
     def ingest_now(self):
         """Consulta la ventana y vuelca el resultado en la bandeja."""
         from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
@@ -147,8 +186,24 @@ class MercadoPagoAccount(models.Model):
 
     @api.model
     def cron_ingest_payments(self):
-        """Cron del ingestor. Sólo corre si hay una sesión de POS abierta."""
-        open_sessions = self.env["pos.session"].search_count([("state", "=", "opened")])
+        """Cron del ingestor. Corre seguido; cada cuenta decide si le toca.
+
+        Sólo trabaja si hay una sesión de POS abierta, con el mismo predicado
+        que `_notify_open_sessions()`: `state != "closed"`, no `state ==
+        "opened"`. El `state` de una sesión pasa por "opening_control" hasta
+        que el cajero confirma el conteo de apertura, y es el criterio que usa
+        el propio Odoo en `_compute_current_session`. Con el predicado
+        divergente, una caja abierta sin confirmar el conteo recibía avisos por
+        bus de una bandeja que el ingestor no estaba llenando.
+
+        La frecuencia por cuenta la resuelve `_is_due_for_polling()`: el cron
+        es el reloj, no el intervalo (ver ahí el detalle del piso de 1 minuto).
+        """
+        open_sessions = self.env["pos.session"].search_count([("state", "!=", "closed")])
         if not open_sessions:
             return
-        self.search([("active", "=", True)]).ingest_now()
+        accounts = self.search([("active", "=", True)])
+        due = accounts.filtered(lambda a: a._is_due_for_polling())
+        if not due:
+            return
+        due.ingest_now()

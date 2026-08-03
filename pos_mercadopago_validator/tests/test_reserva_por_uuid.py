@@ -141,6 +141,22 @@ class TestReservaPorUuid(TransactionCase):
         self.assertEqual(payment.state, "available")
         self.assertFalse(payment.pos_payment_uuid)
 
+    def test_undo_does_not_reach_a_reservation_of_another_cash_register(self):
+        """I-4: el deshacer también se acota al QR de esta caja, como dice su docstring.
+
+        Misma cuenta, otro QR. El `search` no tenía `_channel_domain()` y la
+        afirmación de "se acota al QR de esta caja" era falsa: la caja de al
+        lado podía liberar una reserva que no era suya (si además la había
+        hecho el mismo usuario, que es el caso de un cajero con dos cajas).
+        """
+        payment = self._payment(pos_id="99999999")
+        payment.reserve_for_uuid("uuid-ajeno")
+
+        result = self.method.revert_mp_reservation_by_uuid("uuid-ajeno")
+        self.assertFalse(result["ok"])
+        self.assertEqual(payment.state, "matched")
+        self.assertEqual(payment.pos_payment_uuid, "uuid-ajeno")
+
     def test_reserving_a_payment_of_another_cash_register_is_rejected(self):
         """Misma cuenta, otro QR: tampoco se puede tomar el pago de la caja de al lado."""
         payment = self._payment(pos_id="99999999")

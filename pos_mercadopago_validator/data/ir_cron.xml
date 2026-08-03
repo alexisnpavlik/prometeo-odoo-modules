@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- noupdate: sin esto, cada actualización del módulo reactiva el cron y
+         pisa cualquier ajuste que el administrador haya hecho en producción
+         (desactivarlo, espaciarlo). El intervalo de acá es el reloj, no la
+         frecuencia de consulta: esa la decide cada cuenta con
+         poll_interval_seconds (ver mercadopago.account._is_due_for_polling).
+         El primer -u posterior a este cambio todavía escribe el registro, que
+         es cuando la bandera queda asentada en ir_model_data; a partir de ahí
+         el registro no se vuelve a tocar. -->
+    <data noupdate="1">
     <record id="cron_mercadopago_ingest" model="ir.cron">
         <field name="name">Mercado Pago: ingestar pagos recibidos</field>
         <field name="model_id" ref="model_mercadopago_account"/>
@@ -9,4 +18,5 @@
         <field name="interval_type">minutes</field>
         <field name="active" eval="True"/>
     </record>
+    </data>
 </odoo>
