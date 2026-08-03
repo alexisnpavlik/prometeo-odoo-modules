@@ -140,9 +140,39 @@ class TestReservaAImputacion(TransactionCase):
         self.assertFalse(line.mercadopago_payment_id)
 
     def test_load_pos_data_fields_exposes_the_uuid(self):
-        """El POS necesita sincronizar mercadopago_uuid para poder cerrar la reserva."""
+        """El POS necesita sincronizar mercadopago_uuid para cerrar la reserva.
+
+        Pero sin recortar la lista: `pos.payment` no override el método en el
+        core, así que el mixin devuelve `[]`, que el cargador interpreta como
+        "todos los campos". Convertir ese `[]` en una lista de un solo elemento
+        dejaba al modelo del navegador sin `pos_order_id` y rompía el cobro con
+        cualquier método de pago.
+        """
         fields_list = self.env["pos.payment"]._load_pos_data_fields(self.config.id)
-        self.assertIn("mercadopago_uuid", fields_list)
+        if fields_list:
+            self.assertIn("mercadopago_uuid", fields_list)
+            self.assertIn(
+                "pos_order_id", fields_list,
+                "La lista no puede recortar los campos que el POS necesita",
+            )
+        else:
+            self.assertEqual(
+                fields_list, [],
+                "Con lista vacía el cargador trae todos los campos, uuid incluido",
+            )
+
+    def test_payment_line_keeps_its_order_link_for_the_browser(self):
+        """El campo del que depende set_amount() en el navegador sigue disponible.
+
+        Guard de regresión del bug que rompía `add_paymentline`: si la lista de
+        campos deja de incluir `pos_order_id`, `this.pos_order_id` es undefined
+        en el cliente y `assert_editable()` revienta.
+        """
+        fields_list = self.env["pos.payment"]._load_pos_data_fields(self.config.id)
+        model_fields = self.env["pos.payment"]._fields
+        effective = fields_list or list(model_fields)
+        for needed in ("pos_order_id", "payment_method_id", "amount"):
+            self.assertIn(needed, effective)
 
     def test_reservation_from_another_cash_register_does_not_get_linked(self):
         """El uuid lo elige el navegador: una línea de otra caja no se lo queda.

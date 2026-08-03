@@ -26,10 +26,21 @@ class PosPayment(models.Model):
     def _load_pos_data_fields(self, config_id):
         """Incluye el uuid de vínculo en los campos que sincroniza el POS.
 
-        Sin esto la línea de pago que arma el navegador nunca lleva el uuid al
-        servidor, y `create()` no tiene con qué cerrar la reserva.
+        Sin el uuid, la línea de pago que arma el navegador nunca lo lleva al
+        servidor y `create()` no tiene con qué cerrar la reserva.
+
+        Cuidado con la lista vacía: `pos.payment` no override este método en el
+        core, así que el mixin devuelve `[]`, y el cargador del POS interpreta
+        `[]` como "todos los campos" (se lo pasa tal cual a `search_read`).
+        Concatenar sobre esa lista la convertía en `["mercadopago_uuid"]`, o sea
+        "sólo ese campo": el modelo del navegador se quedaba sin `pos_order_id`
+        y `set_amount()` reventaba con `assert_editable` de undefined, rompiendo
+        el cobro con cualquier método de pago.
         """
-        return super()._load_pos_data_fields(config_id) + ["mercadopago_uuid"]
+        fields = super()._load_pos_data_fields(config_id)
+        if not fields:
+            return fields
+        return fields + ["mercadopago_uuid"]
 
     @api.model_create_multi
     def create(self, vals_list):
