@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mercadopago_account_manager,mercadopago.account manager,model_mercadopago_account,group_mercadopago_manager,1,0,0,0
+access_mercadopago_account_system,mercadopago.account system,model_mercadopago_account,base.group_system,1,1,1,1

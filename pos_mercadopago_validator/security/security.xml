@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_mercadopago_manager" model="res.groups">
+        <field name="name">Mercado Pago - Administración de la bandeja</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Puede revisar la bandeja, los huérfanos y las aprobaciones manuales.</field>
+        <field name="implied_ids" eval="[(4, ref('point_of_sale.group_pos_manager'))]"/>
+    </record>
+</odoo>
