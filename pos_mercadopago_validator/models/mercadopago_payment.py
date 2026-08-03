@@ -1,6 +1,7 @@
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -142,6 +143,64 @@ class MercadoPagoPayment(models.Model):
             if mapped:
                 return mapped.partner_id
         return Partner.browse()
+
+    def impute(self, pos_payment, ambiguous=False):
+        """Vincula este pago con una línea de cobro del POS, de forma definitiva.
+
+        Toma la fila con SELECT ... FOR UPDATE antes de decidir: dos cajeros
+        pueden hacer clic con milisegundos de diferencia sobre la misma lista.
+        El índice único parcial actúa como red final si el bloqueo falla.
+        """
+        self.ensure_one()
+        self.env.cr.execute(
+            "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (self.id,)
+        )
+        row = self.env.cr.fetchone()
+        if not row or row[0] != "available":
+            raise UserError(_(
+                "Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
+            ))
+
+        order = pos_payment.pos_order_id
+        difference = pos_payment.amount - self.amount
+        self.write({
+            "state": "matched",
+            "pos_payment_id": pos_payment.id,
+            "pos_order_id": order.id,
+            "pos_session_id": order.session_id.id,
+            "matched_by_user_id": self.env.user.id,
+            "matched_at": fields.Datetime.now(),
+            "amount_difference": difference,
+            "ambiguous_pick": ambiguous,
+        })
+        pos_payment.write({"mercadopago_payment_id": self.id})
+        _logger.info(
+            "Pago %s imputado a la línea %s por %s",
+            self.mp_payment_id, pos_payment.id, self.env.user.login,
+        )
+        return True
+
+    def revert(self, reason=None):
+        """Devuelve el pago a la bandeja. Queda registrado en el chatter del pedido."""
+        self.ensure_one()
+        if self.state != "matched":
+            raise UserError(_("Sólo se puede revertir un pago imputado."))
+        order = self.pos_order_id
+        self.write({
+            "state": "available", "pos_payment_id": False, "pos_order_id": False,
+            "pos_session_id": False, "matched_by_user_id": False, "matched_at": False,
+            "amount_difference": 0.0, "ambiguous_pick": False,
+        })
+        _logger.info(
+            "Pago %s revertido por %s. Motivo: %s",
+            self.mp_payment_id, self.env.user.login, reason or "sin motivo",
+        )
+        if order:
+            order.message_post(body=_(
+                "Se revirtió la imputación del pago de Mercado Pago %(mp)s. Motivo: %(reason)s",
+                mp=self.mp_payment_id, reason=reason or _("sin motivo"),
+            ))
+        return True
 
     def _notify_open_sessions(self):
         """Avisa por bus a las cajas con sesión abierta. Se completa en Task 10."""
