@@ -8,3 +8,4 @@ from . import test_imputacion_unica
 from . import test_webhook
 from . import test_ingest_race_condition
 from . import test_inbox_rpc
+from . import test_bus

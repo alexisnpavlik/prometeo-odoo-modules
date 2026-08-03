@@ -251,5 +251,57 @@ class MercadoPagoPayment(models.Model):
         return True
 
     def _notify_open_sessions(self):
-        """Avisa por bus a las cajas con sesión abierta. Se completa en Task 10."""
+        """Avisa por bus a las cajas con sesión abierta que la bandeja cambió.
+
+        El bus de Odoo 18 no tiene canal global para el POS: pos.bus.mixin
+        publica en el canal privado de cada pos.config (token propio por
+        config). Hay que resolver qué configs están afectadas por este pago
+        e iterarlas notificando una por una.
+
+        El criterio de pertenencia tiene que ser el mismo que usa
+        `_inbox_domain()` en pos.payment.method: un método de este módulo
+        pertenece a este pago si su cuenta coincide y, según el canal, su
+        mp_pos_id es el del QR o tiene habilitado accept_alias_payments. Si
+        divergiera, una caja podría recibir un aviso de un pago que después
+        no ve en su lista (o al revés).
+
+        `current_session_state` de pos.config es un campo computado sin
+        store=True: no es buscable (`search()` sobre un compute sin store
+        levanta ValueError en Odoo 18). Además su valor es literalmente el
+        `state` de la sesión, y ese state pasa por "opening_control" antes
+        de llegar a "opened" (recién al confirmar el conteo de apertura, no
+        al sólo abrir la interfaz). Lo que necesitamos -una caja con un
+        diálogo de cobro en uso- es "hay una sesión de esta caja que no está
+        cerrada", el mismo criterio que usa pos.config para su propio
+        current_session_id/has_active_session (state != "closed"), así que
+        se resuelve vía pos.session con ese filtro en vez de state="opened".
+        """
+        PaymentMethod = self.env["pos.payment.method"].sudo()
+        Session = self.env["pos.session"].sudo()
+        for payment in self:
+            domain = [("mp_account_id", "=", payment.account_id.id)]
+            if payment.source == "qr":
+                if not payment.mp_pos_id:
+                    # Anomalía de datos: un pago QR sin mp_pos_id no debe
+                    # matchear por accidente los métodos sin QR configurado.
+                    continue
+                domain.append(("mp_pos_id", "=", payment.mp_pos_id))
+            else:
+                domain.append(("accept_alias_payments", "=", True))
+
+            methods = PaymentMethod.search(domain)
+            if not methods:
+                continue
+
+            sessions = Session.search([
+                ("state", "!=", "closed"),
+                ("config_id.payment_method_ids", "in", methods.ids),
+            ])
+            for config in sessions.config_id:
+                config._notify("MERCADOPAGO_INBOX_UPDATED", {
+                    "config_id": config.id,
+                    "mp_payment_id": payment.mp_payment_id,
+                    "amount": payment.amount,
+                    "state": payment.state,
+                })
         return True
