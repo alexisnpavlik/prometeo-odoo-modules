@@ -1,7 +1,6 @@
 import logging
 import threading
 
-import psycopg2
 from psycopg2 import errors as psycopg2_errors
 
 import odoo
@@ -235,7 +234,14 @@ class TestImputacionConcurrente(ImputacionCommon):
                         with mute_logger("odoo.sql_db"):
                             payment_b.impute(line_b)
                         outcomes.append("b")
-                    except (UserError, psycopg2.Error) as error:
+                    # Lista blanca deliberadamente angosta: el rechazo válido es
+                    # el UserError del chequeo de estado tras el FOR UPDATE, o a
+                    # lo sumo un fallo de serialización de Postgres. Aceptar
+                    # `psycopg2.Error` entero incluía IntegrityError, así que si
+                    # el bloqueo de fila se rompiera y el rechazo llegara recién
+                    # por violación del índice único -la red final, no el
+                    # mecanismo bajo prueba- el test daría verde igual.
+                    except (UserError, psycopg2_errors.SerializationFailure) as error:
                         expected_errors.append(error)
                         _logger.info(
                             "El segundo cajero fue rechazado con %s: %s",
@@ -272,15 +278,20 @@ class TestImputacionConcurrente(ImputacionCommon):
 
             second.join(timeout=LOCK_TIMEOUT_SECONDS + THREAD_START_SECONDS)
             self.assertFalse(second.is_alive(), "El segundo intento quedó colgado en el lock")
+            # Con la lista blanca angosta, un lock_timeout ya no entra en
+            # expected_errors sino en unexpected_errors; se mira primero y en
+            # las dos listas para que el diagnóstico siga siendo el específico
+            # y no el genérico de "falló por algo inesperado".
+            self.assertFalse(
+                [e for e in expected_errors + unexpected_errors
+                 if isinstance(e, psycopg2_errors.LockNotAvailable)],
+                "El segundo intento murió por lock_timeout, no por el estado del pago",
+            )
             self.assertFalse(
                 unexpected_errors,
                 "El segundo intento falló por algo inesperado: %s" % unexpected_errors,
             )
             self.assertTrue(expected_errors, "El segundo intento no falló")
-            self.assertFalse(
-                [e for e in expected_errors if isinstance(e, psycopg2_errors.LockNotAvailable)],
-                "El segundo intento murió por lock_timeout, no por el estado del pago",
-            )
             self.assertEqual(outcomes, ["a"], "Se imputó más de una vez el mismo pago")
 
             with registry.cursor() as cr_check:
