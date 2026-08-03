@@ -11,3 +11,4 @@ from . import test_inbox_rpc
 from . import test_bus
 from . import test_reserva_por_uuid
 from . import test_reserva_a_imputacion
+from . import test_aprobacion_manual

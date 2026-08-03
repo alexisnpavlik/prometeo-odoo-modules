@@ -41,12 +41,14 @@ class PosPayment(models.Model):
         puede completar `pos_payment_id` y dejar que actúe el índice único
         parcial de `mercadopago.payment`.
 
-        Una línea con un uuid sin reserva asociada se loguea y no rompe la
-        creación: frenar la venta acá dejaría la sesión del POS sin poder
-        sincronizar y al cajero sin poder cerrar caja, que es peor que un pago
-        de Mercado Pago sin vincular. La anomalía queda visible igual: el
-        registro de `mercadopago.payment`, si existe, sigue en estado
-        `matched` sin `pos_payment_id`, buscable desde el backoffice.
+        Una línea con un uuid sin reserva asociada puede corresponder a una
+        aprobación manual (Task 12, sin pago verificado): se intenta cerrar esa
+        en su lugar antes de darla por huérfana. Si tampoco hay aprobación, se
+        loguea y no rompe la creación: frenar la venta acá dejaría la sesión
+        del POS sin poder sincronizar y al cajero sin poder cerrar caja, que es
+        peor que un pago de Mercado Pago sin vincular. La anomalía queda
+        visible igual: el registro de `mercadopago.payment`, si existe, sigue
+        en estado `matched` sin `pos_payment_id`, buscable desde el backoffice.
 
         `mercadopago_uuid` lo pone el navegador, así que la búsqueda no puede
         confiar en el uuid solo: se acota por cuenta y canal (QR/alias) del
@@ -60,6 +62,7 @@ class PosPayment(models.Model):
         """
         lines = super().create(vals_list)
         Inbox = self.env["mercadopago.payment"].sudo()
+        Approval = self.env["mercadopago.manual.approval"].sudo()
         for line in lines:
             if not line.mercadopago_uuid:
                 continue
@@ -74,11 +77,7 @@ class PosPayment(models.Model):
                 ("account_id", "=", method.mp_account_id.id),
             ] + method._channel_domain(), order="id asc")
             if not reserved:
-                _logger.warning(
-                    "La línea de pago %s declara el uuid %s pero no hay ninguna "
-                    "reserva de Mercado Pago asociada",
-                    line.id, line.mercadopago_uuid,
-                )
+                line._close_manual_approval(Approval)
                 continue
             if len(reserved) > 1:
                 _logger.error(
@@ -100,3 +99,51 @@ class PosPayment(models.Model):
                 reserved.mp_payment_id, line.id,
             )
         return lines
+
+    def _close_manual_approval(self, Approval):
+        """Completa la aprobación manual pendiente de esta línea, si hay una.
+
+        `register_manual_approval()` (Task 11) sólo conoce el uuid del
+        navegador al momento del cobro: la aprobación queda creada sin monto,
+        sin venta y sin sesión. Recién acá, con la línea real sincronizada, se
+        puede completar -si no, el reporte de aprobaciones manuales, el
+        control que justifica la existencia del modelo, saldría inútil.
+
+        Igual que el cierre de la reserva de `mercadopago.payment`: el uuid lo
+        pone el navegador, así que no alcanza para autorizar por sí solo. Acá
+        la pertenencia es incluso más precisa que cuenta+canal porque la
+        aprobación ya guarda el `payment_method_id` exacto de la caja que la
+        generó -es el mismo dato que produce `register_manual_approval()`
+        sobre `self` (la caja)-, así que basta con exigir que coincida con el
+        de esta línea para que una caja no pueda cerrar la aprobación de otra.
+        """
+        self.ensure_one()
+        approval = Approval.search([
+            ("pos_payment_uuid", "=", self.mercadopago_uuid),
+            ("pos_payment_id", "=", False),
+            ("payment_method_id", "=", self.payment_method_id.id),
+        ], order="id asc", limit=1)
+        if not approval:
+            _logger.warning(
+                "La línea de pago %s declara el uuid %s pero no hay ninguna "
+                "reserva ni aprobación manual de Mercado Pago asociada",
+                self.id, self.mercadopago_uuid,
+            )
+            return
+        order = self.pos_order_id
+        approval.write({
+            "pos_payment_id": self.id,
+            "pos_order_id": order.id,
+            "pos_session_id": order.session_id.id,
+            "amount": self.amount,
+        })
+        self.write({
+            "is_manual_approval": True,
+            "manual_reason": approval.reason,
+            "manual_approved_by_user_id": approval.user_id.id,
+            "manual_approved_at": approval.create_date,
+        })
+        _logger.info(
+            "Aprobación manual de Mercado Pago cerrada sobre la línea de pago %s",
+            self.id,
+        )
