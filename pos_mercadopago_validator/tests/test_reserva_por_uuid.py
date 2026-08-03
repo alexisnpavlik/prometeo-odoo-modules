@@ -8,16 +8,29 @@ class TestReservaPorUuid(TransactionCase):
     """Reserva y deshacer contra una línea de cobro que sólo vive en el navegador."""
 
     def setUp(self):
-        """Arma una cuenta, un método de cobro de este módulo y su bandeja."""
+        """Arma una cuenta, un método de cobro de este módulo y su bandeja.
+
+        Todo se crea en una compañía **activa** y explícita. En esta base la
+        compañía del superusuario (id 1) está archivada: un método de pago
+        creado con ella no es legible por ningún usuario de prueba, y las
+        pruebas que usan `with_user()` mueren con AccessError de la regla
+        multiempresa antes de llegar a lo que querían probar.
+        """
         super().setUp()
-        self.account = self.env["mercadopago.account"].create({
+        self.company = self.env["res.company"].search([], limit=1)
+        self.env = self.env(context=dict(self.env.context, allowed_company_ids=self.company.ids))
+        self.account = self.env["mercadopago.account"].with_company(self.company).create({
             "name": "Cuenta", "mode": "production", "mp_user_id": "430185252",
+            "company_id": self.company.id,
         })
-        journal = self.env["account.journal"].search([("type", "=", "bank")], limit=1)
-        self.method = self.env["pos.payment.method"].create({
+        journal = self.env["account.journal"].search([
+            ("type", "=", "bank"), ("company_id", "=", self.company.id),
+        ], limit=1)
+        self.method = self.env["pos.payment.method"].with_company(self.company).create({
             "name": "MP QR", "journal_id": journal.id,
             "use_payment_terminal": "mercadopago_validator",
             "mp_account_id": self.account.id, "mp_pos_id": "64365871",
+            "company_id": self.company.id,
         })
         self.Inbox = self.env["mercadopago.payment"]
 
@@ -35,13 +48,11 @@ class TestReservaPorUuid(TransactionCase):
         })
 
     def _pos_user(self, login):
-        """Crea otro cajero real, con el grupo del POS y una compañía activa."""
-        # En esta base la compañía del entorno puede estar archivada.
-        active_company = self.env["res.company"].search([], limit=1)
+        """Crea otro cajero real, en la misma compañía activa que el método."""
         return self.env["res.users"].create({
             "name": login, "login": login,
-            "company_id": active_company.id,
-            "company_ids": [(6, 0, active_company.ids)],
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, self.company.ids)],
             "groups_id": [(6, 0, [
                 self.env.ref("base.group_user").id,
                 self.env.ref("point_of_sale.group_pos_user").id,
@@ -50,7 +61,9 @@ class TestReservaPorUuid(TransactionCase):
 
     def _make_pos_payment(self, amount=1500.0):
         """Crea una línea de cobro real sobre la que imputar."""
-        config = self.env["pos.config"].create({"name": "Caja test reserva uuid"})
+        config = self.env["pos.config"].with_company(self.company).create({
+            "name": "Caja test reserva uuid", "company_id": self.company.id,
+        })
         config.write({"payment_method_ids": [(4, self.method.id)]})
         config.open_ui()
         order = self.env["pos.order"].create({
@@ -109,8 +122,9 @@ class TestReservaPorUuid(TransactionCase):
 
     def _other_account_method(self):
         """Un método de cobro idéntico pero apuntando a otra cuenta."""
-        other_account = self.env["mercadopago.account"].create({
+        other_account = self.env["mercadopago.account"].with_company(self.company).create({
             "name": "Otra cuenta", "mode": "production", "mp_user_id": "999999999",
+            "company_id": self.company.id,
         })
         return self.method.copy({
             "name": "MP QR otra caja", "mp_account_id": other_account.id,
@@ -135,14 +149,23 @@ class TestReservaPorUuid(TransactionCase):
         self.assertFalse(result["ok"])
         self.assertEqual(payment.state, "available")
 
-    def test_reserving_a_payment_outside_the_window_is_rejected(self):
-        """Lo que el cajero no pudo ver en la lista tampoco lo puede tomar."""
+    def test_a_payment_outside_the_window_is_hidden_but_still_imputable(self):
+        """La ventana es filtro de presentación, no una transición de estado.
+
+        Un pago que envejece entre que el cajero lo ve en pantalla y hace clic
+        -hasta un intervalo de polling de desfasaje- le sigue perteneciendo a
+        esta caja. Si la puerta de autorización heredara la ventana, la única
+        salida del cajero sería aprobar sin verificar un cobro que sí entró.
+        """
         self.assertEqual(self.method.search_window_minutes, 5)
         payment = self._payment(minutes_ago=30)
 
+        self.assertEqual(self.method.get_mp_inbox(1500.0)["matching"], [])
+
         result = self.method.impute_mp_payment_by_uuid(payment.id, "uuid-abc")
-        self.assertFalse(result["ok"])
-        self.assertEqual(payment.state, "available")
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertEqual(payment.state, "matched")
+        self.assertEqual(payment.pos_payment_uuid, "uuid-abc")
 
     def test_imputing_a_payment_of_another_cash_register_is_rejected(self):
         """La misma puerta cierra en la RPC con pos.payment real, no sólo por uuid."""

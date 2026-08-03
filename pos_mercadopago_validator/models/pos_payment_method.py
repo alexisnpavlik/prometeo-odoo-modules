@@ -60,8 +60,17 @@ class PosPaymentMethod(models.Model):
 
     STALE_AFTER_SECONDS = 60
 
-    def _inbox_domain(self):
-        """Filtro de presentación: la bandeja de esta caja (§6.2 del spec).
+    def _inbox_ownership_domain(self):
+        """Pertenencia: qué pagos son de esta caja, sin mirar la hora.
+
+        Es el criterio que decide de quién es un pago -cuenta, canal y estado-
+        y por eso también sirve para autorizar (`_find_inbox_line`). La ventana
+        temporal queda deliberadamente afuera: el spec §9 la define como filtro
+        de presentación, no como transición de estado. Un pago que envejece
+        entre que el cajero lo ve en la lista y hace clic -hasta un intervalo de
+        polling de desfasaje- le sigue perteneciendo a esta caja, y tiene que
+        poder imputarlo; si no, la única salida que le queda es aprobar sin
+        verificar un cobro que sí entró.
 
         Si esta caja no tiene `mp_pos_id` configurado, la rama del QR no debe
         matchear ningún registro: `("mp_pos_id", "=", False)` calzaría con
@@ -69,18 +78,26 @@ class PosPaymentMethod(models.Model):
         rompiendo el aislamiento entre cajas por una configuración incompleta.
         """
         self.ensure_one()
-        window_start = fields.Datetime.subtract(
-            fields.Datetime.now(), minutes=self.search_window_minutes
-        )
         domain = [
             ("account_id", "=", self.mp_account_id.id),
             ("state", "=", "available"),
-            ("date_approved", ">=", window_start),
         ]
         qr_leaf = [("mp_pos_id", "=", self.mp_pos_id)] if self.mp_pos_id else [(0, "=", 1)]
         channel = ["|"] + qr_leaf + [("source", "=", "alias")] \
             if self.accept_alias_payments else qr_leaf
         return domain + channel
+
+    def _inbox_domain(self):
+        """Filtro de presentación: la bandeja de esta caja (§6.2 del spec).
+
+        Pertenencia más la ventana de búsqueda. Sólo lo que se le muestra al
+        cajero; para decidir si puede tocar una fila se usa la pertenencia sola.
+        """
+        self.ensure_one()
+        window_start = fields.Datetime.subtract(
+            fields.Datetime.now(), minutes=self.search_window_minutes
+        )
+        return self._inbox_ownership_domain() + [("date_approved", ">=", window_start)]
 
     def get_mp_inbox(self, amount):
         """Devuelve la bandeja de esta caja para el monto pedido.
@@ -132,10 +149,13 @@ class PosPaymentMethod(models.Model):
 
         `browse()` a secas alcanza cualquier fila de `mercadopago.payment`, y el
         id llega desde el navegador: un usuario del POS que arme la llamada a
-        mano reservaría el pago de otra caja, de otra cuenta o fuera de la
-        ventana de búsqueda. La pertenencia se decide con el mismo
-        `_inbox_domain()` que armó la lista que el cajero vio, así que lo que no
-        pudo ver tampoco lo puede tomar.
+        mano reservaría el pago de otra caja o de otra cuenta. La pertenencia se
+        decide con `_inbox_ownership_domain()`.
+
+        Usa la pertenencia y **no** `_inbox_domain()`: la ventana temporal es un
+        filtro de presentación, no una condición de autorización. Autorizar con
+        ella dejaría inimputable un pago que el cajero tiene en pantalla y que
+        envejeció entre el render y el clic.
 
         No reemplaza al `SELECT ... FOR UPDATE` de `impute()` ni de
         `reserve_for_uuid()`: esto es la puerta de autorización, aquello la
@@ -145,7 +165,7 @@ class PosPaymentMethod(models.Model):
         if not isinstance(inbox_line_id, int) or isinstance(inbox_line_id, bool):
             return self.env["mercadopago.payment"].sudo().browse()
         return self.env["mercadopago.payment"].sudo().search(
-            self._inbox_domain() + [("id", "=", inbox_line_id)], limit=1
+            self._inbox_ownership_domain() + [("id", "=", inbox_line_id)], limit=1
         )
 
     @api.model

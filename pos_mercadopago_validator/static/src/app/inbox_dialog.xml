@@ -30,15 +30,7 @@
 
                     <div t-if="state.loading" class="mp-inbox-empty">Consultando…</div>
 
-                    <div t-elif="!state.matching.length" class="mp-inbox-empty">
-                        <p>No hay pagos de <t t-esc="formatAmount(props.amount)"/> en los últimos minutos.</p>
-                        <button t-if="state.othersCount" class="btn btn-link"
-                                t-on-click="() => state.showOthers = !state.showOthers">
-                            Hay <t t-esc="state.othersCount"/> pago(s) de otro monto
-                        </button>
-                    </div>
-
-                    <div t-else="" class="mp-inbox-list">
+                    <div t-elif="state.matching.length" class="mp-inbox-list">
                         <div t-if="isAmbiguous" class="mp-inbox-warning">
                             Estos pagos no se pueden distinguir entre sí. Elegí el más reciente.
                         </div>
@@ -55,6 +47,16 @@
                             <span t-if="line.difference" class="mp-diff">
                                 Diferencia: <t t-esc="formatAmount(line.difference)"/>
                             </span>
+                        </button>
+                    </div>
+
+                    <!-- El mensaje de lista vacía sólo vale si de verdad se pudo
+                         consultar: con `state.error` arriba diría lo contrario. -->
+                    <div t-elif="!state.error" class="mp-inbox-empty">
+                        <p>No hay pagos de <t t-esc="formatAmount(props.amount)"/> en los últimos minutos.</p>
+                        <button t-if="state.othersCount" class="btn btn-link"
+                                t-on-click="() => state.showOthers = !state.showOthers">
+                            Hay <t t-esc="state.othersCount"/> pago(s) de otro monto
                         </button>
                     </div>
 

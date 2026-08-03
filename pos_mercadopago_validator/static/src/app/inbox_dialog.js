@@ -104,13 +104,10 @@ export class MercadoPagoInboxDialog extends Component {
                 [[this.props.paymentMethod.id], this.props.amount]
             );
         } catch (error) {
-            if (this.alive) {
-                this.state.loading = false;
-                this.state.error = _t(
-                    "No se pudo leer la bandeja de Mercado Pago. Verificá el pago por otro medio."
-                );
-            }
-            console.warn("Fallo al leer la bandeja de Mercado Pago", error);
+            this._reportError(
+                _t("No se pudo leer la bandeja de Mercado Pago. Verificá el pago por otro medio."),
+                error
+            );
             return;
         }
         if (!this.alive) {
@@ -125,6 +122,17 @@ export class MercadoPagoInboxDialog extends Component {
             loading: false,
             error: false,
         });
+    }
+
+    /**
+     * Muestra el fallo dentro del diálogo en vez de dejarlo escapar a OWL.
+     */
+    _reportError(message, error) {
+        if (this.alive) {
+            this.state.loading = false;
+            this.state.error = message;
+        }
+        console.warn(message, error);
     }
 
     // Dos filas son indistinguibles si comparten monto y no tienen identificador.
@@ -146,9 +154,22 @@ export class MercadoPagoInboxDialog extends Component {
 
     /**
      * Imputa la fila elegida. Con `auto` el diálogo queda abierto para deshacer.
+     *
+     * Atrapa el fallo de transporte por el mismo motivo que `refresh()`: con el
+     * servidor caído y una lista vieja en pantalla, el rechazo escaparía al
+     * manejador de errores de OWL en vez de avisar dentro del diálogo.
      */
     async pick(line, auto = false) {
-        const accepted = await this.props.onPicked(line, this.isAmbiguous);
+        let accepted;
+        try {
+            accepted = await this.props.onPicked(line, this.isAmbiguous);
+        } catch (error) {
+            this._reportError(
+                _t("No se pudo imputar el pago. Verificá la conexión con el servidor."),
+                error
+            );
+            return;
+        }
         if (!accepted) {
             await this.refresh();
             return;
@@ -173,7 +194,16 @@ export class MercadoPagoInboxDialog extends Component {
      * Deshace la imputación automática y devuelve el cajero a la lista.
      */
     async undoAuto() {
-        const undone = await this.props.onUndo();
+        let undone;
+        try {
+            undone = await this.props.onUndo();
+        } catch (error) {
+            this._reportError(
+                _t("No se pudo deshacer. Verificá la conexión con el servidor."),
+                error
+            );
+            return;
+        }
         if (undone) {
             this.state.autoImputed = false;
             await this.refresh();
