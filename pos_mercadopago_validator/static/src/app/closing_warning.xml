@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_mercadopago_validator.ClosingWarningDialog">
+        <Dialog title="'Pagos de Mercado Pago sin imputar'" size="'md'">
+            <div class="mp-closing-warning">
+                <p class="mp-closing-warning-lead">
+                    Estos pagos se recibieron durante el turno y no quedaron asociados a
+                    ninguna venta. Revisalos antes de reconciliar la cuenta; el cierre
+                    de caja sigue de todas formas.
+                </p>
+                <div class="mp-closing-warning-list">
+                    <div t-foreach="props.payments" t-as="payment" t-key="payment.id"
+                         class="mp-closing-warning-row">
+                        <span class="mp-amount"><t t-esc="formatAmount(payment.amount)"/></span>
+                        <span class="mp-time"><t t-esc="formatTime(payment.date_approved)"/></span>
+                        <span class="mp-payer">
+                            <t t-if="payment.display_payer"><t t-esc="payment.display_payer"/></t>
+                            <t t-else="">Sin identificar</t>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="() => props.confirm()">
+                    Continuar con el cierre
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

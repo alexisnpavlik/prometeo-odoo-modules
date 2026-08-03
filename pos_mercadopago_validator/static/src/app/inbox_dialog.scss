@@ -44,3 +44,22 @@
     .mp-inbox-empty { padding: 16px; text-align: center; color: #6c757d; }
     .mp-inbox-manual { margin-top: 16px; border-top: 1px solid #dee2e6; padding-top: 12px; }
 }
+
+.mp-closing-warning {
+    .mp-closing-warning-lead { color: #6c757d; margin-bottom: 12px; }
+    .mp-closing-warning-row {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        padding: 12px;
+        border: 1px solid #ffe08a;
+        background: #fff3cd;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        .mp-amount { font-size: 1.2rem; font-weight: 700; }
+        .mp-time { color: #6c757d; }
+        .mp-payer { text-align: right; }
+    }
+}
