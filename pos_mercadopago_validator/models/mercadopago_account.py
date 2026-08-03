@@ -106,6 +106,29 @@ class MercadoPagoAccount(models.Model):
             if created:
                 created._notify_open_sessions()
 
+    def ingest_payment_id(self, payment_id):
+        """Trae un pago puntual de la API y lo vuelca en la bandeja.
+
+        Es el camino del webhook: del cuerpo de la notificación sólo se usó el
+        identificador, y el dato real se resuelve con credenciales propias.
+        """
+        self.ensure_one()
+        from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
+        from ..services.mp_client import MercadoPagoClient, MercadoPagoError, MercadoPagoTransientError
+
+        provider = MercadoPagoInboxProvider(
+            MercadoPagoClient(self.sudo().access_token), self.mp_user_id
+        )
+        try:
+            raw = provider.get_payment(payment_id)
+        except (MercadoPagoError, MercadoPagoTransientError) as error:
+            _logger.warning("No se pudo resolver el pago %s: %s", payment_id, error)
+            return False
+        created = self.env["mercadopago.payment"].ingest_raw(self, [raw])
+        if created:
+            created._notify_open_sessions()
+        return bool(created)
+
     @api.model
     def cron_ingest_payments(self):
         """Cron del ingestor. Sólo corre si hay una sesión de POS abierta."""

@@ -1,5 +1,7 @@
 import logging
 
+import psycopg2
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -90,7 +92,11 @@ class MercadoPagoPayment(models.Model):
         """Upsert idempotente de pagos crudos. Único camino de escritura.
 
         Tanto el webhook como el cron entran por acá: dos caminos distintos para
-        el mismo dato es como aparecen las inconsistencias irreproducibles.
+        el mismo dato es como aparecen las inconsistencias irreproducibles. Con
+        el webhook conviviendo con el cron, dos llamadas pueden hacer el search
+        de existencia al mismo tiempo, no encontrar nada, e intentar crear la
+        misma fila: la que pierde la carrera contra la restricción única de
+        mp_payment_id degrada con gracia en vez de propagar el IntegrityError.
         """
         from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
 
@@ -114,7 +120,16 @@ class MercadoPagoPayment(models.Model):
                 "state": "available",
                 "partner_id": self._resolve_partner(values).id,
             })
-            created |= self.create(values)
+            try:
+                with self.env.cr.savepoint():
+                    created |= self.create(values)
+            except psycopg2.IntegrityError:
+                # Otro llamador (cron o webhook) ganó la carrera y ya lo creó.
+                # No es nuestro: no sumarlo a `created` evita notificar dos veces.
+                _logger.info(
+                    "Carrera de ingesta en el pago %s: ya lo creó otro proceso, se ignora",
+                    values["mp_payment_id"],
+                )
 
         _logger.info(
             "Ingesta Mercado Pago cuenta %s: %s pagos nuevos de %s recibidos",
