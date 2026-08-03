@@ -1,0 +1,884 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pos_mercadopago_validator
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0-20260409\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-03 22:01+0000\n"
+"PO-Revision-Date: 2026-08-03 22:01+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment_method__amount_tolerance
+msgid "0 significa sólo coincidencia exacta de monto."
+msgstr "0 significa sólo coincidencia exacta de monto."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__access_token
+msgid "Access Token"
+msgstr "Token de acceso"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__account_id
+msgid "Account"
+msgstr "Cuenta"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__accept_alias_payments
+msgid "Aceptar cobros por alias"
+msgstr "Aceptar cobros por alias"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__active
+msgid "Active"
+msgstr "Activo"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_search
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Agrupar por"
+msgstr "Agrupar por"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_payment__source__alias
+msgid "Alias / CVU"
+msgstr "Alias / CVU"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__ambiguous_pick
+msgid "Ambiguous Pick"
+msgstr "Selección ambigua"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__amount
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__amount
+msgid "Amount"
+msgstr "Monto"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__amount_difference
+msgid "Amount Difference"
+msgstr "Diferencia de monto"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__amount_tolerance
+msgid "Amount Tolerance"
+msgstr "Tolerancia de monto"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Aprobar sin verificar el pago"
+msgstr "Aprobar sin verificar el pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__payer_bank_name
+msgid "Banco de origen"
+msgstr "Banco de origen"
+
+#. module: pos_mercadopago_validator
+#: model:ir.actions.act_window,name:pos_mercadopago_validator.action_mercadopago_payment
+#: model:ir.ui.menu,name:pos_mercadopago_validator.menu_mercadopago_payment
+msgid "Bandeja de pagos"
+msgstr "Bandeja de pagos"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__payer_vat
+msgid "CUIT del pagador"
+msgstr "CUIT del pagador"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Canal QR"
+msgstr "Canal QR"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Canal alias"
+msgstr "Canal alias"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Cancelar"
+msgstr "Cancelar"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__partner_id
+msgid "Cliente"
+msgstr "Cliente"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_mercadopago_manual_approval
+msgid "Cobro aprobado sin verificación de pago"
+msgstr "Cobro aprobado sin verificación de pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.actions.act_window,name:pos_mercadopago_validator.action_manual_approval
+#: model:ir.ui.menu,name:pos_mercadopago_validator.menu_manual_approval
+msgid "Cobros sin verificación"
+msgstr "Cobros sin verificación"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__mp_user_id
+msgid "Collector ID"
+msgstr "ID de cobrador"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__company_id
+msgid "Company"
+msgstr "Compañía"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_account.py:0
+msgid "Conexión correcta. Collector ID %(uid)s, cuenta %(nick)s."
+msgstr "Conexión correcta. Collector ID %(uid)s, cuenta %(nick)s."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Confirmar cobro sin verificar"
+msgstr "Confirmar cobro sin verificar"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Consultando…"
+msgstr "Consultando…"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Continuar"
+msgstr "Continuar"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/closing_warning.xml:0
+msgid "Continuar con el cierre"
+msgstr "Continuar con el cierre"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__create_uid
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__create_uid
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__create_uid
+msgid "Created by"
+msgstr "Creado por"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__create_date
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__create_date
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__create_date
+msgid "Created on"
+msgstr "Creado el"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_mercadopago_account
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__mp_account_id
+msgid "Cuenta de Mercado Pago"
+msgstr "Cuenta de Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.ui.menu,name:pos_mercadopago_validator.menu_mercadopago_account
+msgid "Cuentas"
+msgstr "Cuentas"
+
+#. module: pos_mercadopago_validator
+#: model:ir.actions.act_window,name:pos_mercadopago_validator.action_mercadopago_account
+msgid "Cuentas de Mercado Pago"
+msgstr "Cuentas de Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__currency_id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__currency_id
+msgid "Currency"
+msgstr "Moneda"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__date_approved
+msgid "Date Approved"
+msgstr "Fecha de aprobación"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.js:0
+msgid "Datos desactualizados. Última sincronización: %s"
+msgstr "Datos desactualizados. Última sincronización: %s"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment_method__auto_impute_single_match
+msgid "Desactivado, el cajero confirma siempre."
+msgstr "Desactivado, el cajero confirma siempre."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_payment__state__discarded
+msgid "Descartado"
+msgstr "Descartado"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Deshacer"
+msgstr "Deshacer"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid "Deshecho por el cajero antes de confirmar la venta"
+msgstr "Deshecho por el cajero antes de confirmar la venta"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Diferencia:"
+msgstr "Diferencia:"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__display_name
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__display_name
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__display_name
+msgid "Display Name"
+msgstr "Nombre a mostrar"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_payment__state__available
+msgid "Disponible"
+msgstr "Disponible"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Día"
+msgstr "Día"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid "Esa línea de cobro ya tiene asignado el pago de Mercado Pago %s."
+msgstr "Esa línea de cobro ya tiene asignado el pago de Mercado Pago %s."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid "Esa línea de cobro ya tiene reservado el pago de Mercado Pago %s."
+msgstr "Esa línea de cobro ya tiene reservado el pago de Mercado Pago %s."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid "Esa reserva la hizo otro cajero: no la podés deshacer."
+msgstr "Esa reserva la hizo otro cajero: no la podés deshacer."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid "Esa reserva ya no existe: la venta pudo haberse confirmado."
+msgstr "Esa reserva ya no existe: la venta pudo haberse confirmado."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Escribí el motivo para poder continuar."
+msgstr "Escribí el motivo para poder continuar."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.constraint,message:pos_mercadopago_validator.constraint_mercadopago_payment_mp_payment_id_uniq
+msgid "Ese pago de Mercado Pago ya está en la bandeja."
+msgstr "Ese pago de Mercado Pago ya está en la bandeja."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid ""
+"Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
+msgstr ""
+"Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid ""
+"Ese pago ya no está disponible en la bandeja de esta caja. Actualizá la "
+"lista y elegí otro."
+msgstr ""
+"Ese pago ya no está disponible en la bandeja de esta caja. Actualizá la "
+"lista y elegí otro."
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Estado"
+msgstr "Estado"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Estos pagos no se pueden distinguir entre sí. Elegí el más reciente."
+msgstr "Estos pagos no se pueden distinguir entre sí. Elegí el más reciente."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/closing_warning.xml:0
+msgid ""
+"Estos pagos se recibieron durante el turno y no quedaron asociados a\n"
+"                    ninguna venta. Revisalos antes de reconciliar la cuenta; el cierre\n"
+"                    de caja sigue de todas formas."
+msgstr ""
+"Estos pagos se recibieron durante el turno y no quedaron asociados a\n"
+"                    ninguna venta. Revisalos antes de reconciliar la cuenta; el cierre\n"
+"                    de caja sigue de todas formas."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid ""
+"Estás registrando un cobro SIN verificación de pago.\n"
+"                                Queda auditado con tu usuario."
+msgstr ""
+"Estás registrando un cobro SIN verificación de pago.\n"
+"                                Queda auditado con tu usuario."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__require_manager_for_manual
+msgid "Exigir encargado para aprobación manual"
+msgstr "Exigir encargado para aprobación manual"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_list
+msgid "Fecha"
+msgstr "Fecha"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Hay"
+msgstr "Hay"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_search
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Hoy"
+msgstr "Hoy"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Huérfanos (sin imputar)"
+msgstr "Huérfanos (sin imputar)"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__id
+msgid "ID"
+msgstr "ID"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__mp_payer_id
+msgid "ID de pagador"
+msgstr "ID de pagador"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__mp_pos_id
+msgid "ID del QR (caja)"
+msgstr "ID del QR (caja)"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_payment__state__matched
+msgid "Imputado"
+msgstr "Imputado"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Imputados"
+msgstr "Imputados"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__auto_impute_single_match
+msgid "Imputar solo cuando hay un único candidato"
+msgstr "Imputar solo cuando hay un único candidato"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__is_manual_approval
+msgid "Is Manual Approval"
+msgstr "Es aprobación manual"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid "La aprobación manual necesita un motivo."
+msgstr "La aprobación manual necesita un motivo."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.js:0
+msgid "La bandeja nunca se sincronizó con Mercado Pago."
+msgstr "La bandeja nunca se sincronizó con Mercado Pago."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__last_sync_at
+msgid "Last Sync At"
+msgstr "Última sincronización"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__last_sync_error
+msgid "Last Sync Error"
+msgstr "Último error de sincronización"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__write_uid
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__write_uid
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__write_uid
+msgid "Last Updated by"
+msgstr "Última actualización por"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__write_date
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__write_date
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__write_date
+msgid "Last Updated on"
+msgstr "Última actualización el"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__last_validated_at
+msgid "Last Validated At"
+msgstr "Última validación"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Listo"
+msgstr "Listo"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment_method__accept_alias_payments
+msgid "Los cobros por alias no traen caja ni pagador identificable."
+msgstr "Los cobros por alias no traen caja ni pagador identificable."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__manual_approved_at
+msgid "Manual Approved At"
+msgstr "Aprobado manualmente el"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__manual_approved_by_user_id
+msgid "Manual Approved By User"
+msgstr "Aprobado manualmente por"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__manual_reason
+msgid "Manual Reason"
+msgstr "Motivo manual"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__matched_at
+msgid "Matched At"
+msgstr "Imputado el"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__matched_by_user_id
+msgid "Matched By User"
+msgstr "Imputado por"
+
+#. module: pos_mercadopago_validator
+#: model:ir.ui.menu,name:pos_mercadopago_validator.menu_mercadopago_root
+msgid "Mercado Pago"
+msgstr "Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/payment_mercadopago_validator.js:0
+msgid "Mercado Pago %s"
+msgstr "Mercado Pago %s"
+
+#. module: pos_mercadopago_validator
+#: model:res.groups,name:pos_mercadopago_validator.group_mercadopago_manager
+msgid "Mercado Pago - Administración de la bandeja"
+msgstr "Mercado Pago - Administración de la bandeja"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_pos_payment_method_form_mp
+msgid "Mercado Pago - Validador de QR"
+msgstr "Mercado Pago - Validador de QR"
+
+#. module: pos_mercadopago_validator
+#: model:ir.actions.server,name:pos_mercadopago_validator.cron_mercadopago_ingest_ir_actions_server
+msgid "Mercado Pago: ingestar pagos recibidos"
+msgstr "Mercado Pago: ingestar pagos recibidos"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__mercadopago_uuid
+msgid "Mercadopago Uuid"
+msgstr "Uuid de Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__mode
+msgid "Mode"
+msgstr "Modo"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Motivo (obligatorio)"
+msgstr "Motivo (obligatorio)"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__mp_payment_id
+msgid "Mp Payment"
+msgstr "Pago de Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__name
+msgid "Name"
+msgstr "Nombre"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "No hay pagos de"
+msgstr "No hay pagos de"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/closing_warning.js:0
+msgid "No se pudo consultar los pagos de Mercado Pago sin imputar"
+msgstr "No se pudo consultar los pagos de Mercado Pago sin imputar"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/payment_mercadopago_validator.js:0
+msgid "No se pudo deshacer"
+msgstr "No se pudo deshacer"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.js:0
+msgid "No se pudo deshacer. Verificá la conexión con el servidor."
+msgstr "No se pudo deshacer. Verificá la conexión con el servidor."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.js:0
+msgid "No se pudo imputar el pago. Verificá la conexión con el servidor."
+msgstr "No se pudo imputar el pago. Verificá la conexión con el servidor."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.js:0
+msgid ""
+"No se pudo leer la bandeja de Mercado Pago. Verificá el pago por otro medio."
+msgstr ""
+"No se pudo leer la bandeja de Mercado Pago. Verificá el pago por otro medio."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/pos_payment_method.py:0
+msgid "No tenés acceso a la bandeja de Mercado Pago."
+msgstr "No tenés acceso a la bandeja de Mercado Pago."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__display_payer
+msgid "Pagador"
+msgstr "Pagador"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__mercadopago_payment_id
+msgid "Pago de Mercado Pago"
+msgstr "Pago de Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Pago imputado automáticamente"
+msgstr "Pago imputado automáticamente"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_mercadopago_payment
+msgid "Pago recibido en Mercado Pago"
+msgstr "Pago recibido en Mercado Pago"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/payment_mercadopago_validator.js:0
+msgid "Pago ya asignado"
+msgstr "Pago ya asignado"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.actions.act_window,help:pos_mercadopago_validator.action_mercadopago_orphans
+msgid ""
+"Pagos acreditados en Mercado Pago que no quedaron vinculados a ninguna "
+"venta. Es dinero real que entró sin imputar: cruzalo con las aprobaciones "
+"manuales del mismo período."
+msgstr ""
+"Pagos acreditados en Mercado Pago que no quedaron vinculados a ninguna "
+"venta. Es dinero real que entró sin imputar: cruzalo con las aprobaciones "
+"manuales del mismo período."
+
+#. module: pos_mercadopago_validator
+#: model:ir.actions.act_window,name:pos_mercadopago_validator.action_mercadopago_orphans
+#: model:ir.ui.menu,name:pos_mercadopago_validator.menu_mercadopago_orphans
+msgid "Pagos huérfanos"
+msgstr "Pagos huérfanos"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__payer_email
+msgid "Payer Email"
+msgstr "Email del pagador"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__payment_method_id
+msgid "Payment Method"
+msgstr "Método de pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__payment_method_detail
+msgid "Payment Method Detail"
+msgstr "Detalle del método de pago"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_pos_payment_method
+msgid "Point of Sale Payment Methods"
+msgstr "Point of Sale Payment Methods"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_pos_payment
+msgid "Point of Sale Payments"
+msgstr "Point of Sale Payments"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model,name:pos_mercadopago_validator.model_pos_session
+msgid "Point of Sale Session"
+msgstr "Point of Sale Session"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__poll_interval_seconds
+msgid "Poll Interval Seconds"
+msgstr "Intervalo de sondeo (segundos)"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__pos_order_id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__pos_order_id
+msgid "Pos Order"
+msgstr "Venta POS"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__pos_payment_id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__pos_payment_id
+msgid "Pos Payment"
+msgstr "Pago POS"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__pos_payment_uuid
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__pos_payment_uuid
+msgid "Pos Payment Uuid"
+msgstr "Uuid del pago POS"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__pos_session_id
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__pos_session_id
+msgid "Pos Session"
+msgstr "Sesión POS"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_account_form
+msgid "Probar conexión"
+msgstr "Probar conexión"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_account.py:0
+msgid "Probá la conexión antes de activar la cuenta '%s'."
+msgstr "Probá la conexión antes de activar la cuenta '%s'."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_account__mode__production
+msgid "Producción"
+msgstr "Producción"
+
+#. module: pos_mercadopago_validator
+#: model:res.groups,comment:pos_mercadopago_validator.group_mercadopago_manager
+msgid "Puede revisar la bandeja, los huérfanos y las aprobaciones manuales."
+msgstr "Puede revisar la bandeja, los huérfanos y las aprobaciones manuales."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_payment__source__qr
+msgid "QR"
+msgstr "QR"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__mp_pos_id
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "QR / Caja"
+msgstr "QR / Caja"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__raw_status
+msgid "Raw Status"
+msgstr "Estado original"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__reason
+msgid "Reason"
+msgstr "Motivo"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment__mercadopago_reference
+msgid "Referencia MP"
+msgstr "Referencia MP"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields.selection,name:pos_mercadopago_validator.selection__mercadopago_account__mode__sandbox
+msgid "Sandbox"
+msgstr "Sandbox"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_mercadopago_account__mp_user_id
+msgid "Se completa al validar las credenciales. Filtra los cobros propios."
+msgstr "Se completa al validar las credenciales. Filtra los cobros propios."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_mercadopago_payment__ambiguous_pick
+msgid "Se eligió entre candidatos que no podían distinguirse entre sí."
+msgstr "Se eligió entre candidatos que no podían distinguirse entre sí."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid ""
+"Se revirtió la imputación del pago de Mercado Pago %(mp)s. Motivo: "
+"%(reason)s"
+msgstr ""
+"Se revirtió la imputación del pago de Mercado Pago %(mp)s. Motivo: "
+"%(reason)s"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_pos_payment_method__search_window_minutes
+msgid "Search Window Minutes"
+msgstr "Ventana de búsqueda (minutos)"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_search
+msgid "Selección ambigua"
+msgstr "Selección ambigua"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_search
+msgid "Sesión"
+msgstr "Sesión"
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/closing_warning.xml:0
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "Sin identificar"
+msgstr "Sin identificar"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_account_form
+msgid "Sincronización"
+msgstr "Sincronización"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__source
+msgid "Source"
+msgstr "Origen"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_payment__state
+msgid "State"
+msgstr "Estado"
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid "Sólo se puede revertir un pago imputado."
+msgstr "Sólo se puede revertir un pago imputado."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_mercadopago_account__access_token
+msgid "Token de producción de la cuenta. Nunca sale del servidor."
+msgstr "Token de producción de la cuenta. Nunca sale del servidor."
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_list
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_mercadopago_payment_list
+msgid "Total"
+msgstr "Total"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_manual_approval__user_id
+msgid "User"
+msgstr "Usuario"
+
+#. module: pos_mercadopago_validator
+#: model_terms:ir.ui.view,arch_db:pos_mercadopago_validator.view_manual_approval_search
+msgid "Usuario"
+msgstr "Usuario"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment_method__mp_account_id
+msgid "Varias cajas pueden apuntar a la misma cuenta con QR distintos."
+msgstr "Varias cajas pueden apuntar a la misma cuenta con QR distintos."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,field_description:pos_mercadopago_validator.field_mercadopago_account__webhook_secret
+msgid "Webhook Secret"
+msgstr "Secreto del webhook"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.constraint,message:pos_mercadopago_validator.constraint_mercadopago_account_mp_user_id_uniq
+msgid ""
+"Ya existe una cuenta de Mercado Pago con ese Collector ID en esta compañía."
+msgstr ""
+"Ya existe una cuenta de Mercado Pago con ese Collector ID en esta compañía."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "en los últimos minutos."
+msgstr "en los últimos minutos."
+
+#. module: pos_mercadopago_validator
+#. odoo-javascript
+#: code:addons/pos_mercadopago_validator/static/src/app/inbox_dialog.xml:0
+msgid "pago(s) de otro monto"
+msgstr "pago(s) de otro monto"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment_method__mp_pos_id
+msgid "pos_id del QR de esta caja. Separa la bandeja de las demás cajas."
+msgstr "pos_id del QR de esta caja. Separa la bandeja de las demás cajas."
+
+#. module: pos_mercadopago_validator
+#. odoo-python
+#: code:addons/pos_mercadopago_validator/models/mercadopago_payment.py:0
+msgid "sin motivo"
+msgstr "sin motivo"
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_mercadopago_payment__amount
+msgid ""
+"transaction_amount de Mercado Pago: lo que pagó el cliente, antes de "
+"retenciones."
+msgstr ""
+"transaction_amount de Mercado Pago: lo que pagó el cliente, antes de "
+"retenciones."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_mercadopago_payment__pos_payment_uuid
+msgid "uuid de la línea del navegador que reservó el pago durante el cobro."
+msgstr "uuid de la línea del navegador que reservó el pago durante el cobro."
+
+#. module: pos_mercadopago_validator
+#: model:ir.model.fields,help:pos_mercadopago_validator.field_pos_payment__mercadopago_uuid
+msgid ""
+"uuid de la línea en el navegador. Vincula la reserva hecha durante el cobro "
+"(Task 11)."
+msgstr ""
+"uuid de la línea en el navegador. Vincula la reserva hecha durante el cobro "
+"(Task 11)."
