@@ -73,3 +73,43 @@ class MercadoPagoAccount(models.Model):
                 ),
             },
         }
+
+    def _window_minutes(self):
+        """Mayor ventana configurada entre los métodos de pago de esta cuenta."""
+        methods = self.env["pos.payment.method"].search([("mp_account_id", "=", self.id)])
+        return max(methods.mapped("search_window_minutes") or [5])
+
+    def ingest_now(self):
+        """Consulta la ventana y vuelca el resultado en la bandeja."""
+        from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
+        from ..services.mp_client import MercadoPagoAuthError, MercadoPagoTransientError, MercadoPagoClient
+
+        for account in self:
+            provider = MercadoPagoInboxProvider(
+                MercadoPagoClient(account.sudo().access_token), account.mp_user_id
+            )
+            try:
+                raw = provider.fetch_payments("NOW-%sMINUTES" % account._window_minutes(), "NOW")
+            except MercadoPagoAuthError as error:
+                account.sudo().write({"last_sync_error": str(error), "active": False})
+                _logger.error("Credenciales rechazadas para la cuenta %s", account.name)
+                continue
+            except MercadoPagoTransientError as error:
+                account.sudo().write({"last_sync_error": str(error)})
+                _logger.warning("Bandeja desactualizada para %s: %s", account.name, error)
+                continue
+
+            created = self.env["mercadopago.payment"].ingest_raw(account, raw)
+            account.sudo().write({
+                "last_sync_at": fields.Datetime.now(), "last_sync_error": False,
+            })
+            if created:
+                created._notify_open_sessions()
+
+    @api.model
+    def cron_ingest_payments(self):
+        """Cron del ingestor. Sólo corre si hay una sesión de POS abierta."""
+        open_sessions = self.env["pos.session"].search_count([("state", "=", "opened")])
+        if not open_sessions:
+            return
+        self.search([("active", "=", True)]).ingest_now()

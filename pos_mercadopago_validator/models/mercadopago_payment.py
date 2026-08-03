@@ -83,3 +83,66 @@ class MercadoPagoPayment(models.Model):
                 payment.display_payer = payment.payer_bank_name
             else:
                 payment.display_payer = False
+
+    @api.model
+    def ingest_raw(self, account, raw_payments):
+        """Upsert idempotente de pagos crudos. Único camino de escritura.
+
+        Tanto el webhook como el cron entran por acá: dos caminos distintos para
+        el mismo dato es como aparecen las inconsistencias irreproducibles.
+        """
+        from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
+
+        provider = MercadoPagoInboxProvider(client=None, mp_user_id=account.mp_user_id)
+        currency = account.company_id.currency_id
+        created = self.browse()
+
+        for raw in raw_payments:
+            if not provider.is_ingestable(raw):
+                continue
+            values = provider.normalize(raw)
+            existing = self.search([("mp_payment_id", "=", values["mp_payment_id"])], limit=1)
+            if existing:
+                # Nunca se reabre un pago ya imputado ni se pisa su vínculo.
+                if existing.state == "available":
+                    existing.write(self._values_without_state(values))
+                continue
+            values.update({
+                "account_id": account.id,
+                "currency_id": currency.id,
+                "state": "available",
+                "partner_id": self._resolve_partner(values).id,
+            })
+            created |= self.create(values)
+
+        _logger.info(
+            "Ingesta Mercado Pago cuenta %s: %s pagos nuevos de %s recibidos",
+            account.name, len(created), len(raw_payments),
+        )
+        return created
+
+    @api.model
+    def _values_without_state(self, values):
+        """Quita del dict las claves que no deben pisarse en una reingesta."""
+        return {k: v for k, v in values.items() if k not in ("state", "mp_payment_id")}
+
+    @api.model
+    def _resolve_partner(self, values):
+        """Busca el cliente por CUIT y, si no, por mapeo previo del payer id."""
+        Partner = self.env["res.partner"]
+        if values.get("payer_vat"):
+            partner = Partner.search([("vat", "=", values["payer_vat"])], limit=1)
+            if partner:
+                return partner
+        if values.get("mp_payer_id"):
+            mapped = self.search([
+                ("mp_payer_id", "=", values["mp_payer_id"]),
+                ("partner_id", "!=", False),
+            ], limit=1)
+            if mapped:
+                return mapped.partner_id
+        return Partner.browse()
+
+    def _notify_open_sessions(self):
+        """Avisa por bus a las cajas con sesión abierta. Se completa en Task 10."""
+        return True

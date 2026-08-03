@@ -21,6 +21,7 @@ los pagos recibidos que quedaron sin imputar.
         "security/ir.model.access.csv",
         "views/mercadopago_account_views.xml",
         "views/menus.xml",
+        "data/ir_cron.xml",
     ],
     "installable": True,
     "auto_install": False,
