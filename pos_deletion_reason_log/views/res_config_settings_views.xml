@@ -7,6 +7,12 @@
         <field name="arch" type="xml">
             <xpath expr="//block[@id='product_and_category_block']" position="after">
                 <block id="pos_deletion_reason_block" title="Trazabilidad de operaciones POS">
+                    <setting string="Nota de justificación obligatoria" help="Exige escribir una nota además de elegir el motivo de la lista. Si se desactiva, la nota queda opcional.">
+                        <field name="require_reason_note"/>
+                    </setting>
+                    <setting string="No permitir cancelar el aviso de motivo" help="Si está activo (por defecto), el cajero NO puede cancelar ni cerrar el aviso (sin Cancelar, sin X, Escape bloqueado): debe elegir motivo y confirmar. Desactivalo para permitir cancelar (se revierte la operación).">
+                        <field name="block_reason_cancel"/>
+                    </setting>
                     <setting string="Motivo al eliminar orden" help="Pide un motivo cuando se elimina una orden completa.">
                         <field name="require_reason_order_deletion"/>
                     </setting>
@@ -28,6 +34,9 @@
                     </setting>
                     <setting string="Motivo al aumentar precio" help="Pide un motivo cuando se sube el precio de una línea por encima del que tenía al seleccionarla.">
                         <field name="require_reason_price_increase"/>
+                    </setting>
+                    <setting string="Motivo al hacer un reembolso" help="Pide un motivo al cobrar un reembolso (orden con líneas devueltas). Desactivado por defecto: los reembolsos ya se registran de forma nativa.">
+                        <field name="require_reason_refund"/>
                     </setting>
                     <setting string="Bloquear cierre con órdenes pendientes" help="Impide cerrar la caja si quedan órdenes con productos sin finalizar. El cajero debe cobrarlas o cancelarlas (con motivo) antes de cerrar.">
                         <field name="block_close_with_pending_orders"/>

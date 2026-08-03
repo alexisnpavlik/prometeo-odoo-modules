@@ -86,6 +86,35 @@ patch(OrderSummary.prototype, {
             return result;
         }
 
+        // Red de seguridad para la reducción por tecleo directo: garantiza que la
+        // línea tenga un baseline aunque no se haya seleccionado vía
+        // selectOrderLine (p.ej. selección restaurada al abrir/cambiar de orden).
+        // Se captura AHORA, antes de que super aplique el cambio, así el valor
+        // guardado es el previo a la edición y _resolvePendingLineChanges detecta
+        // la reducción al deseleccionar o cobrar.
+        if (
+            line &&
+            val !== "" &&
+            val !== "remove" &&
+            (!this.pos._controlLogBaseline || !this.pos._controlLogBaseline.has(line.uuid))
+        ) {
+            this.pos._captureLineBaseline(line);
+        }
+
         return super._setValue(val);
+    },
+
+    /**
+     * Al deseleccionar una línea clickeándola de nuevo, el core NO pasa por
+     * selectOrderLine, así que los cambios pendientes (reducción de cantidad,
+     * descuento o precio) nunca se resolvían y no se pedía motivo. Se resuelven
+     * acá, antes de perder la selección. (En doble click el core edita lotes, no
+     * deselecciona, así que se omite.)
+     */
+    clickLine(ev, orderline) {
+        if (orderline.isSelected() && ev.detail !== 2) {
+            this.pos._resolvePendingLineChanges(this.currentOrder);
+        }
+        return super.clickLine(...arguments);
     },
 });

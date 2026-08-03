@@ -12,7 +12,9 @@
                         <strong>Reducciones de cantidad</strong>: <span t-out="control_counts['qty_reduction']">0</span> ·
                         <strong>Descuentos altos</strong>: <span t-out="control_counts['high_discount']">0</span> ·
                         <strong>Reducciones de precio</strong>: <span t-out="control_counts['price_reduction']">0</span> ·
-                        <strong>Aumentos de precio</strong>: <span t-out="control_counts['price_increase']">0</span>
+                        <strong>Aumentos de precio</strong>: <span t-out="control_counts['price_increase']">0</span> ·
+                        <strong>Reembolsos</strong>: <span t-out="control_counts['refund']">0</span> ·
+                        <strong>Importe reembolsado</strong>: $<span t-out="refund_amount" t-options="{'widget': 'float', 'precision': 2}">0</span>
                     </div>
                 </div>
                 <table class="table table-sm table-borderless mt-2">
@@ -34,7 +36,7 @@
                             <td><span t-out="d['datetime']" t-options="{'widget': 'datetime'}">2026-01-01 00:00:00</span></td>
                             <td><span t-out="d['user_name']">Cajero</span></td>
                             <td><span t-out="d['type_label']">Tipo</span></td>
-                            <td><span t-out="d['product_name']">Producto</span></td>
+                            <td style="white-space: pre-line;"><span t-out="d['product_name']">Producto</span></td>
                             <td class="text-end"><span t-out="d['qty']" t-options="{'widget': 'float', 'precision': 2}">0</span></td>
                             <td class="text-end">
                                 <t t-if="d['discount']">

@@ -26,9 +26,15 @@ class PosControlMetricsController(http.Controller):
         self, start_date=None, end_date=None, pos="all", cashier="all",
         company="all", dtype="all",
     ):
-        """WHERE compartido sobre pos_control_log (alias dl)."""
+        """WHERE compartido sobre pos_control_log (alias dl).
+
+        Excluye los eventos 'refund': los reembolsos se miden desde la data
+        nativa (pos_order_line), y el evento 'refund' del log solo guarda el
+        motivo. Contarlos acá los duplicaría en KPIs, ranking, tendencia y
+        detalle.
+        """
         allowed = tuple(request.env.companies.ids) or (0,)
-        where = "dl.company_id IN %s"
+        where = "dl.company_id IN %s AND dl.event_type != 'refund'"
         params = [allowed]
         tz = self._get_timezone()
 
@@ -62,6 +68,53 @@ class PosControlMetricsController(http.Controller):
         LEFT JOIN product_product pp ON pp.id = dl.product_id
         LEFT JOIN product_template pt ON pt.id = pp.product_tmpl_id
     """
+
+    # Los reembolsos no se registran en el log de control: Odoo ya los persiste
+    # nativamente como líneas con refunded_orderline_id y qty negativa. Se leen
+    # directo de pos_order_line, así se capturan TODOS (históricos y futuros) y
+    # no hay forma de evadir el conteo desde el POS.
+    _REFUND_JOINS = """
+        FROM pos_order_line pol
+        JOIN pos_order po ON po.id = pol.order_id
+        LEFT JOIN pos_config pc ON pc.id = po.config_id
+        LEFT JOIN res_users ru ON ru.id = po.user_id
+        LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+        LEFT JOIN res_company rc ON rc.id = po.company_id
+        LEFT JOIN product_product pp ON pp.id = pol.product_id
+        LEFT JOIN product_template pt ON pt.id = pp.product_tmpl_id
+    """
+
+    def _build_refund_where(
+        self, start_date=None, end_date=None, pos="all", cashier="all",
+        company="all",
+    ):
+        """WHERE para las líneas de reembolso (alias pol / po). Solo órdenes
+        no canceladas; misma semántica de filtros que el log de control."""
+        allowed = tuple(request.env.companies.ids) or (0,)
+        where = (
+            "pol.refunded_orderline_id IS NOT NULL "
+            "AND po.company_id IN %s "
+            "AND po.state IN ('paid','done','invoiced')"
+        )
+        params = [allowed]
+        tz = self._get_timezone()
+
+        if start_date:
+            where += " AND po.date_order >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            params.extend([f"{start_date} 00:00:00", tz])
+        if end_date:
+            where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
+            params.extend([f"{end_date} 23:59:59", tz])
+        if pos and pos != "all":
+            where += " AND pc.name = %s"
+            params.append(pos)
+        if cashier and cashier != "all":
+            where += " AND rp.name = %s"
+            params.append(cashier)
+        if company and company != "all":
+            where += " AND rc.name = %s"
+            params.append(company)
+        return where, params
 
     @http.route("/pos_control_metrics/filters", type="json", auth="user")
     def get_filters(self, **kwargs):
@@ -112,6 +165,9 @@ class PosControlMetricsController(http.Controller):
         where, params = self._build_where(
             start_date, end_date, pos, cashier, company, dtype
         )
+        # Los reembolsos entran cuando no se filtra por un tipo puntual del log
+        # ("Todos") o cuando se pide expresamente el tipo "refund".
+        include_refunds = dtype in ("all", "refund")
 
         # --- KPIs: conteo por tipo, importe y unidades ---
         cr.execute(
@@ -144,7 +200,33 @@ class PosControlMetricsController(http.Controller):
             "amount": float(row.get("amount") or 0.0),
             "units": float(row.get("units") or 0.0),
             "avg_discount": round(float(row.get("avg_discount") or 0.0), 2),
+            "n_refund": 0,
+            "refund_amount": 0.0,
+            "refund_units": 0.0,
         }
+
+        # --- KPIs de reembolsos (fuente nativa pos_order_line) ---
+        rf_where, rf_params = self._build_refund_where(
+            start_date, end_date, pos, cashier, company
+        )
+        if include_refunds:
+            cr.execute(
+                f"""
+                SELECT
+                    COUNT(DISTINCT po.id) AS n_refund,
+                    COALESCE(ABS(SUM(pol.price_subtotal_incl)), 0) AS refund_amount,
+                    COALESCE(ABS(SUM(pol.qty)), 0) AS refund_units
+                {self._REFUND_JOINS}
+                WHERE {rf_where}
+                """,
+                rf_params,
+            )
+            rf_row = cr.dictfetchone() or {}
+            kpis["n_refund"] = int(rf_row.get("n_refund") or 0)
+            kpis["refund_amount"] = float(rf_row.get("refund_amount") or 0.0)
+            kpis["refund_units"] = float(rf_row.get("refund_units") or 0.0)
+            # El total de operaciones auditadas incluye los reembolsos.
+            kpis["total"] += kpis["n_refund"]
 
         # --- Tasa de eliminación: órdenes eliminadas / órdenes del período ---
         allowed = tuple(request.env.companies.ids) or (0,)
@@ -168,6 +250,8 @@ class PosControlMetricsController(http.Controller):
         kpis["deletion_rate"] = round(100.0 * kpis["n_order"] / denom, 2) if denom else 0.0
 
         # --- Ranking de cajeros (conteo por tipo + importe) ---
+        # Se arma como dict por nombre para poder fusionar los reembolsos
+        # (fuente distinta) y no perder cajeros que solo hicieron reembolsos.
         cr.execute(
             f"""
             SELECT rp.name AS cajero,
@@ -182,14 +266,14 @@ class PosControlMetricsController(http.Controller):
             {self._JOINS}
             WHERE {where}
             GROUP BY rp.name
-            ORDER BY total DESC
-            LIMIT 15
             """,
             params,
         )
-        cashiers = [
-            {
-                "cajero": r["cajero"] or "—",
+        cashier_map = {}
+        for r in cr.dictfetchall():
+            name = r["cajero"] or "—"
+            cashier_map[name] = {
+                "cajero": name,
                 "n_order": int(r["n_order"]),
                 "n_line": int(r["n_line"]),
                 "n_qty": int(r["n_qty"]),
@@ -198,9 +282,40 @@ class PosControlMetricsController(http.Controller):
                 "n_price_up": int(r["n_price_up"]),
                 "amount": float(r["amount"]),
                 "total": int(r["total"]),
+                "n_refund": 0,
+                "refund_amount": 0.0,
             }
-            for r in cr.dictfetchall()
-        ]
+
+        if include_refunds:
+            cr.execute(
+                f"""
+                SELECT rp.name AS cajero,
+                       COUNT(DISTINCT po.id) AS n_refund,
+                       COALESCE(ABS(SUM(pol.price_subtotal_incl)), 0) AS refund_amount
+                {self._REFUND_JOINS}
+                WHERE {rf_where}
+                GROUP BY rp.name
+                """,
+                rf_params,
+            )
+            for r in cr.dictfetchall():
+                name = r["cajero"] or "—"
+                entry = cashier_map.get(name)
+                if not entry:
+                    entry = {
+                        "cajero": name, "n_order": 0, "n_line": 0, "n_qty": 0,
+                        "n_discount": 0, "n_price": 0, "n_price_up": 0,
+                        "amount": 0.0, "total": 0, "n_refund": 0, "refund_amount": 0.0,
+                    }
+                    cashier_map[name] = entry
+                entry["n_refund"] = int(r["n_refund"])
+                entry["refund_amount"] = float(r["refund_amount"])
+
+        cashiers = sorted(
+            cashier_map.values(),
+            key=lambda c: c["total"] + c["n_refund"],
+            reverse=True,
+        )[:15]
 
         # --- Distribución por motivo ---
         cr.execute(
@@ -229,10 +344,33 @@ class PosControlMetricsController(http.Controller):
             """,
             [tz] + params,
         )
-        trend = [
-            {"dia": r["dia"], "total": int(r["total"]), "amount": float(r["amount"])}
+        trend_map = {
+            r["dia"]: {
+                "dia": r["dia"], "total": int(r["total"]),
+                "amount": float(r["amount"]), "n_refund": 0,
+            }
             for r in cr.dictfetchall()
-        ]
+        }
+
+        if include_refunds:
+            cr.execute(
+                f"""
+                SELECT to_char((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date, 'YYYY-MM-DD') AS dia,
+                       COUNT(DISTINCT po.id) AS n_refund
+                {self._REFUND_JOINS}
+                WHERE {rf_where}
+                GROUP BY 1
+                """,
+                [tz] + rf_params,
+            )
+            for r in cr.dictfetchall():
+                entry = trend_map.get(r["dia"])
+                if not entry:
+                    entry = {"dia": r["dia"], "total": 0, "amount": 0.0, "n_refund": 0}
+                    trend_map[r["dia"]] = entry
+                entry["n_refund"] = int(r["n_refund"])
+
+        trend = [trend_map[k] for k in sorted(trend_map)]
 
         # --- Tabla detalle (últimos 500) ---
         cr.execute(
@@ -241,6 +379,7 @@ class PosControlMetricsController(http.Controller):
                    rp.name AS cajero,
                    dl.event_type AS tipo,
                    COALESCE(pt.name->>%s, pt.name->>'en_US', '') AS producto,
+                   COALESCE(dl.products_summary, '') AS products_summary,
                    dl.qty_removed AS qty,
                    dl.discount_percent AS discount,
                    dl.old_price AS old_price,
@@ -261,7 +400,13 @@ class PosControlMetricsController(http.Controller):
                 "fecha": r["fecha"],
                 "cajero": r["cajero"] or "—",
                 "tipo": r["tipo"],
+                # producto: nombre único (línea/desc/precio). Para órdenes con
+                # varias líneas se manda la lista en `productos` y el frontend
+                # muestra un botón "Ver" en vez de volcar todo en la celda.
                 "producto": r["producto"] or "",
+                "productos": [
+                    p for p in (r["products_summary"] or "").split("\n") if p
+                ],
                 "qty": float(r["qty"] or 0.0),
                 "discount": float(r["discount"] or 0.0),
                 "old_price": float(r["old_price"] or 0.0),
@@ -273,6 +418,62 @@ class PosControlMetricsController(http.Controller):
             }
             for r in cr.dictfetchall()
         ]
+
+        # Filas de reembolso (fuente nativa) mezcladas en el mismo detalle.
+        # Una fila POR ORDEN de reembolso (no por línea): un reembolso de varios
+        # productos es una sola operación. Si se listara por línea, la misma orden
+        # aparecería repetida una vez por producto devuelto.
+        if include_refunds:
+            cr.execute(
+                f"""
+                SELECT to_char((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s), 'YYYY-MM-DD HH24:MI') AS fecha,
+                       rp.name AS cajero,
+                       COUNT(*) AS n_lineas,
+                       COALESCE(SUM(pol.qty), 0) AS qty,
+                       COALESCE(SUM(pol.price_subtotal_incl), 0) AS amount,
+                       COALESCE(po.pos_reference, po.name, '') AS nota,
+                       pc.name AS caja,
+                       MAX(COALESCE(rdr.name->>%s, rdr.name->>'en_US', '')) AS motivo,
+                       MAX(COALESCE(cl.reason_note, '')) AS reason_note
+                FROM pos_order_line pol
+                JOIN pos_order po ON po.id = pol.order_id
+                LEFT JOIN pos_config pc ON pc.id = po.config_id
+                LEFT JOIN res_users ru ON ru.id = po.user_id
+                LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+                LEFT JOIN res_company rc ON rc.id = po.company_id
+                LEFT JOIN pos_control_log cl ON cl.order_ref = po.uuid AND cl.event_type = 'refund'
+                LEFT JOIN pos_deletion_reason rdr ON rdr.id = cl.reason_id
+                WHERE {rf_where}
+                GROUP BY po.id, po.date_order, rp.name, po.pos_reference, po.name, pc.name
+                ORDER BY po.date_order DESC
+                LIMIT 500
+                """,
+                [tz, lang] + rf_params,
+            )
+            for r in cr.dictfetchall():
+                n = int(r["n_lineas"] or 0)
+                # La nota lleva la referencia de la orden y, si se capturó, la
+                # nota del motivo del reembolso.
+                nota = r["nota"] or ""
+                if r["reason_note"]:
+                    nota = f"{nota} — {r['reason_note']}" if nota else r["reason_note"]
+                detail.append({
+                    "fecha": r["fecha"],
+                    "cajero": r["cajero"] or "—",
+                    "tipo": "refund",
+                    "producto": f"{n} ítem(s)",
+                    "qty": float(r["qty"] or 0.0),
+                    "discount": 0.0,
+                    "old_price": 0.0,
+                    "new_price": 0.0,
+                    "amount": float(r["amount"] or 0.0),
+                    "motivo": r["motivo"] or "",
+                    "nota": nota,
+                    "caja": r["caja"] or "",
+                })
+            # El formato 'YYYY-MM-DD HH24:MI' ordena cronológicamente como texto.
+            detail.sort(key=lambda d: d["fecha"] or "", reverse=True)
+            detail = detail[:500]
 
         return {
             "kpis": kpis,

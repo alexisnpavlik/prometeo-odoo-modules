@@ -12,6 +12,7 @@ const TYPE_LABELS = {
     high_discount: "Descuento alto",
     price_reduction: "Reducción precio",
     price_increase: "Aumento precio",
+    refund: "Reembolso",
 };
 
 const COLORS = {
@@ -21,6 +22,7 @@ const COLORS = {
     discount: "#8b5cf6",
     price: "#ec4899",
     price_up: "#14b8a6",
+    refund: "#f97316",
     palette: ["#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"],
 };
 
@@ -40,12 +42,14 @@ class PosControlDashboard extends Component {
             cashier: "all",
             company: "all",
             dtype: "all",
+            productsModal: { open: false, subtitle: "", items: [] },
         });
         this.filtersData = useState({ cajas: [], cajeros: [], empresas: [] });
         this.data = useState({
             kpis: {
                 total: 0, n_order: 0, n_line: 0, n_qty: 0, n_discount: 0, n_price: 0, n_price_up: 0,
                 amount: 0, units: 0, avg_discount: 0, deletion_rate: 0,
+                n_refund: 0, refund_amount: 0, refund_units: 0,
             },
             cashiers: [],
             reasons: [],
@@ -158,6 +162,17 @@ class PosControlDashboard extends Component {
         this.renderCharts();
     }
 
+    openProducts(d) {
+        this.state.productsModal = {
+            open: true,
+            subtitle: [d.fecha, d.cajero, d.caja].filter(Boolean).join(" · "),
+            items: d.productos || [],
+        };
+    }
+    closeProducts() {
+        this.state.productsModal = { open: false, subtitle: "", items: [] };
+    }
+
     typeLabel(t) { return TYPE_LABELS[t] || t; }
     money(v) {
         return (v || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -189,6 +204,7 @@ class PosControlDashboard extends Component {
                         { label: TYPE_LABELS.high_discount, data: this.data.cashiers.map((c) => c.n_discount), backgroundColor: COLORS.discount },
                         { label: TYPE_LABELS.price_reduction, data: this.data.cashiers.map((c) => c.n_price), backgroundColor: COLORS.price },
                         { label: TYPE_LABELS.price_increase, data: this.data.cashiers.map((c) => c.n_price_up), backgroundColor: COLORS.price_up },
+                        { label: TYPE_LABELS.refund, data: this.data.cashiers.map((c) => c.n_refund), backgroundColor: COLORS.refund },
                     ],
                 },
                 options: {
@@ -225,6 +241,7 @@ class PosControlDashboard extends Component {
                     labels: this.data.trend.map((t) => t.dia),
                     datasets: [
                         { label: "Eventos", data: this.data.trend.map((t) => t.total), borderColor: COLORS.order, backgroundColor: "rgba(239,68,68,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
+                        { label: "Reembolsos", data: this.data.trend.map((t) => t.n_refund), borderColor: COLORS.refund, backgroundColor: "rgba(249,115,22,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
                         { label: "Importe ($)", data: this.data.trend.map((t) => t.amount), borderColor: COLORS.qty, backgroundColor: "rgba(59,130,246,0.15)", fill: true, tension: 0.3, yAxisID: "y1" },
                     ],
                 },

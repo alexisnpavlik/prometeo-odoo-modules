@@ -10,9 +10,11 @@ patch(PosStore.prototype, {
     /**
      * Bloquea el paso a la pantalla de pago si alguna línea tiene precio
      * unitario 0 (producto sin precio cargado) o negativo, cada uno con su
-     * propio toggle de configuración. Se excluyen los hijos de combo, que
-     * legítimamente van en 0 porque el precio lo lleva la línea padre, y las
-     * líneas de recompensa.
+     * propio toggle de configuración. Se excluyen las líneas que legítimamente
+     * van en 0 o negativo: hijos de combo (el precio lo lleva la línea padre),
+     * líneas de recompensa (loyalty) y la línea del producto de descuento global
+     * (pos_discount la agrega a precio negativo) — si no se excluyera, aplicar un
+     * descuento global dejaría la orden imposible de cobrar.
      */
     async pay() {
         // Resolver acá los cambios pendientes de la línea seleccionada (cantidad,
@@ -24,8 +26,12 @@ patch(PosStore.prototype, {
         await this._resolvePendingLineChanges(this.get_order());
 
         const order = this.get_order();
+        const discountProduct = this.config.discount_product_id;
         const lines = (order?.get_orderlines() || []).filter(
-            (line) => !line.combo_parent_id && !line.is_reward_line
+            (line) =>
+                !line.combo_parent_id &&
+                !line.is_reward_line &&
+                line.get_product() !== discountProduct
         );
         const blockZero = this.config.block_zero_price_payment;
         const blockNegative = this.config.block_negative_price_payment;
@@ -48,6 +54,30 @@ patch(PosStore.prototype, {
                 ),
             });
             return;
+        }
+
+        // Motivo de reembolso (si está activo): una sola justificación por
+        // reembolso, pedida al cobrar. Se registra como evento 'refund' en el
+        // log; el conteo de reembolsos del dashboard sigue saliendo de la data
+        // nativa — este evento solo aporta el motivo. El flag evita re-preguntar
+        // si se vuelve a Cobrar sobre la misma orden.
+        if (
+            this.config.require_reason_refund &&
+            order?._isRefundOrder?.() &&
+            !order._refundReasonLogged
+        ) {
+            const reason = await askReason(this, _t("Motivo — Reembolso"));
+            if (!reason) {
+                return; // cancelado (si se permite cancelar): no se cobra
+            }
+            order._refundReasonLogged = true;
+            await logEvent(this, {
+                event_type: "refund",
+                order_ref: order.uuid || order.name || "",
+                amount_removed: order.get_total_with_tax ? order.get_total_with_tax() : 0,
+                reason_id: reason.reason_id,
+                reason_note: reason.reason_note,
+            });
         }
         return super.pay(...arguments);
     },

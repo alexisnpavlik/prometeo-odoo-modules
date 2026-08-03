@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="group_pos_deletion_audit" model="res.groups">
-        <field name="name">Métricas de Cajeros</field>
+        <field name="name">Métricas de Auditoría Cajeros</field>
         <field name="category_id" ref="base.module_category_usability"/>
         <field name="comment">Puede consultar la trazabilidad de operaciones y las métricas de cajeros del POS.</field>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>

@@ -67,3 +67,25 @@ class PosConfig(models.Model):
              "unitario negativo. Desactivalo si tu flujo de devoluciones usa "
              "precios negativos de forma legítima.",
     )
+    require_reason_note = fields.Boolean(
+        string="Nota de justificación obligatoria",
+        default=True,
+        help="Exige que el cajero escriba una nota además de elegir el motivo "
+             "de la lista. Si se desactiva, la nota queda opcional.",
+    )
+    require_reason_refund = fields.Boolean(
+        string="Motivo al hacer un reembolso",
+        default=False,
+        help="Pide un motivo cuando el cajero cobra un reembolso (orden con "
+             "líneas devueltas). Desactivado por defecto: los reembolsos ya "
+             "quedan registrados de forma nativa; activalo para exigir además "
+             "una justificación.",
+    )
+    block_reason_cancel = fields.Boolean(
+        string="No permitir cancelar el aviso de motivo",
+        default=True,
+        help="Si está activo (por defecto), el cajero NO puede cancelar ni "
+             "cerrar el aviso de motivo: no hay botón Cancelar ni X y la tecla "
+             "Escape queda bloqueada; debe elegir un motivo y confirmar sí o sí. "
+             "Desactivalo para permitir cancelar (se revierte la operación).",
+    )
