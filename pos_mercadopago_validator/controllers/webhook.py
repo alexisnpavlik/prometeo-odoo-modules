@@ -21,17 +21,30 @@ class MercadoPagoWebhook(http.Controller):
         type="http", auth="public", methods=["POST"], csrf=False, save_session=False,
     )
     def notification(self, **kwargs):
-        """Responde 200 siempre; procesa sólo si el payload trae un id usable."""
-        payload = request.get_json_data() if request.httprequest.data else None
-        payment_id = ((payload or {}).get("data") or {}).get("id")
+        """Responde 200 siempre; procesa sólo si el payload trae un id usable.
 
-        if not payment_id:
-            _logger.info("Notificación de Mercado Pago sin data.id, ignorada")
-            return request.make_response("", status=200)
+        Cualquier excepción durante la resolución (payload ilegible, error de
+        red, un canal de pago no contemplado por normalize()) se traga acá: un
+        atacante no debe poder distinguir por el código de respuesta un id que
+        existe de uno que no. El endpoint nunca puede convertirse en oráculo.
+        """
+        try:
+            payload = request.get_json_data() if request.httprequest.data else None
+            payment_id = ((payload or {}).get("data") or {}).get("id")
 
-        accounts = request.env["mercadopago.account"].sudo().search([("active", "=", True)])
-        for account in accounts:
-            if account.ingest_payment_id(str(payment_id)):
-                break
+            if not payment_id:
+                _logger.info("Notificación de Mercado Pago sin data.id, ignorada")
+                return request.make_response("", status=200)
+
+            accounts = request.env["mercadopago.account"].sudo().search([("active", "=", True)])
+            for account in accounts:
+                # "existing" es el camino normal de cada notificación duplicada
+                # (reintento de MP, o el cron llegó primero): sólo se sigue
+                # probando otras cuentas si la resolución falló de verdad.
+                outcome = account.ingest_payment_id(str(payment_id))
+                if outcome != "failed":
+                    break
+        except Exception:
+            _logger.exception("Error procesando notificación de Mercado Pago, se ignora")
 
         return request.make_response("", status=200)

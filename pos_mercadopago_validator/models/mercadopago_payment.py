@@ -125,11 +125,17 @@ class MercadoPagoPayment(models.Model):
                     created |= self.create(values)
             except psycopg2.IntegrityError:
                 # Otro llamador (cron o webhook) ganó la carrera y ya lo creó.
-                # No es nuestro: no sumarlo a `created` evita notificar dos veces.
+                # Releemos el registro ganador y seguimos con ese: la llamada
+                # perdedora debe terminar con el mismo resultado que la ganadora,
+                # no comportarse como si no hubiera pasado nada. No se suma a
+                # `created`: quien lo creó ya se encargó de notificar.
+                winner = self.search([("mp_payment_id", "=", values["mp_payment_id"])], limit=1)
                 _logger.info(
-                    "Carrera de ingesta en el pago %s: ya lo creó otro proceso, se ignora",
+                    "Carrera de ingesta en el pago %s: ya lo creó otro proceso, se sigue con ese registro",
                     values["mp_payment_id"],
                 )
+                if winner and winner.state == "available":
+                    winner.write(self._values_without_state(values))
 
         _logger.info(
             "Ingesta Mercado Pago cuenta %s: %s pagos nuevos de %s recibidos",

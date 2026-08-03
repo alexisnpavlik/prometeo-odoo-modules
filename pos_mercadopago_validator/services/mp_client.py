@@ -52,26 +52,29 @@ class MercadoPagoClient:
                     params=params,
                     timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
                 )
+
+                if response.status_code in (401, 403):
+                    raise MercadoPagoAuthError(
+                        "Credenciales rechazadas por Mercado Pago (HTTP %s)" % response.status_code
+                    )
+                if response.status_code >= 500:
+                    last_error = "HTTP %s" % response.status_code
+                    _logger.warning("Mercado Pago devolvió %s (intento %s)", response.status_code, attempt + 1)
+                    time.sleep(BACKOFF_BASE * (2 ** attempt))
+                    continue
+                if response.status_code >= 400:
+                    raise MercadoPagoError(
+                        "Mercado Pago rechazó la consulta (HTTP %s)" % response.status_code
+                    )
+                # response.json() adentro del try: un cuerpo no-JSON (por ejemplo
+                # una página de error HTML) es tan "inalcanzable" como un timeout,
+                # y JSONDecodeError de requests hereda de RequestException.
+                return response.json()
             except requests.exceptions.RequestException as error:
                 last_error = error
                 _logger.warning("Mercado Pago inalcanzable (intento %s): %s", attempt + 1, error)
                 time.sleep(BACKOFF_BASE * (2 ** attempt))
                 continue
-
-            if response.status_code in (401, 403):
-                raise MercadoPagoAuthError(
-                    "Credenciales rechazadas por Mercado Pago (HTTP %s)" % response.status_code
-                )
-            if response.status_code >= 500:
-                last_error = "HTTP %s" % response.status_code
-                _logger.warning("Mercado Pago devolvió %s (intento %s)", response.status_code, attempt + 1)
-                time.sleep(BACKOFF_BASE * (2 ** attempt))
-                continue
-            if response.status_code >= 400:
-                raise MercadoPagoError(
-                    "Mercado Pago rechazó la consulta (HTTP %s)" % response.status_code
-                )
-            return response.json()
 
         raise MercadoPagoTransientError(
             "Mercado Pago no respondió tras %s intentos: %s" % (MAX_ATTEMPTS, last_error)

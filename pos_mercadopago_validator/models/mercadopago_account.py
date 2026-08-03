@@ -111,6 +111,17 @@ class MercadoPagoAccount(models.Model):
 
         Es el camino del webhook: del cuerpo de la notificación sólo se usó el
         identificador, y el dato real se resuelve con credenciales propias.
+
+        Devuelve uno de tres desenlaces, y son distintos a propósito:
+        - "created": generó una fila nueva en la bandeja.
+        - "existing": el pago ya estaba en la bandeja (reintento de Mercado
+          Pago, o el cron llegó primero). Es el camino normal en cada
+          notificación duplicada, no una excepción.
+        - "failed": no se pudo resolver contra la API, o el pago resuelto no
+          es de esta cuenta. El llamador sólo debe probar otra cuenta activa
+          ante "failed": tratar "existing" igual que "failed" haría que cada
+          notificación duplicada le pegue a la API con las credenciales de
+          todas las demás cuentas configuradas, preguntando por un pago ajeno.
         """
         self.ensure_one()
         from ..services.inbox_provider_mercadopago import MercadoPagoInboxProvider
@@ -123,11 +134,16 @@ class MercadoPagoAccount(models.Model):
             raw = provider.get_payment(payment_id)
         except (MercadoPagoError, MercadoPagoTransientError) as error:
             _logger.warning("No se pudo resolver el pago %s: %s", payment_id, error)
-            return False
-        created = self.env["mercadopago.payment"].ingest_raw(self, [raw])
+            return "failed"
+
+        Inbox = self.env["mercadopago.payment"]
+        created = Inbox.ingest_raw(self, [raw])
         if created:
             created._notify_open_sessions()
-        return bool(created)
+            return "created"
+        if Inbox.search_count([("mp_payment_id", "=", str(payment_id))]):
+            return "existing"
+        return "failed"
 
     @api.model
     def cron_ingest_payments(self):
