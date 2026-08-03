@@ -86,6 +86,19 @@ class PosPayment(models.Model):
                     len(reserved), line.mercadopago_uuid, reserved.mapped("mp_payment_id"),
                 )
             reserved = reserved[0]
+            if not reserved._lock_still_reserved():
+                # Un revert concurrente -desde el backoffice o desde el botón de
+                # deshacer de otra pestaña- pudo ganar entre el search y esta
+                # escritura. Sin el bloqueo y la re-verificación, el pago
+                # quedaría en `available` **con** pos_payment_id: reaparece en la
+                # bandeja de la caja y además cuenta como cobrado en esta venta.
+                # Mismo tratamiento que impute(): tomar la fila y volver a mirar.
+                _logger.warning(
+                    "La reserva %s dejó de estar viva antes de cerrarse sobre la "
+                    "línea %s: la venta se crea igual, sin vínculo",
+                    reserved.mp_payment_id, line.id,
+                )
+                continue
             order = line.pos_order_id
             reserved.write({
                 "pos_payment_id": line.id,

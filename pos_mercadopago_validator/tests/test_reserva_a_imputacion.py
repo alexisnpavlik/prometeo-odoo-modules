@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
 
@@ -87,6 +89,54 @@ class TestReservaAImputacion(TransactionCase):
             "mercadopago_uuid": "uuid-que-no-existe",
         })
         self.assertTrue(line.id)
+        self.assertFalse(line.mercadopago_payment_id)
+
+    def test_a_revert_landing_between_the_search_and_the_write_does_not_link(self):
+        """I-7: el cierre de la reserva re-verifica el estado con la fila tomada.
+
+        `pos.payment.create()` escribía `pos_payment_id` sin `FOR UPDATE` ni
+        re-chequeo, a diferencia de `impute()`. Si un revert concurrente ganaba
+        entre el `search` y el `write`, el pago quedaba en `available` **con**
+        `pos_payment_id`: reaparecía en la bandeja de la caja y además contaba
+        como cobrado en esa venta.
+
+        La carrera se reproduce en una sola transacción haciendo que el `search`
+        devuelva la reserva que el revert ya deshizo -exactamente lo que ve el
+        código cuando la otra transacción commitea en el medio-.
+        """
+        self.payment.reserve_for_uuid("uuid-abc")
+        self.payment.revert(reason="revert concurrente desde el backoffice")
+        self.assertEqual(self.payment.state, "available")
+
+        Inbox = type(self.env["mercadopago.payment"])
+        original_search = Inbox.search
+        stale = self.payment
+
+        def stale_search(model, domain, *args, **kwargs):
+            result = original_search(model, domain, *args, **kwargs)
+            reserva = any(
+                isinstance(leaf, (list, tuple)) and leaf[0] == "pos_payment_uuid"
+                for leaf in domain
+            )
+            if reserva and not result:
+                return model.browse(stale.id)
+            return result
+
+        with patch.object(Inbox, "search", stale_search):
+            line = self.env["pos.payment"].create({
+                "pos_order_id": self._order().id,
+                "payment_method_id": self.method.id,
+                "amount": 1500.0,
+                "mercadopago_uuid": "uuid-abc",
+            })
+
+        self.payment.invalidate_recordset()
+        self.assertEqual(self.payment.state, "available")
+        self.assertFalse(
+            self.payment.pos_payment_id,
+            "El pago quedó disponible y cobrado a la vez: reaparece en la bandeja "
+            "y además cuenta en la venta.",
+        )
         self.assertFalse(line.mercadopago_payment_id)
 
     def test_load_pos_data_fields_exposes_the_uuid(self):

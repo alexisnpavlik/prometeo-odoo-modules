@@ -32,7 +32,12 @@ class MercadoPagoPayment(models.Model):
     payer_vat = fields.Char(string="CUIT del pagador", readonly=True)
     payer_email = fields.Char(readonly=True)
     mp_payer_id = fields.Char(string="ID de pagador", readonly=True, index=True)
-    partner_id = fields.Many2one("res.partner", string="Cliente", readonly=True)
+    partner_id = fields.Many2one(
+        "res.partner", string="Cliente",
+        help="Se resuelve solo por CUIT en el canal INTRA_PSP. En INTER_PSP -donde "
+             "Mercado Pago oculta la identificación- lo asigna a mano un administrador "
+             "y queda mapeado el ID de pagador para todos sus pagos.",
+    )
     payment_method_detail = fields.Char(readonly=True)
     raw_status = fields.Char(readonly=True)
 
@@ -57,6 +62,11 @@ class MercadoPagoPayment(models.Model):
     )
 
     display_payer = fields.Char(compute="_compute_display_payer", string="Pagador")
+    backoffice_reason = fields.Char(
+        string="Motivo (backoffice)",
+        help="Motivo de la reversión o del descarte hecho desde el backoffice. "
+             "Queda en el registro y en el chatter del pedido.",
+    )
 
     _sql_constraints = [
         ("mp_payment_id_uniq", "unique(mp_payment_id)",
@@ -91,6 +101,53 @@ class MercadoPagoPayment(models.Model):
                 payment.display_payer = payment.payer_bank_name
             else:
                 payment.display_payer = False
+
+    def write(self, vals):
+        """Propaga el mapeo manual de pagador a todos los pagos del mismo payer id.
+
+        Es el mecanismo que el spec §9 destina al canal INTER_PSP: Mercado Pago
+        oculta la identificación del pagador y lo único estable es `payer.id`,
+        así que un administrador asocia una vez el `mp_payer_id` a un
+        `res.partner` y desde ahí todos los pagos de ese id -pasados y
+        futuros- muestran el nombre real. Los futuros ya los resuelve
+        `_resolve_partner()` en la ingesta; los pasados se completan acá.
+
+        Dos cuidados:
+
+        - **No pisa asignaciones distintas.** Sólo se completan los pagos del
+          mismo payer id que todavía no tienen cliente. Si otro pago del mismo
+          id ya quedó asociado a un partner distinto -por CUIT, o por una
+          corrección posterior-, ese dato es más específico que la propagación
+          y se respeta.
+        - **Una sola escritura por payer id**, no una por registro: el mapeo
+          suele hacerse sobre clientes recurrentes con muchos pagos atrás.
+
+        El flag de contexto corta la recursión: el `write()` de la propagación
+        entra de nuevo por acá.
+        """
+        result = super().write(vals)
+        if "partner_id" not in vals or self.env.context.get("mp_skip_payer_propagation"):
+            return result
+        partner_id = vals["partner_id"]
+        if not partner_id:
+            return result
+        payer_ids = [p for p in set(self.mapped("mp_payer_id")) if p]
+        if not payer_ids:
+            return result
+        pending = self.sudo().search([
+            ("mp_payer_id", "in", payer_ids),
+            ("partner_id", "=", False),
+            ("id", "not in", self.ids),
+        ])
+        if pending:
+            pending.with_context(mp_skip_payer_propagation=True).write(
+                {"partner_id": partner_id}
+            )
+            _logger.info(
+                "Mapeo de pagador propagado a %s pagos previos de los payer id %s",
+                len(pending), payer_ids,
+            )
+        return result
 
     @api.model
     def ingest_raw(self, account, raw_payments):
@@ -278,6 +335,25 @@ class MercadoPagoPayment(models.Model):
         self._notify_open_sessions()
         return True
 
+    def _lock_still_reserved(self):
+        """Toma la fila y confirma que la reserva sigue viva. Igual que impute().
+
+        La usa `pos.payment.create()` para cerrar la reserva: entre el `search`
+        que la encontró y la escritura del `pos_payment_id` puede colarse un
+        revert concurrente, y ese cierre no tiene vuelta atrás.
+
+        El flush previo es obligatorio por lo mismo que en `impute()`:
+        `cr.execute` no flushea, y sin él se bloquea y se lee una fila vieja.
+        """
+        self.ensure_one()
+        self.flush_recordset(["state", "pos_payment_id"])
+        self.env.cr.execute(
+            "SELECT state, pos_payment_id FROM mercadopago_payment WHERE id = %s FOR UPDATE",
+            (self.id,),
+        )
+        row = self.env.cr.fetchone()
+        return bool(row) and row[0] == "matched" and not row[1]
+
     def revert(self, reason=None):
         """Devuelve el pago a la bandeja. Queda registrado en el chatter del pedido.
 
@@ -318,6 +394,80 @@ class MercadoPagoPayment(models.Model):
             ))
         return True
 
+    def _check_backoffice_manager(self):
+        """Sólo el grupo de administración opera la bandeja desde el backoffice.
+
+        `sudo()` lo saltea, como cualquier chequeo de permisos en Odoo: estas
+        acciones se llaman desde botones de la vista, siempre con el usuario
+        real, y el `env.su` de un cron o de una migración no debería frenarse.
+        """
+        if self.env.su:
+            return
+        if not self.env.user.has_group("pos_mercadopago_validator.group_mercadopago_manager"):
+            raise UserError(_(
+                "Sólo un administrador de la bandeja de Mercado Pago puede hacer esto."
+            ))
+
+    def action_revert_from_backoffice(self):
+        """Revierte la imputación desde el backoffice, con motivo obligatorio.
+
+        Es la única salida de §7.4 para una venta ya confirmada, y también para
+        una reserva huérfana: si el navegador se cae entre reservar y abandonar,
+        el pago queda en `matched` sin `pos_payment_id` -invisible para todas
+        las cajas, porque la bandeja del POS sólo muestra `available`- y sin
+        `revert()` no hay forma de sacarlo de ahí.
+
+        El motivo se exige acá y no dentro de `revert()` porque `revert()`
+        también lo usa el botón de deshacer del POS, que provee el suyo.
+        """
+        self.ensure_one()
+        self._check_backoffice_manager()
+        if not self.backoffice_reason or not self.backoffice_reason.strip():
+            raise UserError(_(
+                "Escribí el motivo antes de revertir la imputación: queda auditado."
+            ))
+        self.sudo().revert(reason=self.backoffice_reason.strip())
+        self.sudo()._notify_open_sessions()
+        return True
+
+    def action_discard(self):
+        """Saca de la bandeja un pago disponible que nunca va a imputarse.
+
+        Es el único camino que entra al estado `discarded`. Existe para el
+        huérfano ya explicado -un cobro por alias que se resolvió por fuera,
+        una transferencia que no era una venta- que si no queda para siempre
+        en el listado de huérfanos, tapando los que sí hay que investigar.
+
+        No borra nada: el pago sigue en la base, con motivo y autor, y se puede
+        devolver a la bandeja con `action_restore()`.
+        """
+        self.ensure_one()
+        self._check_backoffice_manager()
+        if self.state != "available":
+            raise UserError(_("Sólo se puede descartar un pago disponible."))
+        if not self.backoffice_reason or not self.backoffice_reason.strip():
+            raise UserError(_("Escribí el motivo antes de descartar el pago."))
+        self.sudo().write({"state": "discarded"})
+        _logger.info(
+            "Pago %s descartado por %s. Motivo: %s",
+            self.mp_payment_id, self.env.user.login, self.backoffice_reason.strip(),
+        )
+        self.sudo()._notify_open_sessions()
+        return True
+
+    def action_restore(self):
+        """Devuelve a la bandeja un pago descartado por error."""
+        self.ensure_one()
+        self._check_backoffice_manager()
+        if self.state != "discarded":
+            raise UserError(_("Sólo se puede reponer un pago descartado."))
+        self.sudo().write({"state": "available"})
+        _logger.info(
+            "Pago %s repuesto en la bandeja por %s", self.mp_payment_id, self.env.user.login,
+        )
+        self.sudo()._notify_open_sessions()
+        return True
+
     def _notify_open_sessions(self):
         """Avisa por bus a las cajas con sesión abierta que la bandeja cambió.
 
@@ -328,10 +478,12 @@ class MercadoPagoPayment(models.Model):
 
         El criterio de pertenencia tiene que ser el mismo que usa
         `_inbox_domain()` en pos.payment.method: un método de este módulo
-        pertenece a un pago si su cuenta coincide y, según el canal, su
-        mp_pos_id es el del QR o tiene habilitado accept_alias_payments. Si
-        divergiera, una caja podría recibir un aviso de un pago que después
-        no ve en su lista (o al revés).
+        pertenece a un pago si es del terminal `mercadopago_validator`, su
+        cuenta coincide y, según el canal, su mp_pos_id es el del QR o tiene
+        habilitado accept_alias_payments. Si divergiera, una caja podría
+        recibir un aviso de un pago que después no ve en su lista (o al revés):
+        el filtro por terminal es justamente eso -un método con la cuenta
+        cargada pero otro terminal no tiene diálogo de bandeja que actualizar-.
 
         `current_session_state` de pos.config es un campo computado sin
         store=True: no es buscable (`search()` sobre un compute sin store
@@ -371,6 +523,7 @@ class MercadoPagoPayment(models.Model):
 
         for (account_id, mp_pos_id), payments in qr_groups.items():
             methods = self.env["pos.payment.method"].sudo().search([
+                ("use_payment_terminal", "=", "mercadopago_validator"),
                 ("mp_account_id", "=", account_id),
                 ("mp_pos_id", "=", mp_pos_id),
             ])
@@ -378,6 +531,7 @@ class MercadoPagoPayment(models.Model):
 
         for account_id, payments in alias_groups.items():
             methods = self.env["pos.payment.method"].sudo().search([
+                ("use_payment_terminal", "=", "mercadopago_validator"),
                 ("mp_account_id", "=", account_id),
                 ("accept_alias_payments", "=", True),
             ])
