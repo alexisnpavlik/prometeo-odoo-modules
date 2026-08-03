@@ -21,7 +21,8 @@
                 </div>
             </div>
             <t t-set-slot="footer">
-                <button class="btn btn-primary" t-on-click="() => props.confirm()">
+                <button class="btn btn-primary"
+                        t-on-click="() => { props.confirm(); props.close(); }">
                     Continuar con el cierre
                 </button>
             </t>

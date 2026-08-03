@@ -51,29 +51,39 @@ patch(ClosePosPopup.prototype, {
      * Antes de confirmar el cierre, avisa si quedaron pagos de Mercado Pago
      * sin imputar durante la sesión.
      *
-     * El aviso nunca bloquea el cierre: es sólo informativo. Si la consulta
-     * falla (servidor caído, timeout), se atrapa el error y se sigue al
-     * cierre normal -bloquear la caja por un aviso que no se pudo cargar
-     * sería mucho peor que dejarlo pasar en silencio-.
+     * El aviso nunca bloquea el cierre: es sólo informativo. `super.confirm()`
+     * tiene que correr pase lo que pase, así que TODO lo que puede fallar
+     * -la consulta, la forma de lo que devuelve, y el diálogo mismo, que
+     * puede lanzar al construirse o al renderizar- va dentro de un único
+     * `try/catch` que nunca hace `return` adentro: si algo revienta acá, se
+     * loguea y se cae igual al `super.confirm()` de abajo, fuera del bloque.
      */
     async confirm() {
-        let unmatched = [];
         try {
-            unmatched = await this.pos.data.call("pos.session", "get_mercadopago_unmatched", [
-                this.pos.session.id,
-            ]);
+            const unmatched = await this.pos.data.call(
+                "pos.session",
+                "get_mercadopago_unmatched",
+                [this.pos.session.id]
+            );
+            // Un resultado que no es array (null, undefined, un objeto de
+            // error mal formado) se trata como "no hay huérfanos", nunca
+            // como un motivo para bloquear el cierre.
+            if (Array.isArray(unmatched) && unmatched.length) {
+                // Diálogo puramente informativo: se espera a que el cajero lo
+                // cierre (con el único botón, o con Escape/la X) y se
+                // continúa igual, sea cual sea el resultado de la promesa.
+                await ask(
+                    this.dialog,
+                    { payments: unmatched },
+                    {},
+                    MercadoPagoClosingWarningDialog
+                );
+            }
         } catch (error) {
             console.warn(
                 _t("No se pudo consultar los pagos de Mercado Pago sin imputar"),
                 error
             );
-            return super.confirm(...arguments);
-        }
-        if (unmatched.length) {
-            // Diálogo puramente informativo: se espera a que el cajero lo
-            // cierre (con el único botón, o con Escape/la X) y se continúa
-            // igual, sea cual sea el resultado de la promesa.
-            await ask(this.dialog, { payments: unmatched }, {}, MercadoPagoClosingWarningDialog);
         }
         return super.confirm(...arguments);
     },
