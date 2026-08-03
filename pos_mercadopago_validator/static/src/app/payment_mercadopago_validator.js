@@ -73,6 +73,12 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
                             "register_manual_approval",
                             [[line.payment_method_id.id], line.uuid, reason]
                         );
+                        // Igual que en onPicked: sin el uuid en la línea,
+                        // pos_payment.create() la saltea entera y la aprobación
+                        // manual queda para siempre sin monto, sin venta y sin
+                        // sesión. El cruce contra los huérfanos del período que
+                        // el spec §9 declara obligatorio se vuelve imposible.
+                        line.mercadopago_uuid = line.uuid;
                         line.set_payment_status("done");
                         this.pendingLine = null;
                         this._resolve(true);

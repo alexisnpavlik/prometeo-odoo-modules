@@ -3,6 +3,13 @@ class InboxProvider:
 
     Permite sumar otro procesador sin tocar el modelo de bandeja, el diálogo
     del POS ni la lógica de imputación.
+
+    **`refund()` no forma parte de la interfaz, a propósito.** El boceto del
+    spec §12 la listaba entre las operaciones, pero §3 deja las devoluciones
+    fuera de alcance: declarar un método abstracto que ningún provider
+    implementa -y que ningún llamador invoca- sólo promete una capacidad que no
+    existe. Si algún día entran las devoluciones, se agrega acá junto con su
+    implementación y sus pruebas.
     """
 
     def fetch_payments(self, window_start, window_end):
