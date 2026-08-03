@@ -61,7 +61,13 @@ class PosPaymentMethod(models.Model):
     STALE_AFTER_SECONDS = 60
 
     def _inbox_domain(self):
-        """Filtro de presentación: la bandeja de esta caja (§6.2 del spec)."""
+        """Filtro de presentación: la bandeja de esta caja (§6.2 del spec).
+
+        Si esta caja no tiene `mp_pos_id` configurado, la rama del QR no debe
+        matchear ningún registro: `("mp_pos_id", "=", False)` calzaría con
+        todos los pagos por alias (que también llegan con `mp_pos_id` vacío),
+        rompiendo el aislamiento entre cajas por una configuración incompleta.
+        """
         self.ensure_one()
         window_start = fields.Datetime.subtract(
             fields.Datetime.now(), minutes=self.search_window_minutes
@@ -71,8 +77,9 @@ class PosPaymentMethod(models.Model):
             ("state", "=", "available"),
             ("date_approved", ">=", window_start),
         ]
-        channel = ["|", ("mp_pos_id", "=", self.mp_pos_id), ("source", "=", "alias")] \
-            if self.accept_alias_payments else [("mp_pos_id", "=", self.mp_pos_id)]
+        qr_leaf = [("mp_pos_id", "=", self.mp_pos_id)] if self.mp_pos_id else [(0, "=", 1)]
+        channel = ["|"] + qr_leaf + [("source", "=", "alias")] \
+            if self.accept_alias_payments else qr_leaf
         return domain + channel
 
     def get_mp_inbox(self, amount):
@@ -86,9 +93,15 @@ class PosPaymentMethod(models.Model):
         Inbox = self.env["mercadopago.payment"].sudo()
         available = Inbox.search(self._inbox_domain())
 
-        tolerance = self.amount_tolerance or 0.0
-        matching = available.filtered(lambda p: abs(p.amount - amount) <= tolerance)
         account = self.mp_account_id.sudo()
+        currency = account.company_id.currency_id or self.env.company.currency_id
+        tolerance = self.amount_tolerance or 0.0
+        # Comparación consciente del redondeo de la moneda: montos crudos en
+        # punto flotante no se comparan con <= de forma confiable.
+        matching = available.filtered(
+            lambda p: currency.compare_amounts(abs(p.amount - amount), tolerance) <= 0
+        )
+        others = available - matching
         last_sync = account.last_sync_at
         stale = not last_sync or (
             fields.Datetime.now() - last_sync
@@ -96,8 +109,8 @@ class PosPaymentMethod(models.Model):
 
         return {
             "matching": [self._serialize_inbox_line(p, amount) for p in matching],
-            "others": [self._serialize_inbox_line(p, amount) for p in (available - matching)],
-            "others_count": len(available - matching),
+            "others": [self._serialize_inbox_line(p, amount) for p in others],
+            "others_count": len(others),
             "last_sync_at": last_sync and last_sync.isoformat() or False,
             "stale": stale,
         }
@@ -114,14 +127,33 @@ class PosPaymentMethod(models.Model):
             "difference": round(requested_amount - payment.amount, 2),
         }
 
-    def impute_mp_payment(self, mp_payment_id, pos_payment_id, ambiguous=False):
-        """Imputa un pago a una línea. Devuelve el error de carrera si lo hay."""
+    def impute_mp_payment(self, inbox_line_id, pos_payment_id, ambiguous=False):
+        """Imputa un pago a una línea. Devuelve el error de carrera si lo hay.
+
+        `inbox_line_id` es el id interno de Odoo del registro de
+        `mercadopago.payment` (no el `mp_payment_id` externo de Mercado Pago,
+        que es un string): confundirlos imputaría un pago que no es, porque
+        Postgres castea el string numérico y `browse()` resolvería cualquier
+        registro cuyo id interno coincida.
+
+        Sólo la carrera perdida deliberada de `impute()` (un `UserError` literal)
+        se devuelve como resultado de negocio. `AccessError`, `MissingError` y
+        `ValidationError` heredan de `UserError` en Odoo pero son bugs o
+        problemas de permisos, no una carrera: deben propagarse, no esconderse
+        detrás de un mensaje de "ese pago ya fue asignado a otra venta".
+        """
         self.ensure_one()
         self._check_pos_access()
-        payment = self.env["mercadopago.payment"].sudo().browse(mp_payment_id)
+        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
         pos_payment = self.env["pos.payment"].browse(pos_payment_id)
         try:
             payment.impute(pos_payment, ambiguous=ambiguous)
         except UserError as error:
+            if type(error) is not UserError:
+                raise
+            _logger.info(
+                "Imputación rechazada para la línea de bandeja %s: %s",
+                inbox_line_id, str(error),
+            )
             return {"ok": False, "error": str(error)}
         return {"ok": True, "mp_payment_id": payment.mp_payment_id}
