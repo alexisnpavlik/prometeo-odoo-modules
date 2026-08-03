@@ -51,6 +51,21 @@ ALIAS = {
     },
 }
 
+QR_SELF_PAYER = {
+    "id": 171858334766, "status": "approved", "status_detail": "accredited",
+    "collector_id": 430185252, "transaction_amount": 100, "currency_id": "ARS",
+    "date_approved": "2026-08-03T12:03:02.000-04:00",
+    "payment_method_id": "account_money", "pos_id": "64365871",
+    "metadata": {},
+    "payer": {"id": "430185252", "email": "erojasmontealegre@gmail.com",
+              "identification": {"type": "CUIT", "number": "27964493338"}},
+    "transaction_details": {"net_received_amount": 97.53},
+    "point_of_interaction": {
+        "type": "INSTORE", "sub_type": "INTRA_PSP",
+        "business_info": {"unit": "wallet", "sub_unit": "qr", "branch": "QR"},
+    },
+}
+
 OUTGOING = {
     "id": 170057310398, "status": "approved", "status_detail": "accredited",
     "payer_id": 430185252, "collector": {"id": 2052122995},
@@ -108,3 +123,11 @@ class TestNormalization(TransactionCase):
         self.assertFalse(row["payer_email"])
         self.assertFalse(row["mp_payer_id"])
         self.assertFalse(row["mp_pos_id"])
+
+    def test_qr_with_self_payer_discards_identity(self):
+        """Si el payer es el propio collector, el dato es del receptor: no se guarda."""
+        row = self.provider.normalize(QR_SELF_PAYER)
+        self.assertEqual(row["source"], "qr")
+        self.assertFalse(row["mp_payer_id"])
+        self.assertFalse(row["payer_vat"])
+        self.assertFalse(row["payer_email"])
