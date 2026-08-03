@@ -152,6 +152,10 @@ class MercadoPagoPayment(models.Model):
         El índice único parcial actúa como red final si el bloqueo falla.
         """
         self.ensure_one()
+        pos_payment.ensure_one()
+        # cr.execute no flushea: sin esto se bloquea y se lee una fila vieja, y
+        # un revert() previo en esta misma transacción daría un rechazo falso.
+        self.flush_recordset(["state"])
         self.env.cr.execute(
             "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (self.id,)
         )
@@ -159,6 +163,14 @@ class MercadoPagoPayment(models.Model):
         if not row or row[0] != "available":
             raise UserError(_(
                 "Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
+            ))
+        linked = pos_payment.mercadopago_payment_id
+        if linked and linked.id != self.id:
+            # Sin este chequeo el índice único parcial tira un IntegrityError
+            # crudo en el flush y al cajero le llega una traza técnica.
+            raise UserError(_(
+                "Esa línea de cobro ya tiene asignado el pago de Mercado Pago %s.",
+                linked.mp_payment_id,
             ))
 
         order = pos_payment.pos_order_id
@@ -181,16 +193,31 @@ class MercadoPagoPayment(models.Model):
         return True
 
     def revert(self, reason=None):
-        """Devuelve el pago a la bandeja. Queda registrado en el chatter del pedido."""
+        """Devuelve el pago a la bandeja. Queda registrado en el chatter del pedido.
+
+        Es la operación inversa sobre la misma fila, así que se toma con el mismo
+        bloqueo que impute(): sin él, un revert contra una imputación concurrente
+        sale como error de serialización crudo en vez de un mensaje legible.
+        """
         self.ensure_one()
-        if self.state != "matched":
+        self.flush_recordset(["state"])
+        self.env.cr.execute(
+            "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (self.id,)
+        )
+        row = self.env.cr.fetchone()
+        if not row or row[0] != "matched":
             raise UserError(_("Sólo se puede revertir un pago imputado."))
         order = self.pos_order_id
+        line = self.pos_payment_id
         self.write({
             "state": "available", "pos_payment_id": False, "pos_order_id": False,
             "pos_session_id": False, "matched_by_user_id": False, "matched_at": False,
             "amount_difference": 0.0, "ambiguous_pick": False,
         })
+        if line:
+            # El índice único vive del lado de mercadopago_payment.pos_payment_id:
+            # si no se limpia también acá, la línea vieja sigue contando el cobro.
+            line.write({"mercadopago_payment_id": False})
         _logger.info(
             "Pago %s revertido por %s. Motivo: %s",
             self.mp_payment_id, self.env.user.login, reason or "sin motivo",

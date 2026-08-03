@@ -1,4 +1,8 @@
 import logging
+import threading
+
+import psycopg2
+from psycopg2 import errors as psycopg2_errors
 
 import odoo
 from odoo.exceptions import UserError
@@ -6,6 +10,12 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
 _logger = logging.getLogger(__name__)
+
+# Tiempos de la prueba de concurrencia. El lock_timeout es sólo una red para que
+# un lock que no se libere mate al hilo en vez de colgar la suite entera.
+THREAD_START_SECONDS = 10.0
+CONTENTION_SECONDS = 1.0
+LOCK_TIMEOUT_SECONDS = 30
 
 # Datos propios del escenario committeado de la prueba de concurrencia. No
 # pueden coincidir con los del setUp: esos viven sin commitear en la transacción
@@ -78,6 +88,52 @@ class TestImputacionUnica(ImputacionCommon):
         with self.assertRaises(UserError):
             self.payment.impute(second)
 
+    def test_revert_frees_both_sides_of_the_link(self):
+        """Reimputar tras revertir deja los dos lados del vínculo consistentes.
+
+        Si revert() no limpiara el back-link, la línea vieja y la nueva quedarían
+        apuntando las dos al mismo pago y la conciliación contaría el cobro dos
+        veces: el índice único no lo ve, porque vive del otro lado.
+        """
+        line_a = self._make_pos_payment()
+        line_b = self._make_pos_payment()
+
+        self.payment.impute(line_a)
+        self.assertEqual(line_a.mercadopago_payment_id, self.payment)
+
+        self.payment.revert(reason="cobro asignado a la venta equivocada")
+        self.assertFalse(line_a.mercadopago_payment_id)
+        self.assertFalse(line_a.mercadopago_reference)
+        self.assertFalse(self.payment.pos_payment_id)
+        self.assertEqual(self.payment.state, "available")
+
+        # Reimputar en la misma transacción: sin el flush previo al FOR UPDATE
+        # esta llamada leería todavía "matched" y sería un rechazo falso.
+        self.payment.impute(line_b)
+        self.assertFalse(line_a.mercadopago_payment_id)
+        self.assertEqual(line_b.mercadopago_payment_id, self.payment)
+        self.assertEqual(self.payment.pos_payment_id, line_b)
+
+    def test_line_already_linked_is_rejected(self):
+        """Una línea ya vinculada a otro pago se rechaza antes del índice único."""
+        line = self._make_pos_payment()
+        other = self.env["mercadopago.payment"].create({
+            "mp_payment_id": "170951482399",
+            "account_id": self.account.id,
+            "amount": 1500.0,
+            "date_approved": "2026-08-03 15:25:00",
+            "source": "qr",
+            "state": "available",
+        })
+        self.payment.impute(line)
+        with self.assertRaises(UserError):
+            other.impute(line)
+
+    def test_revert_requires_an_imputed_payment(self):
+        """Revertir un pago disponible no hace nada y avisa con un UserError."""
+        with self.assertRaises(UserError):
+            self.payment.revert()
+
 
 @tagged("post_install", "-at_install")
 class TestImputacionConcurrente(ImputacionCommon):
@@ -118,61 +174,125 @@ class TestImputacionConcurrente(ImputacionCommon):
 
         Corre antes de armarlo y después de usarlo: una corrida abortada no debe
         dejar una sesión de POS abierta ni chocar contra el índice único del pago.
+        Nunca propaga: si fallara, enmascararía el fallo real del test.
         """
-        accounts = env["mercadopago.account"].with_context(active_test=False).search([
-            ("name", "=", CONCURRENCY_ACCOUNT_NAME),
-        ])
-        if not accounts:
-            return
-        env["mercadopago.payment"].search([("account_id", "in", accounts.ids)]).unlink()
-        methods = env["pos.payment.method"].search([("mp_account_id", "in", accounts.ids)])
-        lines = env["pos.payment"].search([("payment_method_id", "in", methods.ids)])
-        orders = lines.pos_order_id
-        configs = methods.config_ids | orders.session_id.config_id
-        sessions = env["pos.session"].search([("config_id", "in", configs.ids)])
-        lines.unlink()
-        orders.unlink()
-        sessions.unlink()
-        configs.unlink()
-        methods.unlink()
-        accounts.unlink()
-        _logger.info("Escenario de concurrencia limpiado de la base de pruebas")
+        try:
+            accounts = env["mercadopago.account"].with_context(active_test=False).search([
+                ("name", "=", CONCURRENCY_ACCOUNT_NAME),
+            ])
+            if not accounts:
+                return
+            env["mercadopago.payment"].search([("account_id", "in", accounts.ids)]).unlink()
+            methods = env["pos.payment.method"].search([("mp_account_id", "in", accounts.ids)])
+            lines = env["pos.payment"].search([("payment_method_id", "in", methods.ids)])
+            orders = lines.pos_order_id
+            configs = methods.config_ids | orders.session_id.config_id
+            sessions = env["pos.session"].search([("config_id", "in", configs.ids)])
+            lines.unlink()
+            orders.unlink()
+            sessions.unlink()
+            configs.unlink()
+            methods.unlink()
+            accounts.unlink()
+            _logger.info("Escenario de concurrencia limpiado de la base de pruebas")
+        except Exception:
+            env.cr.rollback()
+            _logger.exception(
+                "No se pudo limpiar el escenario de concurrencia: quedan datos "
+                "committeados en la base de pruebas"
+            )
 
     def test_concurrent_imputation_yields_exactly_one(self):
         """Dos transacciones simultáneas sobre el mismo pago: una gana, una falla.
 
-        Criterio de salida de la fase 3. Usa dos cursores reales para que el
-        bloqueo de fila se ejerza de verdad, no simulado.
+        Criterio de salida de la fase 3. El segundo intento corre en un hilo con
+        su propio cursor mientras el primero mantiene el lock tomado y sin
+        commitear: así se ejerce la contención de fila de verdad, no el chequeo
+        de estado sobre una fila ya committeada. Se afirma que el segundo espera
+        y que después falla.
         """
         registry = self.registry
+        uid = self.env.uid
         payment_id, line_a_id, line_b_id = self._build_committed_scenario(registry)
         outcomes = []
-        try:
-            with registry.cursor() as cr_a, registry.cursor() as cr_b:
-                env_a = odoo.api.Environment(cr_a, self.env.uid, {})
-                env_b = odoo.api.Environment(cr_b, self.env.uid, {})
-                payment_a = env_a["mercadopago.payment"].browse(payment_id)
-                payment_b = env_b["mercadopago.payment"].browse(payment_id)
+        expected_errors = []
+        unexpected_errors = []
+        second_started = threading.Event()
+        second_finished = threading.Event()
 
+        def impute_from_second_cashier():
+            """Segundo cajero: hilo propio y cursor propio, contra el mismo pago."""
+            try:
+                with registry.cursor() as cr_b:
+                    # Red de seguridad: si el lock no se libera, el hilo muere
+                    # solo en vez de colgar la suite entera.
+                    cr_b.execute("SET LOCAL lock_timeout = '%ss'" % LOCK_TIMEOUT_SECONDS)
+                    env_b = odoo.api.Environment(cr_b, uid, {})
+                    payment_b = env_b["mercadopago.payment"].browse(payment_id)
+                    line_b = env_b["pos.payment"].browse(line_b_id)
+                    second_started.set()
+                    try:
+                        with mute_logger("odoo.sql_db"):
+                            payment_b.impute(line_b)
+                        outcomes.append("b")
+                    except (UserError, psycopg2.Error) as error:
+                        expected_errors.append(error)
+                        _logger.info(
+                            "El segundo cajero fue rechazado con %s: %s",
+                            type(error).__name__, str(error).strip(),
+                        )
+                        cr_b.rollback()
+            except Exception as error:  # cualquier otra cosa rompe el test
+                unexpected_errors.append(error)
+            finally:
+                second_finished.set()
+
+        second = threading.Thread(target=impute_from_second_cashier, daemon=True)
+        try:
+            cr_a = registry.cursor()
+            try:
+                env_a = odoo.api.Environment(cr_a, uid, {})
+                payment_a = env_a["mercadopago.payment"].browse(payment_id)
                 payment_a.impute(env_a["pos.payment"].browse(line_a_id))
                 outcomes.append("a")
+
+                # El primero todavía no commitea: retiene el lock de la fila.
+                second.start()
+                self.assertTrue(
+                    second_started.wait(THREAD_START_SECONDS),
+                    "El segundo cajero nunca llegó a intentar la imputación",
+                )
+                self.assertFalse(
+                    second_finished.wait(CONTENTION_SECONDS),
+                    "El segundo intento no esperó: el bloqueo de fila no se ejerció",
+                )
                 cr_a.commit()
+            finally:
+                cr_a.close()
 
-                try:
-                    with mute_logger("odoo.sql_db"):
-                        payment_b.impute(env_b["pos.payment"].browse(line_b_id))
-                    outcomes.append("b")
-                    cr_b.commit()
-                except Exception:
-                    cr_b.rollback()
-
+            second.join(timeout=LOCK_TIMEOUT_SECONDS + THREAD_START_SECONDS)
+            self.assertFalse(second.is_alive(), "El segundo intento quedó colgado en el lock")
+            self.assertFalse(
+                unexpected_errors,
+                "El segundo intento falló por algo inesperado: %s" % unexpected_errors,
+            )
+            self.assertTrue(expected_errors, "El segundo intento no falló")
+            self.assertFalse(
+                [e for e in expected_errors if isinstance(e, psycopg2_errors.LockNotAvailable)],
+                "El segundo intento murió por lock_timeout, no por el estado del pago",
+            )
             self.assertEqual(outcomes, ["a"], "Se imputó más de una vez el mismo pago")
+
             with registry.cursor() as cr_check:
-                env_check = odoo.api.Environment(cr_check, self.env.uid, {})
+                env_check = odoo.api.Environment(cr_check, uid, {})
                 imputed = env_check["mercadopago.payment"].browse(payment_id)
                 self.assertEqual(imputed.pos_payment_id.id, line_a_id)
+                self.assertEqual(imputed.state, "matched")
+                losing_line = env_check["pos.payment"].browse(line_b_id)
+                self.assertFalse(losing_line.mercadopago_payment_id)
         finally:
+            second.join(timeout=LOCK_TIMEOUT_SECONDS)
             with registry.cursor() as cr_clean:
                 self._drop_committed_scenario(
-                    odoo.api.Environment(cr_clean, self.env.uid, {})
+                    odoo.api.Environment(cr_clean, uid, {})
                 )
