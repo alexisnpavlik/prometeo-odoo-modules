@@ -1,7 +1,7 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -57,3 +57,71 @@ class PosPaymentMethod(models.Model):
         """Verifica que quien llama por RPC sea un usuario del POS."""
         if not self.env.user.has_group("point_of_sale.group_pos_user"):
             raise AccessError(_("No tenés acceso a la bandeja de Mercado Pago."))
+
+    STALE_AFTER_SECONDS = 60
+
+    def _inbox_domain(self):
+        """Filtro de presentación: la bandeja de esta caja (§6.2 del spec)."""
+        self.ensure_one()
+        window_start = fields.Datetime.subtract(
+            fields.Datetime.now(), minutes=self.search_window_minutes
+        )
+        domain = [
+            ("account_id", "=", self.mp_account_id.id),
+            ("state", "=", "available"),
+            ("date_approved", ">=", window_start),
+        ]
+        channel = ["|", ("mp_pos_id", "=", self.mp_pos_id), ("source", "=", "alias")] \
+            if self.accept_alias_payments else [("mp_pos_id", "=", self.mp_pos_id)]
+        return domain + channel
+
+    def get_mp_inbox(self, amount):
+        """Devuelve la bandeja de esta caja para el monto pedido.
+
+        Nunca consulta a Mercado Pago: lee de la base de Odoo. El ingestor
+        server-side es el único que habla con la API.
+        """
+        self.ensure_one()
+        self._check_pos_access()
+        Inbox = self.env["mercadopago.payment"].sudo()
+        available = Inbox.search(self._inbox_domain())
+
+        tolerance = self.amount_tolerance or 0.0
+        matching = available.filtered(lambda p: abs(p.amount - amount) <= tolerance)
+        account = self.mp_account_id.sudo()
+        last_sync = account.last_sync_at
+        stale = not last_sync or (
+            fields.Datetime.now() - last_sync
+        ).total_seconds() > self.STALE_AFTER_SECONDS
+
+        return {
+            "matching": [self._serialize_inbox_line(p, amount) for p in matching],
+            "others": [self._serialize_inbox_line(p, amount) for p in (available - matching)],
+            "others_count": len(available - matching),
+            "last_sync_at": last_sync and last_sync.isoformat() or False,
+            "stale": stale,
+        }
+
+    def _serialize_inbox_line(self, payment, requested_amount):
+        """Arma la fila que ve el cajero. Sin datos que no correspondan."""
+        return {
+            "id": payment.id,
+            "mp_payment_id": payment.mp_payment_id,
+            "amount": payment.amount,
+            "date_approved": payment.date_approved.isoformat(),
+            "display_payer": payment.display_payer or "",
+            "source": payment.source,
+            "difference": round(requested_amount - payment.amount, 2),
+        }
+
+    def impute_mp_payment(self, mp_payment_id, pos_payment_id, ambiguous=False):
+        """Imputa un pago a una línea. Devuelve el error de carrera si lo hay."""
+        self.ensure_one()
+        self._check_pos_access()
+        payment = self.env["mercadopago.payment"].sudo().browse(mp_payment_id)
+        pos_payment = self.env["pos.payment"].browse(pos_payment_id)
+        try:
+            payment.impute(pos_payment, ambiguous=ambiguous)
+        except UserError as error:
+            return {"ok": False, "error": str(error)}
+        return {"ok": True, "mp_payment_id": payment.mp_payment_id}
