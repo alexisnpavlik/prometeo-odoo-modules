@@ -20,6 +20,7 @@ los pagos recibidos que quedaron sin imputar.
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/mercadopago_account_views.xml",
+        "views/pos_payment_method_views.xml",
         "views/menus.xml",
         "data/ir_cron.xml",
     ],
