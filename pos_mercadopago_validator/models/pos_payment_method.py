@@ -82,10 +82,25 @@ class PosPaymentMethod(models.Model):
             ("account_id", "=", self.mp_account_id.id),
             ("state", "=", "available"),
         ]
+        return domain + self._channel_domain()
+
+    def _channel_domain(self):
+        """Filtro de canal: QR de esta caja, o alias si está habilitado.
+
+        Separado de `_inbox_ownership_domain()` para poder reusarlo donde hace
+        falta acotar por caja/canal sin el `state="available"` de la bandeja
+        -por ejemplo, al cerrar en `pos.payment.create()` una reserva que ya
+        está en `matched`-. Mismo criterio de aislamiento en los dos lugares:
+        si divergiera, una caja podría cerrar la reserva de otra.
+
+        Si esta caja no tiene `mp_pos_id` configurado, la rama del QR no debe
+        matchear ningún registro: ver el comentario equivalente en
+        `_inbox_ownership_domain()`.
+        """
+        self.ensure_one()
         qr_leaf = [("mp_pos_id", "=", self.mp_pos_id)] if self.mp_pos_id else [(0, "=", 1)]
-        channel = ["|"] + qr_leaf + [("source", "=", "alias")] \
+        return ["|"] + qr_leaf + [("source", "=", "alias")] \
             if self.accept_alias_payments else qr_leaf
-        return domain + channel
 
     def _inbox_domain(self):
         """Filtro de presentación: la bandeja de esta caja (§6.2 del spec).

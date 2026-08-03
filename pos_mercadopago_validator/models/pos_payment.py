@@ -47,12 +47,23 @@ class PosPayment(models.Model):
         de Mercado Pago sin vincular. La anomalía queda visible igual: el
         registro de `mercadopago.payment`, si existe, sigue en estado
         `matched` sin `pos_payment_id`, buscable desde el backoffice.
+
+        `mercadopago_uuid` lo pone el navegador, así que la búsqueda no puede
+        confiar en el uuid solo: se acota por cuenta y canal (QR/alias) del
+        `payment_method_id` de la línea, con `_channel_domain()` -el mismo
+        criterio de pertenencia que usa `reserve_for_uuid()` vía
+        `_find_inbox_line()` y que usa `revert_mp_reservation_by_uuid()` vía
+        `account_id`-. Sin este filtro, una línea de otra caja o de otra
+        cuenta que declarara el uuid de una reserva viva ajena se la
+        quedaría, y acá no hay vuelta atrás: es la operación que deja el pago
+        imputado a una venta.
         """
         lines = super().create(vals_list)
         Inbox = self.env["mercadopago.payment"].sudo()
         for line in lines:
             if not line.mercadopago_uuid:
                 continue
+            method = line.payment_method_id
             # Orden determinístico: si por algún camino hubiera más de una
             # reserva viva con el mismo uuid -no debería, reserve_for_uuid()
             # ya las rechaza- no se elige a ciegas entre ellas.
@@ -60,7 +71,8 @@ class PosPayment(models.Model):
                 ("pos_payment_uuid", "=", line.mercadopago_uuid),
                 ("state", "=", "matched"),
                 ("pos_payment_id", "=", False),
-            ], order="id asc")
+                ("account_id", "=", method.mp_account_id.id),
+            ] + method._channel_domain(), order="id asc")
             if not reserved:
                 _logger.warning(
                     "La línea de pago %s declara el uuid %s pero no hay ninguna "

@@ -93,3 +93,41 @@ class TestReservaAImputacion(TransactionCase):
         """El POS necesita sincronizar mercadopago_uuid para poder cerrar la reserva."""
         fields_list = self.env["pos.payment"]._load_pos_data_fields(self.config.id)
         self.assertIn("mercadopago_uuid", fields_list)
+
+    def test_reservation_from_another_cash_register_does_not_get_linked(self):
+        """El uuid lo elige el navegador: una línea de otra caja no se lo queda.
+
+        Misma cuenta, distinto QR. Sin el filtro de canal en el `create()`,
+        una línea de la caja B que declarara el uuid de una reserva viva de
+        la caja A se quedaría con ese pago -y ahí no hay vuelta atrás, es la
+        operación que deja el pago imputado a una venta-.
+        """
+        self.payment.reserve_for_uuid("uuid-abc")
+
+        other_method = self.env["pos.payment.method"].with_company(self.company).create({
+            "name": "MP QR caja B", "journal_id": self.method.journal_id.id,
+            "use_payment_terminal": "mercadopago_validator",
+            "mp_account_id": self.account.id, "mp_pos_id": "99999999",
+            "company_id": self.company.id,
+        })
+        other_config = self.env["pos.config"].with_company(self.company).create({
+            "name": "Caja B", "company_id": self.company.id,
+        })
+        other_config.write({"payment_method_ids": [(4, other_method.id)]})
+        other_config.open_ui()
+        other_order = self.env["pos.order"].create({
+            "session_id": other_config.current_session_id.id, "amount_total": 1500.0,
+            "amount_tax": 0, "amount_paid": 0, "amount_return": 0,
+        })
+
+        line = self.env["pos.payment"].create({
+            "pos_order_id": other_order.id,
+            "payment_method_id": other_method.id,
+            "amount": 1500.0,
+            "mercadopago_uuid": "uuid-abc",
+        })
+
+        self.assertFalse(line.mercadopago_payment_id)
+        self.payment.invalidate_recordset()
+        self.assertEqual(self.payment.state, "matched")
+        self.assertFalse(self.payment.pos_payment_id)
