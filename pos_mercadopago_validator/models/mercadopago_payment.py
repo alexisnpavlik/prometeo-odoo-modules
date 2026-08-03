@@ -255,12 +255,12 @@ class MercadoPagoPayment(models.Model):
 
         El bus de Odoo 18 no tiene canal global para el POS: pos.bus.mixin
         publica en el canal privado de cada pos.config (token propio por
-        config). Hay que resolver qué configs están afectadas por este pago
+        config). Hay que resolver qué configs están afectadas por cada pago
         e iterarlas notificando una por una.
 
         El criterio de pertenencia tiene que ser el mismo que usa
         `_inbox_domain()` en pos.payment.method: un método de este módulo
-        pertenece a este pago si su cuenta coincide y, según el canal, su
+        pertenece a un pago si su cuenta coincide y, según el canal, su
         mp_pos_id es el del QR o tiene habilitado accept_alias_payments. Si
         divergiera, una caja podría recibir un aviso de un pago que después
         no ve en su lista (o al revés).
@@ -275,33 +275,66 @@ class MercadoPagoPayment(models.Model):
         cerrada", el mismo criterio que usa pos.config para su propio
         current_session_id/has_active_session (state != "closed"), así que
         se resuelve vía pos.session con ese filtro en vez de state="opened".
+
+        El llamador (`ingest_now()`) suele activar esto sobre un lote de
+        varios pagos nuevos de la misma corrida de polling, y lo habitual es
+        que compartan cuenta y QR. Por eso se agrupa antes de consultar: una
+        sola búsqueda de métodos y de sesiones por grupo (account_id,
+        mp_pos_id) o (account_id, alias), en vez de repetirla por pago. Un
+        lote de N pagos del mismo QR queda en un número constante de
+        consultas, no en 2N.
         """
-        PaymentMethod = self.env["pos.payment.method"].sudo()
         Session = self.env["pos.session"].sudo()
+        qr_groups = {}
+        alias_groups = {}
         for payment in self:
-            domain = [("mp_account_id", "=", payment.account_id.id)]
             if payment.source == "qr":
                 if not payment.mp_pos_id:
                     # Anomalía de datos: un pago QR sin mp_pos_id no debe
                     # matchear por accidente los métodos sin QR configurado.
+                    _logger.warning(
+                        "Pago QR %s sin mp_pos_id: no se puede resolver a qué caja avisar",
+                        payment.mp_payment_id,
+                    )
                     continue
-                domain.append(("mp_pos_id", "=", payment.mp_pos_id))
+                qr_groups.setdefault((payment.account_id.id, payment.mp_pos_id), []).append(payment)
             else:
-                domain.append(("accept_alias_payments", "=", True))
+                alias_groups.setdefault(payment.account_id.id, []).append(payment)
 
-            methods = PaymentMethod.search(domain)
-            if not methods:
-                continue
-
-            sessions = Session.search([
-                ("state", "!=", "closed"),
-                ("config_id.payment_method_ids", "in", methods.ids),
+        for (account_id, mp_pos_id), payments in qr_groups.items():
+            methods = self.env["pos.payment.method"].sudo().search([
+                ("mp_account_id", "=", account_id),
+                ("mp_pos_id", "=", mp_pos_id),
             ])
-            for config in sessions.config_id:
+            self._notify_configs_for_methods(methods, payments, Session)
+
+        for account_id, payments in alias_groups.items():
+            methods = self.env["pos.payment.method"].sudo().search([
+                ("mp_account_id", "=", account_id),
+                ("accept_alias_payments", "=", True),
+            ])
+            self._notify_configs_for_methods(methods, payments, Session)
+
+        return True
+
+    def _notify_configs_for_methods(self, methods, payments, Session):
+        """Notifica por bus, una vez por config y por pago, a las cajas de `methods`.
+
+        `methods` y `payments` ya vienen agrupados por (cuenta, canal) desde
+        `_notify_open_sessions()`: acá sólo se resuelven las configs con
+        sesión abierta para ese grupo y se emite el evento por cada pago.
+        """
+        if not methods:
+            return
+        sessions = Session.search([
+            ("state", "!=", "closed"),
+            ("config_id.payment_method_ids", "in", methods.ids),
+        ])
+        for config in sessions.config_id:
+            for payment in payments:
                 config._notify("MERCADOPAGO_INBOX_UPDATED", {
                     "config_id": config.id,
                     "mp_payment_id": payment.mp_payment_id,
                     "amount": payment.amount,
                     "state": payment.state,
                 })
-        return True
