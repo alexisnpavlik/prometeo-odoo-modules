@@ -1832,7 +1832,7 @@ git commit -m "feat(mp): webhook público que sólo lee el id del pago"
 - Test: `pos_mercadopago_validator/tests/test_inbox_rpc.py`
 
 **Interfaces:**
-- Produces: `pos.payment.method.get_mp_inbox(amount)` → `{"matching": [...], "others_count": int, "last_sync_at": str|False, "stale": bool}`, y `pos.payment.method.impute_mp_payment(mp_payment_id, pos_payment_id, ambiguous)`.
+- Produces: `pos.payment.method.get_mp_inbox(amount)` → `{"matching": [...], "others_count": int, "last_sync_at": str|False, "stale": bool}`, y `pos.payment.method.impute_mp_payment(inbox_line_id, pos_payment_id, ambiguous)`.
 
 - [ ] **Step 1: Escribir el test que falla**
 
@@ -1959,11 +1959,11 @@ Agregar a `models/pos_payment_method.py`:
             "difference": round(requested_amount - payment.amount, 2),
         }
 
-    def impute_mp_payment(self, mp_payment_id, pos_payment_id, ambiguous=False):
+    def impute_mp_payment(self, inbox_line_id, pos_payment_id, ambiguous=False):
         """Imputa un pago a una línea. Devuelve el error de carrera si lo hay."""
         self.ensure_one()
         self._check_pos_access()
-        payment = self.env["mercadopago.payment"].sudo().browse(mp_payment_id)
+        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
         pos_payment = self.env["pos.payment"].browse(pos_payment_id)
         try:
             payment.impute(pos_payment, ambiguous=ambiguous)
@@ -2452,7 +2452,7 @@ register_payment_method("mercadopago_validator", PaymentMercadoPagoValidator);
 
 Agregar a `models/pos_payment_method.py`:
 ```python
-    def impute_mp_payment_by_uuid(self, mp_payment_id, pos_payment_uuid, ambiguous=False):
+    def impute_mp_payment_by_uuid(self, inbox_line_id, pos_payment_uuid, ambiguous=False):
         """Imputa contra una línea que todavía vive sólo en el navegador.
 
         La línea de pago se crea en el servidor recién al confirmar la venta, así
@@ -2460,7 +2460,7 @@ Agregar a `models/pos_payment_method.py`:
         """
         self.ensure_one()
         self._check_pos_access()
-        payment = self.env["mercadopago.payment"].sudo().browse(mp_payment_id)
+        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
         try:
             payment.reserve_for_uuid(pos_payment_uuid, ambiguous=ambiguous)
         except UserError as error:
