@@ -38,10 +38,16 @@ class TestCviVendorStock(CviCommon):
         return self._picking_from_action(wizard.action_confirm_delivery())
 
     def _picking_from_action(self, action):
-        """Extrae el albarán de la notificación que devuelve el wizard."""
+        """Extrae el albarán de la notificación que devuelve el wizard.
+
+        Chequea también que la act_window anidada traiga "views": clean_action() solo
+        lo genera para la acción de nivel superior, y acá la de arriba es
+        ir.actions.client. Sin "views" el cliente web falla en action.views.map().
+        """
         self.assertEqual(action["tag"], "display_notification")
         nxt = action["params"]["next"]
         self.assertEqual(nxt["res_model"], "stock.picking")
+        self.assertTrue(nxt.get("views"), "la acción anidada tiene que traer views")
         return self.env["stock.picking"].browse(nxt["res_id"])
 
     def test_production_intake_increases_factory_stock(self):

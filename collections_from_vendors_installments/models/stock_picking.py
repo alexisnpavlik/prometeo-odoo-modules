@@ -119,11 +119,14 @@ class StockPicking(models.Model):
                     original=self.name,
                     reversal=reversal.name,
                 ),
+                # Ver la nota en cvi_vendor_delivery_wizard: clean_action() no completa
+                # "views" en una act_window anidada dentro de un ir.actions.client.
                 "next": {
                     "type": "ir.actions.act_window",
                     "res_model": "stock.picking",
                     "res_id": reversal.id,
                     "view_mode": "form",
+                    "views": [[False, "form"]],
                     "target": "current",
                 },
             },

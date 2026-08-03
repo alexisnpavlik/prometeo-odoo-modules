@@ -154,3 +154,20 @@ class TestCviDeliveryReversal(CviCommon):
         picking = self._deliver(3)
         picking.with_user(manager).action_cvi_reverse_delivery()
         self.assertTrue(picking.cvi_reversal_id)
+
+    def test_reversal_action_is_consumable_by_the_web_client(self):
+        """La notificación de anulación trae una act_window completa.
+
+        clean_action() genera "views" solo para la acción de nivel superior. Acá la de
+        arriba es ir.actions.client, así que la act_window anidada tiene que traerlo
+        puesto: sin eso el cliente web falla en action.views.map() y el usuario ve un
+        UncaughtPromiseError en vez del albarán.
+        """
+        self._receive(10)
+        picking = self._deliver(3)
+        action = picking.action_cvi_reverse_delivery()
+        self.assertEqual(action["tag"], "display_notification")
+        nxt = action["params"]["next"]
+        self.assertEqual(nxt["type"], "ir.actions.act_window")
+        self.assertTrue(nxt.get("views"))
+        self.assertEqual(nxt["views"][0][1], "form")

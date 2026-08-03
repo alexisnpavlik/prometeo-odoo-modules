@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Mismo esquema que la barra del punto de venta: acción arriba, dato abajo. -->
+    <t t-name="collections_from_vendors_installments.CviMobileSaveBar">
+        <div t-if="visible" class="o_cvi_save_bar d-md-none">
+            <button type="button" class="o_cvi_save_bar_btn o_cvi_save_bar_primary"
+                    t-on-click="save">
+                <span class="o_cvi_save_bar_action">Guardar</span>
+                <span class="o_cvi_save_bar_detail" t-if="totalLabel">
+                    <t t-esc="totalLabel"/>
+                </span>
+            </button>
+            <button type="button" class="o_cvi_save_bar_btn o_cvi_save_bar_secondary"
+                    t-on-click="discard">
+                <span class="o_cvi_save_bar_action">Cancelar</span>
+                <span class="o_cvi_save_bar_detail"><t t-esc="discardLabel"/></span>
+            </button>
+        </div>
+    </t>
+
+</templates>

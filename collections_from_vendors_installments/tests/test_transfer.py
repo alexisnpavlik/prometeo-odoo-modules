@@ -26,7 +26,7 @@ class TestCviTransfer(CviCommon):
         cards = self.env["cvi.card"]
         for _index in range(how_many):
             card = self.env["cvi.card"].create({
-                "partner_id": self.partner.id,
+                "customer_id": self.customer.id,
                 "vendor_id": self.vendor_user.id,
                 "product_id": self.product.id,
                 "date_sale": "2026-01-15",
@@ -102,7 +102,7 @@ class TestCviTransfer(CviCommon):
     def test_draft_card_cannot_be_transferred(self):
         """Solo se transfieren tarjetas ya en cobranza o enrutadas."""
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

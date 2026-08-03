@@ -42,7 +42,7 @@ class TestCviSecurity(CviCommon):
     def _card(self, vendor):
         """Tarjeta confirmada del vendedor indicado."""
         card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": vendor.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",

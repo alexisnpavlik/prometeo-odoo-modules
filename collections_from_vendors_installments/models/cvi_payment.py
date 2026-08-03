@@ -23,8 +23,8 @@ class CviPayment(models.Model):
     card_id = fields.Many2one(
         "cvi.card", string="Tarjeta", required=True, ondelete="restrict", index=True
     )
-    partner_id = fields.Many2one(
-        related="card_id.partner_id", store=True, index=True, string="Cliente"
+    customer_id = fields.Many2one(
+        related="card_id.customer_id", store=True, index=True, string="Cliente"
     )
     company_id = fields.Many2one(related="card_id.company_id", store=True, index=True)
     currency_id = fields.Many2one(related="card_id.currency_id", readonly=True)
@@ -48,6 +48,11 @@ class CviPayment(models.Model):
     )
     allocation_ids = fields.One2many(
         "cvi.allocation", "payment_id", string="Imputaciones"
+    )
+    settlement_id = fields.Many2one(
+        "cvi.settlement", string="Rendición", readonly=True, copy=False,
+        index=True, ondelete="restrict",
+        help="Rendición de caja en la que se entregó este cobro (HU-18).",
     )
     note = fields.Char(string="Observación")
 
@@ -140,6 +145,14 @@ class CviPayment(models.Model):
                 raise UserError(_(
                     "Solo se puede anular un cobro registrado (el cobro %s está en estado %s).",
                     payment.name, payment.state,
+                ))
+            # Un cobro ya rendido está respaldado por plata entregada en caja: anularlo
+            # dejaría la rendición cerrada cuadrando contra un cobro que ya no existe.
+            if payment.settlement_id:
+                raise UserError(_(
+                    "El cobro %(name)s ya se rindió en %(settlement)s. Reabrí la "
+                    "rendición antes de anularlo.",
+                    name=payment.name, settlement=payment.settlement_id.name,
                 ))
             payment.allocation_ids.unlink()
             payment.state = "cancel"

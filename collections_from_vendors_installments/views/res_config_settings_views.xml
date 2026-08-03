@@ -24,6 +24,10 @@
                                  help="Días de atraso tolerados antes de marcar una cuota como vencida">
                             <field name="cvi_overdue_days"/>
                         </setting>
+                        <setting string="Frecuencia de rendición"
+                                 help="Cada cuánto los cobradores rinden la caja">
+                            <field name="cvi_settlement_frequency"/>
+                        </setting>
                     </block>
                 </app>
             </xpath>

@@ -15,4 +15,18 @@
         <field name="padding">6</field>
         <field name="company_id" eval="False"/>
     </record>
+    <record id="seq_cvi_settlement" model="ir.sequence">
+        <field name="name">Rendición de caja</field>
+        <field name="code">cvi.settlement</field>
+        <field name="prefix">REND/</field>
+        <field name="padding">6</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_cvi_supervision_visit" model="ir.sequence">
+        <field name="name">Visita de supervisión</field>
+        <field name="code">cvi.supervision.visit</field>
+        <field name="prefix">SUP/</field>
+        <field name="padding">6</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

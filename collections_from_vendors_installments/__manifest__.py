@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Cobranza a vendedores y cuotas",
-    "version": "18.0.1.0.0",
+    "version": "18.0.3.1.2",
     "category": "Sales/Sales",
     "summary": "Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza",
     "description": """
@@ -25,18 +25,24 @@
         "data/ir_sequence.xml",
         "data/stock_location.xml",
         "data/ir_cron.xml",
+        "views/dashboard_views.xml",
         "views/cvi_card_views.xml",
         "views/cvi_installment_views.xml",
         "views/cvi_payment_views.xml",
+        "views/cvi_settlement_views.xml",
+        "views/cvi_supervision_views.xml",
         "views/cvi_wizard_views.xml",
         "views/stock_quant_views.xml",
         "views/stock_picking_views.xml",
+        "views/cvi_customer_views.xml",
         "views/product_template_views.xml",
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
     ],
     "assets": {
         "web.assets_backend": [
+            "collections_from_vendors_installments/static/src/css/*.css",
+            "collections_from_vendors_installments/static/src/scss/*.scss",
             "collections_from_vendors_installments/static/src/js/*.js",
             "collections_from_vendors_installments/static/src/xml/*.xml",
         ],

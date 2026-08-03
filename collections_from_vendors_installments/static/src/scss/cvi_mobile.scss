@@ -1,0 +1,96 @@
+// Botón de venta nueva: solo el símbolo +, en cualquier tamaño de pantalla.
+//
+// Se reestiliza el botón "Nuevo" del panel de control en vez de agregar uno propio: así
+// conserva su comportamiento, su atajo de teclado y su lógica de permisos. El selector
+// funciona porque la clase del arch termina en el div raíz de la vista, que contiene al
+// panel de control (computeViewClassName en views/utils.js).
+.o_cvi_fab .o-kanban-button-new {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0; // oculta el texto "Nuevo" sin sacarlo del DOM ni de los lectores
+
+    &::before {
+        content: "\f067"; // fa-plus
+        font-family: FontAwesome;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+}
+
+// Ajustes que aplican solo en pantalla chica. El corte en 767.98px es el límite del
+// breakpoint md de Bootstrap, el mismo que usan las clases d-md-none de las vistas.
+@media (max-width: 767.98px) {
+
+    // En el celular además flota sobre el contenido, abajo a la derecha.
+    .o_cvi_fab .o-kanban-button-new {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 1035;
+        width: 3.5rem;
+        height: 3.5rem;
+        padding: 0;
+        border-radius: 50%;
+        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
+
+        &::before {
+            font-size: 1.5rem;
+        }
+    }
+
+    // Barra de guardar/cancelar al pie, con el esquema de la del punto de venta:
+    // dos botones grandes lado a lado, acción arriba y dato abajo.
+    .o_cvi_save_bar {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1035;
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background-color: var(--o-view-background-color, #fff);
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .o_cvi_save_bar_btn {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.125rem;
+        min-height: 3.75rem;
+        padding: 0.5rem;
+        border: 0;
+        border-radius: 0.25rem;
+    }
+
+    .o_cvi_save_bar_primary {
+        color: #fff;
+        background-color: var(--primary, #714b67);
+    }
+
+    .o_cvi_save_bar_secondary {
+        color: inherit;
+        background-color: rgba(0, 0, 0, 0.06);
+    }
+
+    .o_cvi_save_bar_action {
+        font-size: 1.125rem;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .o_cvi_save_bar_detail {
+        font-size: 0.8125rem;
+        opacity: 0.85;
+        line-height: 1.2;
+    }
+
+    // Sin esto la barra fija tapa los últimos campos del formulario.
+    .o_form_view .o_form_sheet {
+        padding-bottom: 6rem;
+    }
+}

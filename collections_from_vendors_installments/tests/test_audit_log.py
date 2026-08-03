@@ -25,12 +25,12 @@ class TestCviAuditLog(CviCommon):
         })
         # Aseguramos que el partner del usuario no tenga email, sea cual sea
         # el valor por defecto que Odoo le haya puesto al crearlo.
-        cls.no_email_collector.partner_id.email = False
+        cls.no_email_collector.customer_id.email = False
 
     def _confirmed_card(self, **kwargs):
         """Tarjeta confirmada (estado Vendida) sin cobrador asignado."""
         vals = {
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",
@@ -45,19 +45,19 @@ class TestCviAuditLog(CviCommon):
     def test_accept_without_email_does_not_raise_and_preserves_attribution(self):
         """Un cobrador sin email puede aceptar una tarjeta enrutada (RN-08) y el
         mensaje de auditoría queda atribuido a él, no a OdooBot."""
-        self.assertFalse(self.no_email_collector.partner_id.email)
+        self.assertFalse(self.no_email_collector.customer_id.email)
         card = self._confirmed_card(collector_id=self.no_email_collector.id)
         self.assertEqual(card.state, "routed")
         card.with_user(self.no_email_collector).action_accept()
         self.assertEqual(card.state, "active")
         last_message = card.message_ids.sorted("id", reverse=True)[0]
-        self.assertEqual(last_message.author_id, self.no_email_collector.partner_id)
+        self.assertEqual(last_message.author_id, self.no_email_collector.customer_id)
 
     def test_accept_with_email_still_works(self):
         """El camino normal (usuario con email) sigue funcionando sin cambios."""
-        self.assertTrue(self.collector_user.partner_id.email)
+        self.assertTrue(self.collector_user.customer_id.email)
         card = self._confirmed_card(collector_id=self.collector_user.id)
         card.with_user(self.collector_user).action_accept()
         self.assertEqual(card.state, "active")
         last_message = card.message_ids.sorted("id", reverse=True)[0]
-        self.assertEqual(last_message.author_id, self.collector_user.partner_id)
+        self.assertEqual(last_message.author_id, self.collector_user.customer_id)

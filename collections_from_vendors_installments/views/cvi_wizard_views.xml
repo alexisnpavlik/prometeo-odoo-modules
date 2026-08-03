@@ -12,7 +12,7 @@
                 <field name="card_ids" nolabel="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="plan_id"/>
                         <field name="installment_amount"/>
                         <field name="charge_day_display"/>
@@ -49,7 +49,7 @@
                 <field name="card_ids" nolabel="1" readonly="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="vendor_id"/>
                     </list>
                 </field>
@@ -75,7 +75,7 @@
                 <field name="card_ids" nolabel="1">
                     <list>
                         <field name="name"/>
-                        <field name="partner_id"/>
+                        <field name="customer_id"/>
                         <field name="collector_id" string="Cobrador actual"/>
                         <field name="amount_residual"/>
                         <field name="currency_id" column_invisible="True"/>
@@ -115,6 +115,12 @@
                     <button name="action_confirm_delivery" type="object" string="Confirmar"
                             class="btn-primary"/>
                 </header>
+                <!-- Ver la nota en cvi_card_views: en móvil los botones del <header> se
+                     esconden en el menú de engranaje. -->
+                <div class="d-md-none d-grid mb-3">
+                    <button name="action_confirm_delivery" type="object" string="Confirmar"
+                            class="btn btn-primary btn-lg"/>
+                </div>
                 <group>
                     <group>
                         <field name="vendor_id"/>
@@ -139,5 +145,49 @@
         <field name="res_model">cvi.vendor.delivery.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">current</field>
+    </record>
+
+    <record id="view_cvi_payment_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.payment.wizard.form</field>
+        <field name="model">cvi.payment.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Registrar cobro">
+                <group>
+                    <field name="customer_id"/>
+                    <field name="installment_id"/>
+                    <field name="amount_installment"/>
+                    <field name="amount_due_before" invisible="not amount_due_before"/>
+                    <field name="amount_max"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="card_id" invisible="1"/>
+                    <field name="is_commission" invisible="1"/>
+                </group>
+
+                <div class="alert alert-warning" role="alert"
+                     invisible="not amount_due_before">
+                    El cliente arrastra <field name="amount_due_before" readonly="1"
+                                                nolabel="1" class="oe_inline"/>
+                    de cuotas anteriores impagas. Lo que cobres se imputa primero a la
+                    deuda más vieja.
+                </div>
+
+                <group string="Cobro">
+                    <field name="date"/>
+                    <!-- Grande y solo: es el único dato que el cobrador carga parado en
+                         la vereda, muchas veces con una mano. -->
+                    <field name="amount" class="oe_inline fs-4"/>
+                    <field name="note" placeholder="Observación (opcional)"/>
+                </group>
+
+                <footer>
+                    <button name="action_confirm_payment" type="object"
+                            string="Registrar cobro" class="btn-primary"/>
+                    <button name="action_charge_everything_due" type="object"
+                            string="Cobrar todo lo adeudado" class="btn-secondary"
+                            invisible="not amount_due_before"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
     </record>
 </odoo>

@@ -15,7 +15,7 @@ class TestCviCardState(CviCommon):
         # pisa este valor a 0 explícitamente donde sí necesita mora real.
         self.company.cvi_overdue_days = 3650  # ~10 años
         self.card = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2026-01-15",
@@ -87,7 +87,7 @@ class TestCviCardState(CviCommon):
         """Las cuotas impagas ya vencidas se cuentan como vencidas (HU-16)."""
         self.company.cvi_overdue_days = 0
         old = self.env["cvi.card"].create({
-            "partner_id": self.partner.id,
+            "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
             "product_id": self.product.id,
             "date_sale": "2020-01-15",

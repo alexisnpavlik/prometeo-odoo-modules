@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cvi_assignment_list" model="ir.ui.view">
+        <field name="name">cvi.supervision.assignment.list</field>
+        <field name="model">cvi.supervision.assignment</field>
+        <field name="arch" type="xml">
+            <list string="Asignaciones" editable="bottom">
+                <field name="supervisor_id" options="{'no_create': True}"/>
+                <field name="collector_id" options="{'no_create': True}"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="company_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_assignment_search" model="ir.ui.view">
+        <field name="name">cvi.supervision.assignment.search</field>
+        <field name="model">cvi.supervision.assignment</field>
+        <field name="arch" type="xml">
+            <search string="Asignaciones">
+                <field name="supervisor_id"/>
+                <field name="collector_id"/>
+                <filter name="filter_current" string="Vigentes"
+                        domain="['&amp;', ('date_start', '&lt;=', context_today().strftime('%Y-%m-%d')), '|', ('date_end', '=', False), ('date_end', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_supervisor" string="Supervisor"
+                            context="{'group_by': 'supervisor_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_assignments" model="ir.actions.act_window">
+        <field name="name">Asignaciones de supervisión</field>
+        <field name="res_model">cvi.supervision.assignment</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_cvi_assignment_search"/>
+        <field name="context">{'search_default_filter_current': 1, 'search_default_group_by_supervisor': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Ningún cobrador tiene supervisor asignado</p>
+            <p>Asigná cobradores a un supervisor para que pueda auditar su cartera.</p>
+        </field>
+    </record>
+
+    <record id="view_cvi_visit_form" model="ir.ui.view">
+        <field name="name">cvi.supervision.visit.form</field>
+        <field name="model">cvi.supervision.visit</field>
+        <field name="arch" type="xml">
+            <form string="Visita de supervisión">
+                <header>
+                    <button name="action_load_cards" type="object"
+                            string="Traer tarjetas de la cartera"
+                            invisible="state != 'draft'"/>
+                    <button name="action_close" type="object" string="Cerrar visita"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_reopen" type="object" string="Reabrir"
+                            invisible="state != 'done'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="d-md-none d-grid gap-2 mb-3">
+                        <button name="action_close" type="object" string="Cerrar visita"
+                                class="btn btn-primary btn-lg" invisible="state != 'draft'"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Quién y cuándo">
+                            <field name="supervisor_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="collector_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                        <group string="Período auditado">
+                            <field name="date_from" readonly="state != 'draft'"/>
+                            <field name="date_to" readonly="state != 'draft'"/>
+                            <field name="card_count" readonly="1"/>
+                            <field name="issue_count" readonly="1"/>
+                            <field name="result" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tarjetas revisadas" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="card_id" options="{'no_create': True}"/>
+                                    <field name="customer_id" readonly="1"/>
+                                    <field name="amount_residual" readonly="1"/>
+                                    <field name="verified"/>
+                                    <field name="has_issue"/>
+                                    <field name="note"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Observaciones" name="note">
+                            <field name="note" nolabel="1" readonly="state != 'draft'"
+                                   placeholder="Hallazgos generales de la visita"/>
+                        </page>
+                    </notebook>
+                    <!-- Las fotos y la documentación que pide HU-22 van como adjuntos
+                         del chatter: sirve para cualquier formato y ya queda fechado
+                         y atribuido. -->
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cvi_visit_list" model="ir.ui.view">
+        <field name="name">cvi.supervision.visit.list</field>
+        <field name="model">cvi.supervision.visit</field>
+        <field name="arch" type="xml">
+            <list string="Visitas de supervisión"
+                  decoration-warning="result == 'issues'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="supervisor_id"/>
+                <field name="collector_id"/>
+                <field name="card_count"/>
+                <field name="issue_count"/>
+                <field name="result" widget="badge"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_visit_kanban" model="ir.ui.view">
+        <field name="name">cvi.supervision.visit.kanban</field>
+        <field name="model">cvi.supervision.visit</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_order="date desc">
+                <field name="result"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="row">
+                            <div class="col-8">
+                                <strong><field name="collector_id"/></strong>
+                                <div class="text-muted small">
+                                    <field name="name"/> · <field name="date"/>
+                                </div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <field name="result" widget="label_selection"
+                                       options="{'classes': {'compliant': 'success', 'issues': 'warning'}}"/>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12 text-muted small">
+                                <field name="card_count"/> tarjetas ·
+                                <field name="issue_count"/> con observación
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_cvi_visit_search" model="ir.ui.view">
+        <field name="name">cvi.supervision.visit.search</field>
+        <field name="model">cvi.supervision.visit</field>
+        <field name="arch" type="xml">
+            <search string="Visitas">
+                <field name="name"/>
+                <field name="collector_id"/>
+                <field name="supervisor_id"/>
+                <filter name="filter_open" string="En curso"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_issues" string="Con observaciones"
+                        domain="[('result', '=', 'issues')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_by_collector" string="Cobrador"
+                            context="{'group_by': 'collector_id'}"/>
+                    <filter name="group_by_supervisor" string="Supervisor"
+                            context="{'group_by': 'supervisor_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_visits" model="ir.actions.act_window">
+        <field name="name">Visitas de supervisión</field>
+        <field name="res_model">cvi.supervision.visit</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="search_view_id" ref="view_cvi_visit_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Todavía no se registraron visitas</p>
+            <p>Registrá la verificación que hacés sobre la cartera de un cobrador.</p>
+        </field>
+    </record>
+</odoo>

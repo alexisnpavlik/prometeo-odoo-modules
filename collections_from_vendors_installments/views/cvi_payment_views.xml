@@ -20,7 +20,7 @@
                     <group>
                         <group>
                             <field name="card_id" readonly="state != 'draft'"/>
-                            <field name="partner_id" readonly="1"/>
+                            <field name="customer_id" readonly="1"/>
                             <field name="date" readonly="state != 'draft'"/>
                         </group>
                         <group>
@@ -55,7 +55,7 @@
             <list string="Cobros" decoration-muted="state == 'cancel'">
                 <field name="name"/>
                 <field name="date"/>
-                <field name="partner_id"/>
+                <field name="customer_id"/>
                 <field name="card_id" optional="show"/>
                 <field name="amount" sum="Total cobrado"/>
                 <field name="user_id"/>
@@ -66,10 +66,45 @@
         </field>
     </record>
 
+    <record id="view_cvi_payment_kanban" model="ir.ui.view">
+        <field name="name">cvi.payment.kanban</field>
+        <field name="model">cvi.payment</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" default_order="date desc, id desc">
+                <field name="state"/>
+                <field name="currency_id"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="row">
+                            <div class="col-8">
+                                <strong><field name="customer_id"/></strong>
+                                <div class="text-muted small">
+                                    <field name="name"/> · <field name="date"/>
+                                </div>
+                            </div>
+                            <div class="col-4 text-end">
+                                <strong><field name="amount" widget="monetary"/></strong>
+                            </div>
+                        </div>
+                        <div class="row mt-2 align-items-center">
+                            <div class="col-7 text-truncate">
+                                <field name="user_id"/>
+                            </div>
+                            <div class="col-5 text-end">
+                                <field name="state" widget="label_selection"
+                                       options="{'classes': {'draft': 'default', 'posted': 'success', 'cancel': 'danger'}}"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="action_cvi_payment" model="ir.actions.act_window">
         <field name="name">Cobros</field>
         <field name="res_model">cvi.payment</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,kanban,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Todavía no registraste cobros</p>
             <p>Registrá lo que te paga el cliente: se imputa solo a las cuotas más viejas.</p>

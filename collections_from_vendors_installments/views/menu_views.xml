@@ -3,12 +3,26 @@
     <menuitem id="menu_cvi_root" name="Venta en cuotas" sequence="45"
               web_icon="collections_from_vendors_installments,static/description/icon.png"/>
 
+    <menuitem id="menu_cvi_dashboard" name="Dashboard" parent="menu_cvi_root" sequence="5"
+              action="action_cvi_dashboard"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
+
     <menuitem id="menu_cvi_vendor" name="Vendedor" parent="menu_cvi_root" sequence="10"
               groups="collections_from_vendors_installments.group_cvi_vendor"/>
-    <menuitem id="menu_cvi_my_stock" name="Mi mercadería" parent="menu_cvi_vendor"
-              action="action_cvi_my_stock" sequence="5"/>
+    <!--
+        "Mis ventas" va primero a propósito. Al entrar a una aplicación, Odoo abre sola la
+        primera opción con acción que el usuario tenga permitida; con "Nueva venta"
+        arriba, entrar al módulo disparaba el diálogo del DNI sin que nadie lo pidiera.
+        Cargar una venta tiene que ser una decisión, no la pantalla de bienvenida.
+    -->
     <menuitem id="menu_cvi_my_sales" name="Mis ventas" parent="menu_cvi_vendor"
-              action="action_cvi_card_my_sales" sequence="10"/>
+              action="action_cvi_card_my_sales" sequence="1"/>
+    <menuitem id="menu_cvi_sale_start" name="Nueva venta" parent="menu_cvi_vendor"
+              action="action_cvi_sale_start" sequence="5"/>
+    <menuitem id="menu_cvi_customers" name="Clientes" parent="menu_cvi_vendor"
+              action="action_cvi_customers" sequence="10"/>
+    <menuitem id="menu_cvi_my_stock" name="Mi mercadería" parent="menu_cvi_vendor"
+              action="action_cvi_my_stock" sequence="15"/>
     <menuitem id="menu_cvi_to_route" name="Sin cobrador" parent="menu_cvi_vendor"
               action="action_cvi_card_to_route" sequence="20"/>
 
@@ -22,6 +36,8 @@
               action="action_cvi_card_portfolio" sequence="30"/>
     <menuitem id="menu_cvi_payments" name="Cobros" parent="menu_cvi_collector"
               action="action_cvi_payment" sequence="40"/>
+    <menuitem id="menu_cvi_my_settlements" name="Mis rendiciones" parent="menu_cvi_collector"
+              action="action_cvi_my_settlements" sequence="50"/>
 
     <menuitem id="menu_cvi_stock" name="Depósito" parent="menu_cvi_root" sequence="30"
               groups="stock.group_stock_user"/>
@@ -29,6 +45,15 @@
               parent="menu_cvi_stock" action="action_cvi_vendor_delivery" sequence="10"/>
     <menuitem id="menu_cvi_vendor_stock" name="Mercadería en la calle"
               parent="menu_cvi_stock" action="action_cvi_vendor_stock" sequence="20"/>
+
+    <menuitem id="menu_cvi_supervision" name="Supervisión" parent="menu_cvi_root"
+              sequence="35"
+              groups="collections_from_vendors_installments.group_cvi_supervisor,collections_from_vendors_installments.group_cvi_manager"/>
+    <menuitem id="menu_cvi_visits" name="Visitas" parent="menu_cvi_supervision"
+              action="action_cvi_visits" sequence="10"/>
+    <menuitem id="menu_cvi_assignments" name="Asignaciones" parent="menu_cvi_supervision"
+              action="action_cvi_assignments" sequence="20"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
 
     <menuitem id="menu_cvi_admin" name="Administración" parent="menu_cvi_root" sequence="40"
               groups="collections_from_vendors_installments.group_cvi_manager"/>
@@ -38,6 +63,21 @@
               action="action_cvi_transfer_wizard" sequence="20"/>
     <menuitem id="menu_cvi_vendor_pickings" name="Entregas a vendedores" parent="menu_cvi_admin"
               action="action_cvi_vendor_pickings" sequence="30"/>
+    <menuitem id="menu_cvi_settlements" name="Rendiciones" parent="menu_cvi_admin"
+              action="action_cvi_all_settlements" sequence="40"/>
+    <menuitem id="menu_cvi_settlement_differences" name="Diferencias por cobrador"
+              parent="menu_cvi_admin" action="action_cvi_settlement_differences" sequence="50"/>
+    <menuitem id="menu_cvi_overdue" name="Clientes en mora" parent="menu_cvi_admin"
+              action="action_cvi_overdue_cards" sequence="60"/>
+    <menuitem id="menu_cvi_problematic" name="Clientes problemáticos" parent="menu_cvi_admin"
+              action="action_cvi_problematic_customers" sequence="70"/>
+
+    <!-- Los planes de cuotas se cargan en la ficha del mueble: sin este acceso hay que
+         salir del módulo e ir a Inventario para tocarlos. Cuelga del menú raíz y no de
+         Configuración porque se usa seguido, no solo al poner el sistema en marcha. -->
+    <menuitem id="menu_cvi_products" name="Muebles" parent="menu_cvi_root" sequence="50"
+              action="action_cvi_products"
+              groups="collections_from_vendors_installments.group_cvi_manager"/>
 
     <menuitem id="menu_cvi_config" name="Configuración" parent="menu_cvi_root" sequence="90"
               groups="collections_from_vendors_installments.group_cvi_manager"/>
