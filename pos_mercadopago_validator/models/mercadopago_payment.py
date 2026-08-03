@@ -43,6 +43,7 @@ class MercadoPagoPayment(models.Model):
     pos_payment_id = fields.Many2one("pos.payment", readonly=True, ondelete="set null")
     pos_payment_uuid = fields.Char(
         readonly=True, index=True,
+        groups="pos_mercadopago_validator.group_mercadopago_manager,base.group_system",
         help="uuid de la línea del navegador que reservó el pago durante el cobro.",
     )
     pos_order_id = fields.Many2one("pos.order", readonly=True)
@@ -228,20 +229,42 @@ class MercadoPagoPayment(models.Model):
         ocurre acá, antes de que exista el pos.payment. Igual que allá, el
         flush previo es obligatorio: cr.execute no flushea y sin él se bloquea
         y se lee una fila vieja.
+
+        Corre en sudo a propósito: `pos_payment_uuid` no es legible para el
+        cajero (ver el `groups` del campo) y la autorización ya la resolvió
+        `_find_inbox_line()` aguas arriba, con el mismo dominio de la lista que
+        el cajero vio.
         """
         self.ensure_one()
         if not pos_payment_uuid:
             raise ValueError("reserve_for_uuid necesita el uuid de la línea de cobro")
-        self.flush_recordset(["state"])
+        record = self.sudo()
+        # Dos reservas sobre el mismo uuid dejan huérfana a una de las dos: al
+        # crearse el pos.payment sólo se resuelve la primera que aparezca, y la
+        # otra queda en `matched` sin línea para siempre. Es alcanzable desde la
+        # interfaz -cancelar tras la imputación automática deja la línea en
+        # `retry` con el mismo uuid- así que se rechaza acá.
+        duplicate = record.search([
+            ("pos_payment_uuid", "=", pos_payment_uuid),
+            ("state", "=", "matched"),
+            ("pos_payment_id", "=", False),
+            ("id", "!=", record.id),
+        ], limit=1)
+        if duplicate:
+            raise UserError(_(
+                "Esa línea de cobro ya tiene reservado el pago de Mercado Pago %s.",
+                duplicate.mp_payment_id,
+            ))
+        record.flush_recordset(["state"])
         self.env.cr.execute(
-            "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (self.id,)
+            "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (record.id,)
         )
         row = self.env.cr.fetchone()
         if not row or row[0] != "available":
             raise UserError(_(
                 "Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
             ))
-        self.write({
+        record.write({
             "state": "matched",
             "pos_payment_uuid": pos_payment_uuid,
             "matched_by_user_id": self.env.user.id,

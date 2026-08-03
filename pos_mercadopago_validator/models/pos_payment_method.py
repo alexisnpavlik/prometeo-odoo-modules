@@ -127,6 +127,35 @@ class PosPaymentMethod(models.Model):
             "difference": round(requested_amount - payment.amount, 2),
         }
 
+    def _find_inbox_line(self, inbox_line_id):
+        """Resuelve una fila de la bandeja verificando que sea de esta caja.
+
+        `browse()` a secas alcanza cualquier fila de `mercadopago.payment`, y el
+        id llega desde el navegador: un usuario del POS que arme la llamada a
+        mano reservaría el pago de otra caja, de otra cuenta o fuera de la
+        ventana de búsqueda. La pertenencia se decide con el mismo
+        `_inbox_domain()` que armó la lista que el cajero vio, así que lo que no
+        pudo ver tampoco lo puede tomar.
+
+        No reemplaza al `SELECT ... FOR UPDATE` de `impute()` ni de
+        `reserve_for_uuid()`: esto es la puerta de autorización, aquello la
+        carrera. Hacen falta las dos.
+        """
+        self.ensure_one()
+        if not isinstance(inbox_line_id, int) or isinstance(inbox_line_id, bool):
+            return self.env["mercadopago.payment"].sudo().browse()
+        return self.env["mercadopago.payment"].sudo().search(
+            self._inbox_domain() + [("id", "=", inbox_line_id)], limit=1
+        )
+
+    @api.model
+    def _unavailable_line_error(self):
+        """Mensaje único para la fila que ya no está en la bandeja de esta caja."""
+        return _(
+            "Ese pago ya no está disponible en la bandeja de esta caja. "
+            "Actualizá la lista y elegí otro."
+        )
+
     def impute_mp_payment(self, inbox_line_id, pos_payment_id, ambiguous=False):
         """Imputa un pago a una línea. Devuelve el error de carrera si lo hay.
 
@@ -144,7 +173,13 @@ class PosPaymentMethod(models.Model):
         """
         self.ensure_one()
         self._check_pos_access()
-        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
+        payment = self._find_inbox_line(inbox_line_id)
+        if not payment:
+            _logger.info(
+                "Imputación rechazada: la fila %s no está en la bandeja del método %s",
+                inbox_line_id, self.id,
+            )
+            return {"ok": False, "error": self._unavailable_line_error()}
         pos_payment = self.env["pos.payment"].browse(pos_payment_id)
         try:
             payment.impute(pos_payment, ambiguous=ambiguous)
@@ -174,7 +209,13 @@ class PosPaymentMethod(models.Model):
         """
         self.ensure_one()
         self._check_pos_access()
-        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
+        payment = self._find_inbox_line(inbox_line_id)
+        if not payment:
+            _logger.info(
+                "Reserva rechazada: la fila %s no está en la bandeja del método %s",
+                inbox_line_id, self.id,
+            )
+            return {"ok": False, "error": self._unavailable_line_error()}
         try:
             payment.reserve_for_uuid(pos_payment_uuid, ambiguous=ambiguous)
         except UserError as error:
@@ -191,8 +232,14 @@ class PosPaymentMethod(models.Model):
         """Deshace una reserva hecha durante el cobro, antes de confirmar la venta.
 
         Es la contraparte de `impute_mp_payment_by_uuid` para el botón de
-        deshacer de la imputación automática. Se acota a la cuenta de esta caja:
-        el uuid viene del navegador y no debe alcanzar bandejas ajenas.
+        deshacer de la imputación automática.
+
+        Tres cierres, porque el uuid lo elige el navegador y no es un secreto:
+        se acota a la cuenta de esta caja, al QR de esta caja, y a quien hizo la
+        reserva. Sin el último, un cajero que leyera el `pos_payment_uuid` de
+        una reserva en vuelo de otra caja de la misma cuenta podría liberarla y
+        quedársela, dejando la otra línea en `done` contra un pago que ya no
+        tiene. `pos_payment_uuid` además dejó de ser legible para el cajero.
         """
         self.ensure_one()
         self._check_pos_access()
@@ -206,6 +253,16 @@ class PosPaymentMethod(models.Model):
             return {
                 "ok": False,
                 "error": _("Esa reserva ya no existe: la venta pudo haberse confirmado."),
+            }
+        if payment.matched_by_user_id != self.env.user:
+            _logger.warning(
+                "%s intentó deshacer la reserva %s hecha por %s",
+                self.env.user.login, payment.mp_payment_id,
+                payment.matched_by_user_id.login,
+            )
+            return {
+                "ok": False,
+                "error": _("Esa reserva la hizo otro cajero: no la podés deshacer."),
             }
         payment.revert(reason=_("Deshecho por el cajero antes de confirmar la venta"))
         return {"ok": True}

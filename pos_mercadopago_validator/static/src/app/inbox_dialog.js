@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, useState, onWillStart, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, useState, onWillStart, onMounted, onWillDestroy } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { Dialog } from "@web/core/dialog/dialog";
 import { useService } from "@web/core/utils/hooks";
@@ -30,7 +30,6 @@ export class MercadoPagoInboxDialog extends Component {
 
     setup() {
         this.orm = useService("orm");
-        this.pos = useService("pos");
         this.state = useState({
             matching: [],
             others: [],
@@ -39,6 +38,7 @@ export class MercadoPagoInboxDialog extends Component {
             stale: true,
             lastSyncAt: false,
             loading: true,
+            error: false,
             autoImputed: false,
             manualStep: 0,
             manualReason: "",
@@ -71,7 +71,11 @@ export class MercadoPagoInboxDialog extends Component {
         this.onInboxUpdate = () => this.refresh();
         inboxListeners.add(this.onInboxUpdate);
 
-        onWillUnmount(() => {
+        // onWillDestroy y no onWillUnmount: si onWillStart falla, el componente
+        // se destruye sin haberse montado nunca y onWillUnmount no corre. El
+        // timer y el listener quedarían vivos para siempre, uno por intento de
+        // cobro, que es justo la fuga que este registro vino a evitar.
+        onWillDestroy(() => {
             this.alive = false;
             clearInterval(this.poller);
             inboxListeners.delete(this.onInboxUpdate);
@@ -80,6 +84,11 @@ export class MercadoPagoInboxDialog extends Component {
 
     /**
      * Relee la bandeja del servidor. Nunca consulta a Mercado Pago.
+     *
+     * No propaga el error: el POS tiene que poder operar con el servidor caído,
+     * y un rechazo suelto acá tumba el onWillStart (y con él la limpieza del
+     * poller) o pinta un cartel de error del sistema en cada tick del polling.
+     * El diálogo avisa y deja disponible la aprobación manual.
      */
     async refresh() {
         if (!this.alive || this.state.autoImputed) {
@@ -87,11 +96,23 @@ export class MercadoPagoInboxDialog extends Component {
             // lista debajo del cartel sólo genera parpadeo.
             return;
         }
-        const result = await this.orm.silent.call(
-            "pos.payment.method",
-            "get_mp_inbox",
-            [[this.props.paymentMethod.id], this.props.amount]
-        );
+        let result;
+        try {
+            result = await this.orm.silent.call(
+                "pos.payment.method",
+                "get_mp_inbox",
+                [[this.props.paymentMethod.id], this.props.amount]
+            );
+        } catch (error) {
+            if (this.alive) {
+                this.state.loading = false;
+                this.state.error = _t(
+                    "No se pudo leer la bandeja de Mercado Pago. Verificá el pago por otro medio."
+                );
+            }
+            console.warn("Fallo al leer la bandeja de Mercado Pago", error);
+            return;
+        }
         if (!this.alive) {
             return;
         }
@@ -102,6 +123,7 @@ export class MercadoPagoInboxDialog extends Component {
             stale: result.stale,
             lastSyncAt: result.last_sync_at,
             loading: false,
+            error: false,
         });
     }
 
@@ -112,6 +134,14 @@ export class MercadoPagoInboxDialog extends Component {
         }
         const identified = this.state.matching.filter((l) => l.display_payer);
         return identified.length === 0;
+    }
+
+    get isSingleMatch() {
+        return this.state.matching.length === 1;
+    }
+
+    get canConfirmManual() {
+        return Boolean(this.state.manualReason.trim());
     }
 
     /**
@@ -181,7 +211,7 @@ export class MercadoPagoInboxDialog extends Component {
      * Avanza la doble confirmación y registra la aprobación en el segundo paso.
      */
     async confirmManual() {
-        if (!this.state.manualReason.trim()) {
+        if (!this.canConfirmManual) {
             return;
         }
         if (this.state.manualStep === 1) {

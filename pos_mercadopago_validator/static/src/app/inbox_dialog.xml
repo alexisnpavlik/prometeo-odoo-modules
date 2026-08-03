@@ -24,6 +24,10 @@
                 </div>
 
                 <t t-else="">
+                    <div t-if="state.error" class="mp-inbox-warning">
+                        <t t-esc="state.error"/>
+                    </div>
+
                     <div t-if="state.loading" class="mp-inbox-empty">Consultando…</div>
 
                     <div t-elif="!state.matching.length" class="mp-inbox-empty">
@@ -39,7 +43,9 @@
                             Estos pagos no se pueden distinguir entre sí. Elegí el más reciente.
                         </div>
                         <button t-foreach="state.matching" t-as="line" t-key="line.id"
-                                class="mp-inbox-row" t-on-click="() => this.pick(line)">
+                                class="mp-inbox-row"
+                                t-att-class="{ 'mp-inbox-row-single': isSingleMatch }"
+                                t-on-click="() => this.pick(line)">
                             <span class="mp-amount"><t t-esc="formatAmount(line.amount)"/></span>
                             <span class="mp-time"><t t-esc="formatTime(line.date_approved)"/></span>
                             <span class="mp-payer">
@@ -70,7 +76,11 @@
                             </p>
                             <input type="text" class="form-control" placeholder="Motivo (obligatorio)"
                                    t-model="state.manualReason"/>
-                            <button class="btn btn-danger" t-on-click="confirmManual">
+                            <p t-if="!canConfirmManual" class="mp-inbox-hint">
+                                Escribí el motivo para poder continuar.
+                            </p>
+                            <button class="btn btn-danger" t-on-click="confirmManual"
+                                    t-att-disabled="!canConfirmManual">
                                 <t t-if="state.manualStep === 1">Continuar</t>
                                 <t t-else="">Confirmar cobro sin verificar</t>
                             </button>
@@ -79,7 +89,11 @@
                 </t>
             </div>
             <t t-set-slot="footer">
-                <button class="btn btn-secondary" t-on-click="cancel">Cancelar</button>
+                <!-- Con la imputación automática esperando confirmación, el cobro sólo
+                     puede salir por Listo o por Deshacer: un Cancelar acá dejaría el
+                     pago reservado y fuera de la bandeja de todas las cajas. -->
+                <button t-if="!state.autoImputed" class="btn btn-secondary"
+                        t-on-click="cancel">Cancelar</button>
             </t>
         </Dialog>
     </t>

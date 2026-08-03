@@ -8,6 +8,11 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
     setup() {
         super.setup(...arguments);
         this.pendingResolver = null;
+        // Reserva hecha en el servidor que el cajero todavía no confirmó. Si el
+        // cobro se abandona con una reserva viva hay que devolverla a la bandeja:
+        // si no, el pago queda en `matched` sin orden, invisible para todas las
+        // cajas, y el cajero termina aprobando a mano un cobro que sí entró.
+        this.pendingLine = null;
     }
 
     // El cajero fija el monto antes de que se abra la bandeja.
@@ -36,6 +41,7 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
                             });
                             return false;
                         }
+                        this.pendingLine = line;
                         line.set_receipt_info(_t("Mercado Pago %s", result.mp_payment_id));
                         line.transaction_id = result.mp_payment_id;
                         // Viaja al servidor al sincronizar la orden y convierte la
@@ -47,11 +53,7 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
                     // La imputación automática se confirma o se deshace: hasta que el
                     // cajero decide, la promesa del cobro sigue abierta a propósito.
                     onUndo: async () => {
-                        const result = await this.env.services.orm.silent.call(
-                            "pos.payment.method",
-                            "revert_mp_reservation_by_uuid",
-                            [[line.payment_method_id.id], line.uuid]
-                        );
+                        const result = await this._revertReservation(line);
                         if (!result.ok) {
                             this.env.services.dialog.add(AlertDialog, {
                                 title: _t("No se pudo deshacer"),
@@ -59,13 +61,12 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
                             });
                             return false;
                         }
-                        line.set_receipt_info("");
-                        line.transaction_id = false;
-                        line.mercadopago_uuid = false;
-                        line.set_payment_status("waitingCard");
                         return true;
                     },
-                    onDone: () => this._resolve(true),
+                    onDone: () => {
+                        this.pendingLine = null;
+                        this._resolve(true);
+                    },
                     onManualApproval: async (reason) => {
                         await this.env.services.orm.call(
                             "pos.payment.method",
@@ -73,14 +74,16 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
                             [[line.payment_method_id.id], line.uuid, reason]
                         );
                         line.set_payment_status("done");
+                        this.pendingLine = null;
                         this._resolve(true);
                     },
-                    onCancel: () => this._resolve(false),
+                    onCancel: () => this._abandon(),
                 },
                 {
                     // Cerrar con Escape o con la X no pasa por onCancel: sin esta red
-                    // la promesa del cobro nunca se resuelve y la línea queda colgada.
-                    onClose: () => this._resolve(false),
+                    // la promesa del cobro nunca se resuelve, la línea queda colgada
+                    // en waitingCard y la reserva sin confirmar se pierde para siempre.
+                    onClose: () => this._abandon(),
                 }
             );
         });
@@ -96,6 +99,47 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
         );
     }
 
+    /**
+     * Devuelve la reserva a la bandeja y deja la línea como estaba antes.
+     */
+    async _revertReservation(line) {
+        const result = await this.env.services.orm.silent.call(
+            "pos.payment.method",
+            "revert_mp_reservation_by_uuid",
+            [[line.payment_method_id.id], line.uuid]
+        );
+        if (!result.ok) {
+            return result;
+        }
+        this.pendingLine = null;
+        // set_receipt_info() concatena (`this.ticket += value` en pos_payment.js):
+        // limpiar de verdad exige escribir el campo, si no el comprobante sale con
+        // la referencia vieja pegada a la nueva.
+        line.update({ ticket: "" });
+        line.transaction_id = false;
+        line.mercadopago_uuid = false;
+        line.set_payment_status("waitingCard");
+        return result;
+    }
+
+    /**
+     * Abandona el cobro liberando la reserva que el cajero nunca confirmó.
+     */
+    async _abandon() {
+        const line = this.pendingLine;
+        if (line) {
+            this.pendingLine = null;
+            try {
+                await this._revertReservation(line);
+            } catch (error) {
+                // El cobro se abandona igual: dejar la promesa sin resolver es peor
+                // que una reserva colgada, que el backoffice todavía puede revertir.
+                console.warn("No se pudo liberar la reserva de Mercado Pago", error);
+            }
+        }
+        this._resolve(false);
+    }
+
     _resolve(value) {
         this.pendingResolver?.(value);
         this.pendingResolver = null;
@@ -103,12 +147,12 @@ export class PaymentMercadoPagoValidator extends PaymentInterface {
 
     async send_payment_cancel(order, uuid) {
         await super.send_payment_cancel(order, uuid);
-        this._resolve(false);
+        await this._abandon();
         return true;
     }
 
     close() {
         super.close();
-        this._resolve(false);
+        this._abandon();
     }
 }
