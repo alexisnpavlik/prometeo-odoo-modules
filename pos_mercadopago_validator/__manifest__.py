@@ -24,6 +24,13 @@ los pagos recibidos que quedaron sin imputar.
         "views/menus.xml",
         "data/ir_cron.xml",
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_mercadopago_validator/static/src/app/*.js",
+            "pos_mercadopago_validator/static/src/app/*.xml",
+            "pos_mercadopago_validator/static/src/app/*.scss",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": False,

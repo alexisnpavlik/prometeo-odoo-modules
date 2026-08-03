@@ -157,3 +157,73 @@ class PosPaymentMethod(models.Model):
             )
             return {"ok": False, "error": str(error)}
         return {"ok": True, "mp_payment_id": payment.mp_payment_id}
+
+    def impute_mp_payment_by_uuid(self, inbox_line_id, pos_payment_uuid, ambiguous=False):
+        """Imputa contra una línea que todavía vive sólo en el navegador.
+
+        La línea de pago se crea en el servidor recién al confirmar la venta, así
+        que se guarda el vínculo de forma diferida sobre el uuid de la línea.
+
+        `inbox_line_id` es el id interno de Odoo del registro de
+        `mercadopago.payment`, nunca el `mp_payment_id` externo: Postgres castea
+        el string numérico y se reservaría un pago arbitrario sin error visible.
+
+        Igual que `impute_mp_payment`, sólo la carrera perdida (un `UserError`
+        literal) vuelve como resultado de negocio; `AccessError`, `MissingError`
+        y `ValidationError` son bugs o permisos y deben propagarse.
+        """
+        self.ensure_one()
+        self._check_pos_access()
+        payment = self.env["mercadopago.payment"].sudo().browse(inbox_line_id)
+        try:
+            payment.reserve_for_uuid(pos_payment_uuid, ambiguous=ambiguous)
+        except UserError as error:
+            if type(error) is not UserError:
+                raise
+            _logger.info(
+                "Reserva rechazada para la línea de bandeja %s: %s",
+                inbox_line_id, str(error),
+            )
+            return {"ok": False, "error": str(error)}
+        return {"ok": True, "mp_payment_id": payment.mp_payment_id}
+
+    def revert_mp_reservation_by_uuid(self, pos_payment_uuid):
+        """Deshace una reserva hecha durante el cobro, antes de confirmar la venta.
+
+        Es la contraparte de `impute_mp_payment_by_uuid` para el botón de
+        deshacer de la imputación automática. Se acota a la cuenta de esta caja:
+        el uuid viene del navegador y no debe alcanzar bandejas ajenas.
+        """
+        self.ensure_one()
+        self._check_pos_access()
+        payment = self.env["mercadopago.payment"].sudo().search([
+            ("account_id", "=", self.mp_account_id.id),
+            ("pos_payment_uuid", "=", pos_payment_uuid),
+            ("state", "=", "matched"),
+            ("pos_payment_id", "=", False),
+        ], limit=1)
+        if not payment:
+            return {
+                "ok": False,
+                "error": _("Esa reserva ya no existe: la venta pudo haberse confirmado."),
+            }
+        payment.revert(reason=_("Deshecho por el cajero antes de confirmar la venta"))
+        return {"ok": True}
+
+    def register_manual_approval(self, pos_payment_uuid, reason):
+        """Registra una aprobación manual sobre una línea del navegador."""
+        self.ensure_one()
+        self._check_pos_access()
+        if not reason or not reason.strip():
+            raise UserError(_("La aprobación manual necesita un motivo."))
+        self.env["mercadopago.manual.approval"].sudo().create({
+            "payment_method_id": self.id,
+            "pos_payment_uuid": pos_payment_uuid,
+            "reason": reason.strip(),
+            "user_id": self.env.user.id,
+        })
+        _logger.warning(
+            "Cobro aprobado sin verificar el pago por %s sobre la línea %s. Motivo: %s",
+            self.env.user.login, pos_payment_uuid, reason.strip(),
+        )
+        return True

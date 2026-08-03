@@ -9,3 +9,4 @@ from . import test_webhook
 from . import test_ingest_race_condition
 from . import test_inbox_rpc
 from . import test_bus
+from . import test_reserva_por_uuid

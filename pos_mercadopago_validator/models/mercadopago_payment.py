@@ -41,6 +41,10 @@ class MercadoPagoPayment(models.Model):
         default="available", required=True, index=True,
     )
     pos_payment_id = fields.Many2one("pos.payment", readonly=True, ondelete="set null")
+    pos_payment_uuid = fields.Char(
+        readonly=True, index=True,
+        help="uuid de la línea del navegador que reservó el pago durante el cobro.",
+    )
     pos_order_id = fields.Many2one("pos.order", readonly=True)
     pos_session_id = fields.Many2one("pos.session", readonly=True)
     matched_by_user_id = fields.Many2one("res.users", readonly=True)
@@ -213,6 +217,44 @@ class MercadoPagoPayment(models.Model):
         )
         return True
 
+    def reserve_for_uuid(self, pos_payment_uuid, ambiguous=False):
+        """Reserva el pago para una línea que aún no existe en el servidor.
+
+        Durante el cobro la línea vive sólo en el navegador: la orden se crea al
+        confirmar la venta. La reserva se apoya en el uuid de esa línea y se
+        completa después, al crearse el `pos.payment`.
+
+        Usa el mismo bloqueo de fila que impute(): la carrera entre dos cajeros
+        ocurre acá, antes de que exista el pos.payment. Igual que allá, el
+        flush previo es obligatorio: cr.execute no flushea y sin él se bloquea
+        y se lee una fila vieja.
+        """
+        self.ensure_one()
+        if not pos_payment_uuid:
+            raise ValueError("reserve_for_uuid necesita el uuid de la línea de cobro")
+        self.flush_recordset(["state"])
+        self.env.cr.execute(
+            "SELECT state FROM mercadopago_payment WHERE id = %s FOR UPDATE", (self.id,)
+        )
+        row = self.env.cr.fetchone()
+        if not row or row[0] != "available":
+            raise UserError(_(
+                "Ese pago ya fue asignado a otra venta. Actualizá la lista y elegí otro."
+            ))
+        self.write({
+            "state": "matched",
+            "pos_payment_uuid": pos_payment_uuid,
+            "matched_by_user_id": self.env.user.id,
+            "matched_at": fields.Datetime.now(),
+            "ambiguous_pick": ambiguous,
+        })
+        _logger.info(
+            "Pago %s reservado para la línea %s por %s",
+            self.mp_payment_id, pos_payment_uuid, self.env.user.login,
+        )
+        self._notify_open_sessions()
+        return True
+
     def revert(self, reason=None):
         """Devuelve el pago a la bandeja. Queda registrado en el chatter del pedido.
 
@@ -234,6 +276,9 @@ class MercadoPagoPayment(models.Model):
             "state": "available", "pos_payment_id": False, "pos_order_id": False,
             "pos_session_id": False, "matched_by_user_id": False, "matched_at": False,
             "amount_difference": 0.0, "ambiguous_pick": False,
+            # Una reserva por uuid que sobrevive al revert dejaría al pago
+            # esperando una línea que ya no lo reclama.
+            "pos_payment_uuid": False,
         })
         if line:
             # El índice único vive del lado de mercadopago_payment.pos_payment_id:
