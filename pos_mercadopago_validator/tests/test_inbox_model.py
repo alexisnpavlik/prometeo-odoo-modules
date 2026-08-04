@@ -41,9 +41,17 @@ class TestInboxModel(TransactionCase):
                 second.write({"pos_payment_id": 1, "state": "matched"})
 
     def test_null_pos_payment_id_does_not_collide(self):
-        """La restricción es parcial: varios pagos sin imputar conviven."""
+        """La restricción es parcial: varios pagos sin imputar conviven.
+
+        El conteo se acota a la cuenta de este test: en una base donde el cron
+        está ingestando pagos reales, un `search_count` global cuenta también
+        los que trajo el ingestor y el test falla por una razón ajena.
+        """
         self._payment("333")
         self._payment("444")
         self.assertEqual(
-            self.env["mercadopago.payment"].search_count([("state", "=", "available")]), 2
+            self.env["mercadopago.payment"].search_count([
+                ("state", "=", "available"),
+                ("account_id", "=", self.account.id),
+            ]), 2
         )

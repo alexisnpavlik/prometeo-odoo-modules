@@ -134,6 +134,30 @@ class PosPaymentMethod(models.Model):
         )
         return self._inbox_ownership_domain() + [("date_approved", ">=", window_start)]
 
+    def force_mp_sync(self, amount):
+        """Consulta la API a pedido del cajero y devuelve la bandeja al día.
+
+        Es la salida para "sé que el pago entró y todavía no aparece": el cron
+        corre cada minuto —piso de `ir.cron`— y el webhook puede atrasarse o no
+        estar configurado.
+
+        A diferencia de `get_mp_inbox()`, este método sí habla con Mercado Pago,
+        pero sigue siendo el ingestor server-side quien lo hace: el navegador
+        nunca ve el token. Un fallo de la API no rompe el diálogo, sólo devuelve
+        la bandeja como está, con su marca de desactualizada.
+        """
+        self.ensure_one()
+        self._check_pos_access()
+        account = self.mp_account_id.sudo()
+        if account.active:
+            try:
+                account.ingest_now()
+            except Exception:
+                _logger.exception(
+                    "Reconsulta manual fallida para la cuenta %s", account.name
+                )
+        return self.get_mp_inbox(amount)
+
     def get_mp_inbox(self, amount):
         """Devuelve la bandeja de esta caja para el monto pedido.
 

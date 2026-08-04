@@ -39,6 +39,7 @@ export class MercadoPagoInboxDialog extends Component {
             lastSyncAt: false,
             loading: true,
             error: false,
+            searching: false,
             autoImputed: false,
             manualStep: 0,
             manualReason: "",
@@ -121,6 +122,51 @@ export class MercadoPagoInboxDialog extends Component {
             lastSyncAt: result.last_sync_at,
             loading: false,
             error: false,
+        });
+    }
+
+    /**
+     * Fuerza una consulta a Mercado Pago y refresca la lista.
+     *
+     * El cron corre cada minuto (piso de `ir.cron`) y el webhook puede atrasarse
+     * o no estar configurado, así que el cajero que sabe que el pago entró
+     * necesita una forma de pedirlo sin esperar. El botón se bloquea mientras
+     * dura la consulta para que no se dispare una llamada por clic.
+     */
+    async searchNow() {
+        if (!this.alive || this.state.searching) {
+            return;
+        }
+        this.state.searching = true;
+        let result;
+        try {
+            result = await this.orm.silent.call(
+                "pos.payment.method",
+                "force_mp_sync",
+                [[this.props.paymentMethod.id], this.props.amount]
+            );
+        } catch (error) {
+            this._reportError(
+                _t("No se pudo consultar a Mercado Pago. Probá de nuevo en unos segundos."),
+                error
+            );
+            if (this.alive) {
+                this.state.searching = false;
+            }
+            return;
+        }
+        if (!this.alive) {
+            return;
+        }
+        Object.assign(this.state, {
+            matching: result.matching,
+            others: result.others,
+            othersCount: result.others_count,
+            stale: result.stale,
+            lastSyncAt: result.last_sync_at,
+            loading: false,
+            error: false,
+            searching: false,
         });
     }
 

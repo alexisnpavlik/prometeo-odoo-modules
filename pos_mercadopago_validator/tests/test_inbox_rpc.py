@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 
@@ -112,6 +114,39 @@ class TestInboxRpc(TransactionCase):
             self.method.with_user(outsider).get_mp_inbox(1500.0)
         with self.assertRaises(AccessError):
             self.method.with_user(outsider).impute_mp_payment(1, 1)
+        with self.assertRaises(AccessError):
+            self.method.with_user(outsider).force_mp_sync(1500.0)
+
+    def test_force_mp_sync_returns_the_inbox_and_survives_api_failure(self):
+        """La reconsulta manual devuelve la bandeja aunque la API falle.
+
+        Es la salida para "sé que el pago entró y todavía no aparece". Un fallo
+        de Mercado Pago no puede dejar al cajero sin diálogo: se devuelve la
+        bandeja como está, con su marca de desactualizada.
+        """
+        self._payment("777", 1500.0)
+        # Sólo se puede activar una cuenta con credenciales ya validadas.
+        self.account.write({"last_validated_at": fields_now(), "active": True})
+
+        with patch.object(
+            type(self.account), "ingest_now", side_effect=Exception("API caída")
+        ) as mocked:
+            result = self.method.force_mp_sync(1500.0)
+
+        self.assertTrue(mocked.called, "Tiene que intentar consultar la API")
+        self.assertEqual([p["mp_payment_id"] for p in result["matching"]], ["777"])
+        self.assertIn("stale", result)
+
+    def test_force_mp_sync_skips_inactive_accounts(self):
+        """Una cuenta desactivada no se consulta, pero la bandeja se devuelve igual."""
+        self._payment("888", 1500.0)
+        self.account.active = False
+
+        with patch.object(type(self.account), "ingest_now") as mocked:
+            result = self.method.force_mp_sync(1500.0)
+
+        self.assertFalse(mocked.called)
+        self.assertEqual([p["mp_payment_id"] for p in result["matching"]], ["888"])
 
 
 def fields_now():

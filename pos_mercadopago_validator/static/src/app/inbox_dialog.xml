@@ -31,9 +31,6 @@
                     <div t-if="state.loading" class="mp-inbox-empty">Consultando…</div>
 
                     <div t-elif="state.matching.length" class="mp-inbox-list">
-                        <div t-if="isAmbiguous" class="mp-inbox-warning">
-                            Estos pagos no se pueden distinguir entre sí. Elegí el más reciente.
-                        </div>
                         <button t-foreach="state.matching" t-as="line" t-key="line.id"
                                 class="mp-inbox-row"
                                 t-att-class="{ 'mp-inbox-row-single': isSingleMatch }"
@@ -64,6 +61,17 @@
                         <div t-foreach="state.others" t-as="line" t-key="line.id" class="mp-inbox-row-muted">
                             <t t-esc="formatAmount(line.amount)"/> — <t t-esc="formatTime(line.date_approved)"/>
                         </div>
+                    </div>
+
+                    <!-- Salida para "sé que el pago entró y todavía no aparece": el
+                         cron corre cada minuto y el webhook puede atrasarse. -->
+                    <div class="mp-inbox-actions">
+                        <button class="btn btn-secondary mp-inbox-search"
+                                t-att-disabled="state.searching"
+                                t-on-click="searchNow">
+                            <t t-if="state.searching">Buscando…</t>
+                            <t t-else="">Buscar ahora</t>
+                        </button>
                     </div>
 
                     <div class="mp-inbox-manual">
