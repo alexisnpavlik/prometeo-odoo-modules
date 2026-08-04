@@ -42,7 +42,9 @@ export class MercadoPagoClosingWarningDialog extends Component {
         // navegador los leería como hora local y mostraría una hora que
         // no ocurrió (mismo ajuste que inbox_dialog.js).
         const utc = /(Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
-        return new Date(utc).toLocaleTimeString("es-AR");
+        // h23: 24 horas con medianoche en 00, no en 24 como devuelve hour12:false
+        // en algunos navegadores.
+        return new Date(utc).toLocaleTimeString("es-AR", { hourCycle: "h23" });
     }
 }
 
