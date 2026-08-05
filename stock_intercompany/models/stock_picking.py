@@ -1,13 +1,30 @@
+# Copyright 2021 Camptocamp
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-from odoo import Command, fields, models
+from odoo import Command, api, fields, models
+
+from .intercompany_sync import get_counterpart
 
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
     counterpart_of_picking_id = fields.Many2one("stock.picking", check_company=False)
+    counterpart_picking_id = fields.Many2one(
+        "stock.picking",
+        string="Contraparte intercompany",
+        compute="_compute_counterpart_picking_id",
+        check_company=False,
+    )
+
+    @api.depends("counterpart_of_picking_id")
+    def _compute_counterpart_picking_id(self):
+        """Resuelve el espejo en los dos sentidos: hacia el origen y hacia la copia."""
+        for picking in self:
+            picking.counterpart_picking_id = get_counterpart(
+                picking, "counterpart_of_picking_id"
+            )
 
     def _create_counterpart_picking(self):
         companies = self.env["res.company"].sudo().search([])
