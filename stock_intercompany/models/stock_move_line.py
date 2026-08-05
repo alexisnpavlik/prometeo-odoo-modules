@@ -11,10 +11,26 @@ from odoo import fields, models
 # owner_id, product_uom_id) más quantity: para una línea done, cualquiera
 # de esos campos hace que Odoo deshaga y rehaga el movimiento de quants
 # real (undo/redo), así que cambia el contenido efectivo de la
-# transferencia igual que la cantidad. product_id, move_id y picking_id
-# se agregan por el mismo criterio aunque no estén en "triggers": cambiar
-# el producto, reparentar la línea a otro move o a otro picking valida
-# también altera qué pasó realmente en la transferencia.
+# transferencia igual que la cantidad. product_id y move_id se agregan
+# por el mismo criterio aunque no estén en "triggers": cambiar el
+# producto o reparentar la línea a otro move también altera qué pasó
+# realmente en la transferencia.
+#
+# picking_id queda deliberadamente AFUERA (ronda de corrección 2):
+# stock.picking._create_backorder() (stock/models/stock_picking.py)
+# reparenta las líneas del remanente al picking de backorder escribiendo
+# picking_id DESPUÉS de que los moves originales ya están "done" —o sea
+# con el picking origen ya en state "done" y, en un picking intercompany,
+# con el espejo ya creado por nuestro _action_done. Vigilar picking_id
+# bloqueaba con AccessError la creación de CUALQUIER backorder en una
+# entrega intercompany parcial, para cualquier usuario sin el rol,
+# incluido el operador normal que es justamente quien valida. No hay
+# forma de distinguir "reparentado por mí, sin rol, para robar contenido
+# de un validado" de "reparentado por el propio flujo de backorder de
+# Odoo" mirando solo picking_id: hace falta vigilar por otro lado si
+# algún día se necesita cerrar ese camino (por ejemplo evaluando el
+# picking_id NUEVO, no el viejo). Por ahora se prioriza que la validación
+# parcial funcione: ver test_operator_creates_backorder_without_role.
 GUARDED_LINE_FIELDS = (
     "quantity",
     "lot_id",
@@ -27,7 +43,6 @@ GUARDED_LINE_FIELDS = (
     "location_id",
     "location_dest_id",
     "move_id",
-    "picking_id",
 )
 
 

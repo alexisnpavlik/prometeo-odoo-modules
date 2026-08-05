@@ -161,6 +161,86 @@ class SyncCommon(BaseCommon):
         )
         return picking, rc.records
 
+    def _create_delivery_with_backorder(
+        self, demand_qty=10.0, validated_qty=4.0, product=None
+    ):
+        """Crea una entrega intercompany parcial y confirma el backorder.
+
+        Reproduce el camino real de stock.picking._create_backorder()
+        (stock/models/stock_picking.py): valida menos cantidad de la
+        demandada, así que Odoo reparenta el remanente a un picking de
+        backorder escribiendo picking_id sobre las líneas del origen
+        DESPUÉS de que los moves de este ya están "done" (con el picking
+        origen ya en state "done" y, siendo intercompany, con el espejo ya
+        creado). Es el camino que la Tarea 4 no cubría y que motivó la
+        regresión Critical de la ronda de corrección 2: sin un test que
+        pase por acá, sacar o poner picking_id en GUARDED_LINE_FIELDS no
+        se nota en la suite.
+
+        A diferencia de _create_delivery (que crea la línea directo con
+        la cantidad final y no pasa por una reserva real), acá hace falta
+        stock disponible y una reserva real (action_assign): si no hay
+        nada reservado, el move remanente que separa Odoo para el
+        backorder queda sin líneas propias y el camino de
+        _create_backorder que se quiere ejercitar no se dispara — el
+        picking_id vigilado nunca llega a escribirse sobre una línea real
+        y el test no detectaría la regresión.
+
+        Corre siempre con user_operator (sin el rol), porque es
+        justamente el operador normal quien tiene que poder validar una
+        entrega parcial sin necesitar el rol de manager.
+        """
+        product = product or self.product
+        self.env["stock.quant"].sudo()._update_available_quantity(
+            product, self.stock_location, demand_qty
+        )
+        picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.company1.intercompany_in_type_id.id,
+                }
+            )
+        )
+        self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "name": product.name,
+                "product_id": product.id,
+                "product_uom_qty": demand_qty,
+                "product_uom": self.uom_unit.id,
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "picking_id": picking.id,
+            }
+        )
+        picking.with_user(self.user_operator).action_confirm()
+        picking.with_user(self.user_operator).action_assign()
+        line = picking.move_line_ids
+        self.assertTrue(line, "La reserva no generó una línea de movimiento")
+        line.with_user(self.user_operator).write({"quantity": validated_qty})
+        with RecordCapturer(self.env["stock.picking"], []) as rc:
+            res = picking.with_user(self.user_operator).button_validate()
+            if isinstance(res, dict) and res.get("res_model") == (
+                "stock.backorder.confirmation"
+            ):
+                wizard = (
+                    self.env["stock.backorder.confirmation"]
+                    .with_user(self.user_operator)
+                    .with_context(res["context"])
+                    .create({})
+                )
+                wizard.with_user(self.user_operator).process()
+        self.assertEqual(
+            picking.state, "done", "La entrega parcial no quedó validada"
+        )
+        self.assertTrue(picking.backorder_ids, "No se generó backorder")
+        return picking, rc.records
+
 
 class TestCounterpartResolution(SyncCommon):
     def test_counterpart_resolves_in_both_directions(self):
@@ -302,15 +382,22 @@ class TestEditGuard(SyncCommon):
         with self.assertRaisesRegex(AccessError, "requiere el rol"):
             line.with_user(self.user_operator).write({"owner_id": partner.id})
 
-    def test_operator_cannot_reparent_validated_line(self):
-        """Mover una línea validada a otro move o picking exige el rol.
+    def test_operator_cannot_reparent_validated_line_to_another_move(self):
+        """Mover una línea validada a otro move exige el rol.
 
-        move_id y picking_id no están en la lista "triggers" del write()
-        core de move.line (no disparan undo/redo de quants por sí
-        solos), pero reparentar una línea validada a otro move o a otro
-        picking cambia igual qué transferencia contiene efectivamente qué
-        movimiento: mismo criterio de "contenido efectivo" que el resto
-        de GUARDED_LINE_FIELDS.
+        move_id no está en la lista "triggers" del write() core de
+        move.line (no dispara undo/redo de quants por sí solo), pero
+        reparentar una línea validada a otro move cambia igual qué
+        transferencia contiene efectivamente qué movimiento: mismo
+        criterio de "contenido efectivo" que el resto de
+        GUARDED_LINE_FIELDS.
+
+        picking_id NO se prueba acá: se sacó de GUARDED_LINE_FIELDS en la
+        ronda de corrección 2 porque el propio _create_backorder() de
+        Odoo lo reparenta con el picking origen ya "done" — vigilarlo
+        bloqueaba toda validación parcial con backorder. Ver el comentario
+        junto a GUARDED_LINE_FIELDS en models/stock_move_line.py y
+        test_operator_creates_backorder_without_role más abajo.
         """
         delivery, _reception = self._create_delivery()
         other_delivery, _other_reception = self._create_delivery(
@@ -320,10 +407,6 @@ class TestEditGuard(SyncCommon):
         with self.assertRaisesRegex(AccessError, "requiere el rol"):
             line.with_user(self.user_operator).write(
                 {"move_id": other_delivery.move_ids[0].id}
-            )
-        with self.assertRaisesRegex(AccessError, "requiere el rol"):
-            line.with_user(self.user_operator).write(
-                {"picking_id": other_delivery.id}
             )
 
     def test_move_uom_change_is_blocked_by_core(self):
@@ -399,6 +482,24 @@ class TestEditGuard(SyncCommon):
         line = picking.move_line_ids[0]
         line.with_user(self.user_operator).write({"quantity": 2.0})
         self.assertEqual(line.quantity, 2.0)
+
+    def test_operator_creates_backorder_without_role(self):
+        """El operador sin rol puede validar una entrega intercompany parcial.
+
+        Esta es la regresión Critical de la ronda de corrección 2:
+        _create_backorder() de Odoo reparenta las líneas del picking
+        origen al picking de backorder escribiendo picking_id con el
+        origen ya "done" y el espejo intercompany ya creado. Si
+        picking_id estuviera vigilado, esa escritura interna del propio
+        flujo de validación de Odoo caía en el guard y el operador normal
+        —quien no tiene ni necesita el rol de manager— no podía validar
+        ninguna entrega intercompany parcial.
+        """
+        delivery, _reception = self._create_delivery_with_backorder(
+            demand_qty=10.0, validated_qty=4.0
+        )
+        self.assertEqual(delivery.state, "done")
+        self.assertTrue(delivery.backorder_ids)
 
     def test_propagation_bypasses_guard(self):
         """Una escritura propagada desde la contraparte no pasa por el guard.
