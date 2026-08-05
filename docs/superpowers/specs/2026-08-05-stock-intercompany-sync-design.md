@@ -219,7 +219,7 @@ Esa es la contención del riesgo de 3.2: cuando un operador de B corrige una ent
 - **Propagación de cancelaciones.** Cancelar un picking no cancela su contraparte.
 - **Rutas multi-paso** (pick + pack + ship) en cualquiera de las dos compañías.
 - **Devoluciones.** El módulo ya oculta el botón y eso no cambia.
-- **Coherencia con facturas intercompany.** `account_invoice_inter_company` está instalado en el mismo entorno: corregir un picking validado que ya tiene factura emitida desincroniza stock contra factura. El módulo no lo detecta ni lo corrige. Si esto aparece en la operación real, es un trabajo aparte.
+- **Coherencia con facturas intercompany.** `account_invoice_inter_company` fue removido de este repo el 2026-08-05 (commit `bb4756d`), pero puede seguir instalado en la base destino. Si lo está, corregir un picking validado que ya tiene factura emitida desincroniza stock contra factura. El módulo no lo detecta ni lo corrige. Confirmar en Fase 0 si está instalado; si aparece en la operación real, es un trabajo aparte.
 
 ---
 
