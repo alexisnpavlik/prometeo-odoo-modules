@@ -1,3 +1,6 @@
+# Copyright 2026 Alexis Medina
+# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
+
 from odoo import Command, fields, models
 
 
@@ -17,8 +20,18 @@ class StockPicking(models.Model):
             vals = self._get_counterpart_picking_vals(company)
             # Create picking in correct company context
             picking = picking_model.create(vals)
-            # Confirm picking in the same company context
-            picking.action_confirm()
+            # "picking_id" en stock.move.line es un campo propio (no
+            # derivado de move_id), así que no se completa solo al crear
+            # las líneas anidadas dentro de move_ids: hay que sincronizarlo
+            # a mano para que picking.move_line_ids las vea.
+            picking.move_ids.move_line_ids.picking_id = picking.id
+            # Confirm picking in the same company context. merge=False:
+            # el merge automático de moves de Odoo colapsaría dos moves
+            # espejo del mismo producto en uno solo, perdiendo la relación
+            # 1 a 1 con counterpart_of_move_id que este módulo necesita.
+            picking.move_ids.filtered(
+                lambda m: m.state == "draft"
+            )._action_confirm(merge=False)
         return picking
 
     def _get_counterpart_picking_vals(self, company):
@@ -42,7 +55,7 @@ class StockPicking(models.Model):
         location_dest = ptype.default_location_dest_id or warehouse.lot_stock_id
         supplier_location = self.env.ref("stock.stock_location_suppliers")
 
-        move_ids, move_line_ids = self._check_company_consistency(company, ptype)
+        move_ids = self._get_counterpart_move_commands(company, ptype)
 
         return {
             "partner_id": self.company_id.partner_id.id,
@@ -54,21 +67,22 @@ class StockPicking(models.Model):
             "location_dest_id": location_dest.id,
             "counterpart_of_picking_id": self.id,
             "move_ids": move_ids,
-            "move_line_ids": move_line_ids,
             "scheduled_date": self.scheduled_date,
             "priority": self.priority,
         }
 
-    def _check_company_consistency(self, company, picking_type):
-        # Ensure supplier location has no company set
+    def _get_counterpart_move_commands(self, company, picking_type):
+        """Construye los moves espejo con sus líneas anidadas dentro de cada move."""
         supplier_location = self.env.ref("stock.stock_location_suppliers")
         if supplier_location.company_id:
             supplier_location.sudo().company_id = False
 
         location_dest = picking_type.default_location_dest_id
         if not location_dest:
-            warehouse = self.env["stock.warehouse"].sudo().search(
-                [("company_id", "=", company.id)], limit=1
+            warehouse = (
+                self.env["stock.warehouse"]
+                .sudo()
+                .search([("company_id", "=", company.id)], limit=1)
             )
             location_dest = warehouse.lot_stock_id
 
@@ -79,32 +93,28 @@ class StockPicking(models.Model):
             "picking_type_id": picking_type.id,
         }
 
-        # Create moves with correct company context
-        move_ids = []
-        for sm in self.move_ids.sudo():
-            move_vals = sm.with_company(company).copy_data(
+        move_commands = []
+        for move in self.move_ids.sudo():
+            line_commands = []
+            for line in move.move_line_ids:
+                line_vals = line.with_company(company).copy_data(
+                    dict(
+                        common_vals,
+                        move_id=False,
+                        picking_id=False,
+                        counterpart_of_line_id=line.id,
+                    )
+                )[0]
+                line_commands.append(Command.create(line_vals))
+            move_vals = move.with_company(company).copy_data(
                 dict(
                     common_vals,
-                    counterpart_of_move_id=sm.id,
-                    picking_type_id=picking_type.id,
+                    counterpart_of_move_id=move.id,
+                    move_line_ids=line_commands,
                 )
             )[0]
-            move_ids.append(Command.create(move_vals))
-
-        # Create move lines with correct company context
-        move_line_ids = []
-        for ln in self.move_line_ids.sudo():
-            line_vals = ln.with_company(company).copy_data(
-                dict(
-                    common_vals,
-                    move_id=False,
-                    counterpart_of_line_id=ln.id,
-                    picking_type_id=picking_type.id,
-                )
-            )[0]
-            move_line_ids.append(Command.create(line_vals))
-
-        return move_ids, move_line_ids
+            move_commands.append(Command.create(move_vals))
+        return move_commands
 
     def _action_done(self):
         counterparts = []
