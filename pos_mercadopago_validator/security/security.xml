@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_mercadopago_manager" model="res.groups">
+        <field name="name">Mercado Pago - Administración de la bandeja</field>
+        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="comment">Puede revisar la bandeja, los huérfanos y las aprobaciones manuales.</field>
+        <field name="implied_ids" eval="[(4, ref('point_of_sale.group_pos_manager'))]"/>
+        <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+
+    <!-- El cajero necesita perm_read sobre la bandeja porque el diálogo del POS
+         la consulta, pero sin regla de registro un search_read directo le
+         devuelve los movimientos de dinero de todas las cajas y todas las
+         cuentas. Se acota a las cuentas de sus propias cajas. -->
+    <record id="rule_mercadopago_payment_pos_user" model="ir.rule">
+        <field name="name">Bandeja de Mercado Pago: sólo las cuentas de las cajas del usuario</field>
+        <field name="model_id" ref="model_mercadopago_payment"/>
+        <field name="domain_force">[('account_id', 'in', user.mp_visible_account_ids)]</field>
+        <field name="groups" eval="[(4, ref('point_of_sale.group_pos_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- Las reglas de distintos grupos se combinan con OR: esta le devuelve la
+         bandeja completa a la administración, que también es group_pos_user por
+         herencia y si no quedaría acotada por la regla de arriba. -->
+    <record id="rule_mercadopago_payment_manager" model="ir.rule">
+        <field name="name">Bandeja de Mercado Pago: la administración ve todo</field>
+        <field name="model_id" ref="model_mercadopago_payment"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('pos_mercadopago_validator.group_mercadopago_manager'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>

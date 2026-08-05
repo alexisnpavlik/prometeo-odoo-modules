@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_manual_approval_list" model="ir.ui.view">
+        <field name="name">mercadopago.manual.approval.list</field>
+        <field name="model">mercadopago.manual.approval</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="create_date" string="Fecha"/>
+                <field name="user_id"/>
+                <field name="pos_session_id"/>
+                <field name="pos_order_id"/>
+                <field name="amount" sum="Total"/>
+                <field name="reason"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_manual_approval_search" model="ir.ui.view">
+        <field name="name">mercadopago.manual.approval.search</field>
+        <field name="model">mercadopago.manual.approval</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="reason"/>
+                <filter name="today" string="Hoy"
+                        domain="[('create_date','&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="by_user" string="Usuario" context="{'group_by':'user_id'}"/>
+                    <filter name="by_session" string="Sesión" context="{'group_by':'pos_session_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_manual_approval" model="ir.actions.act_window">
+        <field name="name">Cobros sin verificación</field>
+        <field name="res_model">mercadopago.manual.approval</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_manual_approval" name="Cobros sin verificación"
+              parent="menu_mercadopago_root" sequence="30"
+              action="action_manual_approval"/>
+</odoo>

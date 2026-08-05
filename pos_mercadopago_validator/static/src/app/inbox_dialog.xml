@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_mercadopago_validator.InboxDialog">
+        <Dialog title="'Pagos recibidos'" size="'md'">
+            <div class="mp-inbox">
+                <div t-if="state.stale" class="mp-inbox-stale">
+                    <t t-esc="staleLabel"/>
+                </div>
+
+                <div t-if="state.autoImputed" class="mp-inbox-auto">
+                    <p class="mp-inbox-auto-title">Pago imputado automáticamente</p>
+                    <p>
+                        <span class="mp-amount"><t t-esc="formatAmount(state.autoImputed.amount)"/></span>
+                        <span class="mp-time"> — <t t-esc="formatTime(state.autoImputed.date_approved)"/></span>
+                    </p>
+                    <p class="mp-payer">
+                        <t t-if="state.autoImputed.display_payer">
+                            <t t-esc="state.autoImputed.display_payer"/>
+                        </t>
+                        <t t-else="">Sin identificar</t>
+                    </p>
+                    <button class="btn btn-primary" t-on-click="acceptAuto">Listo</button>
+                    <button class="btn btn-link" t-on-click="undoAuto">Deshacer</button>
+                </div>
+
+                <t t-else="">
+                    <div t-if="state.error" class="mp-inbox-warning">
+                        <t t-esc="state.error"/>
+                    </div>
+
+                    <div t-if="state.loading" class="mp-inbox-empty">Consultando…</div>
+
+                    <div t-elif="state.matching.length" class="mp-inbox-list">
+                        <button t-foreach="state.matching" t-as="line" t-key="line.id"
+                                class="mp-inbox-row"
+                                t-att-class="{ 'mp-inbox-row-single': isSingleMatch }"
+                                t-on-click="() => this.pick(line)">
+                            <span class="mp-amount"><t t-esc="formatAmount(line.amount)"/></span>
+                            <span class="mp-time"><t t-esc="formatTime(line.date_approved)"/></span>
+                            <span class="mp-payer">
+                                <t t-if="line.display_payer"><t t-esc="line.display_payer"/></t>
+                                <t t-else="">Sin identificar</t>
+                            </span>
+                            <span t-if="line.difference" class="mp-diff">
+                                Diferencia: <t t-esc="formatAmount(line.difference)"/>
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- El mensaje de lista vacía sólo vale si de verdad se pudo
+                         consultar: con `state.error` arriba diría lo contrario. -->
+                    <div t-elif="!state.error" class="mp-inbox-empty">
+                        <p>No hay pagos de <t t-esc="formatAmount(props.amount)"/> en los últimos minutos.</p>
+                        <button t-if="state.othersCount" class="btn btn-link"
+                                t-on-click="() => state.showOthers = !state.showOthers">
+                            Hay <t t-esc="state.othersCount"/> pago(s) de otro monto
+                        </button>
+                    </div>
+
+                    <div t-if="state.showOthers" class="mp-inbox-others">
+                        <div t-foreach="state.others" t-as="line" t-key="line.id" class="mp-inbox-row-muted">
+                            <t t-esc="formatAmount(line.amount)"/> — <t t-esc="formatTime(line.date_approved)"/>
+                        </div>
+                    </div>
+
+                    <!-- Salida para "sé que el pago entró y todavía no aparece": el
+                         cron corre cada minuto y el webhook puede atrasarse. -->
+                    <div class="mp-inbox-actions">
+                        <button class="btn btn-secondary mp-inbox-search"
+                                t-att-disabled="state.searching"
+                                t-on-click="searchNow">
+                            <t t-if="state.searching">Buscando…</t>
+                            <t t-else="">Buscar ahora</t>
+                        </button>
+                    </div>
+
+                    <div class="mp-inbox-manual">
+                        <button t-if="!state.manualStep" class="btn btn-outline-danger"
+                                t-on-click="startManual">
+                            Aprobar sin verificar el pago
+                        </button>
+                        <div t-if="state.manualStep">
+                            <p t-if="state.manualStep === 2" class="mp-inbox-warning">
+                                Estás registrando un cobro SIN verificación de pago.
+                                Queda auditado con tu usuario.
+                            </p>
+                            <input type="text" class="form-control" placeholder="Motivo (obligatorio)"
+                                   t-model="state.manualReason"/>
+                            <p t-if="!canConfirmManual" class="mp-inbox-hint">
+                                Escribí el motivo para poder continuar.
+                            </p>
+                            <button class="btn btn-danger" t-on-click="confirmManual"
+                                    t-att-disabled="!canConfirmManual">
+                                <t t-if="state.manualStep === 1">Continuar</t>
+                                <t t-else="">Confirmar cobro sin verificar</t>
+                            </button>
+                        </div>
+                    </div>
+                </t>
+            </div>
+            <t t-set-slot="footer">
+                <!-- Con la imputación automática esperando confirmación, el cobro sólo
+                     puede salir por Listo o por Deshacer: un Cancelar acá dejaría el
+                     pago reservado y fuera de la bandeja de todas las cajas. -->
+                <button t-if="!state.autoImputed" class="btn btn-secondary"
+                        t-on-click="cancel">Cancelar</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

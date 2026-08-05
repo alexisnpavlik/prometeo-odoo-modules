@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_mercadopago_root" name="Mercado Pago"
+              parent="point_of_sale.menu_point_root" sequence="90"
+              groups="pos_mercadopago_validator.group_mercadopago_manager"/>
+    <menuitem id="menu_mercadopago_account" name="Cuentas"
+              parent="menu_mercadopago_root" sequence="20"
+              action="action_mercadopago_account"
+              groups="base.group_system"/>
+</odoo>

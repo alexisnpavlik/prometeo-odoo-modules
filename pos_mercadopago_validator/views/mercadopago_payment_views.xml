@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mercadopago_payment_list" model="ir.ui.view">
+        <field name="name">mercadopago.payment.list</field>
+        <field name="model">mercadopago.payment</field>
+        <field name="arch" type="xml">
+            <list decoration-warning="state == 'available'" decoration-muted="state == 'discarded'">
+                <field name="date_approved"/>
+                <field name="amount" sum="Total"/>
+                <field name="source"/>
+                <field name="display_payer"/>
+                <field name="mp_pos_id"/>
+                <field name="state"/>
+                <field name="pos_order_id"/>
+                <field name="matched_by_user_id"/>
+                <field name="ambiguous_pick"/>
+                <field name="mp_payment_id"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Formulario de la bandeja (spec §9): mapeo de pagadores del canal
+         INTER_PSP, reversión auditada desde backoffice (§7.4) y descarte. -->
+    <record id="view_mercadopago_payment_form" model="ir.ui.view">
+        <field name="name">mercadopago.payment.form</field>
+        <field name="model">mercadopago.payment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_revert_from_backoffice" type="object"
+                            string="Revertir imputación" class="oe_highlight"
+                            invisible="state != 'matched'"
+                            groups="pos_mercadopago_validator.group_mercadopago_manager"
+                            confirm="Esto devuelve el pago a la bandeja y queda auditado en el pedido. ¿Continuar?"/>
+                    <button name="action_discard" type="object" string="Descartar"
+                            invisible="state != 'available'"
+                            groups="pos_mercadopago_validator.group_mercadopago_manager"
+                            confirm="El pago sale de la bandeja y deja de ofrecerse a las cajas. ¿Continuar?"/>
+                    <button name="action_restore" type="object" string="Reponer en la bandeja"
+                            invisible="state != 'discarded'"
+                            groups="pos_mercadopago_validator.group_mercadopago_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="available,matched"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="amount"/></h1>
+                        <h3><field name="mp_payment_id" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Pago">
+                            <field name="account_id"/>
+                            <field name="date_approved"/>
+                            <field name="source"/>
+                            <field name="mp_pos_id"/>
+                            <field name="payment_method_detail"/>
+                            <field name="raw_status"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Pagador">
+                            <field name="mp_payer_id"/>
+                            <field name="payer_bank_name"/>
+                            <field name="payer_vat"/>
+                            <field name="payer_email"/>
+                            <field name="partner_id"
+                                   groups="pos_mercadopago_validator.group_mercadopago_manager"
+                                   help="Al asignar un cliente, todos los pagos del mismo ID de pagador que todavía no tengan uno quedan asociados."/>
+                        </group>
+                        <group string="Imputación">
+                            <field name="pos_order_id"/>
+                            <field name="pos_session_id"/>
+                            <field name="matched_by_user_id"/>
+                            <field name="matched_at"/>
+                            <field name="amount_difference"/>
+                            <field name="ambiguous_pick"/>
+                        </group>
+                        <group string="Backoffice">
+                            <field name="backoffice_reason"
+                                   groups="pos_mercadopago_validator.group_mercadopago_manager"
+                                   placeholder="Motivo de la reversión o del descarte"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mercadopago_payment_search" model="ir.ui.view">
+        <field name="name">mercadopago.payment.search</field>
+        <field name="model">mercadopago.payment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="mp_payment_id"/>
+                <field name="display_payer"/>
+                <field name="mp_pos_id"/>
+                <filter name="orphans" string="Huérfanos (sin imputar)"
+                        domain="[('state','=','available')]"/>
+                <filter name="matched" string="Imputados"
+                        domain="[('state','=','matched')]"/>
+                <filter name="discarded" string="Descartados"
+                        domain="[('state','=','discarded')]"/>
+                <filter name="ambiguous" string="Selección ambigua"
+                        domain="[('ambiguous_pick','=',True)]"/>
+                <filter name="qr" string="Canal QR" domain="[('source','=','qr')]"/>
+                <filter name="alias" string="Canal alias" domain="[('source','=','alias')]"/>
+                <separator/>
+                <filter name="today" string="Hoy"
+                        domain="[('date_approved','&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="by_state" string="Estado" context="{'group_by':'state'}"/>
+                    <filter name="by_pos" string="QR / Caja" context="{'group_by':'mp_pos_id'}"/>
+                    <filter name="by_day" string="Día" context="{'group_by':'date_approved:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mercadopago_payment" model="ir.actions.act_window">
+        <field name="name">Bandeja de pagos</field>
+        <field name="res_model">mercadopago.payment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_mercadopago_payment_search"/>
+    </record>
+
+    <record id="action_mercadopago_orphans" model="ir.actions.act_window">
+        <field name="name">Pagos huérfanos</field>
+        <field name="res_model">mercadopago.payment</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','=','available')]</field>
+        <field name="search_view_id" ref="view_mercadopago_payment_search"/>
+        <field name="context">{'search_default_orphans': 1}</field>
+        <field name="help">Pagos acreditados en Mercado Pago que no quedaron vinculados a ninguna venta. Es dinero real que entró sin imputar: cruzalo con las aprobaciones manuales del mismo período.</field>
+    </record>
+
+    <menuitem id="menu_mercadopago_payment" name="Bandeja de pagos"
+              parent="menu_mercadopago_root" sequence="10"
+              action="action_mercadopago_payment"/>
+    <menuitem id="menu_mercadopago_orphans" name="Pagos huérfanos"
+              parent="menu_mercadopago_root" sequence="15"
+              action="action_mercadopago_orphans"/>
+</odoo>

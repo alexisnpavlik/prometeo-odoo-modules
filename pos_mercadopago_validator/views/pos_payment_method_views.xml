@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_method_form_mp" model="ir.ui.view">
+        <field name="name">pos.payment.method.form.mercadopago</field>
+        <field name="model">pos.payment.method</field>
+        <field name="inherit_id" ref="point_of_sale.pos_payment_method_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group" position="after">
+                <group string="Mercado Pago - Validador de QR"
+                       invisible="use_payment_terminal != 'mercadopago_validator'">
+                    <group>
+                        <field name="mp_account_id"/>
+                        <field name="mp_pos_id"/>
+                        <field name="accept_alias_payments"/>
+                    </group>
+                    <group>
+                        <field name="search_window_minutes"/>
+                        <field name="poll_interval_seconds"/>
+                        <field name="amount_tolerance"/>
+                        <field name="auto_impute_single_match"/>
+                        <field name="require_manager_for_manual"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

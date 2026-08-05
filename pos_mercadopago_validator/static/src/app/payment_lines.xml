@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <!--
+        "Enviar" viene de las terminales físicas, donde el POS le manda la orden
+        de cobro al posnet y espera respuesta. Acá no se envía nada: el pago ya
+        entró por el QR y el botón lo único que hace es abrir la bandeja para que
+        el cajero lo encuentre.
+
+        El texto se cambia sólo para este método de pago; cualquier otra terminal
+        instalada conserva el del núcleo. Se reemplaza el primer botón, que es el
+        del estado `pending`; el de `retry` queda como está.
+    -->
+    <t t-name="pos_mercadopago_validator.PaymentScreenPaymentLines"
+       t-inherit="point_of_sale.PaymentScreenPaymentLines"
+       t-inherit-mode="extension">
+
+        <xpath expr="(//div[hasclass('send_payment_request')])[1]" position="replace">
+            <div class="button send_payment_request highlight text-bg-primary"
+                 title="Send Payment Request"
+                 t-on-click="() => this.props.sendPaymentRequest(line)">
+                <t t-if="line.payment_method_id.use_payment_terminal === 'mercadopago_validator'">
+                    Buscar pago
+                </t>
+                <t t-else="">
+                    Send
+                </t>
+            </div>
+        </xpath>
+
+    </t>
+
+</templates>
