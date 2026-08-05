@@ -69,16 +69,25 @@ Con la decisión de recepción parcial, un operador de la compañía B modifica 
 
 ## 4. Fase 0 — verificar antes de escribir código
 
-El contenedor no estaba levantado durante el diseño. Tres cosas se afirmaron por lectura de código y hay que confirmarlas contra Odoo real; la primera es bloqueante.
+**Ejecutada el 2026-08-05 contra `calidad` (contenedor `odoo-odoo-1`).** Detalle completo, comandos y salidas en `.superpowers/sdd/2026-08-05-stock-intercompany-sync/task-0-report.md`. Tres cosas se afirmaron por lectura de código; se confirmaron o refutaron contra Odoo real.
 
-**[BLOQUEANTE] 4.1 — Las move lines de la recepción espejo quedan sin move asociado.**
-En [`stock_picking.py:96-105`](../../../stock_intercompany/models/stock_picking.py#L96-L105) las líneas se copian con `move_id=False`. Si en runtime quedan efectivamente huérfanas, no hay sobre qué mapear línea a línea y hay que corregir la creación antes de todo lo demás: las líneas deben crearse colgando del move espejo correspondiente.
+**[BLOQUEANTE] 4.1 — Las move lines de la recepción espejo quedan sin move asociado. → REFUTADO (2026-08-05).**
+En [`stock_picking.py:96-105`](../../../stock_intercompany/models/stock_picking.py#L96-L105) las líneas se copian con `move_id=False`, lo cual hacía suponer que quedarían huérfanas. En runtime, sobre los 38 pickings espejo reales de `calidad` (4758 líneas en total), **0** quedaron sin move asociado: `action_confirm()`, llamado inmediatamente después de crear el picking espejo, termina asociando cada línea a su move aunque se haya creado con `move_id=False`. No bloquea la Tarea 1; no hace falta corregir la creación de líneas por este motivo.
 
-**4.2 — Odoo 18 postea nota y reajusta quants al editar la cantidad de una línea validada.**
-`stock.move.line.write()` tiene una rama para registros en `done` que corrige los quants y postea usando `stock.track_move_template`. Confirmar que ocurre y con qué texto, porque de eso depende cuánto tiene que cubrir la auditoría propia.
+**4.2 — Odoo 18 postea nota y reajusta quants al editar la cantidad de una línea validada. → CONFIRMADO (2026-08-05).**
+Probado escribiendo `quantity` sobre una línea `done` de un picking espejo real (`IM/IN/00037`), con rollback inmediato. Odoo postea automáticamente (vía `stock.track_move_template`) una nota con el texto:
+> Se corrigió la línea de movimiento hecha.
+> [(R2A/898248)] "O.F"ALBUM DEL MUNDIAL SERIE 2-A 896 STICKERS DISTRICAU (R2A/898248):
+> Cantidad: 15.0 → 16.0
 
-**4.3 — Los lotes copiados quedan con la compañía equivocada.**
-`stock.lot` tiene `company_id`. La copia actual arrastra el lote de la compañía origen a la recepción de la destino. Confirmar y corregir con el mapeo de la sección 8.
+y el quant se reajustó en el mismo `write()` (7.0 → 8.0, delta +1 acorde al cambio). La auditoría propia (sección 9) puede apoyarse en este tracking nativo para cantidades; no necesita reimplementarlo.
+
+**4.3 — Los lotes copiados quedan con la compañía equivocada. → CONFIRMADO (2026-08-05).**
+`calidad` no tiene tráfico real con productos loteados (0 productos con `tracking` en `lot` o `serial` en toda la base), así que se armó una reproducción controlada con rollback sobre el par de compañías real que usa el módulo (`Sucursal Deposito central` → `Sucursal Impacto modas`): la línea del picking espejo terminó apuntando al **mismo registro** `stock.lot` que la línea origen, y ese lote pertenece a la compañía origen, no a la destino. Confirma que hace falta el mapeo de lotes de la sección 8.3.
+
+**Hallazgo adicional — `account_invoice_inter_company` no instalado en `calidad` (confirmado 2026-08-05).** Ver sección 10.
+
+**Hallazgo adicional fuera de alcance — bug de entorno no relacionado.** El módulo custom `purchase_auto_update_cost` figura `installed` en `calidad` pero le falta la columna `price_sale` en `purchase_order_line` (desalineación módulo/schema). Rompe cualquier `write()` de `quantity` sobre una `stock.move.line` `done` vinculada a una orden de compra, sin relación con `stock_intercompany`. Requiere un `-u purchase_auto_update_cost -d calidad` aparte; no es parte de este trabajo.
 
 ---
 
@@ -219,7 +228,7 @@ Esa es la contención del riesgo de 3.2: cuando un operador de B corrige una ent
 - **Propagación de cancelaciones.** Cancelar un picking no cancela su contraparte.
 - **Rutas multi-paso** (pick + pack + ship) en cualquiera de las dos compañías.
 - **Devoluciones.** El módulo ya oculta el botón y eso no cambia.
-- **Coherencia con facturas intercompany.** `account_invoice_inter_company` fue removido de este repo el 2026-08-05 (commit `bb4756d`), pero puede seguir instalado en la base destino. Si lo está, corregir un picking validado que ya tiene factura emitida desincroniza stock contra factura. El módulo no lo detecta ni lo corrige. Confirmar en Fase 0 si está instalado; si aparece en la operación real, es un trabajo aparte.
+- **Coherencia con facturas intercompany.** `account_invoice_inter_company` fue removido de este repo el 2026-08-05 (commit `bb4756d`), pero puede seguir instalado en la base destino. Si lo está, corregir un picking validado que ya tiene factura emitida desincroniza stock contra factura. El módulo no lo detecta ni lo corrige. **Verificado en Fase 0 (2026-08-05) contra `calidad`: `uninstalled`** (`env["ir.module.module"].sudo().search([("name","=","account_invoice_inter_company")]).mapped("state") == ['uninstalled']`). No es un riesgo activo hoy en `calidad`; si se instala más adelante o aparece en otra base, es un trabajo aparte.
 
 ---
 
