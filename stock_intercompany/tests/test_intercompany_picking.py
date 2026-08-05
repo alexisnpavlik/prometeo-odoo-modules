@@ -198,11 +198,25 @@ class TestIntercompanyDelivery(BaseCommon):
                 "quantity": 7.0,
             }
         )
+        # Fija la premisa del test: si el origen llegara a _action_done con
+        # los dos moves fusionados en uno, el resto de las aserciones se
+        # cumplirían trivialmente sin cubrir la regresión que motiva este
+        # test (ver ronda de corrección 1 del review).
+        self.assertEqual(
+            len(picking.move_ids),
+            2,
+            "El picking de origen no llegó con dos moves separados: "
+            "la premisa del test no se sostiene",
+        )
+
         with RecordCapturer(self.env["stock.picking"], []) as rc:
             picking.action_confirm()
             picking.button_validate()
 
         counterpart = rc.records
+        self.assertEqual(len(counterpart), 1)
+        self.assertEqual(len(counterpart.move_ids), 2)
+        self.assertEqual(len(counterpart.move_line_ids), 2)
         self.assertTrue(counterpart.move_line_ids)
         for line in counterpart.move_line_ids:
             self.assertTrue(

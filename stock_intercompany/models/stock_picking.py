@@ -72,7 +72,19 @@ class StockPicking(models.Model):
         }
 
     def _get_counterpart_move_commands(self, company, picking_type):
-        """Construye los moves espejo con sus líneas anidadas dentro de cada move."""
+        """Construye los moves espejo con sus líneas anidadas dentro de cada move.
+
+        Ojo si reutilizás esto para crear líneas nueva: las líneas quedan
+        con ``picking_id=False`` a propósito, porque el ORM solo completa
+        el inverso del o2m que se está anidando (``move_id``, vía
+        ``move_line_ids`` del move) y ``picking_id`` en
+        ``stock.move.line`` es un campo propio, no derivado de
+        ``move_id``. Quien use estos commands para crear registros tiene
+        que sincronizar ``picking_id`` a mano después (como hace
+        ``_create_counterpart_picking`` con
+        ``picking.move_ids.move_line_ids.picking_id = picking.id``), o
+        las líneas quedan invisibles en ``picking.move_line_ids``.
+        """
         supplier_location = self.env.ref("stock.stock_location_suppliers")
         if supplier_location.company_id:
             supplier_location.sudo().company_id = False
