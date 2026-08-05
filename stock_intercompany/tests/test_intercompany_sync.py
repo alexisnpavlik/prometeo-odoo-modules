@@ -2,9 +2,12 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 from odoo import Command
+from odoo.exceptions import AccessError
 from odoo.tests.common import RecordCapturer
 
 from odoo.addons.base.tests.common import BaseCommon
+
+from odoo.addons.stock_intercompany.models.intercompany_sync import as_propagation
 
 
 class SyncCommon(BaseCommon):
@@ -18,12 +21,9 @@ class SyncCommon(BaseCommon):
         cls.company1 = company_obj.create({"name": "Sync Company A"})
         cls.company2 = company_obj.create({"name": "Sync Company B"})
         cls.group_stock_user = cls.env.ref("stock.group_stock_user")
-        # NOTA: el grupo stock_intercompany.group_intercompany_manager recién
-        # se crea en la Tarea 4. Se deja comentado a propósito; la Tarea 4
-        # debe descomentar esta línea al agregar el grupo.
-        # cls.group_manager = cls.env.ref(
-        #     "stock_intercompany.group_intercompany_manager"
-        # )
+        cls.group_manager = cls.env.ref(
+            "stock_intercompany.group_intercompany_manager"
+        )
         cls.user_operator = cls.env["res.users"].create(
             {
                 "login": "sync_operator",
@@ -94,6 +94,37 @@ class SyncCommon(BaseCommon):
         )
         cls.custs_location = cls.env.ref("stock.stock_location_customers")
         cls.custs_location.company_id = False
+        cls.user_manager_both = cls.env["res.users"].create(
+            {
+                "login": "sync_manager_both",
+                "name": "Manager Ambas",
+                "email": "sync_manager_both@example.org",
+                "company_id": cls.company1.id,
+                "company_ids": [
+                    Command.link(cls.company1.id),
+                    Command.link(cls.company2.id),
+                ],
+                "groups_id": [
+                    Command.link(cls.env.ref("base.group_user").id),
+                    Command.link(cls.group_stock_user.id),
+                    Command.link(cls.group_manager.id),
+                ],
+            }
+        )
+        cls.user_manager_one = cls.env["res.users"].create(
+            {
+                "login": "sync_manager_one",
+                "name": "Manager Una",
+                "email": "sync_manager_one@example.org",
+                "company_id": cls.company1.id,
+                "company_ids": [Command.link(cls.company1.id)],
+                "groups_id": [
+                    Command.link(cls.env.ref("base.group_user").id),
+                    Command.link(cls.group_stock_user.id),
+                    Command.link(cls.group_manager.id),
+                ],
+            }
+        )
 
     def _create_delivery(self, qty=10.0, product=None):
         """Crea y valida una entrega intercompany. Devuelve (entrega, recepción)."""
@@ -199,3 +230,78 @@ class TestCounterpartResolution(SyncCommon):
             "counterpart_picking_id quedó rancio (vacío) en la entrega "
             "tras crear el espejo",
         )
+
+
+class TestEditGuard(SyncCommon):
+    def test_operator_cannot_edit_validated(self):
+        """El operador no puede tocar una entrega intercompany ya validada."""
+        delivery, _reception = self._create_delivery()
+        line = delivery.move_line_ids[0]
+        with self.assertRaises(AccessError):
+            line.with_user(self.user_operator).write({"quantity": 5.0})
+
+    def test_manager_with_one_company_cannot_edit(self):
+        """El manager sin acceso a las dos compañías tampoco puede."""
+        delivery, _reception = self._create_delivery()
+        line = delivery.move_line_ids[0]
+        with self.assertRaises(AccessError):
+            line.with_user(self.user_manager_one).write({"quantity": 5.0})
+
+    def test_manager_with_both_companies_can_edit(self):
+        """El manager con las dos compañías sí puede."""
+        delivery, _reception = self._create_delivery()
+        line = delivery.move_line_ids[0]
+        line.with_user(self.user_manager_both).write({"quantity": 5.0})
+        self.assertEqual(line.quantity, 5.0)
+
+    def test_can_edit_done_flag(self):
+        """El campo que gobierna el readonly de la vista refleja las dos condiciones."""
+        delivery, _reception = self._create_delivery()
+        self.assertFalse(delivery.with_user(self.user_operator).can_edit_done)
+        self.assertFalse(delivery.with_user(self.user_manager_one).can_edit_done)
+        self.assertTrue(delivery.with_user(self.user_manager_both).can_edit_done)
+
+    def test_plain_picking_is_untouched(self):
+        """Un picking sin contraparte no queda sujeto al guard."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        self.env["stock.move.line"].create(
+            {
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "product_id": self.product.id,
+                "product_uom_id": self.uom_unit.id,
+                "quantity": 3.0,
+                "picking_id": picking.id,
+            }
+        )
+        picking.action_confirm()
+        picking.button_validate()
+        line = picking.move_line_ids[0]
+        line.with_user(self.user_operator).write({"quantity": 2.0})
+        self.assertEqual(line.quantity, 2.0)
+
+    def test_propagation_bypasses_guard(self):
+        """Una escritura propagada desde la contraparte no pasa por el guard.
+
+        Es la excepción central de la regla de negocio: as_propagation()
+        deja la escritura en sudo con el flag skip_intercompany_sync, y el
+        guard tiene que dejarla pasar aunque el usuario en curso (el
+        operador, sin el rol de manager) no cumpla ninguna de las dos
+        condiciones. Si esto se rompe, todo el sync bidireccional de las
+        tareas siguientes se estrella contra el guard.
+        """
+        delivery, _reception = self._create_delivery()
+        line = delivery.move_line_ids[0]
+        propagated_line = as_propagation(line.with_user(self.user_operator))
+        propagated_line.write({"quantity": 7.0})
+        self.assertEqual(line.quantity, 7.0)

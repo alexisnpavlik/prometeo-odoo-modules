@@ -2,9 +2,27 @@
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-from odoo import Command, api, fields, models
+from odoo import Command, _, api, fields, models
+from odoo.exceptions import AccessError
 
-from .intercompany_sync import get_counterpart
+from .intercompany_sync import get_counterpart, is_propagation
+
+# Campos cuya escritura sobre un picking validado exige el rol de manager.
+GUARDED_PICKING_FIELDS = (
+    "scheduled_date",
+    "priority",
+    "move_ids",
+    "move_ids_without_package",
+    "move_line_ids",
+)
+
+# El propio _action_done() de stock deja el picking en state "done" (los
+# moves ya están done) y recién ahí escribe date_done/priority para cerrar
+# la transferencia. Esa escritura de cierre ocurre después de que este
+# módulo ya creó el picking espejo, así que sin este flag el guard la vería
+# como una edición posterior a un validado ya sincronizado y la bloquearía
+# en toda transferencia intercompany, no solo en las ediciones reales.
+VALIDATING_CONTEXT_KEY = "stock_intercompany_validating"
 
 
 class StockPicking(models.Model):
@@ -17,6 +35,12 @@ class StockPicking(models.Model):
         compute="_compute_counterpart_picking_id",
         check_company=False,
     )
+    can_edit_done = fields.Boolean(
+        string="Puede editar validado",
+        compute="_compute_can_edit_done",
+        help="Verdadero si el usuario es manager intercompany y tiene "
+        "habilitadas las dos compañías del espejo.",
+    )
 
     @api.depends("counterpart_of_picking_id")
     def _compute_counterpart_picking_id(self):
@@ -25,6 +49,69 @@ class StockPicking(models.Model):
             picking.counterpart_picking_id = get_counterpart(
                 picking, "counterpart_of_picking_id"
             )
+
+    @api.depends("counterpart_picking_id", "company_id")
+    @api.depends_context("uid")
+    def _compute_can_edit_done(self):
+        """Gobierna el readonly de la vista y respalda el guard del modelo."""
+        is_manager = self.env.user.has_group(
+            "stock_intercompany.group_intercompany_manager"
+        )
+        allowed = self.env.user.company_ids
+        for picking in self:
+            counterpart = picking.counterpart_picking_id
+            picking.can_edit_done = bool(
+                is_manager
+                and counterpart
+                and picking.company_id in allowed
+                and counterpart.company_id in allowed
+            )
+
+    def _check_intercompany_edit_allowed(self):
+        """Bloquea la edición de un picking intercompany validado sin el rol.
+
+        No aplica a las escrituras propagadas: esas ya vienen en sudo desde la
+        contraparte, y son las que permiten que el operador destino reciba de
+        menos sin necesitar el rol. Tampoco aplica a la escritura de cierre
+        que el propio _action_done() hace sobre sí mismo mientras valida:
+        para ese momento el picking espejo ya existe, pero todavía es parte
+        de la transacción de validación, no una edición posterior.
+        """
+        if is_propagation(self.env) or self.env.context.get(
+            VALIDATING_CONTEXT_KEY
+        ):
+            return
+        for picking in self:
+            if picking.state != "done" or not picking.counterpart_picking_id:
+                continue
+            if picking.can_edit_done:
+                continue
+            if not self.env.user.has_group(
+                "stock_intercompany.group_intercompany_manager"
+            ):
+                raise AccessError(
+                    _(
+                        "La transferencia %(name)s ya está validada. Editarla "
+                        "requiere el rol «Intercompany: editar transferencias "
+                        "validadas».",
+                        name=picking.name,
+                    )
+                )
+            raise AccessError(
+                _(
+                    "Para editar la transferencia validada %(name)s necesitás "
+                    "tener habilitadas las dos compañías: %(a)s y %(b)s.",
+                    name=picking.name,
+                    a=picking.company_id.name,
+                    b=picking.counterpart_picking_id.company_id.name,
+                )
+            )
+
+    def write(self, vals):
+        """Corta la edición de validados que no cumpla el rol."""
+        if any(field in vals for field in GUARDED_PICKING_FIELDS):
+            self._check_intercompany_edit_allowed()
+        return super().write(vals)
 
     def _create_counterpart_picking(self):
         companies = self.env["res.company"].sudo().search([])
@@ -156,12 +243,22 @@ class StockPicking(models.Model):
         return move_commands
 
     def _action_done(self):
+        """Crea el espejo antes de validar y marca la validación en curso.
+
+        El flag VALIDATING_CONTEXT_KEY viaja en el contexto durante
+        super()._action_done() para que la escritura de cierre de Odoo
+        (date_done/priority) no choque con el guard: en ese punto el
+        picking ya está en state "done" y counterpart_picking_id ya está
+        resuelto, pero todavía es parte de esta misma transacción.
+        """
         counterparts = []
         for picking in self:
             if picking.location_dest_id.usage in ("customer", "transit"):
                 counterpart = picking._create_counterpart_picking()
                 counterparts.append((picking, counterpart))
-        res = super()._action_done()
+        res = super(
+            StockPicking, self.with_context(**{VALIDATING_CONTEXT_KEY: True})
+        )._action_done()
         for picking, counterpart in counterparts:
             picking._finalize_counterpart_picking(counterpart)
         return res
