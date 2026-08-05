@@ -37,6 +37,16 @@ class StockPicking(models.Model):
             vals = self._get_counterpart_picking_vals(company)
             # Create picking in correct company context
             picking = picking_model.create(vals)
+            # El compute de counterpart_picking_id depende de
+            # counterpart_of_picking_id, campo que solo llena el espejo
+            # apuntando a self: depends() no puede rastrear la búsqueda
+            # inversa que hace get_counterpart(). Si algo leyó
+            # self.counterpart_picking_id antes de este create (p. ej. un
+            # guard en action_confirm/button_validate), quedó cacheado
+            # vacío y no se refresca solo. Se invalida a mano apenas existe
+            # el espejo para que cualquier lectura posterior de self lo
+            # recalcule.
+            self.invalidate_recordset(["counterpart_picking_id"])
             # "picking_id" en stock.move.line es un campo propio (no
             # derivado de move_id), así que no se completa solo al crear
             # las líneas anidadas dentro de move_ids: hay que sincronizarlo

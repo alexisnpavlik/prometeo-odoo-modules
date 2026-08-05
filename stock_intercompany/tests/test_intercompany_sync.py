@@ -124,6 +124,10 @@ class SyncCommon(BaseCommon):
         with RecordCapturer(self.env["stock.picking"], []) as rc:
             picking.action_confirm()
             picking.button_validate()
+        self.assertEqual(picking.state, "done", "La entrega no quedó validada")
+        self.assertEqual(
+            len(rc.records), 1, "Se creó más de un picking en el bloque"
+        )
         return picking, rc.records
 
 
@@ -144,3 +148,54 @@ class TestCounterpartResolution(SyncCommon):
             }
         )
         self.assertFalse(picking.counterpart_picking_id)
+
+    def test_counterpart_picking_id_refreshes_after_validate(self):
+        """Leer counterpart_picking_id en la entrega antes de validar no debe
+        dejarlo cacheado vacío para siempre.
+
+        El compute depende de counterpart_of_picking_id, campo que solo
+        llena el espejo apuntando a la entrega: `depends()` no puede
+        rastrear la búsqueda inversa que hace `get_counterpart`. Si algo
+        (por ejemplo un guard durante action_confirm/button_validate) lee
+        el campo antes de que el espejo exista, queda cacheado vacío;
+        `_create_counterpart_picking` tiene que invalidarlo a mano apenas
+        crea el espejo para que una lectura posterior lo recalcule.
+        """
+        picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.company1.intercompany_in_type_id.id,
+                }
+            )
+        )
+        self.env["stock.move.line"].create(
+            {
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "product_id": self.product.id,
+                "product_uom_id": self.uom_unit.id,
+                "quantity": 10.0,
+                "picking_id": picking.id,
+            }
+        )
+        # Lectura previa a validar: cachea vacío, como haría un guard que
+        # corre durante action_confirm/button_validate antes de que exista
+        # el espejo (caso de la Tarea 4: can_edit_done).
+        self.assertFalse(picking.counterpart_picking_id)
+        with RecordCapturer(self.env["stock.picking"], []) as rc:
+            picking.action_confirm()
+            picking.button_validate()
+        self.assertEqual(picking.state, "done", "La entrega no quedó validada")
+        self.assertEqual(len(rc.records), 1, "Se creó más de un picking en el bloque")
+        self.assertEqual(
+            picking.counterpart_picking_id,
+            rc.records,
+            "counterpart_picking_id quedó rancio (vacío) en la entrega "
+            "tras crear el espejo",
+        )
