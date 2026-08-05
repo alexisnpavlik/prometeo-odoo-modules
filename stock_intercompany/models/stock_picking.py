@@ -8,21 +8,20 @@ from odoo.exceptions import AccessError
 from .intercompany_sync import get_counterpart, is_propagation
 
 # Campos cuya escritura sobre un picking validado exige el rol de manager.
+#
+# "priority" queda deliberadamente afuera: es cosmético (no cambia el
+# contenido efectivo del picking) y el propio _action_done() de Odoo lo
+# resetea a '0' al validar (stock/models/stock_picking.py, self.write({
+# 'date_done': ..., 'priority': '0'})), ya con el picking en state "done"
+# y el espejo ya creado. Vigilarlo rompía la validación de cualquier
+# entrega intercompany. La Tarea 6 lo sincroniza igual con la contraparte:
+# "vigilado" y "sincronizado" son listas distintas.
 GUARDED_PICKING_FIELDS = (
     "scheduled_date",
-    "priority",
     "move_ids",
     "move_ids_without_package",
     "move_line_ids",
 )
-
-# El propio _action_done() de stock deja el picking en state "done" (los
-# moves ya están done) y recién ahí escribe date_done/priority para cerrar
-# la transferencia. Esa escritura de cierre ocurre después de que este
-# módulo ya creó el picking espejo, así que sin este flag el guard la vería
-# como una edición posterior a un validado ya sincronizado y la bloquearía
-# en toda transferencia intercompany, no solo en las ediciones reales.
-VALIDATING_CONTEXT_KEY = "stock_intercompany_validating"
 
 
 class StockPicking(models.Model):
@@ -53,7 +52,16 @@ class StockPicking(models.Model):
     @api.depends("counterpart_picking_id", "company_id")
     @api.depends_context("uid")
     def _compute_can_edit_done(self):
-        """Gobierna el readonly de la vista y respalda el guard del modelo."""
+        """Gobierna el readonly de la vista y respalda el guard del modelo.
+
+        `counterpart.sudo()`: el espejo vive en la otra compañía. La
+        ir.rule core de stock.picking restringe la lectura a
+        `company_id in env.companies` (las compañías activas en el
+        selector, no necesariamente todas las `company_ids` habilitadas
+        del usuario). Sin sudo, leer `counterpart.company_id` tira
+        AccessError apenas la caché está fría, y el compute reventaría en
+        vez de simplemente devolver False.
+        """
         is_manager = self.env.user.has_group(
             "stock_intercompany.group_intercompany_manager"
         )
@@ -64,7 +72,7 @@ class StockPicking(models.Model):
                 is_manager
                 and counterpart
                 and picking.company_id in allowed
-                and counterpart.company_id in allowed
+                and counterpart.sudo().company_id in allowed
             )
 
     def _check_intercompany_edit_allowed(self):
@@ -72,14 +80,9 @@ class StockPicking(models.Model):
 
         No aplica a las escrituras propagadas: esas ya vienen en sudo desde la
         contraparte, y son las que permiten que el operador destino reciba de
-        menos sin necesitar el rol. Tampoco aplica a la escritura de cierre
-        que el propio _action_done() hace sobre sí mismo mientras valida:
-        para ese momento el picking espejo ya existe, pero todavía es parte
-        de la transacción de validación, no una edición posterior.
+        menos sin necesitar el rol.
         """
-        if is_propagation(self.env) or self.env.context.get(
-            VALIDATING_CONTEXT_KEY
-        ):
+        if is_propagation(self.env):
             return
         for picking in self:
             if picking.state != "done" or not picking.counterpart_picking_id:
@@ -103,7 +106,7 @@ class StockPicking(models.Model):
                     "tener habilitadas las dos compañías: %(a)s y %(b)s.",
                     name=picking.name,
                     a=picking.company_id.name,
-                    b=picking.counterpart_picking_id.company_id.name,
+                    b=picking.counterpart_picking_id.sudo().company_id.name,
                 )
             )
 
@@ -132,8 +135,14 @@ class StockPicking(models.Model):
             # guard en action_confirm/button_validate), quedó cacheado
             # vacío y no se refresca solo. Se invalida a mano apenas existe
             # el espejo para que cualquier lectura posterior de self lo
-            # recalcule.
-            self.invalidate_recordset(["counterpart_picking_id"])
+            # recalcule. can_edit_done va en la misma lista: depende de
+            # counterpart_picking_id, pero _invalidate_cache solo mete en
+            # el spec los campos pedidos y sus inversos, no sus
+            # dependientes computados — si no lo invalidamos a mano acá
+            # también, queda en caché con el valor rancio de antes del
+            # espejo (False), y el guard de create/unlink de la Tarea 8
+            # se lo va a comer y bloquear a un manager legítimo.
+            self.invalidate_recordset(["counterpart_picking_id", "can_edit_done"])
             # "picking_id" en stock.move.line es un campo propio (no
             # derivado de move_id), así que no se completa solo al crear
             # las líneas anidadas dentro de move_ids: hay que sincronizarlo
@@ -243,22 +252,12 @@ class StockPicking(models.Model):
         return move_commands
 
     def _action_done(self):
-        """Crea el espejo antes de validar y marca la validación en curso.
-
-        El flag VALIDATING_CONTEXT_KEY viaja en el contexto durante
-        super()._action_done() para que la escritura de cierre de Odoo
-        (date_done/priority) no choque con el guard: en ese punto el
-        picking ya está en state "done" y counterpart_picking_id ya está
-        resuelto, pero todavía es parte de esta misma transacción.
-        """
         counterparts = []
         for picking in self:
             if picking.location_dest_id.usage in ("customer", "transit"):
                 counterpart = picking._create_counterpart_picking()
                 counterparts.append((picking, counterpart))
-        res = super(
-            StockPicking, self.with_context(**{VALIDATING_CONTEXT_KEY: True})
-        )._action_done()
+        res = super()._action_done()
         for picking, counterpart in counterparts:
             picking._finalize_counterpart_picking(counterpart)
         return res

@@ -2,7 +2,7 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 from odoo import Command
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import RecordCapturer
 
 from odoo.addons.base.tests.common import BaseCommon
@@ -234,17 +234,30 @@ class TestCounterpartResolution(SyncCommon):
 
 class TestEditGuard(SyncCommon):
     def test_operator_cannot_edit_validated(self):
-        """El operador no puede tocar una entrega intercompany ya validada."""
+        """El operador no puede tocar una entrega intercompany ya validada.
+
+        user_operator tiene las DOS compañías habilitadas (ver setUpClass):
+        lo único que le falta es el grupo, así que esta prueba cubre
+        puntualmente esa rama del guard (mensaje "requiere el rol"), no la
+        de compañías.
+        """
         delivery, _reception = self._create_delivery()
         line = delivery.move_line_ids[0]
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
             line.with_user(self.user_operator).write({"quantity": 5.0})
 
     def test_manager_with_one_company_cannot_edit(self):
-        """El manager sin acceso a las dos compañías tampoco puede."""
+        """El manager sin acceso a las dos compañías tampoco puede.
+
+        user_manager_one tiene el grupo pero una sola compañía habilitada:
+        cubre la otra rama del guard (mensaje "tener habilitadas las dos
+        compañías"), distinta de la de test_operator_cannot_edit_validated.
+        """
         delivery, _reception = self._create_delivery()
         line = delivery.move_line_ids[0]
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(
+            AccessError, "tener habilitadas las dos compañías"
+        ):
             line.with_user(self.user_manager_one).write({"quantity": 5.0})
 
     def test_manager_with_both_companies_can_edit(self):
@@ -254,11 +267,108 @@ class TestEditGuard(SyncCommon):
         line.with_user(self.user_manager_both).write({"quantity": 5.0})
         self.assertEqual(line.quantity, 5.0)
 
+    def test_operator_cannot_change_uom_of_validated_line(self):
+        """Cambiar la UoM de una línea validada exige el rol.
+
+        stock.move.line.write() no bloquea product_uom_id en done a nivel
+        core (a diferencia de stock.move.product_uom, ver
+        test_move_uom_change_is_blocked_by_core más abajo): reescribe
+        quantity_product_uom y deshace/rehace el movimiento de quants
+        real. Sin este campo en GUARDED_LINE_FIELDS, un operador podía
+        convertir 10 Unidades entregadas en 10 Docenas (120 unidades
+        reales) sin el rol y sin que se propague al espejo.
+        """
+        delivery, _reception = self._create_delivery(qty=10.0)
+        line = delivery.move_line_ids[0]
+        dozen = self.env.ref("uom.product_uom_dozen")
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
+            line.with_user(self.user_operator).write({"product_uom_id": dozen.id})
+
+    def test_operator_cannot_change_package_or_owner_of_validated_line(self):
+        """Cambiar el paquete o el propietario de una línea validada exige el rol.
+
+        Estos dos campos están en la lista "triggers" del write() core de
+        stock.move.line: para una línea done, cambiarlos deshace y rehace
+        el movimiento de quants real (misma familia de riesgo que
+        quantity/product_uom_id), así que cambian el contenido efectivo
+        de la transferencia y deben quedar vigilados igual.
+        """
+        delivery, _reception = self._create_delivery()
+        line = delivery.move_line_ids[0]
+        package = self.env["stock.quant.package"].create({"name": "SYNC-PKG"})
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
+            line.with_user(self.user_operator).write({"package_id": package.id})
+        partner = self.env["res.partner"].create({"name": "SYNC-OWNER"})
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
+            line.with_user(self.user_operator).write({"owner_id": partner.id})
+
+    def test_operator_cannot_reparent_validated_line(self):
+        """Mover una línea validada a otro move o picking exige el rol.
+
+        move_id y picking_id no están en la lista "triggers" del write()
+        core de move.line (no disparan undo/redo de quants por sí
+        solos), pero reparentar una línea validada a otro move o a otro
+        picking cambia igual qué transferencia contiene efectivamente qué
+        movimiento: mismo criterio de "contenido efectivo" que el resto
+        de GUARDED_LINE_FIELDS.
+        """
+        delivery, _reception = self._create_delivery()
+        other_delivery, _other_reception = self._create_delivery(
+            product=self.product2
+        )
+        line = delivery.move_line_ids[0]
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
+            line.with_user(self.user_operator).write(
+                {"move_id": other_delivery.move_ids[0].id}
+            )
+        with self.assertRaisesRegex(AccessError, "requiere el rol"):
+            line.with_user(self.user_operator).write(
+                {"picking_id": other_delivery.id}
+            )
+
+    def test_move_uom_change_is_blocked_by_core(self):
+        """stock.move.product_uom no necesita guard propio: Odoo ya lo bloquea.
+
+        `stock.move.write()` core levanta UserError incondicionalmente
+        si `product_uom` está en vals y el move ya está done — corre
+        antes de llegar a nuestro guard y no depende del rol del
+        usuario. No hay hueco que cerrar acá; se deja documentado con
+        este test para que quede registrado que se verificó, no
+        asumido.
+        """
+        delivery, _reception = self._create_delivery()
+        move = delivery.move_ids[0]
+        dozen = self.env.ref("uom.product_uom_dozen")
+        with self.assertRaises(UserError):
+            move.with_user(self.user_manager_both).write({"product_uom": dozen.id})
+
     def test_can_edit_done_flag(self):
         """El campo que gobierna el readonly de la vista refleja las dos condiciones."""
         delivery, _reception = self._create_delivery()
         self.assertFalse(delivery.with_user(self.user_operator).can_edit_done)
         self.assertFalse(delivery.with_user(self.user_manager_one).can_edit_done)
+        self.assertTrue(delivery.with_user(self.user_manager_both).can_edit_done)
+
+    def test_can_edit_done_flag_with_cold_cache(self):
+        """can_edit_done no debe reventar con AccessError al leerse sin caché.
+
+        El espejo vive en la otra compañía. La ir.rule core de
+        stock.picking restringe la lectura a `company_id in
+        env.companies` (compañías activas en el selector; sin contexto
+        explícito, cae a `user.company_ids`). Con la caché tibia (recién
+        creado en la misma transacción), leer counterpart.company_id no
+        dispara esa regla porque el ORM no la re-evalúa en un hit de
+        caché — así que un test que solo lee en caliente no detecta el
+        problema. invalidate_all() fuerza una lectura real desde la base
+        y prueba la regla de verdad: sin sudo() en el compute, esto
+        reventaba con AccessError en vez de devolver False para
+        user_manager_one (que solo tiene una compañía habilitada, y por
+        lo tanto sus `env.companies` no incluye la del espejo).
+        """
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        self.assertFalse(delivery.with_user(self.user_manager_one).can_edit_done)
+        self.env.invalidate_all()
         self.assertTrue(delivery.with_user(self.user_manager_both).can_edit_done)
 
     def test_plain_picking_is_untouched(self):
