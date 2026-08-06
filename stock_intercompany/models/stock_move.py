@@ -342,11 +342,27 @@ class StockMove(models.Model):
         cero, no solo la cantidad hecha- y el chequeo de rol explícito,
         necesario porque este método es público y la UI (o un caller
         externo) puede invocarlo directo, sin pasar por `unlink()`.
+
+        Ronda de corrección 1 (revisor), Critical 1: el chequeo de rol
+        mira las DOS puntas -la propia y la de la contraparte-, no solo
+        `move.picking_id`. Es el mismo agujero que ya se había cerrado en
+        `unlink()` pero que este método, siendo la puerta pública que
+        `unlink()` termina usando, había dejado abierta: un operador SIN
+        rol podía invocar `action_intercompany_void()` directo sobre una
+        línea de una recepción sin validar (su propio picking no está
+        done/cancel, así que un chequeo de una sola punta lo dejaba
+        pasar) cuya contraparte -la entrega- YA está done, y revertir
+        stock real ya validado de la otra compañía sin autorización.
+        Reproducido por el revisor antes de este fix: `cp: quantity 30.0
+        -> 0.0` con un usuario sin `group_intercompany_manager`.
         """
         for move in self:
             picking = move.picking_id
-            picking._check_intercompany_edit_allowed()
             counterpart = move._get_counterpart_move()
+            guard_pickings = picking
+            if counterpart and counterpart.picking_id:
+                guard_pickings |= counterpart.picking_id
+            guard_pickings._check_intercompany_edit_allowed()
             move.move_line_ids.write({"quantity": 0.0})
             move.write({"product_uom_qty": 0.0})
             body = _(
@@ -360,6 +376,47 @@ class StockMove(models.Model):
                 )
         return True
 
+    def _merge_moves(self, merge_into=False):
+        """Fusiona moves duplicados (core) sin disparar la cascada de
+        baja/anulación de este módulo.
+
+        Ronda de corrección 1 (revisor), Important 3 + su seguimiento
+        sobre el orden de `groupby`: `_merge_moves` (core,
+        stock/models/stock_move.py) puede fusionar dos moves "duplicados"
+        del mismo picking/producto/ubicaciones en uno solo, borrando el
+        sobrante con `moves_to_unlink.sudo().unlink()`. Antes de este fix,
+        ese `unlink()` cascadeaba como cualquier baja real -y CUÁL de los
+        dos moves fusionados sobrevive (`moves[0]`) depende del orden
+        natural de `picking.move_ids` en el `groupby` de core, que no está
+        garantizado ni documentado como estable-: si el que se BORRA es el
+        que tenía contraparte `done` con stock real, la cascada de este
+        módulo la anulaba en silencio -no una nota espuria, sino el
+        Critical real: revertir stock validado sin que nadie lo pida-; si
+        el que se borra es el que no tenía contraparte, el síntoma es más
+        leve (una nota "Línea eliminada" espuria) pero sigue siendo
+        incorrecto -nadie borró nada de verdad, fue bookkeeping interno de
+        Odoo-. Reproducido por el revisor en contexto NORMAL (no
+        propagado): agregar una línea del mismo producto a una recepción
+        espejo y correr `action_confirm()` a mano ya dispara la fusión sin
+        pasar por ninguno de los caminos `as_propagation(...)` de este
+        módulo.
+
+        Se corre TODO el método bajo `skip_intercompany_sync` -el único
+        flag de contexto del módulo- para que cualquier `unlink()` que
+        dispare puertas adentro, sea cual sea el move que sobreviva, tome
+        la rama de propagación (mutación local pura, sin resolver
+        contraparte ni postear nota): el resultado deja de depender del
+        orden interno de `groupby`. Efecto colateral aceptado: si el move
+        sobreviviente YA tenía contraparte propia y la fusión le cambia
+        `product_uom_qty` (demanda combinada), ese cambio no se propaga
+        solo a su contraparte durante la fusión -no es un caso cubierto ni
+        testeado por este módulo, y es preferible a arriesgar la cascada
+        espuria descrita arriba-.
+        """
+        return super(
+            StockMove, self.with_context(skip_intercompany_sync=True)
+        )._merge_moves(merge_into=merge_into)
+
     def unlink(self):
         """Borra en cascada al espejo; en pickings validados o cancelados
         anula (o exige rol) en vez de borrar directo.
@@ -371,10 +428,16 @@ class StockMove(models.Model):
         recepción espejo lo dice sin buscar nada (`counterpart_of_picking_id`
         propio, siempre seteado desde que se crea); una entrega solo tiene
         espejo una vez `done` (se crea recién en `_action_done()`), así
-        que cualquier otro estado de un picking que además no es él mismo
-        un espejo no puede tener contraparte y se descarta sin tocar la
-        base -mismo criterio de corte barato que ya usan los `write()` de
-        los tres modelos-.
+        que cualquier picking en `draft`/`confirmed`/`assigned` que
+        además no es él mismo un espejo no puede tener contraparte y se
+        descarta sin tocar la base -mismo criterio de corte barato que ya
+        usan los `write()` de los tres modelos-. `cancel` se incluye igual
+        que `done` -ronda de corrección 1, Minor 3-: aunque una entrega
+        con contraparte real nunca puede llegar a `cancel` (core no deja
+        cancelar un picking `done`), es el estado que el guard de abajo
+        pretende cubrir explícitamente, y dejarlo fuera del corte barato
+        sería inconsistente con esa intención aunque hoy no sea
+        alcanzable.
 
         La decisión de anular en vez de borrar se toma SIEMPRE mirando el
         estado de la punta que efectivamente se está por tocar, no el de
@@ -406,6 +469,34 @@ class StockMove(models.Model):
         core como `_unlink_if_draft_or_cancel`) antes de propagar hacia
         la contraparte: si el borrado del propio lado falla, la
         contraparte de la otra compañía queda sin tocar.
+
+        Ronda de corrección 1 (revisor), Critical 2: cuando se borra un
+        PICKING entero -core, `stock.picking.unlink()`
+        (stock/models/stock_picking.py), hace `self.move_ids.unlink()`
+        con TODOS los moves de esos pickings a la vez, ANTES de borrar el
+        registro del picking- no hay que cascadear nada hacia la
+        contraparte: es limpieza administrativa de un documento
+        (típicamente cancelado o draft), no una baja de línea deliberada.
+        Sin este corte, borrar una recepción espejo cancelada -limpieza
+        rutinaria de un manager- anulaba en silencio (revertía quants de
+        verdad) la entrega YA VALIDADA de la otra compañía, sin que nadie
+        lo pidiera.
+
+        Un primer intento detectaba esto comparando, por picking, si el
+        conjunto de moves que se están borrando ahora coincide con TODOS
+        los moves de ese picking -la firma de `self.move_ids.unlink()`-,
+        pero es un FALSO POSITIVO cuando el picking tiene un solo move:
+        borrar directo LA ÚNICA línea de un picking (`move.unlink()`, no
+        `picking.unlink()`) también cumple esa condición, y quedaba sin
+        cascada por error (reproducido: `test_unlink_on_validated_voids_instead`
+        y análogos empezaban a fallar). La detección correcta vive en
+        `stock.picking.unlink()` (`models/stock_picking.py`), que es
+        quien sabe de verdad que el picking ENTERO se está por borrar: ese
+        override envuelve su propio `self.move_ids.unlink()` con
+        `skip_intercompany_sync`, así que estos moves llegan acá con
+        `is_propagation(self.env)` ya en `True` y entran por la rama de
+        arriba -que no cascadea a la contraparte-, sin necesidad de
+        heurística ninguna en este método.
         """
         if is_propagation(self.env):
             to_void = self.filtered(lambda m: m.picking_id.state == "done")
@@ -416,7 +507,7 @@ class StockMove(models.Model):
             return super(StockMove, to_delete).unlink() if to_delete else True
 
         relevant = self.filtered(
-            lambda m: m.picking_id.state == "done"
+            lambda m: m.picking_id.state in ("done", "cancel")
             or m.picking_id.counterpart_of_picking_id
         )
         if not relevant:

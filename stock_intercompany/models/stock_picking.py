@@ -645,3 +645,25 @@ class StockPicking(models.Model):
     def _finalize_counterpart_picking(self, counterpart_picking):
         """hook to finalize required steps on the counterpart picking after the initial
         outgoing picking is done"""
+
+    def unlink(self):
+        """Borra el picking sin cascadear una anulación hacia la contraparte.
+
+        Ronda de corrección 1 (revisor, Tarea 10), Critical 2: core
+        (`stock.picking.unlink()`, stock/models/stock_picking.py) hace
+        `self.move_ids.unlink()` con TODOS los moves del picking a la
+        vez, ANTES de borrar el registro del picking -es limpieza
+        administrativa de un documento completo (típicamente cancelado o
+        draft), no una baja de línea deliberada-. Sin este corte, borrar
+        una recepción espejo cancelada -limpieza rutinaria de un
+        manager- disparaba en `stock.move.unlink()` la misma cascada que
+        una baja real de línea, y anulaba en silencio (revertía quants de
+        verdad) la entrega YA VALIDADA de la otra compañía, sin que nadie
+        lo pidiera. Envolver este `unlink()` con `skip_intercompany_sync`
+        hace que esos moves lleguen a `stock.move.unlink()` con
+        `is_propagation(env)` ya en `True`, que es la rama que solo
+        mutación local -sin resolver contraparte ni postear nota-.
+        """
+        return super(
+            StockPicking, self.with_context(skip_intercompany_sync=True)
+        ).unlink()

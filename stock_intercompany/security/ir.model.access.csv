@@ -1,2 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_stock_move_user_unlink,stock.move user unlink,stock.model_stock_move,stock.group_stock_user,1,1,1,1
+access_stock_move_intercompany_manager_unlink,stock.move intercompany manager unlink,stock.model_stock_move,group_intercompany_manager,1,1,1,1

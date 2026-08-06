@@ -137,6 +137,32 @@ class SyncCommon(BaseCommon):
             }
         )
         cls.product_lot.company_id = False
+        # Ronda de corrección 1 (Tarea 10), Minor 1 (seguimiento): desde
+        # que el ACL de stock.move.unlink() quedó acotado a
+        # group_intercompany_manager (Important 4), un test de "operador
+        # SIN el rol no puede borrar" hecho con user_operator es vacuo:
+        # el AccessError que dispara es el ACL genérico de Odoo, no
+        # nuestro guard -pasaría igual aunque el guard estuviera roto-.
+        # Este usuario tiene permiso de unlink GENÉRICO sobre stock.move
+        # (stock.group_stock_manager, "Inventory/Administrator") pero NO
+        # el rol intercompany: aísla la prueba de nuestro guard del ACL
+        # de base.
+        cls.user_admin_no_role = cls.env["res.users"].create(
+            {
+                "login": "sync_admin_no_role",
+                "name": "Admin Sin Rol Intercompany",
+                "email": "sync_admin_no_role@example.org",
+                "company_id": cls.company1.id,
+                "company_ids": [
+                    Command.link(cls.company1.id),
+                    Command.link(cls.company2.id),
+                ],
+                "groups_id": [
+                    Command.link(cls.env.ref("base.group_user").id),
+                    Command.link(cls.env.ref("stock.group_stock_manager").id),
+                ],
+            }
+        )
 
     def _create_reserved_delivery_picking(self, demand_qty, product, lot=None):
         """Crea una entrega intercompany CON demanda real y stock reservado.
@@ -263,6 +289,21 @@ class SyncCommon(BaseCommon):
         )
         self.assertTrue(picking.backorder_ids, "No se generó backorder")
         return picking, rc.records
+
+    def _quant_qty(self, product, location):
+        """Suma la cantidad de quant real (no la demanda ni la cantidad
+        del move) de `product` en `location`, en sudo -las dos compañías
+        de este módulo pueden no estar activas en el selector del usuario
+        de test-. Ronda de corrección 1 (revisor), Minor 2: los tests de
+        anulación/baja deben verificar el quant real, no solo los campos
+        del move -son cosas distintas, y solo el quant prueba que el
+        stock físico se revirtió de verdad-."""
+        return sum(
+            self.env["stock.quant"]
+            .sudo()
+            ._gather(product, location, strict=False)
+            .mapped("quantity")
+        )
 
 
 class TestFormAccess(SyncCommon):
@@ -2072,7 +2113,9 @@ class TestLineRemoval(SyncCommon):
 
     def test_unlink_on_draft_removes_own_side_and_voids_done_counterpart(self):
         """Borrar una línea de una recepción sin validar la borra ahí, y
-        anula (no borra) su contraparte, que ya está done."""
+        anula (no borra) su contraparte, que ya está done -incluido el
+        quant real, no solo los campos del move (ronda de corrección 1,
+        Minor 2)."""
         delivery, reception = self._create_delivery(qty=10.0)
         self.assertNotEqual(reception.state, "done")
         move = reception.move_ids[0]
@@ -2080,6 +2123,9 @@ class TestLineRemoval(SyncCommon):
         self.assertTrue(counterpart)
         self.assertEqual(counterpart.picking_id, delivery)
         self.assertEqual(delivery.state, "done")
+        origin_qty_before = self._quant_qty(
+            counterpart.product_id, counterpart.location_id
+        )
         move.with_user(self.user_manager_both).unlink()
         self.assertFalse(move.exists(), "La línea de la recepción debe borrarse de verdad")
         self.assertTrue(
@@ -2088,6 +2134,15 @@ class TestLineRemoval(SyncCommon):
         )
         self.assertEqual(counterpart.quantity, 0.0)
         self.assertEqual(counterpart.product_uom_qty, 0.0)
+        origin_qty_after = self._quant_qty(
+            counterpart.product_id, counterpart.location_id
+        )
+        self.assertEqual(
+            origin_qty_after,
+            origin_qty_before + 10.0,
+            "El quant de origen de la entrega debe recuperar las 10 "
+            "unidades que la anulación revierte",
+        )
 
     def test_unlink_both_sides_undone_removes_both(self):
         """Cuando NINGUNA de las dos puntas está validada, el unlink borra
@@ -2162,31 +2217,71 @@ class TestLineRemoval(SyncCommon):
         self.assertFalse(mirror.exists())
 
     def test_void_on_validated_zeroes_both_sides(self):
-        """En un picking validado, anular deja la línea en cero en las dos puntas."""
+        """En un picking validado, anular deja la línea en cero en las dos
+        puntas, con el quant real revertido en las dos compañías (ronda de
+        corrección 1, Minor 2: no alcanza con mirar los campos del move)."""
         delivery, reception = self._create_delivery(qty=10.0)
         move = delivery.move_ids[0]
         mirrored = move._get_counterpart_move()
+        origin_qty_before = self._quant_qty(move.product_id, move.location_id)
+        dest_qty_before = self._quant_qty(
+            mirrored.product_id, mirrored.location_dest_id
+        )
         move.with_user(self.user_manager_both).action_intercompany_void()
         self.assertTrue(move.exists())
         self.assertEqual(move.quantity, 0.0)
         self.assertEqual(move.product_uom_qty, 0.0)
         self.assertEqual(mirrored.quantity, 0.0)
         self.assertEqual(mirrored.product_uom_qty, 0.0)
+        origin_qty_after = self._quant_qty(move.product_id, move.location_id)
+        dest_qty_after = self._quant_qty(
+            mirrored.product_id, mirrored.location_dest_id
+        )
+        self.assertEqual(
+            origin_qty_after,
+            origin_qty_before + 10.0,
+            "El quant de origen (entrega) debe recuperar las 10 unidades",
+        )
+        # La recepción nunca llegó a `done` (_create_delivery la deja
+        # `assigned`): su move_line nunca movió un quant real de destino
+        # -eso solo pasa cuando la línea está `done`-, así que anularla
+        # (quantity 10 -> 0, sobre una línea todavía no `done`) no debe
+        # cambiar ningún quant ahí. Solo la punta que SÍ estaba `done`
+        # (la entrega) tiene un quant real que revertir.
+        self.assertEqual(
+            dest_qty_after,
+            dest_qty_before,
+            "El quant de destino (recepción, nunca done) no debe cambiar",
+        )
 
     def test_unlink_on_validated_voids_instead(self):
-        """Borrar una línea de un picking validado la anula en vez de borrarla."""
+        """Borrar una línea de un picking validado la anula en vez de
+        borrarla, revirtiendo el quant real de origen (ronda de
+        corrección 1, Minor 2)."""
         delivery, _reception = self._create_delivery(qty=10.0)
         move = delivery.move_ids[0]
+        origin_qty_before = self._quant_qty(move.product_id, move.location_id)
         move.with_user(self.user_manager_both).unlink()
         self.assertTrue(move.exists())
         self.assertEqual(move.quantity, 0.0)
         self.assertEqual(move.product_uom_qty, 0.0)
+        origin_qty_after = self._quant_qty(move.product_id, move.location_id)
+        self.assertEqual(origin_qty_after, origin_qty_before + 10.0)
 
     def test_operator_cannot_remove_from_validated(self):
-        """El operador no puede anular líneas de un picking validado."""
+        """Un usuario sin el rol intercompany no puede anular líneas de un
+        picking validado.
+
+        Ronda de corrección 1, Minor 1 (seguimiento): se usa
+        `user_admin_no_role` -tiene permiso de unlink GENÉRICO sobre
+        stock.move, pero no el rol intercompany- en vez de
+        `user_operator` -que directamente no puede invocar `unlink()`
+        por el ACL de base desde Important 4-, para que el AccessError
+        que se comprueba sea el de NUESTRO guard, no el ACL genérico.
+        """
         delivery, _reception = self._create_delivery(qty=10.0)
         with self.assertRaises(AccessError):
-            delivery.move_ids[0].with_user(self.user_operator).unlink()
+            delivery.move_ids[0].with_user(self.user_admin_no_role).unlink()
 
     def test_operator_cannot_void_directly(self):
         """El operador tampoco puede invocar action_intercompany_void directo."""
@@ -2205,16 +2300,21 @@ class TestLineRemoval(SyncCommon):
     def test_operator_cannot_delete_undone_line_whose_counterpart_is_done(self):
         """Ronda de corrección propia: el chequeo de rol de unlink() debe
         mirar también el estado de la CONTRAPARTE, no solo el del propio
-        picking. Sin esto, un operador sin rol podía anular (vía cascada)
-        stock ya validado de la otra compañía con solo borrar una línea
-        pendiente de su lado -la recepción, sin validar, no pasaba por el
-        guard, y la anulación de la entrega done ocurría sin control-.
+        picking. Sin esto, un usuario sin el rol intercompany podía
+        anular (vía cascada) stock ya validado de la otra compañía con
+        solo borrar una línea pendiente de su lado -la recepción, sin
+        validar, no pasaba por el guard, y la anulación de la entrega
+        done ocurría sin control-.
+
+        Se usa `user_admin_no_role` (ver su docstring en setUpClass) en
+        vez de `user_operator` para que el AccessError sea el de nuestro
+        guard, no el ACL genérico de stock.move.
         """
         delivery, reception = self._create_delivery(qty=10.0)
         self.assertNotEqual(reception.state, "done")
         move = reception.move_ids[0]
         with self.assertRaises(AccessError):
-            move.with_user(self.user_operator).unlink()
+            move.with_user(self.user_admin_no_role).unlink()
         self.assertTrue(move.exists(), "No debe haberse borrado nada tras el AccessError")
         self.assertEqual(
             delivery.move_ids[0].quantity,
@@ -2222,8 +2322,168 @@ class TestLineRemoval(SyncCommon):
             "La entrega, todavía sin tocar, no debe haberse anulado",
         )
 
+    def test_operator_cannot_void_undone_line_whose_counterpart_is_done(self):
+        """Ronda de corrección 1 (revisor), Critical 1: el mismo agujero
+        bilateral que se cerró en `unlink()` estaba abierto en
+        `action_intercompany_void()` -la puerta pública que `unlink()`
+        termina usando-. Reproducido por el revisor: un usuario con SOLO
+        `stock.group_stock_user` (sin `group_intercompany_manager`)
+        invocaba `action_intercompany_void()` directo sobre una línea de
+        recepción `assigned` (su propio picking no está done/cancel, así
+        que un chequeo de una sola punta lo dejaba pasar) cuya
+        contraparte -la entrega- ya está `done`, y revertía stock real ya
+        validado de la otra compañía sin autorización
+        (`cp: quantity 30.0 -> 0.0`, en su corrida).
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        move = reception.move_ids[0]
+        counterpart = move._get_counterpart_move()
+        self.assertEqual(counterpart.picking_id, delivery)
+        self.assertEqual(delivery.state, "done")
+        origin_qty_before = self._quant_qty(
+            counterpart.product_id, counterpart.location_id
+        )
+        with self.assertRaises(AccessError):
+            move.with_user(self.user_operator).action_intercompany_void()
+        self.assertEqual(
+            counterpart.quantity,
+            10.0,
+            "La entrega, ya validada, no debe haberse anulado",
+        )
+        self.assertEqual(
+            self._quant_qty(counterpart.product_id, counterpart.location_id),
+            origin_qty_before,
+            "El quant de origen de la entrega no debe haberse tocado",
+        )
+
+    def test_deleting_cancelled_mirror_picking_does_not_void_done_counterpart(self):
+        """Ronda de corrección 1 (revisor), Critical 2: borrar el picking
+        espejo entero (no una línea suelta) no debe cascadear ninguna
+        anulación hacia la contraparte.
+
+        Core, `stock.picking.unlink()` (stock/models/stock_picking.py),
+        hace `self.move_ids.unlink()` con TODOS los moves del picking a
+        la vez, como parte de la limpieza administrativa rutinaria de
+        borrar una recepción cancelada. Antes de este fix, esa limpieza
+        -que un manager puede hacer sin intención de tocar la otra
+        compañía- cascadeaba una anulación real (revertía quants) sobre
+        la entrega YA VALIDADA. Reproducido por el revisor:
+        `mirror C1/IN/00001 (cancel) unlink -> cp 36.0/36.0 -> 0.0/0.0 ;
+        quant origen 0 -> 36.0`.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).action_cancel()
+        self.assertEqual(reception.state, "cancel")
+        move = delivery.move_ids[0]
+        origin_qty_before = self._quant_qty(move.product_id, move.location_id)
+        before_delivery_msgs = len(delivery.message_ids)
+        reception.with_user(self.user_manager_both).unlink()
+        self.assertFalse(reception.exists())
+        self.assertEqual(
+            move.quantity,
+            10.0,
+            "La entrega, ya validada, no debe haberse anulado por borrar "
+            "el picking espejo cancelado",
+        )
+        self.assertEqual(move.product_uom_qty, 10.0)
+        self.assertEqual(
+            self._quant_qty(move.product_id, move.location_id),
+            origin_qty_before,
+            "El quant de origen de la entrega no debe haberse tocado",
+        )
+        self.assertEqual(
+            len(delivery.message_ids),
+            before_delivery_msgs,
+            "La entrega no debe recibir ninguna nota de sync por la "
+            "limpieza administrativa del espejo cancelado",
+        )
+
+    def test_unlink_covers_cancel_state_via_inverse_link(self):
+        """Ronda de corrección 1 (revisor), Minor 3: el corte barato de
+        `unlink()` también resuelve un picking `cancel` que tiene
+        contraparte solo por el vínculo INVERSO (`counterpart_of_picking_id`
+        vacío en él mismo, pero otro picking le apunta) -antes solo
+        cubría `state == "done"` o ser el espejo directo-.
+
+        Poco alcanzable en el flujo real de este módulo -una entrega con
+        contraparte real nunca llega a `cancel` porque core no permite
+        cancelar un picking `done`- pero es exactamente el `cancel` que
+        el guard de `unlink()` pretende cubrir explícitamente (ver su
+        docstring), así que se arma el vínculo a mano para ejercitarlo,
+        igual que ya hace `test_unlink_both_sides_undone_removes_both`
+        para el caso bilateral sin validar.
+        """
+        picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        move = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "name": self.product.name,
+            }
+        )
+        picking.with_user(self.user_operator).action_cancel()
+        self.assertEqual(picking.state, "cancel")
+        other_picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        # Vínculo INVERSO: other_picking apunta a picking, no al revés
+        # -picking.counterpart_of_picking_id sigue vacío, exactamente el
+        # caso que el corte barato debía dejar de saltear-.
+        other_picking.counterpart_of_picking_id = picking.id
+        # user_admin_no_role (no user_operator): tiene permiso de unlink
+        # genérico sobre stock.move pero no el rol intercompany, así que
+        # el AccessError es el de nuestro guard, no el ACL de base.
+        with self.assertRaises(AccessError):
+            move.with_user(self.user_admin_no_role).unlink()
+        self.assertTrue(
+            move.exists(), "No debe haberse borrado nada tras el AccessError"
+        )
+
     def test_plain_picking_unlink_unaffected(self):
-        """Un picking sin contraparte no cambia de comportamiento al borrar líneas."""
+        """Un picking sin contraparte no cambia de comportamiento al borrar
+        líneas: nuestro guard/cascada no se dispara para nada.
+
+        Ronda de corrección 1 (revisor), Minor 1: el `unlink()` se hace
+        con `user_manager_both`, NO porque nuestro guard exija el rol acá
+        -un picking sin contraparte nunca lo exige, es justo lo que este
+        test prueba-, sino porque `stock.group_stock_user` NO tiene
+        `perm_unlink` sobre `stock.move` en el propio ACL base de Odoo
+        (`stock/security/ir.model.access.csv`): es una restricción global
+        de Inventario, ajena a este módulo, y desde la ronda de
+        corrección 1 el ensanche de ACL de este módulo quedó acotado a
+        `group_intercompany_manager` (antes daba unlink a TODO
+        `group_stock_user` de la base, ensanche que el revisor marcó como
+        no mínimo). Con `user_operator` acá, el `AccessError` genérico de
+        ACL disparaba ANTES de que este test pudiera probar nada sobre
+        nuestra lógica -el bug real que motivó este comentario-.
+        """
         picking = (
             self.env["stock.picking"]
             .with_user(self.user_operator)
@@ -2246,13 +2506,20 @@ class TestLineRemoval(SyncCommon):
                 "name": self.product.name,
             }
         )
-        move.with_user(self.user_operator).unlink()
+        before_msgs = len(picking.message_ids)
+        move.with_user(self.user_manager_both).unlink()
         self.assertFalse(move.exists())
+        self.assertEqual(
+            len(picking.message_ids),
+            before_msgs,
+            "Un picking sin contraparte no debe recibir ninguna nota de sync",
+        )
 
     def test_unlink_without_counterpart_does_not_search_for_one(self):
         """El picking sin contraparte no debe pagar ningún search al borrar
         una línea: get_counterpart (el helper que hace el search) no debe
-        ni siquiera invocarse."""
+        ni siquiera invocarse. Mismo motivo que el test anterior para usar
+        `user_manager_both`: es el ACL base de Odoo, no nuestro guard."""
         picking = (
             self.env["stock.picking"]
             .with_user(self.user_operator)
@@ -2278,7 +2545,7 @@ class TestLineRemoval(SyncCommon):
         with patch(
             "odoo.addons.stock_intercompany.models.stock_move.get_counterpart"
         ) as mock_get_counterpart:
-            move.with_user(self.user_operator).unlink()
+            move.with_user(self.user_manager_both).unlink()
         mock_get_counterpart.assert_not_called()
 
     def test_removal_notes_posted_on_both_sides_draft_case(self):
@@ -2400,5 +2667,92 @@ class TestLineRemoval(SyncCommon):
         self.assertEqual(
             len(reception.message_ids),
             before_reception + 3,
+            f"Mensajes reales: {reception.message_ids.mapped('body')}",
+        )
+
+    def test_no_self_triggering_deletion_on_move_merge_in_normal_context(self):
+        """Ronda de corrección 1 (revisor), Important 3: el test anterior
+        solo cubre la fusión DENTRO de una llamada `as_propagation(...)`
+        (el alta de una línea nueva sobre una entrega ya done, que crea
+        el espejo con ese flag activo) -el camino trivialmente seguro,
+        porque el contexto ya viene con `skip_intercompany_sync`-. El
+        revisor reprodujo la fusión en contexto NORMAL, sin pasar por
+        ningún `as_propagation`: agregar una línea del mismo producto
+        DIRECTO en la recepción (no vía la entrega) y correr
+        `action_confirm()` a mano. En su corrida, la nota espuria fue
+        "Línea eliminada" en la recepción; además, la línea que
+        sobrevivió a la fusión fue la que tenía contraparte -si el orden
+        interno de `groupby` de core cayera al revés, el síntoma deja de
+        ser una nota espuria y pasa a ser la cascada real de Critical 2
+        (anular la entrega done). Este test no depende de saber cuál
+        sobrevive: verifica que, sea cual sea, no hay nota espuria Y que
+        la entrega (contraparte real) no se tocó.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        original_move = reception.move_ids[0]
+        self.assertTrue(original_move.counterpart_of_move_id)
+        delivery_move = original_move._get_counterpart_move()
+        self.assertEqual(delivery_move.picking_id, delivery)
+        before_reception = len(reception.message_ids)
+        before_delivery = len(delivery.message_ids)
+        origin_qty_before = self._quant_qty(
+            delivery_move.product_id, delivery_move.location_id
+        )
+        duplicate = self.env["stock.move"].with_user(
+            self.user_manager_both
+        ).with_company(self.company2).create(
+            {
+                "picking_id": reception.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 10.0,
+                "location_id": reception.location_id.id,
+                "location_dest_id": reception.location_dest_id.id,
+                "name": self.product.name,
+                # Tiene que coincidir en TODOS los "distinct fields" de
+                # `_prepare_merge_moves_distinct_fields()` con el move
+                # original para que core los reconozca como
+                # fusionables -sin esto, quedan como dos moves
+                # separados y el test no ejercita la fusión que dice
+                # ejercitar-.
+                "description_picking": self.product.name,
+            }
+        )
+        self.assertEqual(duplicate.state, "draft")
+        self.assertFalse(
+            duplicate.counterpart_of_move_id,
+            "El duplicado se crea directo, sin pasar por ningún camino "
+            "as_propagation de este módulo",
+        )
+        reception.with_user(self.user_manager_both).with_company(
+            self.company2
+        ).action_confirm()
+        merged = reception.move_ids.filtered(lambda m: m.product_id == self.product)
+        self.assertEqual(
+            len(merged),
+            1,
+            "Se esperaba que core fusionara el duplicado con el move original",
+        )
+        # La entrega (contraparte real, done) no debe haberse anulado ni
+        # tocado, sea cual sea el move que haya sobrevivido a la fusión.
+        self.assertEqual(delivery_move.quantity, 10.0)
+        self.assertEqual(delivery_move.product_uom_qty, 10.0)
+        self.assertEqual(
+            self._quant_qty(delivery_move.product_id, delivery_move.location_id),
+            origin_qty_before,
+        )
+        self.assertEqual(
+            len(delivery.message_ids),
+            before_delivery,
+            f"Mensajes reales: {delivery.message_ids.mapped('body')}",
+        )
+        # +1: la nota NATIVA de core sobre la fusión misma ("The initial
+        # demand has been updated.", ajena a este módulo -mismo patrón que
+        # test_no_self_triggering_deletion_on_move_merge-). Ninguna nota
+        # NUESTRA ("Línea eliminada"/"Línea anulada") debe aparecer.
+        self.assertEqual(
+            len(reception.message_ids),
+            before_reception + 1,
             f"Mensajes reales: {reception.message_ids.mapped('body')}",
         )
