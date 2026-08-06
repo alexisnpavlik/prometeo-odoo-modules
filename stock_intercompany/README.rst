@@ -58,6 +58,51 @@ Configuration
 
   - Intercompany operation type [type incoming]
 
+Sincronización 1 a 1 y edición de validados
+============================================
+
+La entrega y su recepción espejo quedan amarradas en contenido: cantidades,
+alta y baja de productos y lotes se propagan en los dos sentidos. De los
+campos de cabecera, la prioridad se sincroniza siempre; la fecha programada
+no se sincroniza cuando el picking está validado o cancelado, porque Odoo
+bloquea la escritura de ese campo en esos estados (`_set_scheduled_date`) y
+el módulo respeta ese bloqueo en vez de saltearlo. En la práctica, como la
+recepción espejo solo existe una vez que la entrega ya fue validada, la
+fecha programada nunca llega a propagarse entre las dos puntas.
+
+Corregir una transferencia intercompany ya validada requiere el grupo
+**Intercompany: editar transferencias validadas** y tener habilitadas las dos
+compañías involucradas. Ese mismo grupo es el único con permiso para borrar
+movimientos de stock (`stock.move`), un permiso que en Odoo base es del
+administrador de inventario. Toda corrección queda registrada en el chatter
+de las dos puntas: la nota del lado que recibe el cambio nombra el picking
+de origen y el usuario que lo hizo.
+
+Para editar la **Demanda** (`product_uom_qty`) de un picking ya validado hay
+que usar primero el botón estándar de Odoo para desbloquear la transferencia
+(`is_locked`); las **cantidades hechas** se pueden editar directo con el rol
+de arriba. El bloqueo de la Demanda es comportamiento de core, no algo que
+este módulo cambie.
+
+Agregar una línea con un producto que usa lotes o números de serie exige
+indicar el lote al momento de crearla: el camino que usa este módulo para
+llevar el movimiento a "hecho" se saltea el control nativo de Odoo que
+pediría el lote más tarde, así que el módulo lo exige de entrada.
+
+Dos consecuencias a tener presentes:
+
+* La recepción espejo no genera backorder, incluso si el tipo de operación
+  está configurado como "crear siempre backorder": recibir de menos ajusta
+  la entrega automáticamente, sin preguntarle el rol al operador.
+* En un picking validado, eliminar una línea la deja en cantidad cero en vez
+  de borrarla, para no perder la trazabilidad del movimiento original: la
+  línea sigue visible en la pantalla.
+
+Este esquema asume un riesgo operativo: un usuario con el grupo y las dos
+compañías habilitadas puede terminar modificando stock ya validado de la
+otra compañía. La nota en el chatter (picking de origen + usuario) es la
+contención de ese riesgo, no una prevención.
+
 Bug Tracker
 ===========
 
