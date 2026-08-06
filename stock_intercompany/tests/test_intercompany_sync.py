@@ -2042,3 +2042,363 @@ class TestLotSync(SyncCommon):
             "Reescribir el mismo lote (sin cambio real tras el mapeo) no "
             f"debería propagar hacia el espejo; llamadas: {calls}",
         )
+
+
+class TestLineRemoval(SyncCommon):
+    """Tarea 10: baja de líneas.
+
+    En un picking sin validar, borrar una línea es un unlink real. En uno
+    validado, un move en `done` no se puede borrar sin perder la
+    trazabilidad del movimiento original: "eliminar" pasa a significar
+    demanda y cantidad hecha en cero (`action_intercompany_void`), con la
+    línea visible en cero como registro histórico -consecuencia conocida
+    y aceptada del diseño, no un defecto-.
+
+    NOTA DE ALCANCE (verificada contra el código real, no asumida): una
+    entrega intercompany está SIEMPRE `done` en cuanto tiene contraparte
+    -el espejo se crea recién en `_action_done()`- así que la línea de
+    ORIGEN de una entrega nunca puede recibir un unlink real: la propia
+    entrega siempre fuerza la rama de anulación. El unlink real de
+    verdad solo es alcanzable del lado de la RECEPCIÓN (que puede quedar
+    `assigned`, sin validar, mucho después de que su contraparte ya esté
+    `done`) o cuando ninguna de las dos puntas está `done` todavía (una
+    entrega recién creada, sin validar, sin espejo). Por eso
+    `test_unlink_on_draft_removes_both_sides` no es simétrico: el lado
+    que se borra desaparece de verdad, pero como su contraparte (la
+    entrega) siempre está `done`, esa contraparte se ANULA -no se
+    borra-, con nota que lo dice explícitamente. Es la consecuencia
+    real de la regla del spec, no una limitación de este test.
+    """
+
+    def test_unlink_on_draft_removes_own_side_and_voids_done_counterpart(self):
+        """Borrar una línea de una recepción sin validar la borra ahí, y
+        anula (no borra) su contraparte, que ya está done."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        move = reception.move_ids[0]
+        counterpart = move._get_counterpart_move()
+        self.assertTrue(counterpart)
+        self.assertEqual(counterpart.picking_id, delivery)
+        self.assertEqual(delivery.state, "done")
+        move.with_user(self.user_manager_both).unlink()
+        self.assertFalse(move.exists(), "La línea de la recepción debe borrarse de verdad")
+        self.assertTrue(
+            counterpart.exists(),
+            "La línea de la entrega (ya done) no debe borrarse, solo anularse",
+        )
+        self.assertEqual(counterpart.quantity, 0.0)
+        self.assertEqual(counterpart.product_uom_qty, 0.0)
+
+    def test_unlink_both_sides_undone_removes_both(self):
+        """Cuando NINGUNA de las dos puntas está validada, el unlink borra
+        de verdad en las dos: caso de una línea agregada a una entrega
+        todavía sin validar, sin contraparte creada por este módulo -se
+        arma el vínculo a mano para poder ejercitar ese caso, ya que el
+        módulo nunca lo genera solo (ver nota de alcance de la clase)."""
+        picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        other_picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        # El corte barato de unlink() resuelve la relación a nivel
+        # PICKING antes de mirar los moves (ver el docstring de
+        # unlink()): sin vincular también los pickings acá, "relevant"
+        # queda vacío y el test no ejercitaría nada.
+        other_picking.counterpart_of_picking_id = picking.id
+        move = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "name": self.product.name,
+            }
+        )
+        mirror = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": other_picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": other_picking.location_id.id,
+                "location_dest_id": other_picking.location_dest_id.id,
+                "name": self.product.name,
+                "counterpart_of_move_id": move.id,
+            }
+        )
+        self.assertEqual(picking.state, "draft")
+        self.assertEqual(other_picking.state, "draft")
+        # Se borra desde `mirror` (el lado marcado como espejo,
+        # `counterpart_of_picking_id` propio): es el lado que el corte
+        # barato de unlink() puede resolver sin buscar, ya que `picking`
+        # (el origen) no sabe que tiene un espejo sin pagar el search que
+        # el corte evita fuera del estado "done" -ver el docstring de
+        # unlink()-.
+        mirror.with_user(self.user_manager_both).unlink()
+        self.assertFalse(move.exists())
+        self.assertFalse(mirror.exists())
+
+    def test_void_on_validated_zeroes_both_sides(self):
+        """En un picking validado, anular deja la línea en cero en las dos puntas."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        mirrored = move._get_counterpart_move()
+        move.with_user(self.user_manager_both).action_intercompany_void()
+        self.assertTrue(move.exists())
+        self.assertEqual(move.quantity, 0.0)
+        self.assertEqual(move.product_uom_qty, 0.0)
+        self.assertEqual(mirrored.quantity, 0.0)
+        self.assertEqual(mirrored.product_uom_qty, 0.0)
+
+    def test_unlink_on_validated_voids_instead(self):
+        """Borrar una línea de un picking validado la anula en vez de borrarla."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        move.with_user(self.user_manager_both).unlink()
+        self.assertTrue(move.exists())
+        self.assertEqual(move.quantity, 0.0)
+        self.assertEqual(move.product_uom_qty, 0.0)
+
+    def test_operator_cannot_remove_from_validated(self):
+        """El operador no puede anular líneas de un picking validado."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        with self.assertRaises(AccessError):
+            delivery.move_ids[0].with_user(self.user_operator).unlink()
+
+    def test_operator_cannot_void_directly(self):
+        """El operador tampoco puede invocar action_intercompany_void directo."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        with self.assertRaises(AccessError):
+            delivery.move_ids[0].with_user(
+                self.user_operator
+            ).action_intercompany_void()
+
+    def test_manager_one_company_cannot_remove_from_validated(self):
+        """El manager con el rol pero una sola compañía tampoco puede."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        with self.assertRaises(AccessError):
+            delivery.move_ids[0].with_user(self.user_manager_one).unlink()
+
+    def test_operator_cannot_delete_undone_line_whose_counterpart_is_done(self):
+        """Ronda de corrección propia: el chequeo de rol de unlink() debe
+        mirar también el estado de la CONTRAPARTE, no solo el del propio
+        picking. Sin esto, un operador sin rol podía anular (vía cascada)
+        stock ya validado de la otra compañía con solo borrar una línea
+        pendiente de su lado -la recepción, sin validar, no pasaba por el
+        guard, y la anulación de la entrega done ocurría sin control-.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        move = reception.move_ids[0]
+        with self.assertRaises(AccessError):
+            move.with_user(self.user_operator).unlink()
+        self.assertTrue(move.exists(), "No debe haberse borrado nada tras el AccessError")
+        self.assertEqual(
+            delivery.move_ids[0].quantity,
+            10.0,
+            "La entrega, todavía sin tocar, no debe haberse anulado",
+        )
+
+    def test_plain_picking_unlink_unaffected(self):
+        """Un picking sin contraparte no cambia de comportamiento al borrar líneas."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        move = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "name": self.product.name,
+            }
+        )
+        move.with_user(self.user_operator).unlink()
+        self.assertFalse(move.exists())
+
+    def test_unlink_without_counterpart_does_not_search_for_one(self):
+        """El picking sin contraparte no debe pagar ningún search al borrar
+        una línea: get_counterpart (el helper que hace el search) no debe
+        ni siquiera invocarse."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        move = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "name": self.product.name,
+            }
+        )
+        with patch(
+            "odoo.addons.stock_intercompany.models.stock_move.get_counterpart"
+        ) as mock_get_counterpart:
+            move.with_user(self.user_operator).unlink()
+        mock_get_counterpart.assert_not_called()
+
+    def test_removal_notes_posted_on_both_sides_draft_case(self):
+        """La baja real deja nota propia en el lado borrado, y una nota de
+        anulación (con atribución) en el lado que, por estar done, se
+        anula en cascada en vez de borrarse.
+
+        Se cuenta message_ids en las dos puntas con conteo exacto -nunca
+        se grepea el body: la base corre en es_AR (ver el resto de la
+        suite, p. ej. test_quantity_sync_notes_posted_on_both_sides)-.
+
+        La cascada hacia la contraparte (`as_propagation`) hace la
+        mutación directo -`move_line_ids.write()`/`move.write()` con
+        `skip_intercompany_sync` ya activo-, sin pasar por el camino de
+        `action_intercompany_void()` ni por el diff/nota propia de
+        `stock.move.line.write()` (que se corta temprano con
+        `is_propagation()`): por eso la contraparte NO recibe una nota
+        propia de "cantidad X → Y" además de la de "Línea anulada" -daría
+        una nota redundante-, aunque sí recibe la nota nativa de core
+        ("The done move line has been corrected.") porque esa la postea
+        el propio core en `stock.move.line.write()`, fuera de nuestro
+        control.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        move = reception.move_ids[0]
+        counterpart = move._get_counterpart_move()
+        counterpart_line = counterpart.move_line_ids[0]
+        before_reception = len(reception.message_ids)
+        before_delivery = len(delivery.message_ids)
+        expected_delivery = 1 + (  # "Línea anulada" (nuestra)
+            1 if counterpart_line._quantity_change_logged_by_core() else 0
+        )  # nota nativa de core, si corresponde
+        expected_reception = 1  # "Línea eliminada" (la línea ya no existe del otro lado)
+        move.with_user(self.user_manager_both).unlink()
+        self.assertFalse(move.exists())
+        self.assertEqual(
+            len(reception.message_ids),
+            before_reception + expected_reception,
+            f"Mensajes reales: {reception.message_ids.mapped('body')}",
+        )
+        self.assertEqual(
+            len(delivery.message_ids),
+            before_delivery + expected_delivery,
+            f"Mensajes reales: {delivery.message_ids.mapped('body')}",
+        )
+        void_note = delivery.message_ids.filtered(
+            lambda m: reception.name in (m.body or "")
+        )
+        self.assertTrue(
+            void_note,
+            "La nota de anulación en la entrega debe nombrar el picking de "
+            "origen (la recepción)",
+        )
+
+    def test_no_self_triggering_deletion_on_move_merge(self):
+        """Core puede fusionar (y borrar) moves internamente al confirmar
+        -stock.move._merge_moves(), vía _action_confirm(merge=True)-.
+        Verificado en el fuente (stock/models/stock_move.py) que ese
+        camino es el único que hace stock.move.unlink() fuera de este
+        módulo sobre moves con contraparte; se reproduce acá agregando
+        DOS líneas del MISMO producto a una entrega ya validada mientras
+        la recepción todavía está sin validar -el escenario donde el
+        espejo recién creado de la segunda línea es candidato a fusionarse
+        con el de la primera, ambas en un estado elegible para
+        _merge_moves (ni done, ni cancel, ni draft)-. Si esa fusión
+        interna disparara nuestro unlink() como si fuera una baja real, se
+        vería una nota espuria de "Línea eliminada"/"Línea anulada" además
+        de las esperadas por el alta; se comprueba que NO aparece
+        ninguna.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        before_reception = len(reception.message_ids)
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": self.product2.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 4.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": self.product2.name,
+            }
+        )
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": self.product2.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 5.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": self.product2.name,
+            }
+        )
+        mirrored = reception.move_ids.filtered(lambda m: m.product_id == self.product2)
+        self.assertTrue(mirrored, "Debería haber al menos un espejo de product2")
+        total_qty = sum(mirrored.mapped("product_uom_qty"))
+        self.assertEqual(
+            total_qty, 9.0, "La demanda total del espejo debe conservarse (4 + 5)"
+        )
+        # Confirma que la fusión interna de core REALMENTE ocurrió (si no,
+        # el resto del test no estaría probando el escenario que dice
+        # probar): los dos espejos de product2 -mismo producto, mismas
+        # ubicaciones, mismo picking- son candidatos de _merge_moves y
+        # terminan colapsados en un solo move.
+        self.assertEqual(
+            len(mirrored),
+            1,
+            "Se esperaba que core fusionara los dos espejos de product2 en uno",
+        )
+        # Conteo exacto, no grep de body (la base corre en es_AR): cada
+        # alta posta exactamente 1 nota propia en la recepción (2 en
+        # total), más la nota NATIVA de core sobre la fusión ("The
+        # initial demand has been updated.", ajena a este módulo). Si la
+        # fusión interna disparara nuestro unlink() como si fuera una
+        # baja real, se sumaría una CUARTA nota de baja/anulación que no
+        # corresponde a ninguna alta ni a la fusión.
+        self.assertEqual(
+            len(reception.message_ids),
+            before_reception + 3,
+            f"Mensajes reales: {reception.message_ids.mapped('body')}",
+        )

@@ -323,3 +323,152 @@ class StockMove(models.Model):
             if changed:
                 as_propagation(counterpart).write(changed)
         return res
+
+    def action_intercompany_void(self):
+        """Anula la línea dejándola en cero, en las dos puntas.
+
+        Un move en `done` no se puede borrar sin perder la trazabilidad
+        del movimiento original: "eliminar" pasa a significar demanda y
+        cantidad hecha en cero. `move.move_line_ids.write(...)` y
+        `move.write(...)` son escrituras NORMALES -no en
+        sudo/propagación-: pasan por el `write()` ya existente de
+        stock.move.line y stock.move (`quantity` y `product_uom_qty`
+        están en SYNCED_LINE_FIELDS/SYNCED_MOVE_FIELDS), que YA revierte
+        los quants reales (undo/redo del core) y YA propaga el valor al
+        espejo con su propia nota de auditoría ("cantidad %s → %s"): no
+        hace falta duplicar esa propagación a mano acá. Lo único que
+        agrega este método es la nota semántica "línea anulada" -distinta
+        de la de cantidad: documenta que además se puso la demanda en
+        cero, no solo la cantidad hecha- y el chequeo de rol explícito,
+        necesario porque este método es público y la UI (o un caller
+        externo) puede invocarlo directo, sin pasar por `unlink()`.
+        """
+        for move in self:
+            picking = move.picking_id
+            picking._check_intercompany_edit_allowed()
+            counterpart = move._get_counterpart_move()
+            move.move_line_ids.write({"quantity": 0.0})
+            move.write({"product_uom_qty": 0.0})
+            body = _(
+                "Línea anulada: %(product)s",
+                product=move.product_id.display_name,
+            )
+            post_sync_note(picking, body)
+            if counterpart and counterpart.picking_id:
+                post_sync_note(
+                    counterpart.picking_id, body, source_picking=picking
+                )
+        return True
+
+    def unlink(self):
+        """Borra en cascada al espejo; en pickings validados o cancelados
+        anula (o exige rol) en vez de borrar directo.
+
+        Corte temprano barato: la resolución real de la contraparte -que
+        implica un `search()` cuando el picking no es él mismo el espejo,
+        ver `get_counterpart()` en intercompany_sync.py- solo se paga
+        para los moves cuyo picking PUEDE de verdad tener una. Una
+        recepción espejo lo dice sin buscar nada (`counterpart_of_picking_id`
+        propio, siempre seteado desde que se crea); una entrega solo tiene
+        espejo una vez `done` (se crea recién en `_action_done()`), así
+        que cualquier otro estado de un picking que además no es él mismo
+        un espejo no puede tener contraparte y se descarta sin tocar la
+        base -mismo criterio de corte barato que ya usan los `write()` de
+        los tres modelos-.
+
+        La decisión de anular en vez de borrar se toma SIEMPRE mirando el
+        estado de la punta que efectivamente se está por tocar, no el de
+        la punta que el usuario editó directo: si se borra una línea
+        todavía sin validar (p. ej. una recepción `assigned`) cuya
+        contraparte YA está `done` -el caso normal, porque una entrega
+        con espejo está siempre `done`-, esa contraparte no se puede
+        borrar sin perder trazabilidad y se anula en vez de eliminarse,
+        aunque el lado que el usuario tocó sí se borre entero. Por eso el
+        chequeo de rol también mira el estado de la CONTRAPARTE, no solo
+        el propio: sin esto, un operador sin rol podía anular stock ya
+        validado de la otra compañía con solo borrar una línea pendiente
+        de su lado.
+
+        Ronda de corrección (revisión propia, Important): la propagación
+        hacia la contraparte se hace llamando de nuevo a `unlink()` en
+        sudo/propagación (`as_propagation`) en vez de siempre borrar
+        crudo: la llamada recursiva vuelve a evaluar el estado de ESA
+        punta y aplica la misma regla done→anular / resto→borrar del lado
+        que le toca, sin duplicar la lógica ni arriesgar un `unlink()` de
+        un move `done` de la otra compañía (que dejaría sus quants sin
+        revertir: core solo bloquea el borrado de un move done con
+        `move_orig_ids`/`move_dest_ids`, no el de cualquier move done).
+
+        Orden: se resuelve la contraparte y se posta la nota ANTES de
+        borrar nada -después del borrado del original el vínculo ya no
+        existe-, y se borra primero el lado que el usuario tocó
+        directamente (el que más probablemente dispare una restricción
+        core como `_unlink_if_draft_or_cancel`) antes de propagar hacia
+        la contraparte: si el borrado del propio lado falla, la
+        contraparte de la otra compañía queda sin tocar.
+        """
+        if is_propagation(self.env):
+            to_void = self.filtered(lambda m: m.picking_id.state == "done")
+            if to_void:
+                to_void.move_line_ids.write({"quantity": 0.0})
+                to_void.write({"product_uom_qty": 0.0})
+            to_delete = self - to_void
+            return super(StockMove, to_delete).unlink() if to_delete else True
+
+        relevant = self.filtered(
+            lambda m: m.picking_id.state == "done"
+            or m.picking_id.counterpart_of_picking_id
+        )
+        if not relevant:
+            return super().unlink()
+
+        pairs = [(move, move._get_counterpart_move()) for move in relevant]
+        pickings_to_check = self.env["stock.picking"]
+        for move, counterpart in pairs:
+            if (
+                move.picking_id.state in ("done", "cancel")
+                and move.picking_id.counterpart_picking_id
+            ):
+                pickings_to_check |= move.picking_id
+            if counterpart and counterpart.picking_id.state in ("done", "cancel"):
+                pickings_to_check |= counterpart.picking_id
+        if pickings_to_check:
+            pickings_to_check._check_intercompany_edit_allowed()
+
+        to_void = relevant.filtered(lambda m: m.picking_id.state == "done")
+        if to_void:
+            to_void.action_intercompany_void()
+
+        to_delete = relevant - to_void
+        counterparts = self.env["stock.move"]
+        for move, counterpart in pairs:
+            if move not in to_delete:
+                continue
+            own_body = _(
+                "Línea eliminada: %(product)s",
+                product=move.product_id.display_name,
+            )
+            post_sync_note(move.picking_id, own_body)
+            if not counterpart:
+                continue
+            counterparts |= counterpart
+            if not counterpart.picking_id:
+                continue
+            counter_verb = (
+                _("anulada")
+                if counterpart.picking_id.state == "done"
+                else _("eliminada")
+            )
+            counter_body = _(
+                "Línea %(verb)s: %(product)s",
+                verb=counter_verb,
+                product=move.product_id.display_name,
+            )
+            post_sync_note(
+                counterpart.picking_id, counter_body, source_picking=move.picking_id
+            )
+
+        res = super(StockMove, self - to_void).unlink()
+        if counterparts:
+            as_propagation(counterparts).unlink()
+        return res

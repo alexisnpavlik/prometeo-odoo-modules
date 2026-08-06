@@ -14,6 +14,7 @@
     "license": "AGPL-3",
     "data": [
         "security/security.xml",
+        "security/ir.model.access.csv",
         "views/res_config_settings.xml",
         "views/stock_picking_views.xml",
     ],
