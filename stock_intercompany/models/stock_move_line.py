@@ -2,7 +2,14 @@
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-from odoo import fields, models
+from odoo import _, fields, models
+
+from .intercompany_sync import (
+    as_propagation,
+    get_counterpart,
+    is_propagation,
+    post_sync_note,
+)
 
 # Campos cuya escritura sobre una línea de un picking validado exige el rol.
 #
@@ -45,14 +52,67 @@ GUARDED_LINE_FIELDS = (
     "move_id",
 )
 
+# Campos de la línea que viajan al espejo. Mismo criterio de no agregar el
+# atajo "contraparte también en self" de la Tarea 6 que en stock_move.py: no
+# hay en este módulo ningún llamador que escriba en batch sobre líneas de
+# las dos puntas a la vez, y "quantity" viaja crudo (sin conversión de UoM
+# entre las dos puntas), así que no hay valor derivado que ese atajo pudiera
+# propagar mal.
+SYNCED_LINE_FIELDS = ("quantity",)
+
 
 class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
     counterpart_of_line_id = fields.Many2one("stock.move.line", check_company=False)
 
+    def _get_counterpart_line(self):
+        """Resuelve la línea espejo en cualquiera de los dos sentidos."""
+        return get_counterpart(self, "counterpart_of_line_id")
+
     def write(self, vals):
-        """Corta la edición de validados que no cumpla el rol."""
+        """Corta la edición de validados sin rol y propaga la cantidad al espejo.
+
+        A diferencia de lo que asume ingenuamente cualquier atajo copiado
+        sin verificar de otro módulo: acá SÍ se postea la nota también del
+        lado que edita (`line.picking_id`), no solo del que recibe. Se
+        comprobó contra el fuente de stock/models/stock_move_line.py (build
+        de este contenedor) que stock.move.line no hereda mail.thread ni
+        tiene tracking automático sobre "quantity" -no existe ningún
+        "stock.track_move_template"-, así que sin esta nota el lado que
+        edita se queda sin ningún rastro del cambio en su propio chatter.
+        """
         if any(field in vals for field in GUARDED_LINE_FIELDS):
             self.picking_id._check_intercompany_edit_allowed()
-        return super().write(vals)
+        if is_propagation(self.env):
+            return super().write(vals)
+        previous = {
+            line.id: {field: line[field] for field in SYNCED_LINE_FIELDS}
+            for line in self
+        }
+        res = super().write(vals)
+        for line in self:
+            counterpart = line._get_counterpart_line()
+            if not counterpart:
+                continue
+            old = previous.get(line.id, {})
+            changed = {
+                field: line[field]
+                for field in SYNCED_LINE_FIELDS
+                if field in old and line[field] != old[field]
+            }
+            if not changed:
+                continue
+            as_propagation(counterpart).write(changed)
+            if "quantity" in changed and line.picking_id and counterpart.picking_id:
+                body = _(
+                    "%(product)s: cantidad %(old)s → %(new)s",
+                    product=line.product_id.display_name,
+                    old=old["quantity"],
+                    new=changed["quantity"],
+                )
+                post_sync_note(line.picking_id, body)
+                post_sync_note(
+                    counterpart.picking_id, body, source_picking=line.picking_id
+                )
+        return res

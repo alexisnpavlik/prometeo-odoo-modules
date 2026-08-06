@@ -786,6 +786,175 @@ class TestEditGuard(SyncCommon):
         self.assertEqual(line.quantity, 7.0)
 
 
+class TestQuantitySync(SyncCommon):
+    """Tarea 7: sincronización de cantidades y supresión de backorder en el espejo.
+
+    Regla de negocio central del módulo: el operador destino recibe de menos
+    y valida sin pedirle el rol; eso ajusta la entrega de origen
+    automáticamente, y la recepción espejo nunca genera backorder (si lo
+    hiciera, quedarían dos recepciones para una sola entrega).
+    """
+
+    def test_demand_propagates_delivery_to_reception(self):
+        """La demanda editada en la entrega viaja a la recepción."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        delivery.move_ids[0].with_user(self.user_manager_both).write(
+            {"product_uom_qty": 8.0}
+        )
+        self.assertEqual(reception.move_ids[0].product_uom_qty, 8.0)
+
+    def test_done_quantity_propagates_reception_to_delivery(self):
+        """La cantidad hecha editada en la recepción viaja a la entrega."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.move_line_ids[0].with_user(self.user_manager_both).write(
+            {"quantity": 7.0}
+        )
+        self.assertEqual(delivery.move_line_ids[0].quantity, 7.0)
+
+    def test_operator_partial_receipt_adjusts_delivery(self):
+        """El operador recibe 9 de 10 y la entrega queda en 9, sin pedirle el rol."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception = reception.with_user(self.user_operator)
+        reception.move_line_ids[0].write({"quantity": 9.0})
+        reception.button_validate()
+        self.assertEqual(reception.state, "done")
+        self.assertEqual(delivery.move_line_ids[0].quantity, 9.0)
+
+    def test_partial_receipt_creates_no_backorder(self):
+        """La recepción espejo nunca genera backorder."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception = reception.with_user(self.user_operator)
+        reception.move_line_ids[0].write({"quantity": 9.0})
+        reception.button_validate()
+        backorders = self.env["stock.picking"].sudo().search(
+            [("backorder_id", "=", reception.id)]
+        )
+        self.assertFalse(backorders)
+
+    def test_quantity_sync_notes_posted_on_both_sides(self):
+        """El ajuste de cantidad deja nota en las dos puntas.
+
+        Se cuenta message_ids en las dos puntas en vez de grepear el texto
+        del body: la base corre en es_AR y cualquier fragmento en inglés
+        vuelve la aserción vacua (ya pasó en la Tarea 6).
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        before_delivery = len(delivery.message_ids)
+        before_reception = len(reception.message_ids)
+        reception.move_line_ids[0].with_user(self.user_manager_both).write(
+            {"quantity": 7.0}
+        )
+        self.assertGreater(len(delivery.message_ids), before_delivery)
+        self.assertGreater(len(reception.message_ids), before_reception)
+
+    def test_no_infinite_echo_line_write_call_count(self):
+        """La propagación de cantidad no rebota: exactamente 2 write() reales.
+
+        Mismo criterio que el análogo de cabecera (Tarea 6): sin el corte de
+        is_propagation(), esto entraría en recursión infinita.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        model_class = type(self.env["stock.move.line"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            reception.move_line_ids[0].with_user(self.user_manager_both).write(
+                {"quantity": 7.0}
+            )
+
+        self.assertEqual(
+            len(calls),
+            2,
+            "Se esperaban exactamente 2 llamadas a write() (origen + "
+            f"espejo); se registraron {len(calls)}: {calls}",
+        )
+
+    def test_core_internal_writes_during_validation_do_not_echo(self):
+        """Las escrituras internas de core durante la validación (picked,
+        date en move lines, state/date en moves) no deben disparar
+        propagación ni notas espurias del lado de la recepción.
+
+        Inmune al reloj: no depende de que las escrituras internas caigan en
+        el mismo segundo que la del operador, a diferencia del bug análogo
+        de la Tarea 6 con scheduled_date.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        before_delivery = len(delivery.message_ids)
+        before_reception = len(reception.message_ids)
+        reception = reception.with_user(self.user_operator)
+        reception.move_line_ids[0].write({"quantity": 9.0})
+        after_write_delivery = len(delivery.message_ids)
+        after_write_reception = len(reception.message_ids)
+        reception.button_validate()
+        self.assertEqual(reception.state, "done")
+        # La única propagación real es la del write() explícito de arriba;
+        # button_validate() no debe agregar notas nuevas de sync.
+        self.assertEqual(len(delivery.message_ids), after_write_delivery)
+        self.assertEqual(len(reception.message_ids), after_write_reception)
+        self.assertGreater(after_write_delivery, before_delivery)
+        self.assertGreater(after_write_reception, before_reception)
+
+    def test_plain_picking_backorder_not_suppressed(self):
+        """Un picking sin contraparte conserva el comportamiento original:
+        validar de menos sigue generando backorder.
+
+        La supresión de backorder del Step 5 tiene que alcanzar solo a los
+        pickings con espejo intercompany; este test demuestra que uno sin
+        espejo no cambia de comportamiento.
+        """
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        self.env["stock.quant"].sudo()._update_available_quantity(
+            self.product, self.stock_location, 10.0
+        )
+        self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "name": self.product.name,
+                "product_id": self.product.id,
+                "product_uom_qty": 10.0,
+                "product_uom": self.uom_unit.id,
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "picking_id": picking.id,
+            }
+        )
+        picking.with_user(self.user_operator).action_confirm()
+        picking.with_user(self.user_operator).action_assign()
+        line = picking.move_line_ids
+        line.with_user(self.user_operator).write({"quantity": 4.0})
+        res = picking.with_user(self.user_operator).button_validate()
+        if isinstance(res, dict) and res.get("res_model") == (
+            "stock.backorder.confirmation"
+        ):
+            wizard = (
+                self.env["stock.backorder.confirmation"]
+                .with_user(self.user_operator)
+                .with_context(res["context"])
+                .create({})
+            )
+            wizard.with_user(self.user_operator).process()
+        self.assertEqual(picking.state, "done")
+        self.assertTrue(
+            picking.backorder_ids,
+            "Un picking sin espejo intercompany debe seguir generando "
+            "backorder normalmente",
+        )
+
+
 class TestHeaderSync(SyncCommon):
     """Tarea 6: sincronización de cabecera (fecha programada y prioridad).
 

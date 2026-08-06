@@ -206,6 +206,27 @@ class StockPicking(models.Model):
                 )
             )
 
+    def button_validate(self):
+        """La recepción espejo no genera backorder: la diferencia ajusta la entrega.
+
+        Si generara backorder, quedarían dos recepciones para una sola
+        entrega y se rompería el vínculo 1 a 1 que es el objetivo del
+        módulo -la diferencia entre lo demandado y lo recibido queda
+        reflejada propagando la cantidad hacia la entrega (ver
+        SYNCED_LINE_FIELDS en stock_move_line.py), no generando un segundo
+        picking. La supresión alcanza solo a los pickings CON contraparte
+        intercompany: uno sin espejo (`counterparts` vacío) sigue el
+        comportamiento original de Odoo sin cambios.
+        """
+        counterparts = self.filtered(lambda p: p.counterpart_picking_id)
+        record = self
+        if counterparts:
+            record = self.with_context(
+                skip_backorder=True,
+                picking_ids_not_to_backorder=counterparts.ids,
+            )
+        return super(StockPicking, record).button_validate()
+
     def write(self, vals):
         """Corta la edición de validados sin rol y propaga la cabecera al espejo.
 
@@ -391,9 +412,29 @@ class StockPicking(models.Model):
             # el merge automático de moves de Odoo colapsaría dos moves
             # espejo del mismo producto en uno solo, perdiendo la relación
             # 1 a 1 con counterpart_of_move_id que este módulo necesita.
+            #
+            # with_context(skip_intercompany_sync=True): _action_confirm()
+            # dispara _action_assign(), que reserva stock en la ubicación
+            # proveedor (virtual, siempre disponible) escribiendo
+            # `quantity` sobre la línea del espejo RECIÉN CREADA -no es una
+            # edición real de nadie, es el bootstrap interno de la
+            # reserva-. Sin este flag, esa escritura interna se veía como
+            # un cambio genuino de "cantidad hecha" y se propagaba de
+            # vuelta hacia la línea de origen, pisando en silencio la
+            # cantidad parcial que el operador ya había cargado ANTES de
+            # validar (p. ej. 9 de 10): la demanda plena de la reserva
+            # (10) volvía a escribirse sobre el origen, y la recepción
+            # parcial dejaba de generar la diferencia real. Encontrado
+            # verificando explícitamente, contra el fuente de este
+            # contenedor (stock/models/stock_move.py, _action_assign:
+            # `to_update[0].quantity += ...`), qué escribe core durante la
+            # validación -no asumido-. Mismo criterio para el resto del
+            # bootstrap: nada de lo que pasa acá (confirmar y reservar el
+            # espejo recién creado) es una edición real que deba viajar de
+            # vuelta al origen.
             picking.move_ids.filtered(
                 lambda m: m.state == "draft"
-            )._action_confirm(merge=False)
+            ).with_context(skip_intercompany_sync=True)._action_confirm(merge=False)
         return picking
 
     def _get_counterpart_picking_vals(self, company):

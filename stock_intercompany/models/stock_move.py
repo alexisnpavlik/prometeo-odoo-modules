@@ -4,8 +4,27 @@
 
 from odoo import fields, models
 
+from .intercompany_sync import as_propagation, get_counterpart, is_propagation
+
 # Campos cuya escritura sobre un move de un picking validado exige el rol.
 GUARDED_MOVE_FIELDS = ("product_uom_qty", "quantity", "product_id", "picked")
+
+# Campos del move que viajan al espejo.
+#
+# A diferencia de GUARDED_PICKING_FIELDS/SYNCED_PICKING_FIELDS en
+# stock_picking.py, acá no se saltea la propagación cuando la contraparte
+# también está en `self`: ese atajo de la Tarea 6 solo es correcto porque el
+# valor que viaja es idéntico al escrito. product_uom_qty se propaga tal
+# cual (mismo producto, misma UoM en las dos puntas, sin conversión), así
+# que el atajo seguiría siendo válido en principio, pero no hay en este
+# módulo ningún llamador que escriba en batch sobre moves de las dos puntas
+# a la vez (a diferencia de stock.picking, donde sí lo ejercita un test real
+# con (delivery | reception).write(...)): agregar el corte acá sería
+# defensivo sin caso de uso ni cobertura. Si una tarea futura convierte el
+# valor sincronizado a otra UoM antes de propagarlo, este atajo NO debe
+# reutilizarse sin revisar: propagar el valor derivado sería incorrecto si
+# el batch ya escribió el valor crudo en las dos puntas.
+SYNCED_MOVE_FIELDS = ("product_uom_qty",)
 
 
 class StockMove(models.Model):
@@ -13,8 +32,31 @@ class StockMove(models.Model):
 
     counterpart_of_move_id = fields.Many2one("stock.move", check_company=False)
 
+    def _get_counterpart_move(self):
+        """Resuelve el move espejo en cualquiera de los dos sentidos."""
+        return get_counterpart(self, "counterpart_of_move_id")
+
     def write(self, vals):
-        """Corta la edición de validados que no cumpla el rol."""
+        """Corta la edición de validados sin rol y propaga la demanda al espejo."""
         if any(field in vals for field in GUARDED_MOVE_FIELDS):
             self.picking_id._check_intercompany_edit_allowed()
-        return super().write(vals)
+        if is_propagation(self.env):
+            return super().write(vals)
+        previous = {
+            move.id: {field: move[field] for field in SYNCED_MOVE_FIELDS}
+            for move in self
+        }
+        res = super().write(vals)
+        for move in self:
+            counterpart = move._get_counterpart_move()
+            if not counterpart:
+                continue
+            old = previous.get(move.id, {})
+            changed = {
+                field: move[field]
+                for field in SYNCED_MOVE_FIELDS
+                if field in old and move[field] != old[field]
+            }
+            if changed:
+                as_propagation(counterpart).write(changed)
+        return res
