@@ -5,7 +5,12 @@
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
-from .intercompany_sync import get_counterpart, is_propagation
+from .intercompany_sync import (
+    as_propagation,
+    get_counterpart,
+    is_propagation,
+    post_sync_note,
+)
 
 # Campos cuya escritura sobre un picking validado exige el rol de manager.
 #
@@ -22,6 +27,13 @@ GUARDED_PICKING_FIELDS = (
     "move_ids_without_package",
     "move_line_ids",
 )
+
+# Campos de cabecera que viajan al espejo cuando cambian de verdad.
+# Lista distinta de GUARDED_PICKING_FIELDS: "vigilado" (exige el rol para
+# editar un validado) y "sincronizado" (se propaga a la contraparte) son
+# conceptos independientes. "priority" está sincronizado aunque no esté
+# vigilado (ver el comentario junto a GUARDED_PICKING_FIELDS).
+SYNCED_PICKING_FIELDS = ("scheduled_date", "priority")
 
 
 class StockPicking(models.Model):
@@ -146,10 +158,92 @@ class StockPicking(models.Model):
             )
 
     def write(self, vals):
-        """Corta la edición de validados que no cumpla el rol."""
+        """Corta la edición de validados sin rol y propaga la cabecera al espejo.
+
+        Si la escritura ya viene propagada desde la contraparte
+        (`is_propagation`), se aplica y se corta ahí: no hay que volver a
+        comparar ni a propagar, porque eso es exactamente el eco que
+        `skip_intercompany_sync` existe para cortar en un solo salto.
+        """
         if any(field in vals for field in GUARDED_PICKING_FIELDS):
             self._check_intercompany_edit_allowed()
-        return super().write(vals)
+        if is_propagation(self.env):
+            return super().write(vals)
+        previous = {
+            picking.id: {field: picking[field] for field in SYNCED_PICKING_FIELDS}
+            for picking in self
+        }
+        res = super().write(vals)
+        self._propagate_picking_changes(previous)
+        return res
+
+    def _propagate_picking_changes(self, previous):
+        """Lleva al espejo los campos de cabecera que efectivamente cambiaron.
+
+        Compara cada campo sincronizado contra su valor previo (capturado
+        antes del `super().write`) y solo viaja lo que cambió de verdad: así
+        una escritura que reafirma el valor vigente no genera ruido en la
+        contraparte ni en el chatter de ninguna de las dos puntas. Un
+        picking sin contraparte queda directamente afuera del loop.
+        """
+        for picking in self:
+            counterpart = picking.counterpart_picking_id
+            if not counterpart:
+                continue
+            old = previous.get(picking.id, {})
+            changed = {
+                field: picking[field]
+                for field in SYNCED_PICKING_FIELDS
+                if field in old and picking[field] != old[field]
+            }
+            if not changed:
+                continue
+            as_propagation(counterpart).write(changed)
+            for field, value in changed.items():
+                body = _(
+                    "%(label)s: %(old)s → %(new)s",
+                    label=picking._fields[field].string,
+                    old=old[field],
+                    new=value,
+                )
+                post_sync_note(picking, body)
+                post_sync_note(counterpart, body, source_picking=picking)
+
+    def _set_scheduled_date(self):
+        """Inverse de scheduled_date: relaja el bloqueo del core para el
+        caso intercompany ya autorizado por el guard.
+
+        El inverse original de Odoo (`stock/models/stock_picking.py`)
+        bloquea incondicionalmente cualquier escritura de `scheduled_date`
+        sobre un picking `done`/`cancel`, sin distinguir el caso
+        intercompany. Para cuando se llega hasta acá, `write()` ya corrió
+        `_check_intercompany_edit_allowed()`: quien escribe es o bien una
+        propagación autorizada desde la contraparte, o bien un manager con
+        el rol y las dos compañías habilitadas. Sin este relajo,
+        "scheduled_date" en GUARDED_PICKING_FIELDS sería letra muerta:
+        nadie —ni siquiera el manager ya autorizado— podría reprogramar
+        jamás la fecha de una entrega intercompany ya validada, y esta
+        tarea no tendría nada que propagar.
+
+        Fuera del caso intercompany (`counterpart_picking_id` vacío) se
+        preserva el bloqueo original de Odoo, sin relajarlo: este método
+        no reemplaza la protección general de un picking validado
+        cualquiera, solo la de un espejo intercompany que el guard propio
+        del módulo ya vetó.
+        """
+        for picking in self:
+            blocked = (
+                picking.state in ("done", "cancel")
+                and not picking.counterpart_picking_id
+            )
+            if blocked:
+                raise UserError(
+                    _(
+                        "No puede cambiar la fecha programada en un "
+                        "traslado realizado o cancelado."
+                    )
+                )
+            picking.move_ids.write({"date": picking.scheduled_date})
 
     def action_open_counterpart_picking(self):
         """Abre el picking espejo en la otra compañía.

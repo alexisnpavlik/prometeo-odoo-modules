@@ -1,7 +1,9 @@
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-from odoo import Command
+from unittest.mock import patch
+
+from odoo import Command, fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import RecordCapturer
 
@@ -782,3 +784,155 @@ class TestEditGuard(SyncCommon):
         propagated_line = as_propagation(line.with_user(self.user_operator))
         propagated_line.write({"quantity": 7.0})
         self.assertEqual(line.quantity, 7.0)
+
+
+class TestHeaderSync(SyncCommon):
+    """Tarea 6: sincronización de cabecera (fecha programada y prioridad).
+
+    Patrón que copian las tareas 7 (cantidades) y 10 (líneas): un cambio de
+    cabecera en cualquiera de las dos puntas se propaga a la otra en un solo
+    salto, deja nota en el chatter de las dos, y nunca toca un picking sin
+    contraparte.
+    """
+
+    def test_scheduled_date_propagates_to_reception(self):
+        """Cambiar la fecha en la entrega la cambia en la recepción."""
+        delivery, reception = self._create_delivery()
+        new_date = "2030-01-15 10:00:00"
+        delivery.with_user(self.user_manager_both).write({"scheduled_date": new_date})
+        self.assertEqual(
+            fields.Datetime.to_string(reception.scheduled_date), new_date
+        )
+
+    def test_priority_propagates_from_reception(self):
+        """La propagación también va de la recepción hacia la entrega."""
+        delivery, reception = self._create_delivery()
+        reception.with_user(self.user_manager_both).write({"priority": "1"})
+        self.assertEqual(delivery.priority, "1")
+
+    def test_no_infinite_echo(self):
+        """La propagación no rebota: una escritura, un salto.
+
+        Chequeo de valores nomás: pasaría igual si hubiera ida y vuelta que
+        terminara convergiendo. La garantía dura está en
+        test_no_infinite_echo_write_call_count, abajo, que cuenta las
+        invocaciones reales de write().
+        """
+        delivery, reception = self._create_delivery()
+        delivery.with_user(self.user_manager_both).write({"priority": "1"})
+        self.assertEqual(reception.priority, "1")
+        self.assertEqual(delivery.priority, "1")
+
+    def test_no_infinite_echo_write_call_count(self):
+        """Cuenta las llamadas reales a write() sobre stock.picking.
+
+        A diferencia de test_no_infinite_echo (que solo mira el valor final
+        en las dos puntas y pasaría igual si hubiera rebote siempre que
+        convergiera), esto parchea write() en la clase runtime del modelo
+        para contar cuántas veces se invoca de verdad. Tiene que haber
+        exactamente dos: la escritura del usuario sobre la entrega, y la
+        propagada sobre el espejo. Si el guard de is_propagation() no
+        cortara el eco, esto entraría en recursión infinita (RecursionError)
+        o, en el mejor de los casos, contaría de más.
+
+        Lo que NO garantiza: que no haya, en otro escenario, una cadena más
+        larga de propagaciones legítimas encadenadas entre sí (por ejemplo,
+        si un futuro `write` disparara además un cambio en otro campo
+        sincronizado vía onchange); solo cubre el caso puntual de esta
+        escritura.
+        """
+        delivery, reception = self._create_delivery()
+        model_class = type(self.env["stock.picking"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            delivery.with_user(self.user_manager_both).write({"priority": "1"})
+
+        self.assertEqual(
+            len(calls),
+            2,
+            "Se esperaban exactamente 2 llamadas a write() (origen + "
+            f"espejo); se registraron {len(calls)}: {calls}",
+        )
+        self.assertEqual(reception.priority, "1")
+        self.assertEqual(delivery.priority, "1")
+
+    def test_writing_same_value_does_not_propagate_or_note(self):
+        """Reescribir el mismo valor no debe propagar ni postear nota.
+
+        `picking[field] != old[field]` tiene que comportarse bien tanto
+        para Datetime (scheduled_date) como para Selection (priority):
+        pasar el valor que ya está vigente no debe generar una segunda
+        write() sobre el espejo ni ruido en ningún chatter.
+        """
+        delivery, reception = self._create_delivery()
+        before_delivery_msgs = len(delivery.message_ids)
+        before_reception_msgs = len(reception.message_ids)
+        model_class = type(self.env["stock.picking"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            delivery.with_user(self.user_manager_both).write(
+                {
+                    "scheduled_date": delivery.scheduled_date,
+                    "priority": delivery.priority,
+                }
+            )
+
+        self.assertEqual(
+            len(calls),
+            1,
+            "Reescribir el mismo valor no debe disparar una segunda "
+            f"write() sobre el espejo; se registraron {len(calls)}: {calls}",
+        )
+        self.assertEqual(len(delivery.message_ids), before_delivery_msgs)
+        self.assertEqual(len(reception.message_ids), before_reception_msgs)
+
+    def test_no_counterpart_does_not_propagate_or_note(self):
+        """Un picking sin contraparte no dispara propagación ni nota.
+
+        Es la restricción global del plan: ninguna de las dos cosas debe
+        ocurrir sobre un picking sin espejo.
+        """
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_manager_both)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        before_msgs = len(picking.message_ids)
+        picking.write({"priority": "1", "scheduled_date": fields.Datetime.now()})
+        self.assertEqual(picking.priority, "1")
+        self.assertEqual(len(picking.message_ids), before_msgs)
+
+    def test_note_posted_on_both_sides(self):
+        """El cambio deja nota en las dos puntas, y la de destino nombra el origen."""
+        delivery, reception = self._create_delivery()
+        before_delivery = len(delivery.message_ids)
+        before_reception = len(reception.message_ids)
+        delivery.with_user(self.user_manager_both).write({"priority": "1"})
+        self.assertGreater(len(delivery.message_ids), before_delivery)
+        self.assertGreater(len(reception.message_ids), before_reception)
+        reception_note = reception.message_ids.filtered(
+            lambda m: delivery.name in (m.body or "")
+        )
+        self.assertTrue(
+            reception_note,
+            "No se encontró en la recepción ninguna nota que nombre el "
+            "picking de origen",
+        )
