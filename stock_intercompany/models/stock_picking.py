@@ -172,35 +172,57 @@ class StockPicking(models.Model):
             )
 
     def _check_intercompany_edit_allowed(self):
-        """Bloquea la edición de un picking intercompany validado sin el rol.
+        """Bloquea la edición de un picking intercompany validado o cancelado sin el rol.
 
         No aplica a las escrituras propagadas: esas ya vienen en sudo desde la
         contraparte, y son las que permiten que el operador destino reciba de
         menos sin necesitar el rol.
+
+        Ronda de corrección 1 (Tarea 8), Important 1 y 2: antes solo cubría
+        `state == "done"` y hacía `continue` en `cancel`, así que un
+        operador sin rol podía crear un `stock.move` sobre un picking
+        cancelado con contraparte y "resucitarlo": el `_compute_state` de
+        core prioriza `any_draft` sobre `all_cancel`, así que el picking
+        pasaba de `cancel` a `draft` con una línea fantasma, sin
+        `AccessError` ni espejo. Extender la condición a `("done",
+        "cancel")` cierra ese camino con el mismo mensaje de rol/compañías
+        que ya existía para `done`. Verificado que no rompe la
+        cancelación normal: `stock.move._action_cancel()` (core) escribe
+        `picked = False` (campo vigilado) ANTES de poner `state =
+        'cancel'` -con el move todavía en su estado previo, nunca
+        `done`/`cancel` en simultáneo con esa escritura-, así que ese
+        `continue` de más arriba sigue aplicando y la escritura de core
+        nunca llega a este chequeo.
         """
         if is_propagation(self.env):
             return
         for picking in self:
-            if picking.state != "done" or not picking.counterpart_picking_id:
+            if picking.state not in (
+                "done",
+                "cancel",
+            ) or not picking.counterpart_picking_id:
                 continue
             if picking.can_edit_done:
                 continue
+            state_label = _("validada") if picking.state == "done" else _("cancelada")
             if not self.env.user.has_group(
                 "stock_intercompany.group_intercompany_manager"
             ):
                 raise AccessError(
                     _(
-                        "La transferencia %(name)s ya está validada. Editarla "
+                        "La transferencia %(name)s ya está %(state)s. Editarla "
                         "requiere el rol «Intercompany: editar transferencias "
                         "validadas».",
                         name=picking.name,
+                        state=state_label,
                     )
                 )
             raise AccessError(
                 _(
-                    "Para editar la transferencia validada %(name)s necesitás "
+                    "Para editar la transferencia %(state)s %(name)s necesitás "
                     "tener habilitadas las dos compañías: %(a)s y %(b)s.",
                     name=picking.name,
+                    state=state_label,
                     a=picking.company_id.name,
                     b=picking.counterpart_picking_id.sudo().company_id.name,
                 )

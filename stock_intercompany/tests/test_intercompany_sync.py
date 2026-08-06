@@ -1537,3 +1537,263 @@ class TestLineAddition(SyncCommon):
         self.assertEqual(len(reception.move_ids), 1)
         self.assertFalse(delivery.move_ids.counterpart_of_move_id)
         self.assertEqual(reception.move_ids.counterpart_of_move_id, delivery.move_ids)
+
+    def test_new_line_with_pending_reception_completes_on_later_validate(self):
+        """Rama de producción normal: la recepción sigue `assigned` cuando se
+        agrega la línea (nadie la validó todavía), y se termina de procesar
+        después con un `button_validate()` común.
+
+        Ronda de corrección 1, "cosas chicas" 1: los otros dos tests de
+        alta fuerzan la recepción a `done` antes de agregar la línea para
+        cubrir el escenario "las dos puntas ya validadas", pero el caso
+        que se da SIEMPRE en producción (`_create_delivery` deja la
+        recepción `assigned`, sin validar) no tenía cobertura propia.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertNotEqual(reception.state, "done")
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": self.product2.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 4.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": self.product2.name,
+            }
+        )
+        new_move = delivery.move_ids.filtered(
+            lambda m: m.product_id == self.product2
+        )
+        self.assertEqual(new_move.state, "done")
+
+        mirrored = reception.move_ids.filtered(
+            lambda m: m.product_id == self.product2
+        )
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(mirrored.counterpart_of_move_id, new_move)
+        self.assertNotEqual(
+            mirrored.state,
+            "done",
+            "Sin validar la recepción a mano, el espejo no debería llegar "
+            "solo a done",
+        )
+
+        reception.with_user(self.user_operator).button_validate()
+        self.assertEqual(reception.state, "done")
+        self.assertEqual(mirrored.state, "done")
+        self.assertEqual(mirrored.quantity, 4.0)
+
+    def test_manager_one_company_cannot_add_line_to_validated(self):
+        """El manager con el rol pero una sola compañía habilitada tampoco puede.
+
+        Segunda rama del mensaje de `_check_intercompany_edit_allowed`: a
+        diferencia de `test_operator_cannot_add_line_to_validated` (sin
+        rol), `user_manager_one` sí tiene el rol pero le falta la
+        compañía de la contraparte habilitada.
+        """
+        delivery, _reception = self._create_delivery(qty=10.0)
+        with self.assertRaises(AccessError):
+            self.env["stock.move"].with_user(self.user_manager_one).create(
+                {
+                    "picking_id": delivery.id,
+                    "product_id": self.product2.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": delivery.location_id.id,
+                    "location_dest_id": delivery.location_dest_id.id,
+                    "name": self.product2.name,
+                }
+            )
+
+    def test_operator_cannot_add_line_to_cancelled_counterpart(self):
+        """Ronda de corrección 1, Important 1: un picking cancelado con
+        contraparte no se puede "resucitar" agregándole una línea sin rol.
+
+        Reproducido antes del fix: sin extender
+        `_check_intercompany_edit_allowed` a `state == "cancel"`, esta
+        creación no tiraba `AccessError` y la recepción pasaba de
+        `cancel` a `draft` sola (el `_compute_state` de core prioriza
+        `any_draft` sobre `all_cancel`).
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).action_cancel()
+        self.assertEqual(reception.state, "cancel")
+        with self.assertRaises(AccessError):
+            self.env["stock.move"].with_user(self.user_operator).create(
+                {
+                    "picking_id": reception.id,
+                    "product_id": self.product2.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": reception.location_id.id,
+                    "location_dest_id": reception.location_dest_id.id,
+                    "name": self.product2.name,
+                }
+            )
+        self.assertEqual(
+            reception.state,
+            "cancel",
+            "La recepción cancelada no debe resucitar aunque el AccessError "
+            "se capture",
+        )
+
+    def test_manager_cannot_add_line_to_cancelled_counterpart(self):
+        """Ni el manager con las dos compañías puede resucitar un picking
+        cancelado agregándole una línea: pasa el chequeo de rol, pero se
+        rechaza igual con `UserError` porque "editar" no significa
+        "reabrir un documento cancelado".
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).action_cancel()
+        self.assertEqual(reception.state, "cancel")
+        with self.assertRaises(UserError):
+            self.env["stock.move"].with_user(self.user_manager_both).create(
+                {
+                    "picking_id": reception.id,
+                    "product_id": self.product2.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": reception.location_id.id,
+                    "location_dest_id": reception.location_dest_id.id,
+                    "name": self.product2.name,
+                }
+            )
+        self.assertEqual(reception.state, "cancel")
+
+    def test_addition_on_done_delivery_with_cancelled_counterpart_raises(self):
+        """Ronda de corrección 1, Important 2: agregar una línea sobre una
+        entrega `done` cuyo espejo está `cancel` no debe dejar las dos
+        puntas divergentes.
+
+        Reproducido antes del fix: el move de origen quedaba `done` (con
+        stock y SVL movidos en la compañía A) mientras la recepción
+        pasaba de `cancel` a `assigned` con la línea vieja todavía
+        `cancel` — el invariante central de la tarea (mover stock en las
+        dos puntas) fallaba en silencio.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).action_cancel()
+        self.assertEqual(reception.state, "cancel")
+        with self.assertRaises(UserError):
+            self.env["stock.move"].with_user(self.user_manager_both).create(
+                {
+                    "picking_id": delivery.id,
+                    "product_id": self.product2.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": delivery.location_id.id,
+                    "location_dest_id": delivery.location_dest_id.id,
+                    "name": self.product2.name,
+                }
+            )
+        self.assertEqual(
+            reception.state,
+            "cancel",
+            "La recepción cancelada no debe resucitar por el intento "
+            "fallido de alta",
+        )
+        self.assertFalse(
+            reception.move_ids.filtered(lambda m: m.product_id == self.product2),
+            "No debe quedar ninguna línea fantasma en la recepción cancelada",
+        )
+
+    def test_new_line_requires_lot_for_tracked_product(self):
+        """Ronda de corrección 1, Important 3: un producto con seguimiento
+        por lote no puede pasar a `done` sin lote.
+
+        Reproducido antes del fix: como el move nace `done` directo desde
+        `super().create()` (core, porque el picking ya está `done`),
+        `_action_done()` lo filtra y nunca corre
+        `stock.move.line._action_done()` -que es donde vive el chequeo
+        obligatorio de lote de core-, así que el alta pasaba sin lote,
+        silenciosamente.
+        """
+        tracked = self.env["product.product"].create(
+            {
+                "name": "Sync Tracked Product",
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "lot",
+                "categ_id": self.env.ref("product.product_category_all").id,
+            }
+        )
+        tracked.company_id = False
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).button_validate()
+        with self.assertRaises(UserError):
+            self.env["stock.move"].with_user(self.user_manager_both).create(
+                {
+                    "picking_id": delivery.id,
+                    "product_id": tracked.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": delivery.location_id.id,
+                    "location_dest_id": delivery.location_dest_id.id,
+                    "name": tracked.name,
+                }
+            )
+
+    def test_new_line_with_lot_replicates_lot_to_counterpart(self):
+        """Con el lote indicado explícitamente, el alta de un producto
+        trazado sí se replica, con el lote equivalente en la otra
+        compañía (`map_lot`, hasta ahora inalcanzable por este camino)."""
+        tracked = self.env["product.product"].create(
+            {
+                "name": "Sync Tracked Product 2",
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "lot",
+                "categ_id": self.env.ref("product.product_category_all").id,
+            }
+        )
+        tracked.company_id = False
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).button_validate()
+        lot = (
+            self.env["stock.lot"]
+            .with_company(self.company1)
+            .create(
+                {
+                    "name": "LOT-TASK8-001",
+                    "product_id": tracked.id,
+                    "company_id": self.company1.id,
+                }
+            )
+        )
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": tracked.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 4.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": tracked.name,
+                "move_line_ids": [
+                    Command.create(
+                        {
+                            "picking_id": delivery.id,
+                            "product_id": tracked.id,
+                            "product_uom_id": self.uom_unit.id,
+                            "quantity": 4.0,
+                            "lot_id": lot.id,
+                            "location_id": delivery.location_id.id,
+                            "location_dest_id": delivery.location_dest_id.id,
+                        }
+                    )
+                ],
+            }
+        )
+        new_move = delivery.move_ids.filtered(lambda m: m.product_id == tracked)
+        self.assertEqual(new_move.state, "done")
+        self.assertEqual(new_move.move_line_ids.lot_id.name, "LOT-TASK8-001")
+
+        mirrored = reception.move_ids.filtered(lambda m: m.product_id == tracked)
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(mirrored.state, "done")
+        self.assertEqual(mirrored.move_line_ids.lot_id.name, "LOT-TASK8-001")
+        self.assertNotEqual(
+            mirrored.move_line_ids.lot_id, new_move.move_line_ids.lot_id
+        )
+        self.assertEqual(mirrored.move_line_ids.lot_id.company_id, self.company2)
