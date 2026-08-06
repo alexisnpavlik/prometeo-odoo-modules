@@ -795,51 +795,83 @@ class TestHeaderSync(SyncCommon):
     contraparte.
     """
 
-    def test_scheduled_date_propagates_to_reception(self):
-        """Cambiar la fecha en la entrega la cambia en la recepción."""
-        delivery, reception = self._create_delivery()
-        new_date = "2030-01-15 10:00:00"
-        delivery.with_user(self.user_manager_both).write({"scheduled_date": new_date})
-        self.assertEqual(
-            fields.Datetime.to_string(reception.scheduled_date), new_date
-        )
+    # NOTA DE ALCANCE (ronda de corrección 1): la entrega intercompany
+    # SIEMPRE está "done" en cuanto tiene contraparte -el espejo se crea
+    # justo al validarla, en _create_counterpart_picking()-, y un picking
+    # origen "done" no propaga nada (ver el docstring de
+    # _propagate_picking_changes). Por eso todos los tests de este archivo
+    # que ejercitan una propagación REAL escriben sobre la RECEPCIÓN, no
+    # sobre la entrega: es la única dirección viva. Ver
+    # test_scheduled_date_never_propagates_because_delivery_is_always_done
+    # más abajo, que documenta y verifica explícitamente la consecuencia
+    # para "scheduled_date": bajo esta regla, no hay ningún escenario
+    # donde de verdad propague.
 
     def test_priority_propagates_from_reception(self):
-        """La propagación también va de la recepción hacia la entrega."""
+        """La propagación de cabecera va de la recepción hacia la entrega.
+
+        Es la única dirección viva (ver nota de alcance arriba): la
+        recepción no está done recién creada, la entrega sí.
+        """
         delivery, reception = self._create_delivery()
         reception.with_user(self.user_manager_both).write({"priority": "1"})
         self.assertEqual(delivery.priority, "1")
 
-    def test_no_infinite_echo(self):
-        """La propagación no rebota: una escritura, un salto.
+    def test_scheduled_date_never_propagates_because_delivery_is_always_done(self):
+        """Documenta la consecuencia real de la regla nueva para scheduled_date.
 
-        Chequeo de valores nomás: pasaría igual si hubiera ida y vuelta que
-        terminara convergiendo. La garantía dura está en
-        test_no_infinite_echo_write_call_count, abajo, que cuenta las
-        invocaciones reales de write().
+        `scheduled_date` no se propaga hacia un picking done/cancel
+        (SYNC_BLOCKED_STATES). La entrega, del lado que fuera que se mire,
+        siempre está done en cuanto existe el espejo: si se escribe desde
+        la recepción (la única punta no-done), el destino (la entrega) ya
+        está done y la propagación se corta ahí. Si se intenta escribir
+        directo sobre la entrega, el propio inverse de Odoo
+        (`_set_scheduled_date`) revienta con UserError antes de llegar
+        siquiera a nuestro código, porque la entrega ya está done.
+
+        No hay, bajo esta regla, ningún escenario de este módulo donde
+        `scheduled_date` propague de verdad. Se deja este test para
+        dejarlo verificado y documentado en vez de asumido: si algún día
+        cambia (por ejemplo, si una tarea futura agrega un tercer estado
+        de picking intercompany que no sea done), este test tiene que
+        empezar a fallar y avisar.
         """
         delivery, reception = self._create_delivery()
-        delivery.with_user(self.user_manager_both).write({"priority": "1"})
-        self.assertEqual(reception.priority, "1")
-        self.assertEqual(delivery.priority, "1")
+        before_delivery_msgs = len(delivery.message_ids)
+        before_reception_msgs = len(reception.message_ids)
+        original_delivery_date = delivery.scheduled_date
+        new_date = "2030-01-15 10:00:00"
+        reception.with_user(self.user_manager_both).write(
+            {"scheduled_date": new_date}
+        )
+        self.assertEqual(
+            fields.Datetime.to_string(reception.scheduled_date), new_date,
+            "La propia recepción sí debe aceptar el cambio (no está done)",
+        )
+        self.assertEqual(
+            delivery.scheduled_date, original_delivery_date,
+            "La entrega (siempre done) no debe recibir el cambio propagado",
+        )
+        self.assertEqual(len(delivery.message_ids), before_delivery_msgs)
+        self.assertEqual(len(reception.message_ids), before_reception_msgs)
+        with self.assertRaises(UserError):
+            delivery.with_user(self.user_manager_both).write(
+                {"scheduled_date": new_date}
+            )
 
     def test_no_infinite_echo_write_call_count(self):
-        """Cuenta las llamadas reales a write() sobre stock.picking.
+        """La propagación no rebota: cuenta las llamadas reales a write().
 
-        A diferencia de test_no_infinite_echo (que solo mira el valor final
-        en las dos puntas y pasaría igual si hubiera rebote siempre que
-        convergiera), esto parchea write() en la clase runtime del modelo
-        para contar cuántas veces se invoca de verdad. Tiene que haber
-        exactamente dos: la escritura del usuario sobre la entrega, y la
-        propagada sobre el espejo. Si el guard de is_propagation() no
-        cortara el eco, esto entraría en recursión infinita (RecursionError)
-        o, en el mejor de los casos, contaría de más.
+        Escribir sobre la recepción (única dirección viva) tiene que
+        producir EXACTAMENTE dos invocaciones de write() sobre
+        stock.picking: la del usuario y la propagada hacia la entrega. Si
+        el guard de is_propagation() no cortara el eco, esto entraría en
+        recursión infinita (RecursionError) o, en el mejor de los casos,
+        contaría de más.
 
-        Lo que NO garantiza: que no haya, en otro escenario, una cadena más
-        larga de propagaciones legítimas encadenadas entre sí (por ejemplo,
-        si un futuro `write` disparara además un cambio en otro campo
-        sincronizado vía onchange); solo cubre el caso puntual de esta
-        escritura.
+        Lo que NO garantiza: que no haya, en otro escenario, una cadena
+        más larga de propagaciones legítimas encadenadas entre sí; solo
+        cubre el caso puntual de esta escritura.
         """
         delivery, reception = self._create_delivery()
         model_class = type(self.env["stock.picking"])
@@ -851,7 +883,7 @@ class TestHeaderSync(SyncCommon):
             return original_write(self, vals)
 
         with patch.object(model_class, "write", counting_write):
-            delivery.with_user(self.user_manager_both).write({"priority": "1"})
+            reception.with_user(self.user_manager_both).write({"priority": "1"})
 
         self.assertEqual(
             len(calls),
@@ -865,10 +897,9 @@ class TestHeaderSync(SyncCommon):
     def test_writing_same_value_does_not_propagate_or_note(self):
         """Reescribir el mismo valor no debe propagar ni postear nota.
 
-        `picking[field] != old[field]` tiene que comportarse bien tanto
-        para Datetime (scheduled_date) como para Selection (priority):
-        pasar el valor que ya está vigente no debe generar una segunda
-        write() sobre el espejo ni ruido en ningún chatter.
+        Sobre la recepción (única dirección viva), reescribir su propio
+        valor de "priority" no debe disparar una segunda write() sobre
+        la entrega ni ruido en ningún chatter.
         """
         delivery, reception = self._create_delivery()
         before_delivery_msgs = len(delivery.message_ids)
@@ -882,11 +913,8 @@ class TestHeaderSync(SyncCommon):
             return original_write(self, vals)
 
         with patch.object(model_class, "write", counting_write):
-            delivery.with_user(self.user_manager_both).write(
-                {
-                    "scheduled_date": delivery.scheduled_date,
-                    "priority": delivery.priority,
-                }
+            reception.with_user(self.user_manager_both).write(
+                {"priority": reception.priority}
             )
 
         self.assertEqual(
@@ -925,14 +953,115 @@ class TestHeaderSync(SyncCommon):
         delivery, reception = self._create_delivery()
         before_delivery = len(delivery.message_ids)
         before_reception = len(reception.message_ids)
-        delivery.with_user(self.user_manager_both).write({"priority": "1"})
+        reception.with_user(self.user_manager_both).write({"priority": "1"})
         self.assertGreater(len(delivery.message_ids), before_delivery)
         self.assertGreater(len(reception.message_ids), before_reception)
-        reception_note = reception.message_ids.filtered(
-            lambda m: delivery.name in (m.body or "")
+        delivery_note = delivery.message_ids.filtered(
+            lambda m: reception.name in (m.body or "")
         )
         self.assertTrue(
-            reception_note,
-            "No se encontró en la recepción ninguna nota que nombre el "
+            delivery_note,
+            "No se encontró en la entrega ninguna nota que nombre el "
             "picking de origen",
         )
+
+    def test_action_done_does_not_echo_priority_reset(self):
+        """El reset interno de priority='0' que hace _action_done() no debe
+        propagarse como si fuera una edición real.
+
+        Reproduce el bug reportado en la ronda de corrección 1: se crea
+        una entrega con priority='1' (antes de validar), se valida (Odoo
+        internamente hace `self.write({'date_done': ..., 'priority': '0'})`
+        sobre la entrega YA done y con el espejo YA creado -ver el
+        comentario junto a GUARDED_PICKING_FIELDS-), y se verifica que la
+        recepción conserva el priority original de la creación, sin nota
+        espuria de "Priority: 1 → 0". Es inmune al reloj: no depende de
+        que creación y validación caigan en segundos distintos (a
+        diferencia del bug análogo con scheduled_date, que sí era
+        dependiente del reloj y que la regla nueva ya cierra sin
+        necesidad de un test específico: ver
+        test_scheduled_date_never_propagates_because_delivery_is_always_done).
+        """
+        picking = (
+            self.env["stock.picking"]
+            .with_context(default_company_id=self.company1.id)
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.company1.intercompany_in_type_id.id,
+                    "priority": "1",
+                }
+            )
+        )
+        self.env["stock.move.line"].create(
+            {
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "product_id": self.product.id,
+                "product_uom_id": self.uom_unit.id,
+                "quantity": 5.0,
+                "picking_id": picking.id,
+            }
+        )
+        with RecordCapturer(self.env["stock.picking"], []) as rc:
+            picking.action_confirm()
+            picking.button_validate()
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(len(rc.records), 1, "Se creó más de un picking en el bloque")
+        reception = rc.records
+        self.assertEqual(
+            picking.priority, "0",
+            "El propio Odoo resetea priority a '0' al validar",
+        )
+        self.assertEqual(
+            reception.priority, "1",
+            "El espejo se creó con el priority ORIGINAL (antes del reset "
+            "interno); el reset posterior no debe pisarlo vía propagación",
+        )
+        spurious = reception.message_ids.filtered(
+            lambda m: "riority" in (m.body or "")
+        )
+        self.assertFalse(
+            spurious,
+            f"Nota espuria de prioridad en la recepción: {spurious.mapped('body')}",
+        )
+
+    def test_batch_write_touching_both_sides_does_not_duplicate(self):
+        """Un write() que toca las dos puntas a la vez no duplica la propagación.
+
+        Reproducido antes de este fix: `(delivery | reception).write(...)`
+        generaba 3 llamadas a write() y +2 notas espurias en cada picking,
+        porque cada picking del batch intentaba además propagar hacia el
+        otro, que ya había recibido el valor directo del propio batch.
+        Ahora se salta la propagación cuando la contraparte también está
+        en `self`.
+        """
+        delivery, reception = self._create_delivery()
+        before_delivery_msgs = len(delivery.message_ids)
+        before_reception_msgs = len(reception.message_ids)
+        model_class = type(self.env["stock.picking"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            (delivery | reception).with_user(self.user_manager_both).write(
+                {"priority": "1"}
+            )
+
+        self.assertEqual(
+            len(calls),
+            1,
+            "Un write() que ya toca las dos puntas no debe generar ninguna "
+            f"llamada extra de propagación; se registraron {len(calls)}: {calls}",
+        )
+        self.assertEqual(delivery.priority, "1")
+        self.assertEqual(reception.priority, "1")
+        self.assertEqual(len(delivery.message_ids), before_delivery_msgs)
+        self.assertEqual(len(reception.message_ids), before_reception_msgs)
