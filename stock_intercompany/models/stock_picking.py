@@ -3,7 +3,7 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 from odoo import Command, _, api, fields, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 
 from .intercompany_sync import get_counterpart, is_propagation
 
@@ -40,6 +40,12 @@ class StockPicking(models.Model):
         help="Verdadero si el usuario es manager intercompany y tiene "
         "habilitadas las dos compañías del espejo.",
     )
+    has_counterpart_picking = fields.Boolean(
+        string="Tiene contraparte intercompany",
+        compute="_compute_has_counterpart_picking",
+        help="Espejo booleano de counterpart_picking_id para usar en la vista "
+        "sin exponer el Many2one.",
+    )
 
     @api.depends("counterpart_of_picking_id")
     def _compute_counterpart_picking_id(self):
@@ -48,6 +54,30 @@ class StockPicking(models.Model):
             picking.counterpart_picking_id = get_counterpart(
                 picking, "counterpart_of_picking_id"
             )
+
+    @api.depends("counterpart_picking_id")
+    def _compute_has_counterpart_picking(self):
+        """Truthiness de counterpart_picking_id, segura de exponer en la vista.
+
+        counterpart_picking_id resuelve el id de la contraparte con sudo()
+        internamente (ver get_counterpart), pero el Many2one que devuelve
+        queda atado al env del usuario en curso. El cliente web resuelve el
+        display_name de cualquier Many2one presente en el formulario, aunque
+        esté con invisible="1" — y esa resolución sí pasa por la ir.rule de
+        stock.picking (restringe por company_id in company_ids activas en el
+        selector). Si la contraparte vive en una compañía que el usuario
+        tiene habilitada pero no activa en el selector, leer su display_name
+        revienta con AccessError y el formulario del picking deja de abrirse
+        para cualquiera, no solo para quien tiene el rol.
+
+        Este booleano evita el problema: `bool()` sobre un recordset solo
+        mira si hay ids cacheados, no dispara ninguna lectura de campos ni
+        pasa por la ir.rule, así que la vista puede usarlo para decidir si
+        mostrar el botón "Contraparte" sin arriesgarse a heredar el
+        AccessError del Many2one.
+        """
+        for picking in self:
+            picking.has_counterpart_picking = bool(picking.counterpart_picking_id)
 
     @api.depends("counterpart_picking_id", "company_id")
     @api.depends_context("uid")
@@ -115,6 +145,35 @@ class StockPicking(models.Model):
         if any(field in vals for field in GUARDED_PICKING_FIELDS):
             self._check_intercompany_edit_allowed()
         return super().write(vals)
+
+    def action_open_counterpart_picking(self):
+        """Abre el picking espejo en la otra compañía.
+
+        `counterpart.sudo().company_id`: misma razón que en can_edit_done.
+        El espejo vive en una compañía que el usuario puede tener habilitada
+        pero no activa en el selector; sin sudo, leer su company_id acá
+        (para poder armar el contexto que activa esa compañía) revienta con
+        AccessError antes de llegar a abrir nada.
+        """
+        self.ensure_one()
+        counterpart = self.counterpart_picking_id
+        if not counterpart:
+            raise UserError(
+                _(
+                    "La transferencia %(name)s no tiene contraparte intercompany.",
+                    name=self.name,
+                )
+            )
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "stock.picking",
+            "res_id": counterpart.id,
+            "view_mode": "form",
+            "context": dict(
+                self.env.context,
+                allowed_company_ids=[counterpart.sudo().company_id.id],
+            ),
+        }
 
     def _create_counterpart_picking(self):
         companies = self.env["res.company"].sudo().search([])

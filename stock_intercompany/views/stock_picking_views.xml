@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 Alexis Medina
+     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html). -->
 <odoo>
     <record id="view_picking_form_hide_return" model="ir.ui.view">
         <field name="name">stock.picking.form.hide.return</field>
@@ -8,6 +10,70 @@
             <button name="%(stock.act_stock_return_picking)d" position="attributes">
                 <attribute name="invisible">True</attribute>
             </button>
+        </field>
+    </record>
+
+    <!--
+        El arch real de stock.view_picking_form en este build difiere del
+        que asumía el plan original en dos puntos:
+
+        1. move_ids_without_package ya trae
+           readonly="state == 'done' and is_locked" (no solo "state ==
+           'done'"). Reemplazar ese atributo entero por
+           "state == 'done' and not can_edit_done" habría destapado el
+           is_locked: un picking done-pero-desbloqueado (is_locked=False,
+           el propio candado manual de Odoo) sin contraparte intercompany
+           quedaría igual de readonly que uno bloqueado, porque
+           can_edit_done da False para cualquier picking sin espejo. Eso
+           viola "los pickings sin contraparte no cambian de
+           comportamiento". Por eso el nuevo readonly conserva is_locked y
+           solo agrega "and not can_edit_done" como excepción adicional.
+
+        2. scheduled_date trae readonly="state in ['cancel', 'done']", no
+           solo done. Mismo razonamiento: se conserva el readonly en
+           'cancel' (nunca se debe poder editar una transferencia
+           cancelada) y solo se relaja la rama 'done' cuando can_edit_done
+           es verdadero.
+
+        3. priority NO tiene ningún atributo readonly en el arch base: es
+           editable siempre, en cualquier estado, para cualquier usuario
+           con acceso de escritura al picking. Esto es intencional del lado
+           del modelo (ver el comentario junto a GUARDED_PICKING_FIELDS en
+           models/stock_picking.py: prioridad es cosmética y el propio
+           _action_done() de Odoo la resetea al validar). Agregarle acá un
+           readonly nuevo condicionado a can_edit_done introduciría una
+           restricción que hoy no existe para NINGÚN picking, intercompany
+           o no — así que priority se deja sin tocar.
+    -->
+    <record id="view_picking_form_intercompany_edit" model="ir.ui.view">
+        <field name="name">stock.picking.form.intercompany.edit</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form" />
+        <field name="arch" type="xml">
+            <field name="name" position="before">
+                <field name="can_edit_done" invisible="1" />
+                <field name="has_counterpart_picking" invisible="1" />
+            </field>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    type="object"
+                    name="action_open_counterpart_picking"
+                    class="oe_stat_button"
+                    icon="fa-exchange"
+                    invisible="not has_counterpart_picking"
+                >
+                    <span class="o_stat_text">Contraparte</span>
+                </button>
+            </xpath>
+            <xpath
+                expr="//field[@name='move_ids_without_package']"
+                position="attributes"
+            >
+                <attribute name="readonly">state == 'done' and is_locked and not can_edit_done</attribute>
+            </xpath>
+            <field name="scheduled_date" position="attributes">
+                <attribute name="readonly">state == 'cancel' or (state == 'done' and not can_edit_done)</attribute>
+            </field>
         </field>
     </record>
 </odoo>

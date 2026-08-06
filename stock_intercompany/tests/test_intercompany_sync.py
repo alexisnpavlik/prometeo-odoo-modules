@@ -242,6 +242,197 @@ class SyncCommon(BaseCommon):
         return picking, rc.records
 
 
+class TestFormAccess(SyncCommon):
+    """Cubre el riesgo central de la Tarea 5: el formulario de una
+    transferencia intercompany validada tiene que poder abrirse para
+    cualquier usuario, sin importar qué compañías tenga activas en el
+    selector — no solo para quien tiene el rol de manager.
+
+    counterpart_picking_id resuelve su id con sudo() (ver
+    _compute_counterpart_picking_id / get_counterpart en
+    intercompany_sync.py), pero el Many2one que devuelve queda atado al env
+    del usuario en curso. Si ese campo entra al formulario — aunque sea con
+    invisible="1" — y el usuario tiene la compañía de la contraparte
+    habilitada pero no activa en el selector, resolver su display_name pasa
+    por la ir.rule de stock.picking (restringe por
+    company_id in company_ids activas) sin sudo y revienta con AccessError.
+    Comprobado empíricamente en esta misma sesión con una sonda directa
+    sobre `restricted.counterpart_picking_id.display_name`
+    (`restricted = delivery.with_user(self.user_operator).with_context(
+    allowed_company_ids=[self.company1.id])`): tira
+
+        odoo.exceptions.AccessError: Estos registros están restringidos.
+        Operador (id=...) no tiene acceso 'leer' a: Transferir  (stock.picking)
+
+    aun cuando user_operator tiene las DOS compañías habilitadas en
+    company_ids (ver SyncCommon) — el selector activo (allowed_company_ids)
+    puede ser más angosto que eso, y es lo que de verdad usa la ir.rule.
+
+    El fix es has_counterpart_picking: un Boolean cuyo compute solo hace
+    bool() sobre counterpart_picking_id (no dispara ninguna lectura de
+    campos ni pasa por la ir.rule) y es lo único que la vista usa para
+    decidir si mostrar el botón "Contraparte". La vista NUNCA agrega
+    counterpart_picking_id como field.
+    """
+
+    VIEW_FIELDS = (
+        "name",
+        "state",
+        "can_edit_done",
+        "has_counterpart_picking",
+        "move_ids_without_package",
+        "scheduled_date",
+        "priority",
+    )
+
+    def test_counterpart_picking_id_display_name_raises_with_narrow_company(self):
+        """Guard-rail que documenta por qué la vista no expone el Many2one.
+
+        Si algún día alguien vuelve a agregar `counterpart_picking_id` como
+        field en la vista (en vez de has_counterpart_picking), este test
+        prueba en qué condición exacta explota: compañía habilitada pero no
+        activa en el selector.
+        """
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_operator).with_context(
+            allowed_company_ids=[self.company1.id]
+        )
+        with self.assertRaises(AccessError):
+            restricted.counterpart_picking_id.display_name
+
+    def test_operator_reads_form_fields_with_narrow_company(self):
+        """El riesgo central: el operador (sin el rol) tiene que poder leer
+        los campos reales de la vista aunque su compañía activa en el
+        selector no incluya la de la contraparte."""
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_operator).with_context(
+            allowed_company_ids=[self.company1.id]
+        )
+        result = restricted.web_read({f: {} for f in self.VIEW_FIELDS})
+        self.assertEqual(result[0]["id"], delivery.id)
+        self.assertFalse(result[0]["can_edit_done"])
+        self.assertTrue(result[0]["has_counterpart_picking"])
+
+    def test_manager_one_company_reads_form_fields(self):
+        """user_manager_one (el rol, una sola compañía habilitada) también
+        tiene que poder abrir el formulario sin reventar."""
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_manager_one).with_context(
+            allowed_company_ids=[self.company1.id]
+        )
+        result = restricted.web_read({f: {} for f in self.VIEW_FIELDS})
+        self.assertEqual(result[0]["id"], delivery.id)
+        self.assertFalse(result[0]["can_edit_done"])
+        self.assertTrue(result[0]["has_counterpart_picking"])
+
+    def test_manager_both_reads_form_fields(self):
+        """user_manager_both puede leer el formulario y can_edit_done da True."""
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_manager_both).with_context(
+            allowed_company_ids=[self.company1.id, self.company2.id]
+        )
+        result = restricted.web_read({f: {} for f in self.VIEW_FIELDS})
+        self.assertEqual(result[0]["id"], delivery.id)
+        self.assertTrue(result[0]["can_edit_done"])
+        self.assertTrue(result[0]["has_counterpart_picking"])
+
+    def test_plain_picking_has_no_counterpart_flag(self):
+        """Un picking sin espejo no muestra el botón: has_counterpart_picking
+        da False y la lectura del formulario no cambia de comportamiento."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        result = picking.with_user(self.user_operator).web_read(
+            {f: {} for f in self.VIEW_FIELDS}
+        )
+        self.assertFalse(result[0]["has_counterpart_picking"])
+        self.assertFalse(result[0]["can_edit_done"])
+
+    def test_view_readonly_preserves_is_locked_and_leaves_priority_untouched(self):
+        """Guard contra reintroducir el readonly ingenuo del plan original.
+
+        El arch base de stock.view_picking_form en este build trae
+        move_ids_without_package con
+        readonly="state == 'done' and is_locked" (no solo "state == 'done'")
+        y scheduled_date con readonly="state in ['cancel', 'done']" (no solo
+        'done'). Reemplazar esos atributos enteros por
+        "state == 'done' and not can_edit_done" destaparía is_locked y la
+        rama 'cancel', cambiando de comportamiento a CUALQUIER picking done
+        o cancelado sin contraparte intercompany (can_edit_done da False
+        siempre para esos). priority no tiene readonly en el arch base y se
+        deja así a propósito (ver GUARDED_PICKING_FIELDS en
+        models/stock_picking.py): agregarle uno nuevo introduciría una
+        restricción que hoy no existe para ningún picking.
+        """
+        arch = self.env.ref(
+            "stock_intercompany.view_picking_form_intercompany_edit"
+        ).arch_db
+        self.assertIn(
+            "state == 'done' and is_locked and not can_edit_done", arch
+        )
+        self.assertIn(
+            "state == 'cancel' or (state == 'done' and not can_edit_done)", arch
+        )
+        self.assertNotIn('name="priority"', arch)
+
+    def test_plain_picking_button_action_raises_user_error(self):
+        """Sin contraparte, el botón (si se invoca igual) explica el porqué."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        with self.assertRaisesRegex(UserError, "no tiene contraparte"):
+            picking.with_user(self.user_operator).action_open_counterpart_picking()
+
+    def test_operator_can_open_counterpart_from_narrow_company(self):
+        """Reemplaza la verificación manual de UI del Step 5: clickear el
+        botón "Contraparte" no debe reventar aunque la compañía activa del
+        operador en el selector no incluya la de la contraparte, y el
+        contexto devuelto debe activarla."""
+        delivery, reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_operator).with_context(
+            allowed_company_ids=[self.company1.id]
+        )
+        action = restricted.action_open_counterpart_picking()
+        self.assertEqual(action["res_model"], "stock.picking")
+        self.assertEqual(action["res_id"], reception.id)
+        self.assertEqual(
+            action["context"]["allowed_company_ids"], [self.company2.id]
+        )
+
+    def test_manager_both_button_opens_delivery_from_reception(self):
+        """El botón también funciona en el sentido inverso: desde la
+        recepción hacia la entrega, para el manager con las dos compañías."""
+        delivery, reception = self._create_delivery()
+        action = reception.with_user(
+            self.user_manager_both
+        ).action_open_counterpart_picking()
+        self.assertEqual(action["res_id"], delivery.id)
+        self.assertEqual(
+            action["context"]["allowed_company_ids"], [self.company1.id]
+        )
+
+
 class TestCounterpartResolution(SyncCommon):
     def test_counterpart_resolves_in_both_directions(self):
         """La contraparte se resuelve desde la entrega y desde la recepción."""
