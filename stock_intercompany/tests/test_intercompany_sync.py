@@ -2420,12 +2420,21 @@ class TestLineRemoval(SyncCommon):
             origin_qty_before,
             "El quant de origen de la entrega no debe haberse tocado",
         )
+        # Review final, Important 3: la entrega recibe UNA sola nota, la de
+        # desvinculación -antes no recibía ninguna, y esa era justamente la
+        # falla: el espejo desaparecía y con él el guard de la entrega
+        # validada, en silencio-. Lo que sigue prohibido es la nota de
+        # anulación de línea ("Línea anulada"), que sería la cascada.
+        new_msgs = delivery.message_ids[
+            : len(delivery.message_ids) - before_delivery_msgs
+        ]
         self.assertEqual(
-            len(delivery.message_ids),
-            before_delivery_msgs,
-            "La entrega no debe recibir ninguna nota de sync por la "
-            "limpieza administrativa del espejo cancelado",
+            len(new_msgs),
+            1,
+            "La entrega debe recibir exactamente la nota de desvinculación",
         )
+        self.assertIn("vínculo intercompany", new_msgs.body)
+        self.assertNotIn("anulada", new_msgs.body)
 
     def test_unlink_covers_cancel_state_via_inverse_link(self):
         """Ronda de corrección 1 (revisor), Minor 3: el corte barato de
@@ -2784,3 +2793,365 @@ class TestLineRemoval(SyncCommon):
             before_reception + 1,
             f"Mensajes reales: {reception.message_ids.mapped('body')}",
         )
+
+
+class TestFinalReviewFixes(SyncCommon):
+    """Review final de rama: correcciones que ninguna revisión individual
+    de tarea podía ver, porque nacen de la interacción entre piezas
+    revisadas por separado (el flag de contexto y el guard, el guard y el
+    ciclo de vida del picking espejo, la propagación y el chatter)."""
+
+    def test_context_flag_alone_does_not_bypass_guard(self):
+        """Critical 1: `skip_intercompany_sync` en el contexto no alcanza.
+
+        El contexto es dato del cliente en cualquier `execute_kw`: sin el
+        `env.su` en el guard, un `stock.group_stock_user` sin el rol
+        editaba una entrega VALIDADA mandando el flag en el contexto
+        (reproducido en la base de calidad: demanda 24 → 25), y encima sin
+        propagar nada al espejo, porque el mismo flag corta la
+        propagación: bypass del rol más divergencia silenciosa.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        with self.assertRaises(AccessError) as capture:
+            move.with_user(self.user_operator).with_context(
+                skip_intercompany_sync=True
+            ).write({"product_uom_qty": 11.0})
+        self.assertIn("Intercompany", str(capture.exception))
+        self.assertEqual(move.product_uom_qty, 10.0)
+        self.assertEqual(reception.move_ids[0].product_uom_qty, 10.0)
+
+    def test_context_flag_alone_does_not_bypass_line_guard(self):
+        """Critical 1, misma puerta desde `stock.move.line`."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        line = delivery.move_line_ids[0]
+        with self.assertRaises(AccessError) as capture:
+            line.with_user(self.user_operator).with_context(
+                skip_intercompany_sync=True
+            ).write({"quantity": 3.0})
+        # El AccessError tiene que ser el NUESTRO: sin este chequeo el test
+        # es vacuo. Verificado revirtiendo el fix hunk por hunk -sin el
+        # `env.su` en el guard, la escritura igual revienta con un
+        # AccessError, pero ajeno (la valorización de la línea `done` toca
+        # account.move, para el que el operador no tiene permiso), y el
+        # test pasaba con el agujero abierto.
+        self.assertIn("Intercompany", str(capture.exception))
+        self.assertEqual(line.quantity, 10.0)
+
+    def test_context_flag_alone_does_not_bypass_unlink(self):
+        """Critical 1, tercera puerta: la rama de propagación de
+        `stock.move.unlink()` anula stock real (demanda y cantidad a cero)
+        de un picking `done`. Si esa anulación se hiciera en sudo, el flag
+        de contexto seguiría alcanzando para revertir stock validado de la
+        otra compañía sin el rol; sin sudo, el guard la alcanza."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        qty_before = self._quant_qty(move.product_id, move.location_id)
+        with self.assertRaises(AccessError) as capture:
+            move.with_user(self.user_admin_no_role).with_context(
+                skip_intercompany_sync=True
+            ).unlink()
+        self.assertIn("Intercompany", str(capture.exception))
+        self.assertEqual(move.product_uom_qty, 10.0)
+        self.assertEqual(
+            self._quant_qty(move.product_id, move.location_id), qty_before
+        )
+
+    def test_line_create_on_validated_requires_role(self):
+        """Critical 2: `stock.move.line.create()` no tenía guard.
+
+        Core mueve los quants DENTRO del propio `create()` cuando la línea
+        nace `state == 'done'` (lo hereda del move), así que crear una
+        línea sobre un move de un picking validado sacaba stock real sin
+        pasar por ningún `write()`. Reproducido con un usuario sin el rol
+        sobre una entrega validada de la base de calidad: línea creada en
+        `done` y quant de origen 220 → 217.
+        """
+        delivery, _reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        qty_before = self._quant_qty(move.product_id, move.location_id)
+        with self.assertRaises(AccessError) as capture:
+            self.env["stock.move.line"].with_user(self.user_operator).create(
+                {
+                    "move_id": move.id,
+                    "picking_id": delivery.id,
+                    "product_id": move.product_id.id,
+                    "product_uom_id": move.product_uom.id,
+                    "quantity": 3.0,
+                    "picked": True,
+                    "location_id": move.location_id.id,
+                    "location_dest_id": move.location_dest_id.id,
+                    "company_id": delivery.company_id.id,
+                }
+            )
+        # Mismo cuidado que en los tests de contexto: el AccessError tiene
+        # que ser el nuestro, no el de account.move que dispara la
+        # valorización de una línea que nace `done`.
+        self.assertIn("Intercompany", str(capture.exception))
+        self.assertEqual(
+            self._quant_qty(move.product_id, move.location_id),
+            qty_before,
+            "El quant de origen no debe haberse movido",
+        )
+
+    def test_line_create_without_picking_id_in_vals_is_also_guarded(self):
+        """Critical 2: omitir `picking_id` de los vals no esquiva el guard.
+
+        La línea igual nace `done` (el estado lo hereda del move) y mueve
+        los quants, así que el picking se resuelve por `move_id` cuando
+        `picking_id` no viene en los vals.
+        """
+        delivery, _reception = self._create_delivery(qty=10.0)
+        move = delivery.move_ids[0]
+        with self.assertRaises(AccessError) as capture:
+            self.env["stock.move.line"].with_user(self.user_operator).create(
+                {
+                    "move_id": move.id,
+                    "product_id": move.product_id.id,
+                    "product_uom_id": move.product_uom.id,
+                    "quantity": 3.0,
+                    "location_id": move.location_id.id,
+                    "location_dest_id": move.location_dest_id.id,
+                    "company_id": delivery.company_id.id,
+                }
+            )
+        self.assertIn("Intercompany", str(capture.exception))
+
+    def test_line_create_on_plain_picking_is_untouched(self):
+        """Critical 2: un picking SIN contraparte no cambia de comportamiento."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        move = (
+            self.env["stock.move"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "name": self.product.name,
+                    "product_id": self.product.id,
+                    "product_uom_qty": 5.0,
+                    "product_uom": self.uom_unit.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_id": picking.id,
+                }
+            )
+        )
+        line = (
+            self.env["stock.move.line"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "move_id": move.id,
+                    "picking_id": picking.id,
+                    "product_id": self.product.id,
+                    "product_uom_id": self.uom_unit.id,
+                    "quantity": 2.0,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                }
+            )
+        )
+        self.assertTrue(line.exists())
+
+    def test_deleting_counterpart_picking_requires_role(self):
+        """Important 3: borrar el espejo pendiente desarmaba el guard.
+
+        `user_admin_no_role` es `stock.group_stock_manager` (tiene el ACL
+        genérico de borrado) pero NO el rol del módulo: sin este fix
+        borraba la recepción espejo `assigned` sin error, y con el espejo
+        desaparecía el `counterpart_picking_id` de la entrega -y con él el
+        guard-, dejando la entrega VALIDADA editable por cualquiera.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertEqual(reception.state, "assigned")
+        with self.assertRaises(AccessError) as capture:
+            reception.with_user(self.user_admin_no_role).unlink()
+        self.assertIn("Intercompany", str(capture.exception))
+        self.assertTrue(reception.exists())
+        self.assertEqual(delivery.counterpart_picking_id, reception)
+        move = delivery.move_ids[0]
+        with self.assertRaises(AccessError):
+            move.with_user(self.user_operator).write({"product_uom_qty": 15.0})
+        self.assertEqual(move.product_uom_qty, 10.0)
+
+    def test_deleting_plain_picking_needs_no_role(self):
+        """Important 3: un picking sin contraparte se borra como siempre."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_admin_no_role)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        picking.with_user(self.user_admin_no_role).unlink()
+        self.assertFalse(picking.exists())
+
+    def test_duplicating_mirror_does_not_copy_links(self):
+        """Important 4: los tres campos de vínculo llevan `copy=False`.
+
+        El botón Duplicar estándar sobre el espejo creaba una copia
+        apuntando a la MISMA entrega validada, con los moves vinculados:
+        dos pickings apuntando a un solo validado, `_get_counterpart_move()`
+        (que hace `search(limit=1)`) ambiguo, y una copia en `draft` que es
+        una puerta de escritura hacia la entrega de la otra compañía.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        copy = reception.with_user(self.user_manager_both).copy()
+        self.assertFalse(copy.counterpart_of_picking_id)
+        self.assertFalse(copy.move_ids.filtered("counterpart_of_move_id"))
+        self.assertFalse(
+            copy.move_line_ids.filtered("counterpart_of_line_id")
+        )
+        # Duplicar el picking no arrastra las líneas de detalle (core no
+        # copia move_line_ids), así que el copy=False de
+        # counterpart_of_line_id se verifica duplicando la línea directo:
+        # sin esto la aserción de arriba es vacua -verificado revirtiendo
+        # ese hunk solo, con el test todavía en verde-.
+        line = reception.move_line_ids[0]
+        self.assertTrue(line.counterpart_of_line_id)
+        self.assertFalse(
+            line.with_user(self.user_manager_both).copy().counterpart_of_line_id
+        )
+        self.assertEqual(
+            delivery.counterpart_picking_id,
+            reception,
+            "La entrega tiene que seguir resolviendo al espejo original",
+        )
+
+    def test_demand_sync_notes_posted_on_both_sides(self):
+        """Important 5: `product_uom_qty` se propagaba sin dejar nota.
+
+        El §9 del spec exige nota en las dos puntas para todo lo que viaja
+        al espejo, y el §7.1 lista `product_uom_qty` entre lo sincronizado:
+        un manager bajaba la demanda de la entrega validada y la de la
+        recepción de la otra compañía cambiaba sola, sin rastro en ningún
+        chatter. Se cuentan las notas NUESTRAS por su marca ("→" con el
+        producto), sin depender del idioma de los mensajes de core.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        before_delivery = set(delivery.message_ids.ids)
+        before_reception = set(reception.message_ids.ids)
+        delivery.move_ids[0].with_user(self.user_manager_both).write(
+            {"product_uom_qty": 8.0}
+        )
+        self.assertEqual(reception.move_ids[0].product_uom_qty, 8.0)
+        new_delivery = delivery.message_ids.filtered(
+            lambda m: m.id not in before_delivery
+        )
+        new_reception = reception.message_ids.filtered(
+            lambda m: m.id not in before_reception
+        )
+        own = new_delivery.filtered(
+            lambda m: "10.0 → 8.0" in (m.body or "")
+        )
+        mirrored = new_reception.filtered(
+            lambda m: "10.0 → 8.0" in (m.body or "")
+        )
+        self.assertEqual(
+            len(own),
+            1,
+            f"Falta la nota propia; mensajes: {new_delivery.mapped('body')}",
+        )
+        self.assertEqual(
+            len(mirrored),
+            1,
+            f"Falta la nota del espejo; mensajes: {new_reception.mapped('body')}",
+        )
+        self.assertIn(delivery.name, mirrored.body)
+        self.assertIn(self.product.display_name, own.body)
+
+    def test_writing_lot_false_on_both_sides_does_not_propagate(self):
+        """One-liner 1: `map_lot(recordset vacío)` devuelve un recordset.
+
+        Devolvía `False` crudo, y `False != stock.lot()` da `True`: un
+        `write({'lot_id': False})` sobre una línea cuya contraparte tampoco
+        tiene lote forzaba un write espurio en la otra compañía, con el
+        undo/redo de quants que eso implica sobre una línea `done`.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        line = delivery.move_line_ids[0]
+        self.assertFalse(line.lot_id)
+        self.assertFalse(reception.move_line_ids[0].lot_id)
+        before_reception = len(reception.message_ids)
+        model_class = type(self.env["stock.move.line"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            line.with_user(self.user_manager_both).write({"lot_id": False})
+
+        self.assertEqual(
+            len(calls),
+            1,
+            f"No debería propagarse nada al espejo; llamadas: {calls}",
+        )
+        self.assertEqual(len(reception.message_ids), before_reception)
+
+    def test_priority_false_is_normalized_before_propagating(self):
+        """One-liner 2: la normalización `False↔'0'` también al valor.
+
+        Se aplicaba solo a la comparación, así que el `False` crudo viajaba
+        igual al espejo y la nota decía "Prioridad: False → …".
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).write({"priority": "1"})
+        self.assertEqual(delivery.priority, "1")
+        before = set(delivery.message_ids.ids)
+        reception.with_user(self.user_manager_both).write({"priority": False})
+        self.assertEqual(
+            delivery.priority, "0", "Debe llegar la clave normalizada, no False"
+        )
+        notes = delivery.message_ids.filtered(lambda m: m.id not in before)
+        self.assertTrue(notes)
+        for body in notes.mapped("body"):
+            self.assertNotIn("False", body or "")
+
+    def test_lot_required_message_names_lot_id_only(self):
+        """One-liner 3: el mensaje decía "lot_id/lot_name" pero el filtro
+        solo mira `lot_id` -y tiene que seguir mirando solo eso: en este
+        camino `_action_done()` es un no-op y nadie convierte `lot_name` en
+        un `stock.lot` real-."""
+        tracked = self.env["product.product"].create(
+            {
+                "name": "Sync Tracked Msg",
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "lot",
+                "categ_id": self.env.ref("product.product_category_all").id,
+            }
+        )
+        tracked.company_id = False
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).button_validate()
+        with self.assertRaises(UserError) as capture:
+            self.env["stock.move"].with_user(self.user_manager_both).create(
+                {
+                    "picking_id": delivery.id,
+                    "product_id": tracked.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": delivery.location_id.id,
+                    "location_dest_id": delivery.location_dest_id.id,
+                    "name": tracked.name,
+                }
+            )
+        message = str(capture.exception)
+        self.assertIn("lot_id", message)
+        self.assertNotIn("lot_name", message)

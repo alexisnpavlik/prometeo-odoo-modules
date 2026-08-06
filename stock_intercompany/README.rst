@@ -100,6 +100,10 @@ Dos consecuencias a tener presentes:
 * En un picking validado, eliminar una línea la deja en cantidad cero en vez
   de borrarla, para no perder la trazabilidad del movimiento original: la
   línea sigue visible en la pantalla.
+* Eliminar una transferencia que tiene contraparte intercompany (por ejemplo
+  la recepción espejo todavía pendiente) exige el mismo rol, y deja una nota
+  en la contraparte avisando que el vínculo quedó roto: sin el vínculo, la
+  transferencia validada de la otra compañía dejaría de estar protegida.
 
 Este esquema asume un riesgo operativo: un usuario con el grupo y las dos
 compañías habilitadas puede terminar modificando stock ya validado de la

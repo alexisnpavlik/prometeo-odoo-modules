@@ -53,19 +53,30 @@ SYNC_BLOCKED_STATES = {
 }
 
 
-def _header_field_changed(field, new_value, old_value):
-    """Compara el valor viejo y nuevo de un campo de cabecera sincronizado.
+def _normalize_header_value(field, value):
+    """Normaliza `False` a `'0'` para "priority".
 
-    Normaliza `False` y `'0'` como el mismo valor para "priority": es un
-    Selection con default `'0'`, así que nunca debería tener `False` como
-    valor real, pero una lectura intermedia puede devolver `False` donde
-    el valor vigente es la clave por defecto. Sin esto, esa diferencia
-    espuria dispara una propagación de `False` hacia el espejo.
+    "priority" es un Selection con default `'0'`, así que nunca debería
+    tener `False` como valor real, pero una lectura intermedia puede
+    devolver `False` donde el valor vigente es la clave por defecto.
+
+    Review final, one-liner 2: esta normalización se aplicaba solo a la
+    COMPARACIÓN y no al valor, así que el `False` crudo igual terminaba
+    propagado al espejo y en la nota ("Prioridad: False → Urgente", con
+    `_format_header_value` devolviendo el `False` tal cual porque no está
+    en el Selection). Ahora se normaliza el valor una sola vez y se usa
+    tanto para comparar como para escribir y mostrar.
     """
     if field == "priority":
-        new_value = new_value or "0"
-        old_value = old_value or "0"
-    return new_value != old_value
+        return value or "0"
+    return value
+
+
+def _header_field_changed(field, new_value, old_value):
+    """Compara el valor viejo y nuevo de un campo de cabecera sincronizado."""
+    return _normalize_header_value(field, new_value) != _normalize_header_value(
+        field, old_value
+    )
 
 
 def _format_header_value(picking, field, value):
@@ -89,7 +100,18 @@ def _format_header_value(picking, field, value):
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
-    counterpart_of_picking_id = fields.Many2one("stock.picking", check_company=False)
+    # copy=False (review final, Important 4): sin esto, el botón "Duplicar"
+    # estándar del formulario sobre un espejo creaba una copia apuntando a
+    # la MISMA entrega validada (medido: la copia con
+    # counterpart_of_picking_id seteado y 32/32 moves vinculados). Eso rompe
+    # el 1 a 1 que es el objetivo del módulo y, peor, la copia en `draft` es
+    # una puerta de escritura hacia la entrega validada: sus moves llevan el
+    # vínculo, así que un write de product_uom_qty ahí propaga a la otra
+    # compañía desde un documento fantasma, y `_get_counterpart_move()` -que
+    # hace search(limit=1)- pasa a ser ambiguo.
+    counterpart_of_picking_id = fields.Many2one(
+        "stock.picking", check_company=False, copy=False
+    )
     counterpart_picking_id = fields.Many2one(
         "stock.picking",
         string="Contraparte intercompany",
@@ -194,8 +216,21 @@ class StockPicking(models.Model):
         `done`/`cancel` en simultáneo con esa escritura-, así que ese
         `continue` de más arriba sigue aplicando y la escritura de core
         nunca llega a este chequeo.
+
+        Review final, Critical 1: la salida temprana por propagación exige
+        ADEMÁS `self.env.su`. `is_propagation()` mira solo `env.context`, y
+        el contexto es dato del cliente en cualquier llamada `execute_kw`:
+        un usuario con `stock.group_stock_user` y sin el rol podía anular
+        el guard entero mandando `{'skip_intercompany_sync': True}` en el
+        contexto (reproducido sobre una entrega validada: la demanda pasó
+        de 24 a 25 sin AccessError, y encima sin propagarse al espejo,
+        porque el mismo flag corta la propagación). `env.su` no es
+        seteable por RPC, y todas las propagaciones internas del módulo
+        pasan por `as_propagation()`, que hace `sudo()` + flag: la
+        combinación identifica la propagación real sin agregar un segundo
+        flag. `is_propagation()` queda como está para el corte del eco.
         """
-        if is_propagation(self.env):
+        if is_propagation(self.env) and self.env.su:
             return
         for picking in self:
             if picking.state not in (
@@ -224,6 +259,42 @@ class StockPicking(models.Model):
                     "tener habilitadas las dos compañías: %(a)s y %(b)s.",
                     name=picking.name,
                     state=state_label,
+                    a=picking.company_id.name,
+                    b=picking.counterpart_picking_id.sudo().company_id.name,
+                )
+            )
+
+    def _check_intercompany_unlink_allowed(self):
+        """Exige el rol para borrar un picking que tiene contraparte intercompany.
+
+        Distinto de `_check_intercompany_edit_allowed()`, que solo mira los
+        pickings `done`/`cancel`: acá el estado propio no alcanza como
+        criterio, porque el picking peligroso de borrar es justamente el
+        espejo TODAVÍA PENDIENTE (`assigned`), cuyo borrado deja a la
+        entrega validada de la otra compañía sin guard (ver el docstring de
+        `unlink()`). Mismo par de mensajes que el otro guard: falta de rol
+        y falta de alguna de las dos compañías se distinguen.
+        """
+        for picking in self:
+            if picking.can_edit_done:
+                continue
+            if not self.env.user.has_group(
+                "stock_intercompany.group_intercompany_manager"
+            ):
+                raise AccessError(
+                    _(
+                        "La transferencia %(name)s tiene contraparte "
+                        "intercompany. Eliminarla requiere el rol "
+                        "«Intercompany: editar transferencias validadas».",
+                        name=picking.name,
+                    )
+                )
+            raise AccessError(
+                _(
+                    "Para eliminar la transferencia intercompany %(name)s "
+                    "necesitás tener habilitadas las dos compañías: "
+                    "%(a)s y %(b)s.",
+                    name=picking.name,
                     a=picking.company_id.name,
                     b=picking.counterpart_picking_id.sudo().company_id.name,
                 )
@@ -348,8 +419,9 @@ class StockPicking(models.Model):
             for field in SYNCED_PICKING_FIELDS:
                 if field not in old:
                     continue
-                new_value = picking[field]
-                if not _header_field_changed(field, new_value, old[field]):
+                new_value = _normalize_header_value(field, picking[field])
+                old_value = _normalize_header_value(field, old[field])
+                if not _header_field_changed(field, new_value, old_value):
                     continue
                 if counterpart.state in SYNC_BLOCKED_STATES.get(field, ()):
                     continue
@@ -362,7 +434,9 @@ class StockPicking(models.Model):
                 body = _(
                     "%(label)s: %(old)s → %(new)s",
                     label=label,
-                    old=_format_header_value(picking, field, old[field]),
+                    old=_format_header_value(
+                        picking, field, _normalize_header_value(field, old[field])
+                    ),
                     new=_format_header_value(picking, field, value),
                 )
                 post_sync_note(picking, body)
@@ -663,7 +737,38 @@ class StockPicking(models.Model):
         hace que esos moves lleguen a `stock.move.unlink()` con
         `is_propagation(env)` ya en `True`, que es la rama que solo
         mutación local -sin resolver contraparte ni postear nota-.
+
+        Review final, Important 3: borrar el picking espejo desarmaba el
+        guard de la entrega validada. Como el espejo puede estar sin
+        validar (67 de los 117 espejos de la base de calidad están en
+        `assigned`), core deja borrarlo sin más; y al desaparecer el
+        registro que lleva `counterpart_of_picking_id`, `get_counterpart()`
+        sobre la entrega devuelve vacío y el guard -que arranca con `if
+        ... not picking.counterpart_picking_id: continue`- deja de
+        aplicar. Reproducido: un `stock.group_stock_manager` sin el rol del
+        módulo borra el espejo, y acto seguido un `stock.group_stock_user`
+        pelado sube la demanda de la entrega VALIDADA de 24 a 29. Dos
+        pasos, ningún rol del módulo. Por eso ahora borrar un picking CON
+        contraparte exige el rol (y las dos compañías, igual que el resto
+        del módulo), y en todo caso deja nota en la contraparte ANTES de
+        romper el vínculo: la desconexión no puede ser silenciosa.
         """
+        if not (is_propagation(self.env) and self.env.su):
+            for picking in self:
+                counterpart = picking.counterpart_picking_id
+                if not counterpart:
+                    continue
+                picking._check_intercompany_unlink_allowed()
+                post_sync_note(
+                    counterpart,
+                    _(
+                        "Se eliminó la transferencia contraparte "
+                        "%(name)s (%(company)s): el vínculo intercompany "
+                        "de esta transferencia queda roto.",
+                        name=picking.name,
+                        company=picking.company_id.name,
+                    ),
+                )
         return super(
             StockPicking, self.with_context(skip_intercompany_sync=True)
         ).unlink()

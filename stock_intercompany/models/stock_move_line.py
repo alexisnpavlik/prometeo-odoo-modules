@@ -2,7 +2,7 @@
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 
 from .intercompany_sync import (
     as_propagation,
@@ -79,7 +79,11 @@ RAW_COPY_LINE_FIELDS = ("quantity",)
 class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
-    counterpart_of_line_id = fields.Many2one("stock.move.line", check_company=False)
+    # copy=False: ver el comentario del campo homólogo en stock_picking.py
+    # (review final, Important 4).
+    counterpart_of_line_id = fields.Many2one(
+        "stock.move.line", check_company=False, copy=False
+    )
 
     def _get_counterpart_line(self):
         """Resuelve la línea espejo en cualquiera de los dos sentidos."""
@@ -114,6 +118,61 @@ class StockMoveLine(models.Model):
         """
         self.ensure_one()
         return self.move_id.state == "done" and self.product_id.is_storable
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Corta el alta de líneas sobre un picking validado o cancelado sin rol.
+
+        Review final, Critical 2: hasta esta ronda, `stock.move.line` solo
+        vigilaba `write()`. Pero core mueve los quants DENTRO del propio
+        `create()` cuando la línea nace con `state == 'done'` -y una línea
+        creada sobre un move de un picking ya validado nace así, porque el
+        estado lo hereda del move-. O sea que crear una línea a mano sobre
+        una entrega validada saca stock real sin pasar nunca por un
+        `write()`. Reproducido con un usuario `stock.group_stock_user` sin
+        el rol sobre una entrega intercompany validada: la línea se creó en
+        `done` y el quant de origen bajó 3 unidades, sin AccessError y sin
+        que el espejo recibiera nada.
+
+        Mismo patrón que `stock_move.create()`: el chequeo corre ANTES de
+        `super()`, para que el AccessError no deje una línea insertada, y
+        el picking se resuelve primero por `vals['picking_id']` -que es lo
+        que core siempre completa al armar líneas
+        (`stock.move._prepare_move_line_vals`)- y solo si falta se paga la
+        lectura del `move_id`, para no agregar un SELECT a cada creación de
+        línea de la base.
+
+        Alcance deliberado (declarado, no omitido): este override NO
+        replica la línea nueva en la contraparte. El alta de una línea
+        suelta sobre un move ya espejado no tiene una semántica única del
+        otro lado -si el espejo está `assigned`, agregar una línea con
+        cantidad no equivale a "recibir de más", y el flujo soportado para
+        agregar contenido a un validado es el alta de un `stock.move`
+        (`stock_move.create()` → `_bring_to_done()` →
+        `_create_counterpart_move()`), que sí replica y deja nota-.
+        Replicar acá arriesgaba duplicar cantidades en la punta espejo por
+        un camino sin cobertura. Lo que esta ronda cierra es el bypass del
+        rol, que era la parte de seguridad.
+        """
+        if not is_propagation(self.env) or not self.env.su:
+            picking_ids = set()
+            move_ids = set()
+            for vals in vals_list:
+                if vals.get("picking_id"):
+                    picking_ids.add(vals["picking_id"])
+                elif vals.get("move_id"):
+                    move_ids.add(vals["move_id"])
+            if move_ids:
+                moves = self.env["stock.move"].sudo().browse(move_ids)
+                picking_ids |= set(moves.mapped("picking_id").ids)
+            if picking_ids:
+                pickings = self.env["stock.picking"].browse(picking_ids)
+                relevant = pickings.filtered(
+                    lambda p: p.state in ("done", "cancel")
+                )
+                if relevant:
+                    relevant._check_intercompany_edit_allowed()
+        return super().create(vals_list)
 
     def write(self, vals):
         """Corta la edición de validados sin rol y propaga cantidad y lote al espejo.

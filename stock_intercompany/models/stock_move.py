@@ -37,7 +37,12 @@ SYNCED_MOVE_FIELDS = ("product_uom_qty",)
 class StockMove(models.Model):
     _inherit = "stock.move"
 
-    counterpart_of_move_id = fields.Many2one("stock.move", check_company=False)
+    # copy=False: ver el comentario del campo homólogo en stock_picking.py
+    # (review final, Important 4). Duplicar el picking espejo copiaba el
+    # vínculo de los 32 moves hacia los moves de la entrega validada.
+    counterpart_of_move_id = fields.Many2one(
+        "stock.move", check_company=False, copy=False
+    )
 
     def _get_counterpart_move(self):
         """Resuelve el move espejo en cualquiera de los dos sentidos."""
@@ -185,8 +190,16 @@ class StockMove(models.Model):
             ):
                 raise UserError(
                     _(
+                        # Review final, one-liner 3: el mensaje decía
+                        # "lot_id/lot_name" pero el filtro de arriba solo
+                        # mira lot_id, y tiene que seguir siendo así: en
+                        # este camino `_action_done()` es un no-op (el move
+                        # ya nace done), así que nadie convierte lot_name en
+                        # un stock.lot real y la línea quedaría done con el
+                        # quant sin lote. Se corrige el mensaje, no el
+                        # filtro.
                         "%(product)s usa lote o número de serie: hay que "
-                        "indicar el lote (línea con lot_id/lot_name) al "
+                        "indicar el lote ya creado (línea con lot_id) al "
                         "agregarlo a una transferencia ya validada.",
                         product=move.product_id.display_name,
                     )
@@ -320,8 +333,32 @@ class StockMove(models.Model):
                 for field in SYNCED_MOVE_FIELDS
                 if field in old and move[field] != old[field]
             }
-            if changed:
-                as_propagation(counterpart).write(changed)
+            if not changed:
+                continue
+            as_propagation(counterpart).write(changed)
+            # Review final, Important 5: la demanda se propagaba en
+            # silencio. El §9 del spec exige nota en las DOS puntas para
+            # todo lo que viaja al espejo, y `product_uom_qty` estaba
+            # listado en el §7.1 como sincronizado: un manager bajaba la
+            # demanda de la entrega validada de 10 a 8, la demanda de la
+            # recepción de la otra compañía cambiaba sola, y no quedaba
+            # nada escrito en ningún chatter. Es exactamente la contención
+            # que el §3.2 exige para haber aceptado el riesgo de que un
+            # operador de una compañía modifique documentos de la otra.
+            # Mismo patrón que `stock_move_line.write`.
+            if not (move.picking_id and counterpart.picking_id):
+                continue
+            if "product_uom_qty" in changed:
+                body = _(
+                    "%(product)s: demanda %(old)s → %(new)s",
+                    product=move.product_id.display_name,
+                    old=old["product_uom_qty"],
+                    new=changed["product_uom_qty"],
+                )
+                post_sync_note(move.picking_id, body)
+                post_sync_note(
+                    counterpart.picking_id, body, source_picking=move.picking_id
+                )
         return res
 
     def action_intercompany_void(self):
@@ -501,6 +538,20 @@ class StockMove(models.Model):
         if is_propagation(self.env):
             to_void = self.filtered(lambda m: m.picking_id.state == "done")
             if to_void:
+                # Review final, Critical 1 (verificado, no supuesto): estas
+                # dos escrituras quedan como escrituras NORMALES, sin
+                # sudo. Los dos alcances anchos que abren el flag sin sudo
+                # -`stock.picking.unlink()` y `_merge_moves()`- no llegan
+                # nunca acá con un picking `done` y contraparte (core no
+                # deja borrar un picking done, y la fusión ocurre al
+                # confirmar, sobre pickings que todavía no lo están): se
+                # verificó corriendo la suite entera. Ponerlas en sudo
+                # "por las dudas" era peor: dejaba viva por `unlink()` la
+                # misma puerta que el Critical 1 cierra en `write()`, o
+                # sea anular stock validado de la otra compañía mandando
+                # `skip_intercompany_sync` en el contexto por RPC. Sin
+                # sudo, el guard las alcanza y ese camino queda cerrado
+                # (ver test_context_flag_alone_does_not_bypass_unlink).
                 to_void.move_line_ids.write({"quantity": 0.0})
                 to_void.write({"product_uom_qty": 0.0})
             to_delete = self - to_void

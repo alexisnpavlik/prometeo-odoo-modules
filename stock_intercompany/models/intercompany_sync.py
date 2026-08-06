@@ -47,6 +47,14 @@ def map_lot(lot, company):
     Ronda de corrección 1 (Tarea 9), Critical 1: un lote sin `company_id` ya
     sirve en cualquier compañía -es el caso normal para los productos
     intercompany, que son compartidos (`company_id = False`):
+    NOTA (review final, one-liner 1): `lot` es SIEMPRE un recordset de
+    `stock.lot` (vacío o no), y el retorno también lo es —nunca `False`—.
+    Antes, el caso "sin lote" devolvía el `False` crudo, así que el tipo de
+    retorno era a veces `bool` y a veces recordset, y la comparación
+    `mapped != counterpart.lot_id` en `stock_move_line.write()` daba
+    `False != stock.lot()` → `True`: un `write({'lot_id': False})` espurio
+    sobre una línea `done` de la otra compañía (con el undo/redo de quants
+    que eso implica) aunque la contraparte tampoco tuviera lote.
     `stock.lot._compute_company_id` (core) hace `lot.company_id =
     lot.product_id.company_id`, así que un lote creado desde la UI sobre uno
     de estos productos nace SIN compañía-. Sin este corte, `lot.company_id ==
@@ -57,7 +65,7 @@ def map_lot(lot, company):
     intercompany con un lote recién creado por el flujo normal.
     """
     if not lot:
-        return False
+        return lot.browse()
     if not lot.company_id or lot.company_id == company:
         return lot
     lot_model = lot.sudo().with_company(company)
