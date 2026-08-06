@@ -1397,3 +1397,143 @@ class TestHeaderSync(SyncCommon):
         self.assertEqual(reception.priority, "1")
         self.assertEqual(len(delivery.message_ids), before_delivery_msgs)
         self.assertEqual(len(reception.message_ids), before_reception_msgs)
+
+
+class TestLineAddition(SyncCommon):
+    def test_new_line_on_validated_picking_mirrors_and_moves_stock(self):
+        """Agregar un producto a una entrega validada lo replica y mueve stock.
+
+        `_create_delivery` valida la entrega, pero la recepción espejo
+        queda "assigned" (lista, sin validar): es la contraparte quien
+        decide cuándo procesarla, como en el resto de la suite
+        (`test_operator_partial_receipt_adjusts_delivery` y análogos
+        validan la recepción a mano antes de asertar `state == "done"`).
+        El escenario de esta tarea es "las dos puntas YA validadas", así
+        que hay que llevar la recepción a done acá también.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).button_validate()
+        self.assertEqual(reception.state, "done")
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": self.product2.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 4.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": self.product2.name,
+            }
+        )
+        new_move = delivery.move_ids.filtered(
+            lambda m: m.product_id == self.product2
+        )
+        self.assertEqual(len(new_move), 1)
+        self.assertEqual(new_move.state, "done")
+        self.assertEqual(new_move.quantity, 4.0)
+
+        mirrored = reception.move_ids.filtered(
+            lambda m: m.product_id == self.product2
+        )
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(mirrored.counterpart_of_move_id, new_move)
+        self.assertEqual(mirrored.product_uom_qty, 4.0)
+        self.assertEqual(mirrored.state, "done")
+        self.assertEqual(mirrored.move_line_ids.picking_id, reception)
+
+        # El estado "done" del move no alcanza para probar que el stock se
+        # movió de verdad: se verifica el quant en las dos compañías.
+        # product2 no tenía stock previo en la ubicación de origen de la
+        # entrega, así que el quant queda negativo -es exactamente lo
+        # esperado de una edición forzada de cantidad sobre un move ya
+        # done, no una limitación del test-.
+        Quant = self.env["stock.quant"].sudo()
+        origin_qty = Quant._get_available_quantity(
+            self.product2, delivery.location_id, allow_negative=True
+        )
+        self.assertEqual(origin_qty, -4.0)
+        dest_qty = Quant._get_available_quantity(
+            self.product2, reception.location_dest_id
+        )
+        self.assertEqual(dest_qty, 4.0)
+
+    def test_addition_posts_note_on_both_sides(self):
+        """El alta deja nota en las dos puntas, con conteo exacto de mensajes."""
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception.with_user(self.user_manager_both).button_validate()
+        before_delivery = len(delivery.message_ids)
+        before_reception = len(reception.message_ids)
+        self.env["stock.move"].with_user(self.user_manager_both).create(
+            {
+                "picking_id": delivery.id,
+                "product_id": self.product2.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 4.0,
+                "location_id": delivery.location_id.id,
+                "location_dest_id": delivery.location_dest_id.id,
+                "name": self.product2.name,
+            }
+        )
+        self.assertEqual(len(delivery.message_ids), before_delivery + 1)
+        self.assertEqual(len(reception.message_ids), before_reception + 1)
+
+    def test_operator_cannot_add_line_to_validated(self):
+        """El operador no puede agregar productos a un picking validado."""
+        delivery, _reception = self._create_delivery(qty=10.0)
+        with self.assertRaises(AccessError):
+            self.env["stock.move"].with_user(self.user_operator).create(
+                {
+                    "picking_id": delivery.id,
+                    "product_id": self.product2.id,
+                    "product_uom": self.uom_unit.id,
+                    "product_uom_qty": 4.0,
+                    "location_id": delivery.location_id.id,
+                    "location_dest_id": delivery.location_dest_id.id,
+                    "name": self.product2.name,
+                }
+            )
+
+    def test_new_line_without_counterpart_picking_unaffected(self):
+        """Un picking sin contraparte no cambia de comportamiento al agregar líneas."""
+        picking = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .with_context(default_company_id=self.company1.id)
+            .create(
+                {
+                    "partner_id": self.company2.partner_id.id,
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        move = self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "picking_id": picking.id,
+                "product_id": self.product.id,
+                "product_uom": self.uom_unit.id,
+                "product_uom_qty": 3.0,
+                "location_id": picking.location_id.id,
+                "location_dest_id": picking.location_dest_id.id,
+                "name": self.product.name,
+            }
+        )
+        self.assertEqual(move.state, "draft")
+        self.assertFalse(move.counterpart_of_move_id)
+
+    def test_addition_does_not_trigger_spurious_counterpart_on_mirror_creation(self):
+        """Crear el espejo original no debe disparar una segunda ronda de create().
+
+        La Tarea 7 tuvo un caso análogo: un write() del propio flujo de
+        validación pisaba el origen porque no distinguía "edición real" de
+        "bootstrap interno". Acá se verifica que armar la entrega y su
+        recepción espejo (que en el proceso crea moves con picking_id
+        apuntando a un picking con counterpart_picking_id ya resuelto) no
+        produzca un tercer move (un "espejo del espejo").
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.assertEqual(len(delivery.move_ids), 1)
+        self.assertEqual(len(reception.move_ids), 1)
+        self.assertFalse(delivery.move_ids.counterpart_of_move_id)
+        self.assertEqual(reception.move_ids.counterpart_of_move_id, delivery.move_ids)
