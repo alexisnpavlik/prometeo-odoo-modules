@@ -214,18 +214,47 @@ class StockPicking(models.Model):
         módulo -la diferencia entre lo demandado y lo recibido queda
         reflejada propagando la cantidad hacia la entrega (ver
         SYNCED_LINE_FIELDS en stock_move_line.py), no generando un segundo
-        picking. La supresión alcanza solo a los pickings CON contraparte
-        intercompany: uno sin espejo (`counterparts` vacío) sigue el
-        comportamiento original de Odoo sin cambios.
+        picking. La supresión alcanza solo a los pickings que SON un
+        espejo (`counterpart_of_picking_id` propio, no el computado
+        `counterpart_picking_id`: ver el comentario de `_action_done` más
+        abajo sobre por qué la distinción importa acá): un picking sin
+        espejo (`mirrors` vacío) sigue el comportamiento original de Odoo
+        sin cambios.
+
+        Ronda de corrección 1, Important 3: el contexto de supresión NO se
+        aplica nunca a `self` entero. Antes, un batch mixto (espejo +
+        picking sin contraparte validados juntos) heredaba
+        `skip_backorder=True` en los DOS, porque el contexto se pisaba
+        sobre todo el recordset: `_pre_action_done_hook()` (core) no corre
+        `_check_backorder()` para NINGÚN picking del batch con ese flag,
+        así que el picking sin espejo perdía en silencio su wizard
+        "¿crear backorder?" y terminaba con un backorder creado sin
+        preguntarle a nadie -medido: `MIXED res=True ... backorders=[...]`
+        sobre el picking suelto-. Ahora cada subconjunto se valida por
+        separado: primero los espejos (nunca muestran wizard, se
+        resuelven solos), después el resto con el comportamiento original
+        intacto. No es un caso hipotético: hay dos caminos reales de batch
+        en este build - la acción de servidor de la vista lista
+        (`stock.action_validate_picking`, `binding_view_types=list`,
+        stock/views/stock_picking_views.xml) y
+        `stock.picking.batch.action_done()`
+        (stock_picking_batch/models/stock_picking_batch.py).
         """
-        counterparts = self.filtered(lambda p: p.counterpart_picking_id)
-        record = self
-        if counterparts:
-            record = self.with_context(
+        mirrors = self.filtered(lambda p: p.counterpart_of_picking_id)
+        others = self - mirrors
+        if not mirrors:
+            return super().button_validate()
+        mirrors_res = super(
+            StockPicking,
+            mirrors.with_context(
                 skip_backorder=True,
-                picking_ids_not_to_backorder=counterparts.ids,
-            )
-        return super(StockPicking, record).button_validate()
+                picking_ids_not_to_backorder=mirrors.ids,
+            ),
+        ).button_validate()
+        if not others:
+            return mirrors_res
+        others_res = super(StockPicking, others).button_validate()
+        return others_res if isinstance(others_res, dict) else mirrors_res
 
     def write(self, vals):
         """Corta la edición de validados sin rol y propaga la cabecera al espejo.
@@ -532,12 +561,54 @@ class StockPicking(models.Model):
         return move_commands
 
     def _action_done(self):
+        """Crea el espejo de las entregas y fuerza `cancel_backorder` en las recepciones espejo.
+
+        Ronda de corrección 1, Critical 2: `button_validate()` (más arriba)
+        suprime el wizard y arma `picking_ids_not_to_backorder`, pero core
+        (stock/models/stock_picking.py) filtra esa lista con
+        `lambda p: p.picking_type_id.create_backorder != 'always'` antes de
+        decidir con qué `cancel_backorder` llamar a `_action_done()`. Si el
+        tipo de operación de recepción de la compañía destino está
+        configurado en "Always" -un valor soportado de fábrica-, el espejo
+        se cae de esa lista, entra con `cancel_backorder=False` y genera
+        backorder igual: dos recepciones para una entrega, medido
+        (`ALWAYS2 state=done bo=['Sync /IN/00002']`), exactamente el
+        invariante que este módulo existe para sostener.
+
+        La única vía que no depende de `picking_ids_not_to_backorder` es
+        forzar `cancel_backorder=True` directamente en el contexto con el
+        que se llama a `_action_done()`, que es lo que de verdad decide
+        (stock/models/stock_move.py: `_create_backorder()` y
+        `_create_backorder()` a nivel picking corren solo `if not
+        cancel_backorder`) si se genera el split y el backorder,
+        sin importar qué política tenga configurada el tipo de operación.
+
+        `counterpart_of_picking_id` (campo propio, no el `counterpart_picking_id`
+        computado) identifica de forma inequívoca a una recepción espejo:
+        se completa SOLO al crear el espejo (ver
+        `_get_counterpart_picking_vals`) y nunca en la entrega origen. Usar
+        el computado acá sería un error distinto: apenas este método crea
+        el espejo de una entrega (más abajo) e invalida la caché,
+        `counterpart_picking_id` de esa MISMA entrega origen empieza a
+        resolver al espejo recién creado, así que un filtro por el
+        computado capturaría también a la entrega origen -que si necesita
+        poder generar backorder normalmente, ver
+        test_operator_creates_backorder_without_role-.
+        """
         counterparts = []
         for picking in self:
             if picking.location_dest_id.usage in ("customer", "transit"):
                 counterpart = picking._create_counterpart_picking()
                 counterparts.append((picking, counterpart))
-        res = super()._action_done()
+        mirrors = self.filtered(lambda p: p.counterpart_of_picking_id)
+        others = self - mirrors
+        res = True
+        if mirrors:
+            res = super(
+                StockPicking, mirrors.with_context(cancel_backorder=True)
+            )._action_done()
+        if others:
+            res = super(StockPicking, others)._action_done() and res
         for picking, counterpart in counterparts:
             picking._finalize_counterpart_picking(counterpart)
         return res

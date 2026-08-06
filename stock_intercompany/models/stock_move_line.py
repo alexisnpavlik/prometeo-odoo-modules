@@ -70,27 +70,58 @@ class StockMoveLine(models.Model):
         """Resuelve la línea espejo en cualquiera de los dos sentidos."""
         return get_counterpart(self, "counterpart_of_line_id")
 
+    def _quantity_change_logged_by_core(self):
+        """Verdadero si Odoo ya audita este cambio de `quantity` en su chatter.
+
+        Ronda de corrección 1, Important 4: el comentario original de este
+        método afirmaba, sin haberlo comprobado, que stock.move.line no
+        tiene tracking automático. Es falso: `stock.move.line.write()`
+        (stock/models/stock_move_line.py de este build, alrededor de la
+        línea 517) hace `ml._log_message(ml.picking_id, ml,
+        'stock.track_move_template', vals)` para toda línea cuyo
+        `move_id.state == 'done'` y producto almacenable, cuando `vals`
+        toca `quantity`. Como el espejo solo existe una vez que la entrega
+        ya está `done`, TODA propagación recepción → entrega escribe sobre
+        una línea que cae justo en esa condición, y postear la nota propia
+        ahí encima duplicaba el chatter -medido: dos mensajes por un solo
+        cambio, el propio más "The done move line has been corrected."-.
+        """
+        self.ensure_one()
+        return self.move_id.state == "done" and self.product_id.is_storable
+
     def write(self, vals):
         """Corta la edición de validados sin rol y propaga la cantidad al espejo.
 
-        A diferencia de lo que asume ingenuamente cualquier atajo copiado
-        sin verificar de otro módulo: acá SÍ se postea la nota también del
-        lado que edita (`line.picking_id`), no solo del que recibe. Se
-        comprobó contra el fuente de stock/models/stock_move_line.py (build
-        de este contenedor) que stock.move.line no hereda mail.thread ni
-        tiene tracking automático sobre "quantity" -no existe ningún
-        "stock.track_move_template"-, así que sin esta nota el lado que
-        edita se queda sin ningún rastro del cambio en su propio chatter.
+        La nota de sync se postea del lado que edita (`line.picking_id`) Y
+        del lado que recibe (`counterpart.picking_id`) -salvo que, para esa
+        línea puntual, core ya vaya a auditar el mismo cambio por su
+        cuenta: ver `_quantity_change_logged_by_core`-.
+
+        `touches_synced_fields`: igual que en stock_picking.py, el diff y
+        la búsqueda de contraparte (`_get_counterpart_line`, que hace un
+        `search()` cuando el campo inverso está vacío -el caso de
+        CUALQUIER línea sin espejo, o sea casi todas las de la base-) solo
+        se ejecutan cuando `vals` toca algún campo sincronizado. `write()`
+        de stock.move.line es uno de los caminos más calientes de Odoo
+        (`moves_todo.write({'state': 'done', 'date': ...})` sobre un
+        picking de 200 líneas, por ejemplo); sin este corte, cada
+        escritura -toque o no `quantity`- agregaba un SELECT extra por
+        línea sobre TODA la base, tenga o no espejo intercompany.
         """
         if any(field in vals for field in GUARDED_LINE_FIELDS):
             self.picking_id._check_intercompany_edit_allowed()
         if is_propagation(self.env):
             return super().write(vals)
-        previous = {
-            line.id: {field: line[field] for field in SYNCED_LINE_FIELDS}
-            for line in self
-        }
+        touches_synced_fields = bool(set(vals) & set(SYNCED_LINE_FIELDS))
+        previous = {}
+        if touches_synced_fields:
+            previous = {
+                line.id: {field: line[field] for field in SYNCED_LINE_FIELDS}
+                for line in self
+            }
         res = super().write(vals)
+        if not touches_synced_fields:
+            return res
         for line in self:
             counterpart = line._get_counterpart_line()
             if not counterpart:
@@ -111,8 +142,10 @@ class StockMoveLine(models.Model):
                     old=old["quantity"],
                     new=changed["quantity"],
                 )
-                post_sync_note(line.picking_id, body)
-                post_sync_note(
-                    counterpart.picking_id, body, source_picking=line.picking_id
-                )
+                if not line._quantity_change_logged_by_core():
+                    post_sync_note(line.picking_id, body)
+                if not counterpart._quantity_change_logged_by_core():
+                    post_sync_note(
+                        counterpart.picking_id, body, source_picking=line.picking_id
+                    )
         return res

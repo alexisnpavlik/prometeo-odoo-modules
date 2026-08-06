@@ -37,16 +37,37 @@ class StockMove(models.Model):
         return get_counterpart(self, "counterpart_of_move_id")
 
     def write(self, vals):
-        """Corta la edición de validados sin rol y propaga la demanda al espejo."""
+        """Corta la edición de validados sin rol y propaga la demanda al espejo.
+
+        `touches_synced_fields`: mismo corte temprano que ya usa
+        stock_picking.write() (y, desde esta ronda de corrección, también
+        stock_move_line.write()). Ronda de corrección 1, Important 5:
+        antes, el `for move in self: move._get_counterpart_move()` corría
+        en TODO write(), tocara o no un campo sincronizado -y
+        `get_counterpart()` hace un `search(limit=1)` por registro cuando
+        el campo inverso está vacío, que es el caso de cualquier move sin
+        espejo, o sea prácticamente todos los de la base-.
+        `stock.move.write()` es uno de los caminos más calientes de Odoo
+        (`moves_todo.write({'state': 'done', 'date': ...})` en
+        `_action_done()` de core, por ejemplo, sobre TODOS los moves de
+        cualquier picking que se valide, tenga o no espejo intercompany):
+        sin este corte, cada validación de la base agregaba un SELECT
+        extra por move.
+        """
         if any(field in vals for field in GUARDED_MOVE_FIELDS):
             self.picking_id._check_intercompany_edit_allowed()
         if is_propagation(self.env):
             return super().write(vals)
-        previous = {
-            move.id: {field: move[field] for field in SYNCED_MOVE_FIELDS}
-            for move in self
-        }
+        touches_synced_fields = bool(set(vals) & set(SYNCED_MOVE_FIELDS))
+        previous = {}
+        if touches_synced_fields:
+            previous = {
+                move.id: {field: move[field] for field in SYNCED_MOVE_FIELDS}
+                for move in self
+            }
         res = super().write(vals)
+        if not touches_synced_fields:
+            return res
         for move in self:
             counterpart = move._get_counterpart_move()
             if not counterpart:

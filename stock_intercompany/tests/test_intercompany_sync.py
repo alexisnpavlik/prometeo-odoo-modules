@@ -128,71 +128,25 @@ class SyncCommon(BaseCommon):
             }
         )
 
-    def _create_delivery(self, qty=10.0, product=None):
-        """Crea y valida una entrega intercompany. Devuelve (entrega, recepción)."""
-        product = product or self.product
-        picking = (
-            self.env["stock.picking"]
-            .with_context(default_company_id=self.company1.id)
-            .with_user(self.user_operator)
-            .create(
-                {
-                    "partner_id": self.company2.partner_id.id,
-                    "location_id": self.stock_location.id,
-                    "location_dest_id": self.custs_location.id,
-                    "picking_type_id": self.company1.intercompany_in_type_id.id,
-                }
-            )
-        )
-        self.env["stock.move.line"].create(
-            {
-                "location_id": self.stock_location.id,
-                "location_dest_id": self.custs_location.id,
-                "product_id": product.id,
-                "product_uom_id": self.uom_unit.id,
-                "quantity": qty,
-                "picking_id": picking.id,
-            }
-        )
-        with RecordCapturer(self.env["stock.picking"], []) as rc:
-            picking.action_confirm()
-            picking.button_validate()
-        self.assertEqual(picking.state, "done", "La entrega no quedó validada")
-        self.assertEqual(
-            len(rc.records), 1, "Se creó más de un picking en el bloque"
-        )
-        return picking, rc.records
+    def _create_reserved_delivery_picking(self, demand_qty, product):
+        """Crea una entrega intercompany CON demanda real y stock reservado.
 
-    def _create_delivery_with_backorder(
-        self, demand_qty=10.0, validated_qty=4.0, product=None
-    ):
-        """Crea una entrega intercompany parcial y confirma el backorder.
+        Compartido por _create_delivery y _create_delivery_with_backorder.
+        Ronda de corrección 1, Critical 1: la versión anterior de
+        _create_delivery creaba la línea directo sobre el picking, SIN un
+        move con demanda (product_uom_qty). Eso dejaba al move espejo con
+        product_uom_qty=0.0 -medido-, y con demanda 0 Odoo core nunca
+        genera backorder, con o sin la supresión de la Tarea 7: la
+        funcionalidad central de este módulo (recibir de menos ajusta la
+        entrega) no se estaba ejercitando en ningún test. Acá se crea un
+        stock.move real con la demanda pedida y se reserva de verdad contra
+        stock disponible (action_assign), igual que ya hacía
+        _create_delivery_with_backorder -que si probaba el camino real,
+        pero solo para el caso parcial-.
 
-        Reproduce el camino real de stock.picking._create_backorder()
-        (stock/models/stock_picking.py): valida menos cantidad de la
-        demandada, así que Odoo reparenta el remanente a un picking de
-        backorder escribiendo picking_id sobre las líneas del origen
-        DESPUÉS de que los moves de este ya están "done" (con el picking
-        origen ya en state "done" y, siendo intercompany, con el espejo ya
-        creado). Es el camino que la Tarea 4 no cubría y que motivó la
-        regresión Critical de la ronda de corrección 2: sin un test que
-        pase por acá, sacar o poner picking_id en GUARDED_LINE_FIELDS no
-        se nota en la suite.
-
-        A diferencia de _create_delivery (que crea la línea directo con
-        la cantidad final y no pasa por una reserva real), acá hace falta
-        stock disponible y una reserva real (action_assign): si no hay
-        nada reservado, el move remanente que separa Odoo para el
-        backorder queda sin líneas propias y el camino de
-        _create_backorder que se quiere ejercitar no se dispara — el
-        picking_id vigilado nunca llega a escribirse sobre una línea real
-        y el test no detectaría la regresión.
-
-        Corre siempre con user_operator (sin el rol), porque es
-        justamente el operador normal quien tiene que poder validar una
-        entrega parcial sin necesitar el rol de manager.
+        Corre con user_operator (sin el rol): es quien tiene que poder
+        crear y confirmar una entrega intercompany en el uso diario.
         """
-        product = product or self.product
         self.env["stock.quant"].sudo()._update_available_quantity(
             product, self.stock_location, demand_qty
         )
@@ -224,6 +178,51 @@ class SyncCommon(BaseCommon):
         picking.with_user(self.user_operator).action_assign()
         line = picking.move_line_ids
         self.assertTrue(line, "La reserva no generó una línea de movimiento")
+        return picking, line
+
+    def _create_delivery(self, qty=10.0, product=None):
+        """Crea y valida una entrega intercompany con demanda completa.
+
+        Devuelve (entrega, recepción). La reserva ya deja la línea en la
+        cantidad total pedida (sin diferencia demanda/hecho), así que no
+        debería generar backorder: se verifica explícitamente.
+        """
+        product = product or self.product
+        picking, line = self._create_reserved_delivery_picking(qty, product)
+        with RecordCapturer(self.env["stock.picking"], []) as rc:
+            picking.with_user(self.user_operator).button_validate()
+        self.assertEqual(picking.state, "done", "La entrega no quedó validada")
+        self.assertEqual(
+            len(rc.records), 1, "Se creó más de un picking en el bloque"
+        )
+        self.assertFalse(
+            picking.backorder_ids,
+            "La entrega con demanda completa no debería generar backorder",
+        )
+        return picking, rc.records
+
+    def _create_delivery_with_backorder(
+        self, demand_qty=10.0, validated_qty=4.0, product=None
+    ):
+        """Crea una entrega intercompany parcial y confirma el backorder.
+
+        Reproduce el camino real de stock.picking._create_backorder()
+        (stock/models/stock_picking.py): valida menos cantidad de la
+        demandada, así que Odoo reparenta el remanente a un picking de
+        backorder escribiendo picking_id sobre las líneas del origen
+        DESPUÉS de que los moves de este ya están "done" (con el picking
+        origen ya en state "done" y, siendo intercompany, con el espejo ya
+        creado). Es el camino que la Tarea 4 no cubría y que motivó la
+        regresión Critical de la ronda de corrección 2: sin un test que
+        pase por acá, sacar o poner picking_id en GUARDED_LINE_FIELDS no
+        se nota en la suite.
+
+        Corre siempre con user_operator (sin el rol), porque es
+        justamente el operador normal quien tiene que poder validar una
+        entrega parcial sin necesitar el rol de manager.
+        """
+        product = product or self.product
+        picking, line = self._create_reserved_delivery_picking(demand_qty, product)
         line.with_user(self.user_operator).write({"quantity": validated_qty})
         with RecordCapturer(self.env["stock.picking"], []) as rc:
             res = picking.with_user(self.user_operator).button_validate()
@@ -832,11 +831,24 @@ class TestQuantitySync(SyncCommon):
         self.assertFalse(backorders)
 
     def test_quantity_sync_notes_posted_on_both_sides(self):
-        """El ajuste de cantidad deja nota en las dos puntas.
+        """El ajuste de cantidad deja EXACTAMENTE una nota nueva en cada punta.
 
         Se cuenta message_ids en las dos puntas en vez de grepear el texto
         del body: la base corre en es_AR y cualquier fragmento en inglés
         vuelve la aserción vacua (ya pasó en la Tarea 6).
+
+        Ronda de corrección 1, Important 4: el conteo tiene que ser EXACTO,
+        no `assertGreater`. La entrega (contraparte de esta propagación)
+        está siempre `done`, y core (stock.move.line.write(), ver
+        `_quantity_change_logged_by_core`) audita por su cuenta cualquier
+        cambio de `quantity` sobre una línea `done` de producto
+        almacenable con su propio mensaje ("The done move line has been
+        corrected."): con `assertGreater`, un `write()` que dejara DOS
+        mensajes en la entrega (el propio + el de core, duplicados) pasaba
+        igual. Acá se verifica que en la entrega llega exactamente uno -el
+        de core, porque el propio se saltea a propósito- y en la recepción
+        exactamente uno -el propio, porque su línea no está done al
+        momento de escribir-.
         """
         delivery, reception = self._create_delivery(qty=10.0)
         before_delivery = len(delivery.message_ids)
@@ -844,8 +856,19 @@ class TestQuantitySync(SyncCommon):
         reception.move_line_ids[0].with_user(self.user_manager_both).write(
             {"quantity": 7.0}
         )
-        self.assertGreater(len(delivery.message_ids), before_delivery)
-        self.assertGreater(len(reception.message_ids), before_reception)
+        self.assertEqual(
+            len(delivery.message_ids),
+            before_delivery + 1,
+            "La entrega debería recibir exactamente una nota nueva "
+            f"(propia + la de core no duplicadas); mensajes: "
+            f"{delivery.message_ids.mapped('body')}",
+        )
+        self.assertEqual(
+            len(reception.message_ids),
+            before_reception + 1,
+            "La recepción debería recibir exactamente una nota nueva; "
+            f"mensajes: {reception.message_ids.mapped('body')}",
+        )
 
     def test_no_infinite_echo_line_write_call_count(self):
         """La propagación de cantidad no rebota: exactamente 2 write() reales.
@@ -952,6 +975,120 @@ class TestQuantitySync(SyncCommon):
             picking.backorder_ids,
             "Un picking sin espejo intercompany debe seguir generando "
             "backorder normalmente",
+        )
+
+    def test_no_backorder_even_with_create_backorder_always(self):
+        """La supresión no depende de picking_ids_not_to_backorder: aguanta
+        aunque el tipo de operación de la recepción esté en "Always".
+
+        Ronda de corrección 1, Critical 2. Core
+        (stock/models/stock_picking.py, button_validate) filtra
+        `picking_ids_not_to_backorder` con `lambda p:
+        p.picking_type_id.create_backorder != 'always'`: con esa política
+        -un valor soportado de fábrica- el espejo se caía de la lista de
+        supresión y generaba backorder igual, medido antes del fix:
+        `ALWAYS2 state=done bo=['Sync /IN/00002']`. El fix fuerza
+        `cancel_backorder=True` directamente en `_action_done()` para
+        cualquier picking con `counterpart_of_picking_id` propio, sin
+        pasar por esa lista.
+        """
+        self.picking_type_in.create_backorder = "always"
+        delivery, reception = self._create_delivery(qty=10.0)
+        reception = reception.with_user(self.user_operator)
+        reception.move_line_ids[0].write({"quantity": 9.0})
+        reception.button_validate()
+        self.assertEqual(reception.state, "done")
+        backorders = self.env["stock.picking"].sudo().search(
+            [("backorder_id", "=", reception.id)]
+        )
+        self.assertFalse(
+            backorders,
+            "La recepción espejo no debe generar backorder ni con "
+            "create_backorder='always' en su tipo de operación",
+        )
+        self.assertEqual(delivery.move_line_ids[0].quantity, 9.0)
+
+    def test_mixed_batch_does_not_steal_wizard_from_plain_picking(self):
+        """Validar un espejo junto con un picking suelto en el mismo batch
+        no le roba a este último su wizard de backorder.
+
+        Ronda de corrección 1, Important 3. Antes, `button_validate()`
+        aplicaba `skip_backorder=True` a `self` entero -no solo a los
+        pickings con espejo-, así que `_pre_action_done_hook()` (core) no
+        corría `_check_backorder()` para NINGÚN picking del batch: el
+        picking sin contraparte perdía en silencio su pregunta y quedaba
+        con un backorder creado sin que nadie lo confirmara. Medido antes
+        del fix: `MIXED res=True plain_state=done backorders=[...]` (sin
+        wizard). Caminos reales que arman un batch así: la acción de
+        servidor de la vista lista (`stock.action_validate_picking`) y
+        `stock.picking.batch.action_done()`.
+        """
+        delivery, reception = self._create_delivery(qty=10.0)
+        self.env["stock.quant"].sudo()._update_available_quantity(
+            self.product2, self.stock_location, 10.0
+        )
+        plain = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .create(
+                {
+                    "location_id": self.stock_location.id,
+                    "location_dest_id": self.custs_location.id,
+                    "picking_type_id": self.picking_type_out.id,
+                }
+            )
+        )
+        self.env["stock.move"].with_user(self.user_operator).create(
+            {
+                "name": self.product2.name,
+                "product_id": self.product2.id,
+                "product_uom_qty": 10.0,
+                "product_uom": self.uom_unit.id,
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.custs_location.id,
+                "picking_id": plain.id,
+            }
+        )
+        plain.with_user(self.user_operator).action_confirm()
+        plain.with_user(self.user_operator).action_assign()
+        plain.move_line_ids.with_user(self.user_operator).write({"quantity": 4.0})
+
+        reception = reception.with_user(self.user_operator)
+        reception.move_line_ids[0].write({"quantity": 9.0})
+
+        batch = reception | plain
+        res = batch.button_validate()
+        self.assertTrue(
+            isinstance(res, dict)
+            and res.get("res_model") == "stock.backorder.confirmation",
+            f"Se esperaba el wizard de backorder para el picking sin "
+            f"espejo dentro del batch mixto; res={res}",
+        )
+        self.assertEqual(
+            reception.state,
+            "done",
+            "El espejo, dentro del mismo batch, se valida solo sin wizard",
+        )
+        mirror_backorders = self.env["stock.picking"].sudo().search(
+            [("backorder_id", "=", reception.id)]
+        )
+        self.assertFalse(
+            mirror_backorders,
+            "El espejo no debe generar backorder ni en un batch mixto",
+        )
+
+        wizard = (
+            self.env["stock.backorder.confirmation"]
+            .with_user(self.user_operator)
+            .with_context(res["context"])
+            .create({})
+        )
+        wizard.with_user(self.user_operator).process()
+        self.assertEqual(plain.state, "done")
+        self.assertTrue(
+            plain.backorder_ids,
+            "El picking sin espejo, una vez confirmado el wizard, sí debe "
+            "generar su propio backorder",
         )
 
 
