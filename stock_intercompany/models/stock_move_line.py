@@ -71,20 +71,31 @@ class StockMoveLine(models.Model):
         return get_counterpart(self, "counterpart_of_line_id")
 
     def _quantity_change_logged_by_core(self):
-        """Verdadero si Odoo ya audita este cambio de `quantity` en su chatter.
+        """Verdadero si Odoo ya audita este cambio de `quantity` en su propio chatter.
 
-        Ronda de corrección 1, Important 4: el comentario original de este
-        método afirmaba, sin haberlo comprobado, que stock.move.line no
-        tiene tracking automático. Es falso: `stock.move.line.write()`
-        (stock/models/stock_move_line.py de este build, alrededor de la
-        línea 517) hace `ml._log_message(ml.picking_id, ml,
-        'stock.track_move_template', vals)` para toda línea cuyo
-        `move_id.state == 'done'` y producto almacenable, cuando `vals`
-        toca `quantity`. Como el espejo solo existe una vez que la entrega
-        ya está `done`, TODA propagación recepción → entrega escribe sobre
-        una línea que cae justo en esa condición, y postear la nota propia
-        ahí encima duplicaba el chatter -medido: dos mensajes por un solo
-        cambio, el propio más "The done move line has been corrected."-.
+        `stock.move.line.write()` (stock/models/stock_move_line.py de este
+        build, alrededor de la línea 517) hace `ml._log_message(ml.picking_id,
+        ml, 'stock.track_move_template', vals)` para toda línea cuyo
+        `move_id.state == 'done'` y producto almacenable, cuando `vals` toca
+        `quantity`.
+
+        Ronda de corrección 1 (Important 4): esto se usó para SUPRIMIR la
+        nota propia del lado `done`, asumiendo que evitar la duplicación
+        con el mensaje de core alcanzaba. Ronda de corrección 2: esa
+        instrucción del coordinador estaba equivocada y se revirtió — el
+        spec del módulo exige que TODO lo que se propaga deje nota en las
+        dos puntas, y que la de la contraparte nombre el picking de origen
+        y el usuario que lo hizo. Es la mitigación explícita de un riesgo
+        aceptado en el diseño: un operador de la compañía B (sin rol ni
+        acceso a la compañía A) modificando stock ya validado y valorizado
+        de la compañía A. La entrega SIEMPRE es la punta `done` -el caso
+        normal-, y el mensaje genérico de core ("The done move line has
+        been corrected.") no nombra ni el picking contraparte ni la
+        compañía de origen: suprimir la nota propia ahí perdía justo la
+        trazabilidad que justificaba aceptar el riesgo. Ahora este método
+        se usa solo para que los tests sepan cuántos mensajes esperar de
+        cada lado (el propio siempre, más el de core cuando corresponde),
+        no para decidir si postear.
         """
         self.ensure_one()
         return self.move_id.state == "done" and self.product_id.is_storable
@@ -92,10 +103,14 @@ class StockMoveLine(models.Model):
     def write(self, vals):
         """Corta la edición de validados sin rol y propaga la cantidad al espejo.
 
-        La nota de sync se postea del lado que edita (`line.picking_id`) Y
-        del lado que recibe (`counterpart.picking_id`) -salvo que, para esa
-        línea puntual, core ya vaya a auditar el mismo cambio por su
-        cuenta: ver `_quantity_change_logged_by_core`-.
+        La nota de sync se postea SIEMPRE en las dos puntas -del lado que
+        edita (`line.picking_id`) y del lado que recibe
+        (`counterpart.picking_id`)-, conviva o no con el mensaje nativo de
+        core en el lado `done` (ver `_quantity_change_logged_by_core`): son
+        dos auditorías con propósitos distintos, la de core sobre el
+        movimiento de stock, la nuestra sobre el contexto intercompany
+        (qué picking y qué usuario de la OTRA compañía lo originó), y
+        ninguna reemplaza a la otra.
 
         `touches_synced_fields`: igual que en stock_picking.py, el diff y
         la búsqueda de contraparte (`_get_counterpart_line`, que hace un
@@ -142,10 +157,8 @@ class StockMoveLine(models.Model):
                     old=old["quantity"],
                     new=changed["quantity"],
                 )
-                if not line._quantity_change_logged_by_core():
-                    post_sync_note(line.picking_id, body)
-                if not counterpart._quantity_change_logged_by_core():
-                    post_sync_note(
-                        counterpart.picking_id, body, source_picking=line.picking_id
-                    )
+                post_sync_note(line.picking_id, body)
+                post_sync_note(
+                    counterpart.picking_id, body, source_picking=line.picking_id
+                )
         return res

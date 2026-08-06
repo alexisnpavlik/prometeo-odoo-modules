@@ -820,54 +820,80 @@ class TestQuantitySync(SyncCommon):
         self.assertEqual(delivery.move_line_ids[0].quantity, 9.0)
 
     def test_partial_receipt_creates_no_backorder(self):
-        """La recepción espejo nunca genera backorder."""
+        """La recepción espejo nunca genera backorder.
+
+        Ronda de corrección 2: sin el `assertEqual(reception.state, "done")`
+        este test pasaba vacuamente si se revertían las dos supresiones
+        (button_validate + _action_done) — sin supresión, el flujo se
+        frena en el wizard de backorder, nunca se llega a crear un
+        backorder, y `assertFalse(backorders)` da verdadero igual, sin
+        haber probado nada. Verificado revirtiendo ambas supresiones: con
+        el `assertEqual` de abajo, el test SÍ falla (`reception.state` se
+        queda en un estado no-"done" porque `button_validate()` devuelve
+        la acción del wizard en vez de completar la validación).
+        """
         delivery, reception = self._create_delivery(qty=10.0)
         reception = reception.with_user(self.user_operator)
         reception.move_line_ids[0].write({"quantity": 9.0})
         reception.button_validate()
+        self.assertEqual(reception.state, "done")
         backorders = self.env["stock.picking"].sudo().search(
             [("backorder_id", "=", reception.id)]
         )
         self.assertFalse(backorders)
 
     def test_quantity_sync_notes_posted_on_both_sides(self):
-        """El ajuste de cantidad deja EXACTAMENTE una nota nueva en cada punta.
+        """El ajuste de cantidad deja nota propia en las dos puntas, SIEMPRE.
 
         Se cuenta message_ids en las dos puntas en vez de grepear el texto
         del body: la base corre en es_AR y cualquier fragmento en inglés
         vuelve la aserción vacua (ya pasó en la Tarea 6).
 
-        Ronda de corrección 1, Important 4: el conteo tiene que ser EXACTO,
-        no `assertGreater`. La entrega (contraparte de esta propagación)
-        está siempre `done`, y core (stock.move.line.write(), ver
-        `_quantity_change_logged_by_core`) audita por su cuenta cualquier
-        cambio de `quantity` sobre una línea `done` de producto
-        almacenable con su propio mensaje ("The done move line has been
-        corrected."): con `assertGreater`, un `write()` que dejara DOS
-        mensajes en la entrega (el propio + el de core, duplicados) pasaba
-        igual. Acá se verifica que en la entrega llega exactamente uno -el
-        de core, porque el propio se saltea a propósito- y en la recepción
-        exactamente uno -el propio, porque su línea no está done al
-        momento de escribir-.
+        Ronda de corrección 2: la ronda anterior suprimía la nota propia
+        del lado `done` para no convivir con el mensaje nativo de core
+        ("The done move line has been corrected."). Esa instrucción del
+        coordinador estaba equivocada y se revirtió: el spec exige nota
+        propia en las DOS puntas siempre -es la mitigación de que un
+        operador de otra compañía, sin rol, esté tocando stock ya
+        validado de la compañía origen, y el mensaje de core no nombra ni
+        el picking contraparte ni la compañía-. Lo que sí se conserva de
+        la ronda anterior es la precisión: nada de `assertGreater`. Se
+        assertea el conteo EXACTO en las dos puntas, usando
+        `_quantity_change_logged_by_core` (ahora solo un helper de
+        predicción, no de supresión) para saber si además hay que contar
+        el mensaje nativo de core en cada lado.
         """
         delivery, reception = self._create_delivery(qty=10.0)
+        delivery_line = delivery.move_line_ids[0]
+        reception_line = reception.move_line_ids[0]
+        expected_delivery = 1 + (
+            1 if delivery_line._quantity_change_logged_by_core() else 0
+        )
+        expected_reception = 1 + (
+            1 if reception_line._quantity_change_logged_by_core() else 0
+        )
         before_delivery = len(delivery.message_ids)
         before_reception = len(reception.message_ids)
-        reception.move_line_ids[0].with_user(self.user_manager_both).write(
-            {"quantity": 7.0}
-        )
+        reception_line.with_user(self.user_manager_both).write({"quantity": 7.0})
         self.assertEqual(
             len(delivery.message_ids),
-            before_delivery + 1,
-            "La entrega debería recibir exactamente una nota nueva "
-            f"(propia + la de core no duplicadas); mensajes: "
-            f"{delivery.message_ids.mapped('body')}",
+            before_delivery + expected_delivery,
+            "La entrega debería recibir la nota propia siempre, más la de "
+            f"core si le toca; mensajes: {delivery.message_ids.mapped('body')}",
         )
         self.assertEqual(
             len(reception.message_ids),
-            before_reception + 1,
-            "La recepción debería recibir exactamente una nota nueva; "
-            f"mensajes: {reception.message_ids.mapped('body')}",
+            before_reception + expected_reception,
+            "La recepción debería recibir la nota propia siempre, más la "
+            f"de core si le toca; mensajes: {reception.message_ids.mapped('body')}",
+        )
+        # Con demanda completa (_create_delivery), la entrega SIEMPRE está
+        # done -es el caso normal del spec- y la recepción todavía no: si
+        # esto deja de sostenerse, el desglose de arriba deja de probar lo
+        # que dice.
+        self.assertEqual(expected_delivery, 2, "La entrega debería estar done acá")
+        self.assertEqual(
+            expected_reception, 1, "La recepción no debería estar done acá"
         )
 
     def test_no_infinite_echo_line_write_call_count(self):
