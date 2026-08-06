@@ -72,9 +72,10 @@ fecha programada nunca llega a propagarse entre las dos puntas.
 
 Corregir una transferencia intercompany ya validada requiere el grupo
 **Intercompany: editar transferencias validadas** y tener habilitadas las dos
-compañías involucradas. Ese mismo grupo es el único con permiso para borrar
-movimientos de stock (`stock.move`), un permiso que en Odoo base es del
-administrador de inventario. Toda corrección queda registrada en el chatter
+compañías involucradas. Ese mismo grupo tiene permiso para borrar
+movimientos de stock (`stock.move`), un permiso que en Odoo base está
+reservado al administrador de inventario (`stock.group_stock_manager`).
+Toda corrección queda registrada en el chatter
 de las dos puntas: la nota del lado que recibe el cambio nombra el picking
 de origen y el usuario que lo hizo.
 
