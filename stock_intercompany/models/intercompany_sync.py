@@ -43,10 +43,22 @@ def map_lot(lot, company):
 
     `stock.lot` es por compañía: el lote de la entrega no sirve en la recepción.
     El equivalente se identifica por nombre y producto.
+
+    Ronda de corrección 1 (Tarea 9), Critical 1: un lote sin `company_id` ya
+    sirve en cualquier compañía -es el caso normal para los productos
+    intercompany, que son compartidos (`company_id = False`):
+    `stock.lot._compute_company_id` (core) hace `lot.company_id =
+    lot.product_id.company_id`, así que un lote creado desde la UI sobre uno
+    de estos productos nace SIN compañía-. Sin este corte, `lot.company_id ==
+    company` daba falso, la búsqueda por `company_id = company.id` no lo
+    encontraba, e intentaba crear un duplicado que chocaba contra
+    `_check_unique_lot` (core, que sí cruza los lotes sin compañía) con un
+    `ValidationError` que bloqueaba la validación de cualquier entrega
+    intercompany con un lote recién creado por el flujo normal.
     """
     if not lot:
         return False
-    if lot.company_id == company:
+    if not lot.company_id or lot.company_id == company:
         return lot
     lot_model = lot.sudo().with_company(company)
     existing = lot_model.search(

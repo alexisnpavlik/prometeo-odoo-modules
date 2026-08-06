@@ -60,12 +60,20 @@ GUARDED_LINE_FIELDS = (
 # entre las dos puntas), así que no hay valor derivado que ese atajo pudiera
 # propagar mal.
 #
-# "lot_id" (Tarea 9) es la excepción a "viaja crudo": stock.lot es un
-# registro por compañía, así que el id de la línea de origen no sirve en la
-# contraparte. El bucle de write() de abajo no copia line.lot_id tal cual,
-# lo resuelve con map_lot() al lote equivalente de la compañía destino
-# antes de armar `changed`.
+# "lot_id" (Tarea 9) se agrega para el corte temprano y la captura de
+# `previous`/`old` en write(), pero NO para el diff genérico de abajo: no
+# "viaja crudo" como quantity, porque stock.lot es un registro por
+# compañía y el id de la línea de origen no sirve en la contraparte
+# (ver RAW_COPY_LINE_FIELDS).
 SYNCED_LINE_FIELDS = ("quantity", "lot_id")
+
+# Subconjunto de SYNCED_LINE_FIELDS cuyo valor viaja tal cual al espejo, sin
+# ninguna transformación. "lot_id" queda deliberadamente afuera: el diff
+# genérico de más abajo compara `line[field] != old[field]` y copiaría el id
+# crudo del lote de la compañía de ORIGEN, que no existe en la compañía
+# destino. Se resuelve aparte, con map_lot(), en el bloque dedicado del
+# write().
+RAW_COPY_LINE_FIELDS = ("quantity",)
 
 
 class StockMoveLine(models.Model):
@@ -108,7 +116,7 @@ class StockMoveLine(models.Model):
         return self.move_id.state == "done" and self.product_id.is_storable
 
     def write(self, vals):
-        """Corta la edición de validados sin rol y propaga la cantidad al espejo.
+        """Corta la edición de validados sin rol y propaga cantidad y lote al espejo.
 
         La nota de sync se postea SIEMPRE en las dos puntas -del lado que
         edita (`line.picking_id`) y del lado que recibe
@@ -117,7 +125,11 @@ class StockMoveLine(models.Model):
         dos auditorías con propósitos distintos, la de core sobre el
         movimiento de stock, la nuestra sobre el contexto intercompany
         (qué picking y qué usuario de la OTRA compañía lo originó), y
-        ninguna reemplaza a la otra.
+        ninguna reemplaza a la otra. Esto vale igual para `quantity` que
+        para `lot_id` (Tarea 9): `lot_id` es el primer campo de
+        GUARDED_LINE_FIELDS que además se propaga, así que necesita la
+        misma nota que `quantity`, no la ausencia de nota que tienen hoy el
+        resto de los campos vigilados que no viajan al espejo.
 
         `touches_synced_fields`: igual que en stock_picking.py, el diff y
         la búsqueda de contraparte (`_get_counterpart_line`, que hace un
@@ -151,21 +163,54 @@ class StockMoveLine(models.Model):
             old = previous.get(line.id, {})
             changed = {
                 field: line[field]
-                for field in SYNCED_LINE_FIELDS
+                for field in RAW_COPY_LINE_FIELDS
                 if field in old and line[field] != old[field]
             }
-            if "lot_id" in vals and line.lot_id != counterpart.lot_id:
+            if "lot_id" in vals:
+                # Ronda de corrección 1 (Tarea 9), Minor 1: se compara el
+                # lote YA MAPEADO contra el de la contraparte, no
+                # `line.lot_id` (de la compañía de origen) contra
+                # `counterpart.lot_id` (de la compañía destino) -esos dos
+                # nunca son el mismo registro aunque representen "el mismo"
+                # lote, así que esa comparación daba siempre verdadero y
+                # forzaba un write sobre la contraparte (con el undo/redo
+                # de quants que eso implica en una línea done) incluso
+                # cuando el lote equivalente ya era el correcto.
                 mapped = map_lot(line.lot_id, counterpart.company_id)
-                changed["lot_id"] = mapped.id if mapped else False
+                if mapped != counterpart.lot_id:
+                    changed["lot_id"] = mapped.id if mapped else False
             if not changed:
                 continue
             as_propagation(counterpart).write(changed)
-            if "quantity" in changed and line.picking_id and counterpart.picking_id:
+            if not (line.picking_id and counterpart.picking_id):
+                continue
+            if "quantity" in changed:
                 body = _(
                     "%(product)s: cantidad %(old)s → %(new)s",
                     product=line.product_id.display_name,
                     old=old["quantity"],
                     new=changed["quantity"],
+                )
+                post_sync_note(line.picking_id, body)
+                post_sync_note(
+                    counterpart.picking_id, body, source_picking=line.picking_id
+                )
+            if "lot_id" in changed:
+                # Ronda de corrección 1 (Tarea 9), Critical 2: a diferencia
+                # de los demás campos de GUARDED_LINE_FIELDS -que hoy no se
+                # propagan-, un write de lot_id SÍ cambia stock ya validado
+                # de la otra compañía (undo/redo de quants incluido), así
+                # que necesita la misma nota de auditoría que quantity: el
+                # mensaje propio de core no nombra ni el picking de origen
+                # ni la compañía, que es justo la mitigación que exige el
+                # riesgo aceptado de este módulo (operador de B corrigiendo
+                # stock validado de A).
+                old_lot = old.get("lot_id")
+                body = _(
+                    "%(product)s: lote %(old)s → %(new)s",
+                    product=line.product_id.display_name,
+                    old=old_lot.display_name if old_lot else _("sin lote"),
+                    new=line.lot_id.display_name if line.lot_id else _("sin lote"),
                 )
                 post_sync_note(line.picking_id, body)
                 post_sync_note(

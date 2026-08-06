@@ -1818,6 +1818,7 @@ class TestLineAddition(SyncCommon):
         self.assertNotEqual(
             mirrored.move_line_ids.lot_id, new_move.move_line_ids.lot_id
         )
+        self.assertEqual(mirrored.move_line_ids.lot_id.company_id, self.company2)
 
 
 class TestLotSync(SyncCommon):
@@ -1825,9 +1826,13 @@ class TestLotSync(SyncCommon):
 
     Distinto de `test_new_line_with_lot_replicates_lot_to_counterpart`
     (Tarea 8, en `TestLineAddition`): ese cubre el ALTA de una línea nueva
-    con lote sobre un picking ya done, vía `_get_counterpart_move_commands`.
-    Acá se cubre el WRITE de `lot_id` sobre una línea ya existente de la
-    entrega ya validada, vía el bucle de propagación de
+    con lote sobre un picking ya done, vía
+    `stock.move._create_counterpart_move` (stock_move.py). Acá se cubren
+    dos caminos distintos, los dos en `stock_picking.py`: la construcción
+    inicial del espejo con lote ya puesto en la línea de origen
+    (`_get_counterpart_move_commands`, ejercitado en `_create_lot_delivery`
+    antes de cualquier `write`) y el WRITE de `lot_id` sobre una línea ya
+    existente de la entrega ya validada, vía el bucle de propagación de
     `stock.move.line.write()`.
     """
 
@@ -1841,6 +1846,15 @@ class TestLotSync(SyncCommon):
         `button_validate()` con demanda completa. El lote inicial es
         distinto del que después escribe cada test, para que ese write sea
         un cambio real -no un no-op- que ejercite el mapeo del Step 3.
+
+        Ronda de corrección 1 (Tarea 9), Important 3: el revisor mostró que
+        revirtiendo SOLO el mapeo de `_get_counterpart_move_commands`
+        (Step 4) los dos tests de esta clase seguían en verde, porque el
+        `write` posterior (Step 3) pisa el lote de la línea espejo y tapa
+        cualquier agujero de la creación. Se assertea acá, ANTES de que
+        cualquier test llegue a escribir nada, que el espejo ya nace con el
+        lote equivalente -así el Step 4 queda cubierto de verdad, no solo
+        de encuentro-.
         """
         initial_lot = self.env["stock.lot"].create(
             {
@@ -1849,9 +1863,14 @@ class TestLotSync(SyncCommon):
                 "company_id": self.company1.id,
             }
         )
-        return self._create_delivery(
+        delivery, reception = self._create_delivery(
             qty=qty, product=self.product_lot, lot=initial_lot.id
         )
+        mirror_lot = reception.move_line_ids[0].lot_id
+        self.assertTrue(mirror_lot, "El espejo debería nacer con un lote mapeado")
+        self.assertEqual(mirror_lot.name, "LOTE-INICIAL")
+        self.assertEqual(mirror_lot.company_id, self.company2)
+        return delivery, reception
 
     def test_lot_mapped_to_destination_company(self):
         """El lote de la entrega se resuelve como lote propio de la otra compañía."""
@@ -1893,3 +1912,133 @@ class TestLotSync(SyncCommon):
             {"lot_id": lot_a.id}
         )
         self.assertEqual(reception.move_line_ids[0].lot_id, lot_b)
+
+    def test_lot_change_notes_posted_on_both_sides(self):
+        """El cambio de lote en una línea validada deja nota propia en las
+        dos puntas, con conteo EXACTO (Ronda de corrección 1, Critical 2).
+
+        Antes del fix, `post_sync_note` solo se llamaba si `"quantity" in
+        changed`: un `write({"lot_id": ...})` puro cambiaba stock ya
+        validado de la otra compañía sin dejar ningún rastro en ninguna de
+        las dos puntas.
+
+        Se cuenta `message_ids` en vez de grepear el body (la base corre en
+        es_AR). `_quantity_change_logged_by_core` -pese al nombre, ver su
+        docstring- audita cualquier campo de `triggers` (core,
+        stock_move_line.py: `location_id`, `lot_id`, etc., no solo
+        `quantity`) sobre una línea `done` y almacenable, así que también
+        predice la nota nativa de core para este cambio de lote.
+        """
+        lot_a = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-003",
+                "product_id": self.product_lot.id,
+                "company_id": self.company1.id,
+            }
+        )
+        delivery, reception = self._create_lot_delivery(qty=5.0)
+        delivery_line = delivery.move_line_ids[0]
+        reception_line = reception.move_line_ids[0]
+        expected_delivery = 1 + (
+            1 if delivery_line._quantity_change_logged_by_core() else 0
+        )
+        expected_reception = 1 + (
+            1 if reception_line._quantity_change_logged_by_core() else 0
+        )
+        before_delivery = len(delivery.message_ids)
+        before_reception = len(reception.message_ids)
+        delivery_line.with_user(self.user_manager_both).write({"lot_id": lot_a.id})
+        self.assertEqual(
+            len(delivery.message_ids),
+            before_delivery + expected_delivery,
+            "La entrega debería recibir la nota propia siempre, más la de "
+            f"core si le toca; mensajes: {delivery.message_ids.mapped('body')}",
+        )
+        self.assertEqual(
+            len(reception.message_ids),
+            before_reception + expected_reception,
+            "La recepción debería recibir la nota propia siempre, más la "
+            f"de core si le toca; mensajes: {reception.message_ids.mapped('body')}",
+        )
+        # La entrega SIEMPRE está done (_create_lot_delivery la valida) y la
+        # recepción todavía no: si esto deja de sostenerse, el desglose de
+        # arriba deja de probar lo que dice.
+        self.assertEqual(expected_delivery, 2, "La entrega debería estar done acá")
+        self.assertEqual(
+            expected_reception, 1, "La recepción no debería estar done acá"
+        )
+
+    def test_lot_without_company_is_reused_as_is(self):
+        """Un lote sin `company_id` ya sirve en cualquier compañía: no se
+        duplica ni revienta (Ronda de corrección 1, Critical 1).
+
+        Reproduce el camino real de la UI: los productos intercompany son
+        compartidos (`company_id = False`), así que `stock.lot
+        ._compute_company_id` (core) deja el lote SIN compañía apenas se lo
+        crea sin pasarla explícita -a diferencia del resto de los tests de
+        esta clase, que sí la pasan a propósito para simular un lote ya
+        existente y loteado por compañía-. Antes del fix, `map_lot` no
+        contemplaba `company_id = False`: la búsqueda por
+        `company_id = company.id` no encontraba nada y el intento de crear
+        un lote nuevo con el mismo nombre y producto chocaba con
+        `_check_unique_lot` (core), que sí cruza los lotes sin compañía, y
+        tiraba `ValidationError` -bloqueando la validación de cualquier
+        entrega intercompany con un lote recién creado por el flujo normal-.
+        """
+        lot_sin_compania = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-SIN-COMPANIA",
+                "product_id": self.product_lot.id,
+            }
+        )
+        self.assertFalse(
+            lot_sin_compania.company_id,
+            "El lote debería nacer sin compañía, como lo deja la UI sobre "
+            "un producto intercompany compartido",
+        )
+        delivery, reception = self._create_lot_delivery(qty=5.0)
+        delivery.move_line_ids[0].with_user(self.user_manager_both).write(
+            {"lot_id": lot_sin_compania.id}
+        )
+        self.assertEqual(reception.move_line_ids[0].lot_id, lot_sin_compania)
+
+    def test_lot_rewrite_same_lot_does_not_echo(self):
+        """Reescribir el MISMO lote (ya mapeado) no debe forzar un write()
+        extra sobre el espejo (Ronda de corrección 1, Minor 1).
+
+        `line.lot_id` (compañía de origen) y `counterpart.lot_id` (compañía
+        destino) son SIEMPRE registros distintos aunque representen "el
+        mismo" lote -son de compañías diferentes-, así que comparar esos
+        dos directamente daba siempre verdadero y forzaba una propagación
+        incluso sin cambio real: undo/redo de quants sobre una recepción ya
+        validada, más una nota espuria de core sin ningún cambio que la
+        explique. Se compara el lote YA MAPEADO (`map_lot(line.lot_id,
+        counterpart.company_id)`) contra `counterpart.lot_id` en cambio.
+        """
+        lot_a = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-004",
+                "product_id": self.product_lot.id,
+                "company_id": self.company1.id,
+            }
+        )
+        delivery, reception = self._create_lot_delivery(qty=5.0)
+        line = delivery.move_line_ids[0]
+        line.with_user(self.user_manager_both).write({"lot_id": lot_a.id})
+        model_class = type(self.env["stock.move.line"])
+        original_write = model_class.write
+        calls = []
+
+        def counting_write(self, vals):
+            calls.append(self.ids)
+            return original_write(self, vals)
+
+        with patch.object(model_class, "write", counting_write):
+            line.with_user(self.user_manager_both).write({"lot_id": lot_a.id})
+
+        self.assertEqual(
+            len(calls),
+            1,
+            "Reescribir el mismo lote (sin cambio real tras el mapeo) no "
+            f"debería propagar hacia el espejo; llamadas: {calls}",
+        )
