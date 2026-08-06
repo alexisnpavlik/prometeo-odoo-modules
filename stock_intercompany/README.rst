@@ -42,7 +42,9 @@ in the settings of that company.
 
 Caution:
 
-currently, lots and packages are not handled.
+lots are handled (propagated to the counterpart transfer, including
+addition of tracked products on already validated transfers); packages
+are still not handled.
 
 **Table of contents**
 
