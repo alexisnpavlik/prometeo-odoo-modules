@@ -1,6 +1,7 @@
 # Copyright 2026 Alexis Medina
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
+import re
 from unittest.mock import patch
 
 from odoo import Command, fields
@@ -1654,9 +1655,19 @@ class TestLineAddition(SyncCommon):
         diferencia de `test_operator_cannot_add_line_to_validated` (sin
         rol), `user_manager_one` sí tiene el rol pero le falta la
         compañía de la contraparte habilitada.
+
+        Ronda de corrección 2 (revisor), hallazgo del mismo patrón fuera
+        del alcance pedido (TestLineRemoval) pero encontrado al barrer el
+        módulo: con `assertRaises(AccessError)` pelado, neutralizar
+        `_check_intercompany_edit_allowed` con un `return` temprano NO
+        hacía fallar este test -otro `AccessError` completamente ajeno
+        (ir.rule de compañía, al intentar crear el espejo en
+        company2 sin tenerla habilitada) lo tapaba-. Se usa
+        `assertRaisesRegex` contra el `display_name` de la entrega para
+        que el test solo pase con el AccessError de nuestro guard.
         """
         delivery, _reception = self._create_delivery(qty=10.0)
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(AccessError, re.escape(delivery.display_name)):
             self.env["stock.move"].with_user(self.user_manager_one).create(
                 {
                     "picking_id": delivery.id,
@@ -2278,23 +2289,40 @@ class TestLineRemoval(SyncCommon):
         `user_operator` -que directamente no puede invocar `unlink()`
         por el ACL de base desde Important 4-, para que el AccessError
         que se comprueba sea el de NUESTRO guard, no el ACL genérico.
+
+        Ronda de corrección 2 (revisor), hallazgo repetido del módulo:
+        `assertRaises(AccessError)` pelado no discrimina QUÉ AccessError
+        se disparó. El re-revisor neutralizó `_check_intercompany_edit_allowed`
+        con un `return` temprano y este test seguía en verde -otro
+        `AccessError` completamente ajeno lo tapaba: revertir un move
+        `done` dispara valuación contable, y `user_admin_no_role` no
+        tiene acceso de lectura a `account.move` ("Journal Entry"), así
+        que el `unlink()` igual reventaba con AccessError aunque nuestro
+        guard estuviera apagado. Se usa `assertRaisesRegex` contra el
+        `display_name` del picking -que el guard interpola en su mensaje,
+        y ningún otro AccessError de este camino podría mencionar-, para
+        que el test solo pase si el AccessError es el nuestro.
         """
         delivery, _reception = self._create_delivery(qty=10.0)
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(AccessError, re.escape(delivery.display_name)):
             delivery.move_ids[0].with_user(self.user_admin_no_role).unlink()
 
     def test_operator_cannot_void_directly(self):
-        """El operador tampoco puede invocar action_intercompany_void directo."""
+        """El operador tampoco puede invocar action_intercompany_void
+        directo. Ver la nota de `test_operator_cannot_remove_from_validated`
+        sobre por qué `assertRaisesRegex` y no `assertRaises` pelado."""
         delivery, _reception = self._create_delivery(qty=10.0)
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(AccessError, re.escape(delivery.display_name)):
             delivery.move_ids[0].with_user(
                 self.user_operator
             ).action_intercompany_void()
 
     def test_manager_one_company_cannot_remove_from_validated(self):
-        """El manager con el rol pero una sola compañía tampoco puede."""
+        """El manager con el rol pero una sola compañía tampoco puede. Ver
+        la nota de `test_operator_cannot_remove_from_validated` sobre por
+        qué `assertRaisesRegex` y no `assertRaises` pelado."""
         delivery, _reception = self._create_delivery(qty=10.0)
-        with self.assertRaises(AccessError):
+        with self.assertRaisesRegex(AccessError, re.escape(delivery.display_name)):
             delivery.move_ids[0].with_user(self.user_manager_one).unlink()
 
     def test_operator_cannot_delete_undone_line_whose_counterpart_is_done(self):
