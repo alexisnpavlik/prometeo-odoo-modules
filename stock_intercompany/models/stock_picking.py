@@ -61,20 +61,25 @@ class StockPicking(models.Model):
 
         counterpart_picking_id resuelve el id de la contraparte con sudo()
         internamente (ver get_counterpart), pero el Many2one que devuelve
-        queda atado al env del usuario en curso. El cliente web resuelve el
-        display_name de cualquier Many2one presente en el formulario, aunque
-        esté con invisible="1" — y esa resolución sí pasa por la ir.rule de
-        stock.picking (restringe por company_id in company_ids activas en el
-        selector). Si la contraparte vive en una compañía que el usuario
-        tiene habilitada pero no activa en el selector, leer su display_name
-        revienta con AccessError y el formulario del picking deja de abrirse
-        para cualquiera, no solo para quien tiene el rol.
+        queda atado al env del usuario en curso. Acceder a su display_name
+        por ORM directo (`picking.counterpart_picking_id.display_name`) SÍ
+        pasa por la ir.rule de stock.picking sin sudo, y revienta con
+        AccessError si la compañía de la contraparte no está activa en el
+        selector del usuario (comprobado con un test de regresión).
 
-        Este booleano evita el problema: `bool()` sobre un recordset solo
-        mira si hay ids cacheados, no dispara ninguna lectura de campos ni
-        pasa por la ir.rule, así que la vista puede usarlo para decidir si
-        mostrar el botón "Contraparte" sin arriesgarse a heredar el
-        AccessError del Many2one.
+        Por la vía real que usa el formulario web —`web_read()`, en
+        `web/models/models.py` de este build— la resolución de
+        display_name de un Many2one queda envuelta en `sudo()` (ver el
+        código: `for rec in co_records.sudo(): ...`), así que hoy,
+        concretamente, NO revienta por ese camino. Pero es un detalle
+        interno de esa implementación, no documentado como comportamiento
+        garantizado de la API, y no cubre otras superficies (reportes,
+        otras vistas, XML-RPC, autocomplete). Por eso este booleano en vez
+        de confiar en ese detalle: `bool()` sobre un recordset solo mira si
+        hay ids cacheados, no dispara ninguna lectura de campos ni pasa por
+        la ir.rule bajo ningún camino, así que la vista puede usarlo para
+        decidir si mostrar el botón "Contraparte" sin depender de un
+        detalle interno que podría cambiar.
         """
         for picking in self:
             picking.has_counterpart_picking = bool(picking.counterpart_picking_id)
@@ -154,6 +159,17 @@ class StockPicking(models.Model):
         pero no activa en el selector; sin sudo, leer su company_id acá
         (para poder armar el contexto que activa esa compañía) revienta con
         AccessError antes de llegar a abrir nada.
+
+        Si el usuario directamente NO tiene esa compañía en su
+        `company_ids` (nunca habilitada, no solo "no activa ahora"), armar
+        igual un contexto con `allowed_company_ids` apuntando a ella no
+        sirve de nada: el propio `Environment.companies` de Odoo valida que
+        las compañías activas sean un subconjunto de las habilitadas del
+        usuario, y el primer `read` que dispare el cliente web contra el
+        formulario destino revienta con un AccessError crudo ("Acceso a
+        empresas sin autorización o que no son válidas") — el mismo caso
+        que ya rompió la Tarea 4. Se valida acá antes, con un UserError
+        explícito que dice qué compañía falta.
         """
         self.ensure_one()
         counterpart = self.counterpart_picking_id
@@ -164,15 +180,35 @@ class StockPicking(models.Model):
                     name=self.name,
                 )
             )
+        counterpart_company = counterpart.sudo().company_id
+        if counterpart_company not in self.env.user.company_ids:
+            raise UserError(
+                _(
+                    "No tenés habilitada la compañía %(company)s, donde está "
+                    "la contraparte de %(name)s. Pedile a un administrador "
+                    "que te la habilite.",
+                    company=counterpart_company.name,
+                    name=self.name,
+                )
+            )
+        # Se arranca de un contexto sin los "default_*" del origen: si el
+        # usuario llegó desde una acción con, por ejemplo,
+        # default_picking_type_id de ESTA compañía, arrastrarlo al
+        # formulario de la contraparte (activada vía allowed_company_ids)
+        # puede chocar con un mismatch de compañía en cuanto el usuario
+        # intente crear algo nuevo desde ahí.
+        clean_context = {
+            key: value
+            for key, value in self.env.context.items()
+            if not key.startswith("default_")
+        }
+        clean_context["allowed_company_ids"] = [counterpart_company.id]
         return {
             "type": "ir.actions.act_window",
             "res_model": "stock.picking",
             "res_id": counterpart.id,
             "view_mode": "form",
-            "context": dict(
-                self.env.context,
-                allowed_company_ids=[counterpart.sudo().company_id.id],
-            ),
+            "context": clean_context,
         }
 
     def _create_counterpart_picking(self):

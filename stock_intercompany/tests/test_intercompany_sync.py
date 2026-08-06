@@ -243,36 +243,29 @@ class SyncCommon(BaseCommon):
 
 
 class TestFormAccess(SyncCommon):
-    """Cubre el riesgo central de la Tarea 5: el formulario de una
-    transferencia intercompany validada tiene que poder abrirse para
-    cualquier usuario, sin importar qué compañías tenga activas en el
-    selector — no solo para quien tiene el rol de manager.
+    """Cubre el acceso al formulario de una transferencia intercompany
+    validada para los tres perfiles de usuario, y documenta el
+    comportamiento REAL (comprobado, no supuesto) de counterpart_picking_id.
 
-    counterpart_picking_id resuelve su id con sudo() (ver
-    _compute_counterpart_picking_id / get_counterpart en
-    intercompany_sync.py), pero el Many2one que devuelve queda atado al env
-    del usuario en curso. Si ese campo entra al formulario — aunque sea con
-    invisible="1" — y el usuario tiene la compañía de la contraparte
-    habilitada pero no activa en el selector, resolver su display_name pasa
-    por la ir.rule de stock.picking (restringe por
-    company_id in company_ids activas) sin sudo y revienta con AccessError.
-    Comprobado empíricamente en esta misma sesión con una sonda directa
-    sobre `restricted.counterpart_picking_id.display_name`
-    (`restricted = delivery.with_user(self.user_operator).with_context(
-    allowed_company_ids=[self.company1.id])`): tira
+    Acceso ORM directo, p. ej. `picking.counterpart_picking_id.display_name`,
+    SÍ revienta con AccessError si la compañía de la contraparte no está
+    activa en el selector del usuario en curso — se prueba abajo
+    (test_counterpart_picking_id_orm_access_raises_with_narrow_company),
+    aun cuando el usuario tiene esa compañía habilitada en company_ids (ver
+    user_operator en SyncCommon): el selector activo (allowed_company_ids)
+    puede ser más angosto que company_ids, y es lo que de verdad usa la
+    ir.rule de stock.picking.
 
-        odoo.exceptions.AccessError: Estos registros están restringidos.
-        Operador (id=...) no tiene acceso 'leer' a: Transferir  (stock.picking)
-
-    aun cuando user_operator tiene las DOS compañías habilitadas en
-    company_ids (ver SyncCommon) — el selector activo (allowed_company_ids)
-    puede ser más angosto que eso, y es lo que de verdad usa la ir.rule.
-
-    El fix es has_counterpart_picking: un Boolean cuyo compute solo hace
-    bool() sobre counterpart_picking_id (no dispara ninguna lectura de
-    campos ni pasa por la ir.rule) y es lo único que la vista usa para
-    decidir si mostrar el botón "Contraparte". La vista NUNCA agrega
-    counterpart_picking_id como field.
+    La vía que usa el formulario web real, `web_read()` (ver
+    `web/models/models.py` de este build), envuelve esa resolución de
+    display_name en `sudo()` — así que, concretamente hoy, NO revienta por
+    esa vía. Es un detalle interno de esa implementación, no documentado
+    como comportamiento garantizado de la API, y no cubre otras superficies
+    (reportes, otras vistas, XML-RPC, autocomplete). Por eso la vista NUNCA
+    agrega counterpart_picking_id como field: usa has_counterpart_picking
+    (Boolean, `bool()` puro — no dispara ninguna lectura de campos ni pasa
+    por la ir.rule bajo ningún camino) para decidir si mostrar el botón
+    "Contraparte".
     """
 
     VIEW_FIELDS = (
@@ -285,13 +278,16 @@ class TestFormAccess(SyncCommon):
         "priority",
     )
 
-    def test_counterpart_picking_id_display_name_raises_with_narrow_company(self):
-        """Guard-rail que documenta por qué la vista no expone el Many2one.
+    def test_counterpart_picking_id_orm_access_raises_with_narrow_company(self):
+        """Acceso ORM directo (no vía formulario) al Many2one revienta.
 
-        Si algún día alguien vuelve a agregar `counterpart_picking_id` como
-        field en la vista (en vez de has_counterpart_picking), este test
-        prueba en qué condición exacta explota: compañía habilitada pero no
-        activa en el selector.
+        Esto prueba el hecho ORM crudo — no el camino real del formulario
+        web, que pasa por web_read() y hoy queda protegido por un sudo()
+        interno de esa función (ver docstring de la clase). Es la razón por
+        la que la vista nunca expone counterpart_picking_id como field: si
+        algún día alguien lo agrega igual, este comportamiento de fondo
+        sigue estando ahí, esperando a que cambie ese detalle interno no
+        contractual de web_read.
         """
         delivery, _reception = self._create_delivery()
         self.env.invalidate_all()
@@ -360,32 +356,69 @@ class TestFormAccess(SyncCommon):
         self.assertFalse(result[0]["has_counterpart_picking"])
         self.assertFalse(result[0]["can_edit_done"])
 
-    def test_view_readonly_preserves_is_locked_and_leaves_priority_untouched(self):
-        """Guard contra reintroducir el readonly ingenuo del plan original.
+    def test_form_view_combined_arch_preserves_is_locked_and_full_field_read(self):
+        """Guard contra reintroducir el readonly ingenuo del plan original,
+        sobre el arch COMBINADO — no sobre el arch propio del record.
 
-        El arch base de stock.view_picking_form en este build trae
-        move_ids_without_package con
-        readonly="state == 'done' and is_locked" (no solo "state == 'done'")
-        y scheduled_date con readonly="state in ['cancel', 'done']" (no solo
-        'done'). Reemplazar esos atributos enteros por
-        "state == 'done' and not can_edit_done" destaparía is_locked y la
-        rama 'cancel', cambiando de comportamiento a CUALQUIER picking done
-        o cancelado sin contraparte intercompany (can_edit_done da False
-        siempre para esos). priority no tiene readonly en el arch base y se
-        deja así a propósito (ver GUARDED_PICKING_FIELDS en
-        models/stock_picking.py): agregarle uno nuevo introduciría una
-        restricción que hoy no existe para ningún picking.
+        Ronda de corrección 1, Minor 4: leer arch_db del propio
+        view_picking_form_intercompany_edit es casi tautológico (prueba el
+        texto que uno mismo escribió). get_view() fuerza a Odoo a aplicar
+        TODA la herencia sobre stock.view_picking_form (incluida la de
+        cualquier otro módulo instalado con mayor prioridad que pise el
+        mismo atributo), así que si eso pasara, este test lo detectaría.
+
+        De paso cierra el hueco de cobertura marcado aparte: deriva el
+        field spec del arch real (no una lista hardcodeada que se olvidaba,
+        por ejemplo, de is_locked) y hace el read completo como
+        user_operator con la compañía activa reducida a la propia.
         """
-        arch = self.env.ref(
-            "stock_intercompany.view_picking_form_intercompany_edit"
-        ).arch_db
+        import re
+
+        from lxml import etree
+
+        view_info = (
+            self.env["stock.picking"]
+            .with_user(self.user_operator)
+            .get_view(view_type="form")
+        )
+        arch = view_info["arch"]
         self.assertIn(
             "state == 'done' and is_locked and not can_edit_done", arch
         )
         self.assertIn(
             "state == 'cancel' or (state == 'done' and not can_edit_done)", arch
         )
-        self.assertNotIn('name="priority"', arch)
+
+        # Solo los fields de stock.picking en el nivel superior: los
+        # anidados dentro de una sub-vista de un o2m (p. ej. las líneas de
+        # move_ids_without_package) pertenecen a OTRO modelo (stock.move) y
+        # no se pueden pasar tal cual a web_read() de stock.picking — de
+        # ahí el filtro "not(ancestor::field)".
+        root = etree.fromstring(arch.encode())
+        field_names = sorted(
+            {el.get("name") for el in root.xpath("//field[not(ancestor::field)]")}
+        )
+        self.assertIn("is_locked", field_names)
+        self.assertIn("priority", field_names)
+        self.assertIn("has_counterpart_picking", field_names)
+        self.assertIn("can_edit_done", field_names)
+        # priority no debe traer readonly propio en el arch combinado: es
+        # el mismo criterio de "no restringir lo que hoy es libre" que
+        # motivó no tocarlo en la vista (ver GUARDED_PICKING_FIELDS en
+        # models/stock_picking.py).
+        priority_tag = re.search(r'<field name="priority"[^>]*/?>', arch)
+        self.assertIsNotNone(priority_tag)
+        self.assertNotIn("readonly", priority_tag.group(0))
+
+        delivery, _reception = self._create_delivery()
+        self.env.invalidate_all()
+        restricted = delivery.with_user(self.user_operator).with_context(
+            allowed_company_ids=[self.company1.id]
+        )
+        result = restricted.web_read({f: {} for f in field_names})
+        self.assertEqual(result[0]["id"], delivery.id)
+        self.assertFalse(result[0]["can_edit_done"])
+        self.assertTrue(result[0]["has_counterpart_picking"])
 
     def test_plain_picking_button_action_raises_user_error(self):
         """Sin contraparte, el botón (si se invoca igual) explica el porqué."""
@@ -430,6 +463,48 @@ class TestFormAccess(SyncCommon):
         self.assertEqual(action["res_id"], delivery.id)
         self.assertEqual(
             action["context"]["allowed_company_ids"], [self.company1.id]
+        )
+
+    def test_manager_one_company_button_raises_clear_error(self):
+        """Ronda de corrección 1, Important 1.
+
+        user_manager_one tiene el rol pero SOLO company1 habilitada (ver
+        SyncCommon). Antes del fix, el botón armaba igual un contexto con
+        allowed_company_ids=[company2] (el sudo() en company_id no
+        chequeaba que el usuario tuviera esa compañía), y el primer read
+        que dispararía el cliente web contra el formulario destino
+        reventaba con un AccessError crudo de Environment.companies (mismo
+        caso que ya rompió la Tarea 4). Ahora tiene que fallar acá, antes,
+        con un UserError explícito.
+        """
+        delivery, _reception = self._create_delivery()
+        with self.assertRaisesRegex(UserError, "No tenés habilitada la compañía"):
+            delivery.with_user(
+                self.user_manager_one
+            ).action_open_counterpart_picking()
+
+    def test_button_action_strips_default_context_keys(self):
+        """Ronda de corrección 1, Minor 3.
+
+        Si el usuario llegó a este picking desde una acción con
+        default_picking_type_id (u otro default_*) de ESTA compañía,
+        arrastrarlo al contexto del formulario destino (activado con
+        allowed_company_ids de la OTRA compañía) puede chocar con un
+        mismatch de compañía apenas el usuario intente crear algo nuevo
+        desde ahí. El contexto de la acción devuelta no debe traer ninguna
+        clave default_*.
+        """
+        delivery, _reception = self._create_delivery()
+        action = (
+            delivery.with_user(self.user_manager_both)
+            .with_context(default_picking_type_id=999999, default_priority="1")
+            .action_open_counterpart_picking()
+        )
+        leaked_defaults = [
+            key for key in action["context"] if key.startswith("default_")
+        ]
+        self.assertFalse(
+            leaked_defaults, f"Claves default_* filtradas: {leaked_defaults}"
         )
 
 

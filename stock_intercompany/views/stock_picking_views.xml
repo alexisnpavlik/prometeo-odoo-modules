@@ -62,7 +62,9 @@
                     icon="fa-exchange"
                     invisible="not has_counterpart_picking"
                 >
-                    <span class="o_stat_text">Contraparte</span>
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Contraparte</span>
+                    </div>
                 </button>
             </xpath>
             <xpath
