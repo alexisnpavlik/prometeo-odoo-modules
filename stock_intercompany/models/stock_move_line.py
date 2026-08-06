@@ -8,6 +8,7 @@ from .intercompany_sync import (
     as_propagation,
     get_counterpart,
     is_propagation,
+    map_lot,
     post_sync_note,
 )
 
@@ -58,7 +59,13 @@ GUARDED_LINE_FIELDS = (
 # las dos puntas a la vez, y "quantity" viaja crudo (sin conversión de UoM
 # entre las dos puntas), así que no hay valor derivado que ese atajo pudiera
 # propagar mal.
-SYNCED_LINE_FIELDS = ("quantity",)
+#
+# "lot_id" (Tarea 9) es la excepción a "viaja crudo": stock.lot es un
+# registro por compañía, así que el id de la línea de origen no sirve en la
+# contraparte. El bucle de write() de abajo no copia line.lot_id tal cual,
+# lo resuelve con map_lot() al lote equivalente de la compañía destino
+# antes de armar `changed`.
+SYNCED_LINE_FIELDS = ("quantity", "lot_id")
 
 
 class StockMoveLine(models.Model):
@@ -147,6 +154,9 @@ class StockMoveLine(models.Model):
                 for field in SYNCED_LINE_FIELDS
                 if field in old and line[field] != old[field]
             }
+            if "lot_id" in vals and line.lot_id != counterpart.lot_id:
+                mapped = map_lot(line.lot_id, counterpart.company_id)
+                changed["lot_id"] = mapped.id if mapped else False
             if not changed:
                 continue
             as_propagation(counterpart).write(changed)

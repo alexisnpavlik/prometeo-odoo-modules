@@ -127,8 +127,18 @@ class SyncCommon(BaseCommon):
                 ],
             }
         )
+        cls.product_lot = cls.env["product.product"].create(
+            {
+                "name": "Sync Product Lot",
+                "type": "consu",
+                "is_storable": True,
+                "tracking": "lot",
+                "categ_id": cls.env.ref("product.product_category_all").id,
+            }
+        )
+        cls.product_lot.company_id = False
 
-    def _create_reserved_delivery_picking(self, demand_qty, product):
+    def _create_reserved_delivery_picking(self, demand_qty, product, lot=None):
         """Crea una entrega intercompany CON demanda real y stock reservado.
 
         Compartido por _create_delivery y _create_delivery_with_backorder.
@@ -146,9 +156,17 @@ class SyncCommon(BaseCommon):
 
         Corre con user_operator (sin el rol): es quien tiene que poder
         crear y confirmar una entrega intercompany en el uso diario.
+
+        `lot` (Tarea 9): para productos con `tracking == "lot"`, core exige
+        un lote en la línea para poder validar (`_action_done` revienta con
+        UserError si falta). Se pasa como `lot_id` del quant reservado para
+        que `action_assign` lo propague solo a la línea, igual que pasaría
+        con stock real ya loteado -sin esto, ningún test de este módulo
+        podría llegar a `button_validate()` con un producto trazado.
         """
+        lot_record = self.env["stock.lot"].browse(lot) if lot else None
         self.env["stock.quant"].sudo()._update_available_quantity(
-            product, self.stock_location, demand_qty
+            product, self.stock_location, demand_qty, lot_id=lot_record
         )
         picking = (
             self.env["stock.picking"]
@@ -180,15 +198,19 @@ class SyncCommon(BaseCommon):
         self.assertTrue(line, "La reserva no generó una línea de movimiento")
         return picking, line
 
-    def _create_delivery(self, qty=10.0, product=None):
+    def _create_delivery(self, qty=10.0, product=None, lot=None):
         """Crea y valida una entrega intercompany con demanda completa.
 
         Devuelve (entrega, recepción). La reserva ya deja la línea en la
         cantidad total pedida (sin diferencia demanda/hecho), así que no
         debería generar backorder: se verifica explícitamente.
+
+        `lot` (Tarea 9): se reenvía a `_create_reserved_delivery_picking`
+        para poder validar productos con `tracking == "lot"` (ver el
+        docstring de ese método).
         """
         product = product or self.product
-        picking, line = self._create_reserved_delivery_picking(qty, product)
+        picking, line = self._create_reserved_delivery_picking(qty, product, lot=lot)
         with RecordCapturer(self.env["stock.picking"], []) as rc:
             picking.with_user(self.user_operator).button_validate()
         self.assertEqual(picking.state, "done", "La entrega no quedó validada")
@@ -1796,4 +1818,78 @@ class TestLineAddition(SyncCommon):
         self.assertNotEqual(
             mirrored.move_line_ids.lot_id, new_move.move_line_ids.lot_id
         )
-        self.assertEqual(mirrored.move_line_ids.lot_id.company_id, self.company2)
+
+
+class TestLotSync(SyncCommon):
+    """Sync del lote elegido en una línea existente hacia el espejo.
+
+    Distinto de `test_new_line_with_lot_replicates_lot_to_counterpart`
+    (Tarea 8, en `TestLineAddition`): ese cubre el ALTA de una línea nueva
+    con lote sobre un picking ya done, vía `_get_counterpart_move_commands`.
+    Acá se cubre el WRITE de `lot_id` sobre una línea ya existente de la
+    entrega ya validada, vía el bucle de propagación de
+    `stock.move.line.write()`.
+    """
+
+    def _create_lot_delivery(self, qty=5.0):
+        """Crea y valida una entrega de `product_lot` con un lote inicial.
+
+        `product_lot` tiene `tracking == "lot"`: core exige un lote en la
+        línea para poder validar (ver el docstring de
+        `_create_reserved_delivery_picking`), así que hace falta reservar
+        contra un quant ya loteado antes de poder llegar a
+        `button_validate()` con demanda completa. El lote inicial es
+        distinto del que después escribe cada test, para que ese write sea
+        un cambio real -no un no-op- que ejercite el mapeo del Step 3.
+        """
+        initial_lot = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-INICIAL",
+                "product_id": self.product_lot.id,
+                "company_id": self.company1.id,
+            }
+        )
+        return self._create_delivery(
+            qty=qty, product=self.product_lot, lot=initial_lot.id
+        )
+
+    def test_lot_mapped_to_destination_company(self):
+        """El lote de la entrega se resuelve como lote propio de la otra compañía."""
+        lot_a = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-001",
+                "product_id": self.product_lot.id,
+                "company_id": self.company1.id,
+            }
+        )
+        delivery, reception = self._create_lot_delivery(qty=5.0)
+        delivery.move_line_ids[0].with_user(self.user_manager_both).write(
+            {"lot_id": lot_a.id}
+        )
+        mirrored_lot = reception.move_line_ids[0].lot_id
+        self.assertTrue(mirrored_lot)
+        self.assertEqual(mirrored_lot.name, "LOTE-001")
+        self.assertEqual(mirrored_lot.company_id, self.company2)
+        self.assertNotEqual(mirrored_lot, lot_a)
+
+    def test_existing_lot_is_reused(self):
+        """Si el lote ya existe en la compañía destino, no se duplica."""
+        lot_a = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-002",
+                "product_id": self.product_lot.id,
+                "company_id": self.company1.id,
+            }
+        )
+        lot_b = self.env["stock.lot"].create(
+            {
+                "name": "LOTE-002",
+                "product_id": self.product_lot.id,
+                "company_id": self.company2.id,
+            }
+        )
+        delivery, reception = self._create_lot_delivery(qty=5.0)
+        delivery.move_line_ids[0].with_user(self.user_manager_both).write(
+            {"lot_id": lot_a.id}
+        )
+        self.assertEqual(reception.move_line_ids[0].lot_id, lot_b)

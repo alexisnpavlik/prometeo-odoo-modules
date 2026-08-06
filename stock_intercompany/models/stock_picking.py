@@ -9,6 +9,7 @@ from .intercompany_sync import (
     as_propagation,
     get_counterpart,
     is_propagation,
+    map_lot,
     post_sync_note,
 )
 
@@ -571,6 +572,12 @@ class StockPicking(models.Model):
                         counterpart_of_line_id=line.id,
                     )
                 )[0]
+                # copy_data copia line.lot_id crudo, pero stock.lot es por
+                # compañía: el lote de origen no existe en `company`. Se
+                # resuelve al equivalente (o se crea) con map_lot, igual
+                # que en la propagación del write() de stock.move.line.
+                lot = map_lot(line.lot_id, company)
+                line_vals["lot_id"] = lot.id if lot else False
                 line_commands.append(Command.create(line_vals))
             move_vals = move.with_company(company).copy_data(
                 dict(
