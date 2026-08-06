@@ -251,3 +251,36 @@ En `tests/`, extendiendo lo existente:
 | Picking sin contraparte | Comportamiento estándar de Odoo, sin guard y con backorder normal |
 
 El último es el que protege contra el efecto colateral más probable de todo este trabajo: romperle el flujo a las transferencias que no son intercompany.
+
+---
+
+## 12. Cierre de la implementación (2026-08-06)
+
+Implementado en `mejorar-inter`, 26 commits sobre `b281815`, versión `18.0.2.0.0`. Suite del módulo: **112 tests, sin fallos**, corridos contra `calidad`.
+
+### 12.1 Apartamientos del diseño, con su motivo
+
+| Qué | Por qué |
+|---|---|
+| `priority` **no** está entre los campos vigilados por el guard | `_action_done` de core escribe `priority='0'` cuando el picking ya está `done` y el espejo ya existe. Vigilarlo rompía la validación de toda entrega intercompany. Sigue estando entre los campos sincronizados: son dos listas distintas. |
+| `scheduled_date` **no** se sincroniza en pickings validados o cancelados | Core bloquea ese campo en esos estados. Relajar el bloqueo hacía que propagar la fecha reescribiera `move.date`, que después de `_action_done` es la fecha **real** del movimiento: falsificaba el inventario a fecha y la valorización en las dos compañías. Como el espejo solo existe cuando la entrega ya está validada, en la práctica esa fecha no propaga nunca. `priority` sí. |
+| El permiso de borrar `stock.move` va al grupo del módulo, no a `stock.group_stock_user` | Ensancharlo a todo Inventario habría dejado a cualquier usuario borrar líneas de pickings ajenos, violando la regla de no alterar los pickings sin contraparte. |
+| La vista expone un booleano `has_counterpart_picking`, no el Many2one a la contraparte | El Many2one apunta a un picking de otra compañía; exponerlo hacía depender el formulario de un detalle interno no contractual de `web_read`. |
+| El espejo se confirma con `_action_confirm(merge=False)` | El merge de moves del mismo producto colapsaba los dos moves espejo en uno. |
+
+### 12.2 Pendientes conocidos, no bloqueantes
+
+- **§7.3 sin implementar.** No hay manejo de errores presentables: los fallos de entorno —producto sin configurar en la otra compañía, almacén faltante— salen como traceback en vez de `UserError` nombrando el picking contraparte.
+- **Asimetría del guard bilateral.** Borrar o anular una línea exige el rol y mira las dos puntas, pero poner la cantidad en cero con un `write` logra el mismo estado final sin rol, por el camino que la §3.2 acepta a propósito. Hay que decidir cuál de las dos es la regla.
+- **Alta de línea sin réplica.** Un usuario con el rol que agrega una línea a un picking validado mueve stock en su compañía, pero el espejo no recibe la línea ni una nota. El bypass de permisos está cerrado; la divergencia queda.
+- **Valorización sin probar con costo real.** Todos los tests corrieron con productos de costo cero, así que los SVL verificados fueron 0.0. AVCO, FIFO y `_run_fifo_vacuum` no están ejercitados.
+
+### 12.3 Antes de desplegar
+
+1. **Avisar a los depósitos.** Hay 67 recepciones espejo en `assigned` que cambian de comportamiento en vuelo: al validarlas ya no generan backorder, sino que propagan la baja a la entrega ya validada de la otra compañía, revirtiendo stock y generando asientos de valorización.
+2. **Asignar `group_intercompany_manager`** en el mismo despliegue. Si no, los 48 espejos ya validados y sus entregas quedan de solo lectura para todos: hoy cualquier usuario de stock puede corregirlos de fábrica.
+3. **Correr `-u purchase_auto_update_cost -d calidad` aparte.** Ese módulo tiene el schema desalineado (`purchase_order_line.price_sale` no existe) y rompe cualquier `write` de cantidad sobre líneas validadas ligadas a compras. Sin eso, el error va a parecer culpa de este módulo.
+4. **Revisar la fila ACL de `pos_user` sobre `stock.move`** en la base: le da `perm_unlink` a un grupo ajeno a este módulo y relativiza el acotamiento del punto anterior.
+5. **Probar la valorización con un producto de costo real**, con rollback: alta de línea, baja y recepción parcial, mirando SVL y asientos en las dos compañías.
+
+**No hace falta migración de datos.** Los 117 espejos existentes tienen los vínculos completos (4690/4690 moves, 4758/4758 líneas) y los campos nuevos son todos computados no almacenados, así que el `-u` no toca el schema.
