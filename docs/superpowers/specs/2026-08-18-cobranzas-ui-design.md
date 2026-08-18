@@ -27,8 +27,8 @@ pagos sin tocar la base a mano, con carga opcional de comprobantes.
   propia. El precedente del repo (`gastos-dashboard`) no tiene ninguna, pero es de solo
   lectura; acá no alcanza.
 - Un solo usuario: Alexis. No hay tabla de usuarios ni recuperación de contraseña.
-- El `.env` de este repo **está versionado a propósito**, así que ningún secreto puede ir
-  en texto plano.
+- El `.env` de este repo está versionado a propósito y el repo es privado: los secretos
+  van en texto plano, igual que `COBRANZAS_DB_PASSWORD`, que ya vive ahí.
 - Estructura de código del repo: `config`/`modules` por responsabilidad, un archivo por
   concern, `snake_case`, docstring en cada función.
 - Sin suite de tests automatizados: la verificación es manual y documentada.
@@ -84,13 +84,12 @@ Sin tabla de usuarios. Tres variables de entorno nuevas en `.env` y `.env.exampl
 | Variable | Contenido |
 |---|---|
 | `COBRANZAS_UI_USER` | Nombre de usuario |
-| `COBRANZAS_UI_PASSWORD_HASH` | Hash `scrypt` de la contraseña |
+| `COBRANZAS_UI_PASSWORD` | Contraseña |
 | `COBRANZAS_SESSION_SECRET` | Cadena aleatoria que firma la cookie de sesión |
 
-La contraseña nunca se guarda en texto plano, porque el `.env` se versiona. El hash se
-genera con un helper del propio servicio (`python -m hash_password`), que usa
-`hashlib.scrypt` de la biblioteca estándar — sin dependencias de criptografía nuevas. La
-verificación compara con `secrets.compare_digest`.
+En texto plano, siguiendo la convención ya establecida del repo, que es privado y versiona
+sus `.env`. La comparación se hace con `secrets.compare_digest`, para no filtrar
+información por tiempo de respuesta.
 
 `.env.example` deja las tres vacías, para que olvidarse de configurarlas sea ruidoso.
 
@@ -149,7 +148,6 @@ services/cobranzas/api/
   auth.py            sesión, login y la dependencia de guardia
   db.py              conexión y consultas
   logic.py           decisión del aviso (sin cambios)
-  hash_password.py   helper para generar el hash de la contraseña
   templates/         login, panel, alta, edición, pago
   static/estilo.css
 ```
