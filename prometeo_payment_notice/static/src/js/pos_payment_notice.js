@@ -18,11 +18,11 @@ export class PosPaymentNoticeBanner extends Component {
 
     get visible() {
         const session = this.pos.session || {};
-        return session.prometeo_notice_show && session.prometeo_notice_mode === "franja";
+        return session._prometeo_notice_show && session._prometeo_notice_mode === "franja";
     }
 
     get message() {
-        return (this.pos.session || {}).prometeo_notice_message || "";
+        return (this.pos.session || {})._prometeo_notice_message || "";
     }
 }
 
@@ -36,11 +36,11 @@ patch(PosStore.prototype, {
     async afterProcessServerData() {
         const result = await super.afterProcessServerData(...arguments);
         const session = this.session || {};
-        if (session.prometeo_notice_show && session.prometeo_notice_mode === "popup") {
+        if (session._prometeo_notice_show && session._prometeo_notice_mode === "popup") {
             try {
                 this.dialog.add(AlertDialog, {
                     title: _t("Aviso de pago"),
-                    body: session.prometeo_notice_message,
+                    body: session._prometeo_notice_message,
                     confirmLabel: _t("Entendido"),
                 });
             } catch (e) {
