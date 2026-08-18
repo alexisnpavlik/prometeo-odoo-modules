@@ -27,6 +27,11 @@ conocido y nunca se genera un aviso nuevo.
             "prometeo_payment_notice/static/src/js/payment_notice_banner.js",
             "prometeo_payment_notice/static/src/xml/payment_notice_banner.xml",
         ],
+        "point_of_sale._assets_pos": [
+            "prometeo_payment_notice/static/src/css/payment_notice_banner.css",
+            "prometeo_payment_notice/static/src/js/pos_payment_notice.js",
+            "prometeo_payment_notice/static/src/xml/pos_payment_notice.xml",
+        ],
     },
     "installable": True,
     "auto_install": False,
