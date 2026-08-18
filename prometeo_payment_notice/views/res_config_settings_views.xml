@@ -9,7 +9,7 @@
                 <app data-string="Aviso de pago" string="Aviso de pago" name="prometeo_payment_notice">
                     <block title="Conexión con cobranzas" name="prometeo_notice_connection">
                         <setting string="URL de la API" help="Base de la API de cobranzas, sin barra final.">
-                            <field name="prometeo_notice_api_url" placeholder="https://cobranzas.prometeolab.com.ar"/>
+                            <field name="prometeo_notice_api_url" placeholder="https://registropagos.prometeolab.com.ar"/>
                         </setting>
                         <setting string="Clave de instalación" help="Identificador de esta instalación.">
                             <field name="prometeo_notice_instance_key"/>

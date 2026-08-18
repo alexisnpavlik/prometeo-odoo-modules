@@ -9,7 +9,7 @@ degrada ninguna funcionalidad: es solo un aviso visual.
 **Ajustes → Aviso de pago.**
 
 - **URL de la API de cobranzas**: base de la API, sin barra final (ej.
-  `https://cobranzas.prometeolab.com.ar`).
+  `https://registropagos.prometeolab.com.ar`).
 - **Clave de instalación**: identificador de esta instalación en la base de
   cobranzas.
 - **Token**: token entregado al dar de alta la instalación.

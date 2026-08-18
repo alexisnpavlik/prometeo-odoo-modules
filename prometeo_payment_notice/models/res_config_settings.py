@@ -15,7 +15,7 @@ class ResConfigSettings(models.TransientModel):
     prometeo_notice_api_url = fields.Char(
         string="URL de la API de cobranzas",
         config_parameter=PARAM_URL,
-        help="Base de la API, sin barra final. Ej: https://cobranzas.prometeolab.com.ar",
+        help="Base de la API, sin barra final. Ej: https://registropagos.prometeolab.com.ar",
     )
     prometeo_notice_instance_key = fields.Char(
         string="Clave de instalación",
