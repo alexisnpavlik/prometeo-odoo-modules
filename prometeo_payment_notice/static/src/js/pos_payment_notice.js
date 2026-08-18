@@ -37,11 +37,15 @@ patch(PosStore.prototype, {
         const result = await super.afterProcessServerData(...arguments);
         const session = this.session || {};
         if (session.prometeo_notice_show && session.prometeo_notice_mode === "popup") {
-            this.dialog.add(AlertDialog, {
-                title: _t("Aviso de pago"),
-                body: session.prometeo_notice_message,
-                confirmLabel: _t("Entendido"),
-            });
+            try {
+                this.dialog.add(AlertDialog, {
+                    title: _t("Aviso de pago"),
+                    body: session.prometeo_notice_message,
+                    confirmLabel: _t("Entendido"),
+                });
+            } catch (e) {
+                console.warn("Aviso de pago: falló al mostrar el popup", e);
+            }
         }
         return result;
     },

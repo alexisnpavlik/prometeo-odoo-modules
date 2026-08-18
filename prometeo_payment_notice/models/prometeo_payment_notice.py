@@ -53,6 +53,10 @@ class PrometeoPaymentNotice(models.AbstractModel):
             _logger.warning("Aviso de pago: falló la consulta de estado (%s)", e)
             return {}
 
+        if not isinstance(data, dict):
+            _logger.warning("Aviso de pago: la API devolvió un JSON que no es un objeto, se ignora")
+            return {}
+
         data["consultado_el"] = fields.Datetime.to_string(fields.Datetime.now())
         self.env["ir.config_parameter"].sudo().set_param(PARAM_STATE, json.dumps(data))
         _logger.info("Aviso de pago: estado actualizado (aviso=%s)", data.get("mostrar_aviso"))

@@ -128,7 +128,12 @@ día 10 del mes: si para el día 10 el pago no figura registrado, aparece el car
 `mensaje` sale de `mensaje_custom` si está cargado; si no, de una plantilla por defecto con
 el nombre del mes interpolado.
 
-Errores: `401` si `instance_key` + `token` no coinciden o el cliente está inactivo.
+Errores: `401` si `instance_key` + `token` no coinciden o faltan.
+
+Si el cliente está inactivo, la respuesta es `200` con `mostrar_aviso: false` (nunca `401`):
+se evita romper la cadena de arranque del módulo por un estado administrativo del cliente,
+y la consulta igual queda registrada como heartbeat en `consultas`.
+
 `GET /health` devuelve `{"status": "ok"}` para el healthcheck del contenedor.
 
 Cada request autenticado inserta una fila en `consultas` con la IP de origen.
