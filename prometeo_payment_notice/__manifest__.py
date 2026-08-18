@@ -21,6 +21,13 @@ conocido y nunca se genera un aviso nuevo.
         "data/ir_cron.xml",
         "views/res_config_settings_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "prometeo_payment_notice/static/src/css/payment_notice_banner.css",
+            "prometeo_payment_notice/static/src/js/payment_notice_banner.js",
+            "prometeo_payment_notice/static/src/xml/payment_notice_banner.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": False,
