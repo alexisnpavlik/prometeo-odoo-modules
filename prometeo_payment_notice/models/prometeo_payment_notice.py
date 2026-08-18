@@ -72,6 +72,9 @@ class PrometeoPaymentNotice(models.AbstractModel):
         except ValueError:
             _logger.warning("Aviso de pago: estado cacheado ilegible, se ignora")
             return dict(SIN_AVISO)
+        if not isinstance(data, dict):
+            _logger.warning("Aviso de pago: estado cacheado no es un objeto, se ignora")
+            return dict(SIN_AVISO)
         return {
             "mostrar": bool(data.get("mostrar_aviso")),
             "mensaje": data.get("mensaje") or "",
