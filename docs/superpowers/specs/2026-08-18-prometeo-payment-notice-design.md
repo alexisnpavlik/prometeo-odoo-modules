@@ -181,9 +181,9 @@ Override de `ir.http._get_session_info()` para inyectar en la sesión:
 Es el mismo mecanismo con el que Odoo entrega `expiration_date` para el cartel de base
 neutralizada, así que no agrega ningún RPC.
 
-Del lado JS, un componente OWL registrado en el registry `main_components` que renderiza
-una franja en la parte superior del cliente web cuando `mostrar` es `true`. La ven **todos
-los usuarios** del backend. No es descartable, pero tampoco bloquea ninguna acción.
+Del lado JS, un componente OWL insertado por herencia de la plantilla `web.WebClient`
+(entre la barra de navegación y el contenido) que renderiza una franja cuando `mostrar` es
+`true`. La ven **todos los usuarios** del backend. No es descartable, pero tampoco bloquea ninguna acción.
 
 Estilo: fondo ámbar suave, texto oscuro, tono cordial.
 
