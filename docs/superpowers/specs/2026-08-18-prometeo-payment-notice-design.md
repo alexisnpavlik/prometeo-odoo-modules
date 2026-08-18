@@ -108,7 +108,7 @@ Respuesta 200:
   "periodo": "2026-08-01",
   "vencio_el": "2026-08-05",
   "dias_atraso": 13,
-  "mensaje": "Hola! No nos figura registrado el pago de agosto. Si ya lo hiciste, avisanos."
+  "mensaje": "¡Hola! No registramos tu pago de agosto (atraso de 13 días). Si ya lo realizaste o se trata de un error, por favor envíanos el comprobante para actualizar el sistema. ¡Gracias!"
 }
 ```
 
