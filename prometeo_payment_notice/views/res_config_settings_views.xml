@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_prometeo_payment_notice" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.prometeo.payment.notice</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Aviso de pago" string="Aviso de pago" name="prometeo_payment_notice">
+                    <block title="Conexión con cobranzas" name="prometeo_notice_connection">
+                        <setting string="URL de la API" help="Base de la API de cobranzas, sin barra final.">
+                            <field name="prometeo_notice_api_url" placeholder="https://cobranzas.prometeolab.com.ar"/>
+                        </setting>
+                        <setting string="Clave de instalación" help="Identificador de esta instalación.">
+                            <field name="prometeo_notice_instance_key"/>
+                        </setting>
+                        <setting string="Token" help="Token entregado al dar de alta esta instalación.">
+                            <field name="prometeo_notice_token" password="True"/>
+                        </setting>
+                        <setting string="Probar conexión" help="Consulta la API en el momento y muestra el resultado.">
+                            <button name="action_test_payment_notice" type="object" string="Probar conexión" class="btn-secondary"/>
+                        </setting>
+                    </block>
+                    <block title="Punto de Venta" name="prometeo_notice_pos">
+                        <setting string="Aviso en el POS" help="Dónde mostrar el aviso dentro del Punto de Venta.">
+                            <field name="prometeo_notice_pos_mode"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
