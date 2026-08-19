@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="prometeo_payment_notice.PosBanner">
+        <div t-if="visible" class="o_prometeo_payment_notice">
+            <i class="fa fa-info-circle me-2"/>
+            <span t-esc="message"/>
+        </div>
+    </t>
+
+    <t t-name="prometeo_payment_notice.PosChrome" t-inherit="point_of_sale.Chrome" t-inherit-mode="extension">
+        <xpath expr="//Navbar" position="after">
+            <PosPaymentNoticeBanner/>
+        </xpath>
+    </t>
+
+</templates>

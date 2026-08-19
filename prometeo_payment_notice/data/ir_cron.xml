@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_prometeo_payment_notice" model="ir.cron">
+        <field name="name">Prometeo: verificar estado de pago del servicio</field>
+        <field name="model_id" ref="model_prometeo_payment_notice"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_check()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
