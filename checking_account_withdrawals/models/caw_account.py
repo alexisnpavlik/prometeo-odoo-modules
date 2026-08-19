@@ -111,11 +111,11 @@ class CawAccount(models.Model):
         "installment_ids.withdrawal_id.state",
     )
     def _compute_balances(self):
-        """Saldo y vencido: residuales de cuotas de retiros vivos (ni borrador ni cancelados)."""
+        """Saldo y vencido: residuales de cuotas de retiros vivos (confirmados y no cancelados)."""
         today = fields.Date.context_today(self)
         for account in self:
             open_installments = account.installment_ids.filtered(
-                lambda i: i.withdrawal_id.state not in ("draft", "cancel")
+                lambda i: i.withdrawal_id.state not in ("draft", "delivered", "cancel")
             )
             account.balance = sum(open_installments.mapped("amount_residual"))
             account.overdue_balance = sum(

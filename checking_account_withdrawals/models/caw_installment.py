@@ -160,7 +160,7 @@ class CawInstallment(models.Model):
         candidates = self.search([
             ("date_due", "<", today),
             ("state", "in", ("pending", "partial")),
-            ("withdrawal_id.state", "not in", ("draft", "cancel")),
+            ("withdrawal_id.state", "not in", ("draft", "delivered", "cancel")),
         ])
         candidates.invalidate_recordset(["state"])
         candidates.modified(["date_due"])

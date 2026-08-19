@@ -18,6 +18,7 @@ INSTALLMENT_STATES = {
 
 WITHDRAWAL_STATES = {
     "draft": "Borrador",
+    "delivered": "Entregado",
     "pending": "Pendiente",
     "partial": "Pago parcial",
     "paid": "Pagado",
@@ -35,7 +36,7 @@ class CawDashboardController(http.Controller):
 
     def _caw_where(self, env, start_date, end_date, company, partner, alias="w"):
         """WHERE parametrizado sobre caw_withdrawal (alias `w`), scopeado a las compañías."""
-        where = f"{alias}.state NOT IN ('draft', 'cancel') AND {alias}.company_id IN %s"
+        where = f"{alias}.state NOT IN ('draft', 'delivered', 'cancel') AND {alias}.company_id IN %s"
         params = [tuple(env.companies.ids)]
         if start_date:
             where += f" AND {alias}.date >= %s"
@@ -269,7 +270,7 @@ class CawDashboardController(http.Controller):
         else:
             record_model = env["caw.withdrawal"]
             date_field = "date"
-            domain.append(("state", "not in", ("draft", "cancel")))
+            domain.append(("state", "not in", ("draft", "delivered", "cancel")))
         if start_date:
             domain.append((date_field, ">=", start_date))
         if end_date:

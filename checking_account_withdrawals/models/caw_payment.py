@@ -116,7 +116,7 @@ class CawPayment(models.Model):
                 ("partner_id", "=", self.partner_id.id),
                 ("company_id", "=", self.company_id.id),
                 ("amount_residual", ">", 0),
-                ("withdrawal_id.state", "not in", ("draft", "cancel")),
+                ("withdrawal_id.state", "not in", ("draft", "delivered", "cancel")),
             ],
             order="date_due asc, withdrawal_id asc, sequence asc",
         )
