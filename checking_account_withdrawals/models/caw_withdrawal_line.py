@@ -78,13 +78,43 @@ class CawWithdrawalLine(models.Model):
             if line.price_unit < 0:
                 raise ValidationError(_("El precio unitario no puede ser negativo."))
 
+    def _caw_price_unit(self):
+        """Precio unitario del producto según la lista de precios del retiro.
+
+        Sin lista configurada se usa el precio base del producto (comportamiento
+        previo del módulo). Con lista, se respeta lo que la lista resuelva: precio
+        fijo por producto o porcentaje de descuento sobre el precio base.
+        """
+        self.ensure_one()
+        product = self.product_id
+        if not product:
+            return 0.0
+        pricelist = self.withdrawal_id.pricelist_id
+        if not pricelist:
+            return product.list_price
+        kwargs = {"date": self.withdrawal_id.date or fields.Date.context_today(self)}
+        if self.withdrawal_id.currency_id:
+            kwargs["currency"] = self.withdrawal_id.currency_id
+        return pricelist._get_product_price(product, self.quantity or 1.0, **kwargs)
+
     @api.onchange("product_id")
     def _onchange_product_id(self):
-        """Propone descripción y precio de lista del producto."""
+        """Propone descripción y precio del producto según la lista del retiro."""
         for line in self:
             if line.product_id:
                 line.name = line.product_id.display_name
-                line.price_unit = line.product_id.list_price
+                line.price_unit = line._caw_price_unit()
+
+    @api.onchange("quantity")
+    def _onchange_quantity(self):
+        """Recalcula el precio: las reglas de la lista pueden depender de la cantidad.
+
+        Solo actúa si hay lista: sin ella el precio base no depende de la cantidad y
+        pisarlo borraría un ajuste manual del Manager sin motivo.
+        """
+        for line in self:
+            if line.product_id and line.withdrawal_id.pricelist_id:
+                line.price_unit = line._caw_price_unit()
 
     def _caw_check_not_locked(self):
         """Bloquea la edición/borrado directo de líneas de un retiro confirmado o cancelado.

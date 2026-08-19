@@ -1,25 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_caw_company_form" model="ir.ui.view">
-        <field name="name">res.company.form.caw</field>
-        <field name="model">res.company</field>
-        <field name="inherit_id" ref="base.view_company_form"/>
+    <!-- Los ajustes del módulo viven en Ajustes generales (/odoo/settings). Escriben
+         sobre la compañía activa: para configurar otra sucursal hay que cambiar de
+         compañía desde el selector del menú superior. -->
+    <record id="view_caw_res_config_settings_form" model="ir.ui.view">
+        <field name="name">res.config.settings.form.caw</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//sheet//notebook" position="inside">
-                <page string="Cuenta corriente" name="caw"
-                      groups="checking_account_withdrawals.group_cc_manager">
-                    <group>
-                        <group string="Plan de cuotas por defecto">
+            <xpath expr="//form" position="inside">
+                <app data-string="Cuenta Corriente" string="Cuenta Corriente"
+                     name="checking_account_withdrawals"
+                     groups="checking_account_withdrawals.group_cc_manager">
+                    <block title="Plan de cuotas por defecto" name="caw_installment_container">
+                        <setting string="Cuotas por defecto"
+                                 help="Cantidad de cuotas propuesta al confirmar un retiro.">
                             <field name="caw_installment_count"/>
+                        </setting>
+                        <setting string="Días hasta el primer vencimiento"
+                                 help="Días desde la fecha del retiro hasta el vencimiento de la primera cuota.">
                             <field name="caw_installment_days"/>
+                        </setting>
+                        <setting string="Periodicidad de cuotas"
+                                 help="Espaciado entre los vencimientos de las cuotas siguientes.">
                             <field name="caw_installment_period"/>
+                        </setting>
+                        <setting string="Día de corte"
+                                 help="Día del mes al que se ajustan los vencimientos. 0 = sin día de corte.">
                             <field name="caw_cutoff_day"/>
-                        </group>
-                        <group string="Stock">
-                            <field name="caw_picking_type_id"/>
-                        </group>
-                    </group>
-                </page>
+                        </setting>
+                    </block>
+                    <block title="Precios" name="caw_pricing_container">
+                        <setting string="Lista de precios para retiros"
+                                 help="Lista con la que se cotizan los productos de un retiro. Vacía = precio base del producto.">
+                            <field name="caw_pricelist_id"
+                                   options="{'no_create': True}"
+                                   domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]"/>
+                        </setting>
+                    </block>
+                    <block title="Stock" name="caw_stock_container">
+                        <setting string="Tipo de operación para retiros"
+                                 help="Tipo de operación usado para el albarán de salida. Vacío = salidas del almacén principal.">
+                            <field name="caw_picking_type_id"
+                                   options="{'no_create': True}"
+                                   domain="[('code', '=', 'outgoing'), ('company_id', '=', company_id)]"/>
+                        </setting>
+                    </block>
+                </app>
             </xpath>
         </field>
     </record>
