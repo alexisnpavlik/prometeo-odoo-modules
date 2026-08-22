@@ -83,13 +83,12 @@ def describe_error(error):
     return name
 
 
-def is_afip_unreachable(error):
-    """Indica si ``error`` viene de que AFIP no contesta, no de un rechazo.
+def _looks_like_network_error(error):
+    """Evalúa una sola excepción, sin mirar la cadena.
 
-    Se mira primero el tipo y el módulo de la excepción, que es lo estable, y
-    recién después el texto. Al revés se escapan cosas como
-    ``httplib2.ServerNotFoundError``, cuyo nombre no contiene ninguna palabra
-    obvia de red.
+    Se mira primero el tipo y el módulo, que es lo estable, y recién después el
+    texto. Al revés se escapan cosas como ``httplib2.ServerNotFoundError``, cuyo
+    nombre no contiene ninguna palabra obvia de red.
     """
     if isinstance(error, NETWORK_EXCEPTIONS):
         return True
@@ -98,6 +97,24 @@ def is_afip_unreachable(error):
         return True
     text = describe_error(error).lower()
     return any(hint in text for hint in AFIP_UNREACHABLE_HINTS)
+
+
+def is_afip_unreachable(error):
+    """Indica si ``error`` viene de que AFIP no contesta, no de un rechazo.
+
+    Recorre la cadena de excepciones porque el error de red casi nunca llega
+    solo: pysimplesoap conserva modismos de Python 2 (``error[0]`` sobre la
+    excepción) que, con la conexión caída, levantan
+    ``TypeError: 'ConnectionRefusedError' object is not subscriptable`` encima
+    del error original. El motivo real queda en ``__context__``.
+    """
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if _looks_like_network_error(error):
+            return True
+        error = error.__cause__ or error.__context__
+    return False
 
 
 def afip_connection_message():
