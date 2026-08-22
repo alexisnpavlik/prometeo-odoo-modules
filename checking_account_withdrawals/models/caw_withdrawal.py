@@ -149,6 +149,12 @@ class CawWithdrawal(models.Model):
         string="Estado del albarán",
         store=True,
     )
+    caw_lines_editable = fields.Boolean(
+        string="Líneas editables por el usuario actual",
+        compute="_compute_caw_lines_editable",
+        help="Campo técnico para el readonly de line_ids: en borrador edita cualquiera, y "
+             "fuera de borrador solo un Manager, y solo para corregir precios.",
+    )
     is_inconsistent = fields.Boolean(
         string="Inconsistente",
         compute="_compute_is_inconsistent",
@@ -174,6 +180,97 @@ class CawWithdrawal(models.Model):
         for withdrawal in self:
             withdrawal.is_overdue = any(
                 installment.state == "overdue" for installment in withdrawal.installment_ids
+            )
+
+    def _caw_posted_allocations(self):
+        """Imputaciones del retiro que provienen de pagos publicados."""
+        self.ensure_one()
+        return self.installment_ids.mapped("allocation_ids").filtered(
+            lambda a: a.payment_id.state == "posted"
+        )
+
+    def _caw_price_correctable(self):
+        """El retiro admite que un Manager corrija los precios de sus líneas.
+
+        Borrador y entregado siempre: en el primero el retiro todavía se está armando y
+        en el segundo salió la mercadería pero aún no hay deuda emitida. Confirmado,
+        solo mientras no haya ningún pago imputado: corregir un precio reescribe los
+        montos de las cuotas, y hacerlo con pagos encima dejaría imputaciones sin
+        correspondencia.
+        """
+        self.ensure_one()
+        if self.is_cancelled:
+            return False
+        if not self.is_confirmed:
+            return True
+        return not self._caw_posted_allocations()
+
+    def _caw_in_draft(self):
+        """El retiro sigue en borrador: sin confirmar y sin mercadería entregada."""
+        self.ensure_one()
+        return not self.is_confirmed and not (
+            self.picking_id and self.picking_id.state == "done"
+        )
+
+    def _caw_check_price_correction(self):
+        """Valida que se pueda corregir el precio de un retiro fuera de borrador."""
+        for withdrawal in self:
+            if withdrawal._caw_in_draft():
+                continue
+            if not self.env.user.has_group("checking_account_withdrawals.group_cc_manager"):
+                raise AccessError(_(
+                    "Solo un Manager de Cuenta Corriente puede corregir el precio de un "
+                    "retiro que ya salió de borrador."
+                ))
+            if not withdrawal._caw_price_correctable():
+                raise UserError(_(
+                    "No se puede corregir el precio del retiro %s: está cancelado o tiene "
+                    "pagos imputados. Anulá primero esos pagos.",
+                    withdrawal.name,
+                ))
+
+    def _caw_resync_installments(self):
+        """Reajusta los montos de las cuotas al total corregido, sin tocar vencimientos.
+
+        No las borra ni las recrea: se escriben los montos sobre las mismas cuotas para
+        no perder sus ids ni sus fechas. El reparto usa el mismo criterio que la
+        generación original — el resto del redondeo va a la última cuota.
+        """
+        for withdrawal in self:
+            installments = withdrawal.installment_ids.sorted("sequence")
+            if not installments:
+                continue
+            currency = withdrawal.currency_id
+            total = withdrawal.amount_total
+            count = len(installments)
+            base = currency.round(total / count)
+            accumulated = 0.0
+            for index, installment in enumerate(installments):
+                is_last = index == count - 1
+                amount = currency.round(total - accumulated) if is_last else base
+                accumulated += amount
+                installment.with_context(caw_skip_total_check=True).amount = amount
+            # Ya con todos los montos escritos, se verifica el invariante una sola vez.
+            withdrawal.installment_ids._check_total_matches_withdrawal()
+            _logger.info(
+                "Retiro %s: cuotas reajustadas al total %s", withdrawal.name, total
+            )
+        return True
+
+    @api.depends_context("uid")
+    @api.depends(
+        "is_confirmed",
+        "is_cancelled",
+        "picking_state",
+        "installment_ids.allocation_ids.payment_id.state",
+    )
+    def _compute_caw_lines_editable(self):
+        """En borrador edita cualquiera; fuera de borrador, solo un Manager."""
+        is_manager = self.env.user.has_group("checking_account_withdrawals.group_cc_manager")
+        for withdrawal in self:
+            withdrawal.caw_lines_editable = bool(
+                (withdrawal._caw_in_draft() and not withdrawal.is_cancelled)
+                or (is_manager and withdrawal._caw_price_correctable())
             )
 
     @api.depends("picking_state", "is_cancelled")
@@ -294,18 +391,39 @@ class CawWithdrawal(models.Model):
             raise UserError(_("Solo se pueden eliminar retiros en borrador o cancelados."))
         return super().unlink()
 
+    @api.model
+    def _caw_is_price_only(self, commands):
+        """True si los comandos de line_ids solo actualizan el precio de líneas existentes.
+
+        La corrección de precios del Manager es la única edición admitida fuera de
+        borrador: alta, baja, cambio de producto o de cantidad siguen prohibidos porque
+        la mercadería ya salió y el albarán quedaría en desacuerdo con el retiro.
+        """
+        if not commands:
+            return False
+        for command in commands:
+            if not (isinstance(command, (list, tuple)) and len(command) == 3):
+                return False
+            if command[0] != 1:
+                return False
+            if set(command[2] or {}) - {"price_unit"}:
+                return False
+        return True
+
     def write(self, vals):
         """Impide editar las líneas de un retiro que ya salió de borrador.
 
         También bloquea las de un retiro entregado aunque siga sin confirmar: el stock
-        ya salió y cambiar las líneas dejaría el albarán y el retiro en desacuerdo.
+        ya salió y cambiar las líneas dejaría el albarán y el retiro en desacuerdo. La
+        excepción es la corrección de precios del Manager, que se valida y reajusta las
+        cuotas en el write de la línea.
         """
-        if "line_ids" in vals and any(w.is_confirmed or w.is_cancelled for w in self):
-            raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
-        if "line_ids" in vals and any(
-            w.picking_id and w.picking_id.state == "done" for w in self
-        ):
-            raise UserError(_("No se pueden modificar las líneas de un retiro ya entregado."))
+        price_only = "line_ids" in vals and self._caw_is_price_only(vals["line_ids"])
+        if "line_ids" in vals and not price_only:
+            if any(w.is_confirmed or w.is_cancelled for w in self):
+                raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
+            if any(w.picking_id and w.picking_id.state == "done" for w in self):
+                raise UserError(_("No se pueden modificar las líneas de un retiro ya entregado."))
         return super().write(vals)
 
     def _caw_due_date(self, index, first_days, period, cutoff_day):
@@ -622,9 +740,7 @@ class CawWithdrawal(models.Model):
         for withdrawal in self:
             if withdrawal.is_cancelled:
                 raise UserError(_("El retiro %s ya está cancelado.", withdrawal.name))
-            allocations = withdrawal.installment_ids.mapped("allocation_ids").filtered(
-                lambda a: a.payment_id.state == "posted"
-            )
+            allocations = withdrawal._caw_posted_allocations()
             if allocations:
                 raise UserError(_(
                     "El retiro %(name)s tiene pagos imputados por %(amount)s. "

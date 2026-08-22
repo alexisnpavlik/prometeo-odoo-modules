@@ -87,12 +87,17 @@
                     </group>
                     <notebook>
                         <page string="Líneas" name="lines">
-                            <field name="line_ids" readonly="state != 'draft'">
+                            <field name="caw_lines_editable" invisible="1"/>
+                            <!-- Fuera de borrador la lista sigue abierta solo para que el
+                                 Manager corrija precios: producto, descripción y cantidad
+                                 quedan bloqueados porque la mercadería ya salió. -->
+                            <field name="line_ids" readonly="not caw_lines_editable">
                                 <list editable="bottom">
-                                    <field name="sequence" widget="handle"/>
+                                    <field name="sequence" widget="handle"
+                                           column_invisible="parent.state != 'draft'"/>
                                     <field name="product_id" readonly="id"/>
-                                    <field name="name"/>
-                                    <field name="quantity"/>
+                                    <field name="name" readonly="parent.state != 'draft'"/>
+                                    <field name="quantity" readonly="parent.state != 'draft'"/>
                                     <field name="caw_price_editable" column_invisible="True"/>
                                     <field name="price_unit" readonly="not caw_price_editable" force_save="1"/>
                                     <field name="price_subtotal" sum="Total"/>

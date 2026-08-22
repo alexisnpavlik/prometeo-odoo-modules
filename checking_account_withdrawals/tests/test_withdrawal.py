@@ -55,12 +55,17 @@ class TestCawWithdrawal(CawCommon):
             self.env["caw.withdrawal"].create({"partner_id": other.id})
 
     def test_line_write_blocked_after_confirm(self):
-        """Una vez confirmado el retiro, no se puede editar una línea directamente."""
+        """Confirmado el retiro, no se puede cambiar la cantidad de una línea.
+
+        El precio sí quedó habilitado para el Manager mientras no haya pagos imputados
+        (ver tests/test_price_correction.py); lo que sigue bloqueado es todo lo demás,
+        porque alteraría el retiro sin correlato con la mercadería entregada.
+        """
         from odoo.exceptions import UserError
         withdrawal = self._new_withdrawal()
         withdrawal.action_confirm()
         with self.assertRaises(UserError):
-            withdrawal.line_ids.write({"price_unit": 999.0})
+            withdrawal.line_ids.write({"quantity": 99.0})
 
     def test_line_unlink_blocked_after_confirm(self):
         """Una vez confirmado el retiro, no se puede borrar una línea directamente."""
