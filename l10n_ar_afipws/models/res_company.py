@@ -5,15 +5,15 @@
 import hashlib
 import logging
 import os
-import sys
 import time
-import traceback
 
 import dateutil.parser
 import odoo.tools as tools
 import pytz
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+from ..afip_errors import afip_connection_message, describe_error, is_afip_unreachable
 
 _logger = logging.getLogger(__name__)
 
@@ -237,15 +237,14 @@ class ResCompany(models.Model):
             expirationTime = wsaa.ObtenerTagXml("expirationTime")
             generationTime = wsaa.ObtenerTagXml("generationTime")
             uniqueId = wsaa.ObtenerTagXml("uniqueId")
-        except Exception:
+        except Exception as error:
             token = sign = None
-            if wsaa.Excepcion:
-                # get the exception already parsed by the helper
-                err_msg = wsaa.Excepcion
-            else:
-                # avoid encoding problem when reporting exceptions to the user:
-                err_msg = traceback.format_exception_only(sys.exc_type, sys.exc_value)[0]
-            raise UserError(_("Could not connect. This is the what we received: %s") % (err_msg))
+            if is_afip_unreachable(error):
+                raise UserError(afip_connection_message())
+            # El sys.exc_type/sys.exc_value original no existe en Python 3, asi
+            # que esta rama enmascaraba el error real con un AttributeError.
+            err_msg = wsaa.Excepcion or describe_error(error)
+            raise UserError(_("No se pudo conectar con AFIP. Respuesta recibida: %s", err_msg))
         return {
             "uniqueid": uniqueId,
             "generationtime": generationTime,
