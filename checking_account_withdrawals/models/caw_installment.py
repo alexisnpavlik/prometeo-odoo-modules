@@ -138,7 +138,14 @@ class CawInstallment(models.Model):
         Es bloqueante y aplica tanto a la generación automática como a la carga manual.
         Odoo evalúa los constrains al final del create/write, así que crear las N cuotas
         en una sola llamada no lo dispara a mitad de camino.
+
+        `caw_skip_total_check` existe para el reajuste de montos tras una corrección de
+        precios: ahí las cuotas se escriben de a una y la suma queda descalzada a mitad
+        de camino. Quien usa ese contexto invoca este constraint al terminar, así que el
+        invariante se sigue verificando.
         """
+        if self.env.context.get("caw_skip_total_check"):
+            return
         for withdrawal in self.mapped("withdrawal_id"):
             total_installments = sum(withdrawal.installment_ids.mapped("amount"))
             if withdrawal.currency_id.compare_amounts(total_installments, withdrawal.amount_total) != 0:

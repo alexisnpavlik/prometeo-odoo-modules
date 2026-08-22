@@ -57,11 +57,19 @@ class CawWithdrawalLine(models.Model):
     )
 
     @api.depends_context("uid")
+    @api.depends(
+        "withdrawal_id.is_confirmed",
+        "withdrawal_id.is_cancelled",
+        "withdrawal_id.picking_state",
+        "withdrawal_id.installment_ids.allocation_ids.payment_id.state",
+    )
     def _compute_caw_price_editable(self):
-        """True solo para un Manager de Cuenta Corriente."""
+        """True para un Manager, mientras el retiro admita corrección de precios."""
         is_manager = self.env.user.has_group("checking_account_withdrawals.group_cc_manager")
         for line in self:
-            line.caw_price_editable = is_manager
+            line.caw_price_editable = bool(
+                is_manager and line.withdrawal_id._caw_price_correctable()
+            )
 
     @api.depends("quantity", "price_unit")
     def _compute_price_subtotal(self):
@@ -122,9 +130,16 @@ class CawWithdrawalLine(models.Model):
         Mismo criterio que `caw.withdrawal.write` usa para bloquear `line_ids`: evita que
         el Operador (con CRUD completo en el ACL de esta línea) altere el total de un
         retiro ya confirmado escribiendo directamente sobre `caw.withdrawal.line`.
+        También cubre el retiro entregado y sin confirmar: el stock ya salió, así que
+        cambiar producto o cantidad dejaría el albarán en desacuerdo con el retiro.
         """
         if any(line.withdrawal_id.is_confirmed or line.withdrawal_id.is_cancelled for line in self):
             raise UserError(_("No se pueden modificar las líneas de un retiro confirmado o cancelado."))
+        if any(
+            line.withdrawal_id.picking_id and line.withdrawal_id.picking_id.state == "done"
+            for line in self
+        ):
+            raise UserError(_("No se pueden modificar las líneas de un retiro ya entregado."))
 
     def write(self, vals):
         """Impide editar directamente una línea de un retiro confirmado o cancelado.
@@ -133,13 +148,25 @@ class CawWithdrawalLine(models.Model):
         de origen (el actual, leído antes del cambio): una línea de un borrador podía
         reasignarse hacia un retiro ya confirmado sin error, alterando su `amount_total`.
         Se agrega el chequeo del retiro de destino.
+
+        Única excepción al bloqueo: la corrección de precios de un Manager. Se valida
+        acá (y no solo en el padre) porque el write llega igual por los dos caminos, y
+        después se reajustan las cuotas al total corregido.
         """
-        self._caw_check_not_locked()
+        price_only = bool(vals) and not (set(vals) - {"price_unit"})
+        withdrawals = self.mapped("withdrawal_id")
+        if price_only:
+            withdrawals._caw_check_price_correction()
+        else:
+            self._caw_check_not_locked()
         if "withdrawal_id" in vals:
             target = self.env["caw.withdrawal"].browse(vals["withdrawal_id"])
             if target.is_confirmed or target.is_cancelled:
                 raise UserError(_("No se pueden agregar líneas a un retiro confirmado o cancelado."))
-        return super().write(vals)
+        res = super().write(vals)
+        if price_only:
+            withdrawals.filtered("is_confirmed")._caw_resync_installments()
+        return res
 
     def unlink(self):
         """Impide borrar directamente una línea de un retiro confirmado o cancelado."""
