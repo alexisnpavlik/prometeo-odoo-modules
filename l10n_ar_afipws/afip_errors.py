@@ -16,10 +16,22 @@ se le muestra al usuario tal cual, porque el problema está en la factura y
 reintentar no lo va a resolver.
 """
 
+import socket
+import ssl
+
 from odoo import _
 
-# Fragmentos que aparecen en repr(error) cuando el problema es la conexión con
-# AFIP y no el comprobante que se está enviando. El matching es case-insensitive.
+# Excepciones de red de la biblioteca estándar. ConnectionError cubre rechazada,
+# reseteada y abortada; TimeoutError cubre socket.timeout.
+NETWORK_EXCEPTIONS = (ConnectionError, TimeoutError, socket.gaierror, ssl.SSLError)
+
+# Módulos de la pila de red que usa pyafipws. Cualquier excepción definida ahí
+# es un problema de transporte, no del comprobante. Se compara contra la primera
+# parte de __module__ ("pysimplesoap.client" -> "pysimplesoap").
+NETWORK_MODULES = frozenset({"httplib2", "pysimplesoap", "socket", "ssl", "http", "urllib"})
+
+# Respaldo por texto, para errores que la pila envuelve en tipos genéricos: por
+# ejemplo pyafipws levanta ValueError("The read operation timed out").
 AFIP_UNREACHABLE_HINTS = (
     "soapfault",
     "timed out",
@@ -72,7 +84,18 @@ def describe_error(error):
 
 
 def is_afip_unreachable(error):
-    """Indica si ``error`` viene de que AFIP no contesta, no de un rechazo."""
+    """Indica si ``error`` viene de que AFIP no contesta, no de un rechazo.
+
+    Se mira primero el tipo y el módulo de la excepción, que es lo estable, y
+    recién después el texto. Al revés se escapan cosas como
+    ``httplib2.ServerNotFoundError``, cuyo nombre no contiene ninguna palabra
+    obvia de red.
+    """
+    if isinstance(error, NETWORK_EXCEPTIONS):
+        return True
+    module = (getattr(type(error), "__module__", "") or "").split(".")[0]
+    if module in NETWORK_MODULES:
+        return True
     text = describe_error(error).lower()
     return any(hint in text for hint in AFIP_UNREACHABLE_HINTS)
 
