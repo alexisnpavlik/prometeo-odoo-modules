@@ -11,7 +11,11 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_repr
 
-from odoo.addons.l10n_ar_afipws.afip_errors import afip_connection_message, is_afip_unreachable
+from odoo.addons.l10n_ar_afipws.afip_errors import (
+    afip_connection_message,
+    describe_error,
+    is_afip_unreachable,
+)
 
 from ..afip_utils import get_invoice_number_from_response
 
@@ -282,7 +286,7 @@ class AccountMove(models.Model):
                 # El segundo "except Exception" que había acá era inalcanzable y
                 # usaba sys.exc_type/sys.exc_value, que no existen en Python 3.
                 request_error = e
-                msg = ws.Excepcion or repr(e)
+                msg = ws.Excepcion or describe_error(e)
             if msg:
                 _logger.error(
                     _("AFIP Validation Error. %s") % msg
@@ -299,7 +303,7 @@ class AccountMove(models.Model):
                 elif is_afip_unreachable(request_error):
                     msg = afip_connection_message()
                 else:
-                    msg = repr(request_error)
+                    msg = describe_error(request_error)
             if not ws.CAE or ws.Resultado != "A":
                 r_invoices += inv
 

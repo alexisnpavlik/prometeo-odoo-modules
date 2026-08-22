@@ -7,7 +7,7 @@ import logging
 from odoo import _, api, fields, models
 from odoo.exceptions import RedirectWarning, UserError
 
-from ..afip_errors import afip_connection_message, is_afip_unreachable
+from ..afip_errors import afip_connection_message, describe_error, is_afip_unreachable
 
 _logger = logging.getLogger(__name__)
 
@@ -143,11 +143,12 @@ class AfipwsConnection(models.Model):
         try:
             ws.Conectar("", wsdl or "", "")
         except Exception as error:
+            error_text = describe_error(error)
             if (
-                "ExpatError" in repr(error)
-                or "mismatched tag" in repr(error)
-                or "Conexión reinicializada por la máquina remota" in repr(error)
-                or "module 'httplib2' has no attribute 'SSLHandshakeError'" in repr(error)
+                "ExpatError" in error_text
+                or "mismatched tag" in error_text
+                or "Conexión reinicializada por la máquina remota" in error_text
+                or "module 'httplib2' has no attribute 'SSLHandshakeError'" in error_text
             ):
                 action = self.env.ref("l10n_ar_afipws.action_afip_padron")
                 msg = _("It seems like AFIP service is not available.\nPlease try again later or try manually")
@@ -155,7 +156,7 @@ class AfipwsConnection(models.Model):
             if is_afip_unreachable(error):
                 raise UserError(afip_connection_message())
             raise UserError(
-                _("Hubo un problema al conectarse a AFIP. Contacte a su proveedor de Odoo.\n\n%s", repr(error))
+                _("Hubo un problema al conectarse a AFIP. Contacte a su proveedor de Odoo.\n\n%s", error_text)
             )
 
         cuit = self.company_id.partner_id.ensure_vat()

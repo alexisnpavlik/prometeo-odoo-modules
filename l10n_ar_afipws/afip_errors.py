@@ -48,9 +48,32 @@ AFIP_UNREACHABLE_HINTS = (
 )
 
 
+def describe_error(error):
+    """``repr()`` seguro: describe la excepción sin levantar nunca.
+
+    No es defensivo de más: ``pysimplesoap.client.SoapFault`` —el tipo que tira
+    AFIP cuando rechaza el request a nivel SOAP— tiene un ``__repr__`` que
+    referencia ``self.detail``, atributo que su ``__init__`` nunca define. O sea
+    que ``repr()`` sobre un SoapFault levanta AttributeError y se lleva puesto
+    al que lo estaba manejando.
+
+    Siempre incluye el nombre de la clase, que es lo que permite reconocer el
+    error aun cuando ``repr()`` y ``str()`` fallen los dos.
+    """
+    name = type(error).__name__
+    for render in (repr, str):
+        try:
+            text = render(error)
+        except Exception:  # noqa: BLE001 - describir un error no puede fallar
+            continue
+        if text:
+            return text if name in text else "%s: %s" % (name, text)
+    return name
+
+
 def is_afip_unreachable(error):
     """Indica si ``error`` viene de que AFIP no contesta, no de un rechazo."""
-    text = repr(error).lower()
+    text = describe_error(error).lower()
     return any(hint in text for hint in AFIP_UNREACHABLE_HINTS)
 
 
