@@ -7,6 +7,8 @@ import logging
 from odoo import _, api, fields, models
 from odoo.exceptions import RedirectWarning, UserError
 
+from ..afip_errors import afip_connection_message, is_afip_unreachable
+
 _logger = logging.getLogger(__name__)
 
 
@@ -150,8 +152,10 @@ class AfipwsConnection(models.Model):
                 action = self.env.ref("l10n_ar_afipws.action_afip_padron")
                 msg = _("It seems like AFIP service is not available.\nPlease try again later or try manually")
                 raise RedirectWarning(msg, action.id, _("Go and find data manually"))
+            if is_afip_unreachable(error):
+                raise UserError(afip_connection_message())
             raise UserError(
-                "There was a connection problem to AFIP. Contact your Odoo Provider. Error\n\n%s" % repr(error)
+                _("Hubo un problema al conectarse a AFIP. Contacte a su proveedor de Odoo.\n\n%s", repr(error))
             )
 
         cuit = self.company_id.partner_id.ensure_vat()
