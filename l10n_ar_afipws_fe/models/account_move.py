@@ -294,18 +294,20 @@ class AccountMove(models.Model):
                 )
 
             msg = "\n".join([ws.Obs or "", ws.ErrMsg or ""]).strip()
-            if not msg:
-                # AFIP no devolvió ni Obs ni ErrMsg: la factura se marcaba como
-                # rechazada con afip_message vacío y el usuario veía un diálogo
-                # en blanco.
-                if request_error is None:
-                    msg = _("AFIP no devolvió CAE ni motivo de rechazo.")
-                elif is_afip_unreachable(request_error):
-                    msg = afip_connection_message()
-                else:
-                    msg = describe_error(request_error)
             if not ws.CAE or ws.Resultado != "A":
                 r_invoices += inv
+
+                if not msg:
+                    # AFIP no devolvió ni Obs ni ErrMsg: la factura se marcaba
+                    # como rechazada con afip_message vacío y el usuario veía un
+                    # diálogo en blanco. Solo aplica al rechazo: en una factura
+                    # aceptada, afip_message vacío es lo normal.
+                    if request_error is None:
+                        msg = _("AFIP no devolvió CAE ni motivo de rechazo.")
+                    elif is_afip_unreachable(request_error):
+                        msg = afip_connection_message()
+                    else:
+                        msg = describe_error(request_error)
 
                 vals = {
                     "name": "/",
