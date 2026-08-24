@@ -308,6 +308,7 @@ class PosMetricsController(http.Controller):
             },
             "charts": {
                 "sales_trend": {"labels": [], "values": [], "timeframe": "Diario"},
+                "pos_trend": {"labels": [], "configs": {}, "timeframe": "Diario"},
                 "sales_by_pos": {"labels": [], "values": []},
                 "payment_methods": {"labels": [], "values": []},
                 "top_products": {"labels": [], "values": []},
@@ -432,9 +433,11 @@ class PosMetricsController(http.Controller):
                 SELECT
                     EXTRACT(hour FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::integer AS hora,
                     rc.name AS empresa,
+                    pc.name AS caja,
                     SUM(pol.price_subtotal_incl) AS subtotal
                 FROM pos_order_line pol
                 JOIN pos_order po ON po.id = pol.order_id
+                JOIN pos_config pc ON pc.id = po.config_id
                 JOIN res_company rc ON rc.id = po.company_id
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
@@ -446,8 +449,8 @@ class PosMetricsController(http.Controller):
             trend_params.extend(line_params)
                 
             trend_query += """
-                GROUP BY hora, rc.name
-                ORDER BY hora, rc.name
+                GROUP BY hora, rc.name, pc.name
+                ORDER BY hora, rc.name, pc.name
             """
             cr.execute(trend_query, trend_params)
             trend_rows = cr.fetchall()
@@ -460,9 +463,11 @@ class PosMetricsController(http.Controller):
                 SELECT
                     (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS fecha,
                     rc.name AS empresa,
+                    pc.name AS caja,
                     SUM(pol.price_subtotal_incl) AS subtotal
                 FROM pos_order_line pol
                 JOIN pos_order po ON po.id = pol.order_id
+                JOIN pos_config pc ON pc.id = po.config_id
                 JOIN res_company rc ON rc.id = po.company_id
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
@@ -474,8 +479,8 @@ class PosMetricsController(http.Controller):
             trend_params.extend(line_params)
                 
             trend_query += """
-                GROUP BY fecha, rc.name
-                ORDER BY fecha, rc.name
+                GROUP BY fecha, rc.name, pc.name
+                ORDER BY fecha, rc.name, pc.name
             """
             cr.execute(trend_query, trend_params)
             trend_rows = cr.fetchall()
@@ -485,11 +490,15 @@ class PosMetricsController(http.Controller):
             timeframe = "Diario"
 
         unique_companies = sorted(list(set(row[1] for row in trend_rows if row[1])))
-        
+        unique_configs = sorted(list(set(row[2] for row in trend_rows if row[2])))
+
         subtotal_map = {}
-        for time_key, company_name, subtotal in trend_rows:
-            subtotal_map[(time_key, company_name)] = round(float(subtotal or 0.0), 2)
-            
+        config_map = {}
+        for time_key, company_name, config_name, subtotal in trend_rows:
+            amount = round(float(subtotal or 0.0), 2)
+            subtotal_map[(time_key, company_name)] = round(subtotal_map.get((time_key, company_name), 0.0) + amount, 2)
+            config_map[(time_key, config_name)] = round(config_map.get((time_key, config_name), 0.0) + amount, 2)
+
         companies_data = {}
         for company_name in unique_companies:
             companies_data[company_name] = [
@@ -497,9 +506,23 @@ class PosMetricsController(http.Controller):
                 for time_key in unique_times
             ]
 
+        configs_data = {}
+        for config_name in unique_configs:
+            configs_data[config_name] = [
+                config_map.get((time_key, config_name), 0.0)
+                for time_key in unique_times
+            ]
+
         sales_trend = {
             "labels": trend_labels,
             "companies": companies_data,
+            "timeframe": timeframe
+        }
+
+        # Misma evolución temporal, pero comparando cajas (pos.config)
+        pos_trend = {
+            "labels": trend_labels,
+            "configs": configs_data,
             "timeframe": timeframe
         }
 
@@ -721,6 +744,7 @@ class PosMetricsController(http.Controller):
         prod_margin_query = f"""
             SELECT
                 COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
+                SUM(pol.qty) AS total_qty,
                 SUM(pol.price_subtotal_incl) AS net_revenue,
                 SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS total_cost,
                 SUM(pol.price_subtotal_incl) - SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS gross_profit
@@ -748,10 +772,12 @@ class PosMetricsController(http.Controller):
         cr.execute(prod_margin_query, prod_margin_params)
         product_margins = cr.dictfetchall()
         for p in product_margins:
+            p['total_qty'] = round(float(p['total_qty'] or 0.0), 2)
             p['net_revenue'] = round(float(p['net_revenue'] or 0.0), 2)
             p['total_cost'] = round(float(p['total_cost'] or 0.0), 2)
             p['gross_profit'] = round(float(p['gross_profit'] or 0.0), 2)
             p['margin_percent'] = round((p['gross_profit'] / p['net_revenue'] * 100.0), 2) if p['net_revenue'] > 0 else 0.0
+            p['unit_cost'] = round(p['total_cost'] / p['total_qty'], 2) if p['total_qty'] else 0.0
         # Descartar productos con costo no cargado o erróneo (margen >= 95% se considera dato basura)
         product_margins = [p for p in product_margins if p['margin_percent'] < 95.0]
 
@@ -802,6 +828,7 @@ class PosMetricsController(http.Controller):
             "kpis": kpis,
             "charts": {
                 "sales_trend": sales_trend,
+                "pos_trend": pos_trend,
                 "sales_by_pos": sales_by_pos,
                 "payment_methods": payment_methods,
                 "top_products": top_products,
