@@ -27,6 +27,8 @@ class PosDashboardMetrics extends Component {
             productSearch: "",
             search: "",
             profitabilitySearch: "",
+            marginSign: "positive",
+            marginSort: "revenue",
             page: 1,
             perPage: 15,
             activeTab: "general",
@@ -58,6 +60,7 @@ class PosDashboardMetrics extends Component {
             },
             charts: {
                 sales_trend: { labels: [], companies: {}, timeframe: "Diario" },
+                pos_trend: { labels: [], configs: {}, timeframe: "Diario" },
                 sales_by_pos: { labels: [], values: [] },
                 payment_methods: { labels: [], values: [] },
                 top_products: { labels: [], values: [] },
@@ -227,15 +230,34 @@ class PosDashboardMetrics extends Component {
 
     get filteredProductMargins() {
         const search = (this.state.profitabilitySearch || "").toLowerCase().trim();
-        if (!search) return this.metricsData.profitability.product_margins || [];
-        return (this.metricsData.profitability.product_margins || []).filter(p => 
-            p.producto && p.producto.toLowerCase().includes(search)
-        );
+        const positive = this.state.marginSign !== "negative";
+        const rows = (this.metricsData.profitability.product_margins || []).filter(p => {
+            const signOk = positive ? p.margin_percent >= 0 : p.margin_percent < 0;
+            if (!signOk) return false;
+            if (!search) return true;
+            return p.producto && p.producto.toLowerCase().includes(search);
+        });
+        if (this.state.marginSort === "revenue") {
+            return rows.sort((a, b) => b.net_revenue - a.net_revenue);
+        }
+        // Mayor margen primero en positivos; peor margen primero en negativos
+        return rows.sort((a, b) => positive
+            ? b.margin_percent - a.margin_percent
+            : a.margin_percent - b.margin_percent);
     }
 
     // --- Manejo de Eventos y Inputs ---
     onProfitabilitySearchInput(ev) {
         this.state.profitabilitySearch = ev.target.value;
+    }
+    setMarginSign(sign) {
+        this.state.marginSign = sign;
+    }
+    setMarginSort(mode) {
+        this.state.marginSort = mode;
+    }
+    onMarginSortChange(ev) {
+        this.state.marginSort = ev.target.value;
     }
     onPresetClick(preset) {
         this.state.preset = preset;
@@ -430,8 +452,11 @@ class PosDashboardMetrics extends Component {
             this.sessionsData.length = 0;
             this.sessionsData.push(...data.sessions);
 
-            // Renderizar gráfico de aperturas/cierres en pestaña Auditoría
-            setTimeout(() => this.renderSessionsChart(data.sessions), 50);
+            // Renderizar gráficos de la pestaña Auditoría
+            setTimeout(() => {
+                this.renderSessionsChart(data.sessions);
+                this.renderPosTrendChart();
+            }, 50);
         } catch (e) {
             console.error("Error al cargar auditoría de cajas:", e);
         }
@@ -769,7 +794,8 @@ class PosDashboardMetrics extends Component {
         const gridConfig = { color: gridColor, drawBorder: false };
         const shorten = (l) => (l && l.length > 30 ? l.substring(0, 27) + "..." : l);
 
-        const byRevenue = this.topArticlesData.by_revenue || [];
+        // Los gráficos muestran solo el top 10; la tabla de detalle conserva los 50
+        const byRevenue = (this.topArticlesData.by_revenue || []).slice(0, 10);
         this.createOrUpdateChart("chart-top-articles-revenue", "bar", {
             labels: byRevenue.map(r => shorten(r.producto)),
             datasets: [{
@@ -799,7 +825,7 @@ class PosDashboardMetrics extends Component {
             }
         });
 
-        const byUnits = this.topArticlesData.by_units || [];
+        const byUnits = (this.topArticlesData.by_units || []).slice(0, 10);
         this.createOrUpdateChart("chart-top-articles-units", "bar", {
             labels: byUnits.map(r => shorten(r.producto)),
             datasets: [{
@@ -826,6 +852,83 @@ class PosDashboardMetrics extends Component {
             scales: {
                 x: { grid: gridConfig, ticks: { precision: 0 } },
                 y: { grid: { display: false } }
+            }
+        });
+    }
+
+    renderPosTrendChart() {
+        const trendData = this.metricsData.charts.pos_trend || { labels: [], configs: {} };
+        const configs = trendData.configs || {};
+
+        const posColors = [
+            { border: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)" },
+            { border: "#a855f7", bg: "rgba(168, 85, 247, 0.08)" },
+            { border: "#10b981", bg: "rgba(16, 185, 129, 0.08)" },
+            { border: "#f59e0b", bg: "rgba(245, 158, 11, 0.08)" },
+            { border: "#ec4899", bg: "rgba(236, 72, 153, 0.08)" },
+            { border: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)" }
+        ];
+
+        const datasets = Object.keys(configs).map((posName, idx) => {
+            const color = posColors[idx % posColors.length];
+            return {
+                label: posName,
+                data: configs[posName],
+                borderColor: color.border,
+                backgroundColor: color.bg,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: color.border,
+                pointHoverRadius: 6
+            };
+        });
+
+        if (datasets.length === 0) {
+            datasets.push({
+                label: "Ingresos",
+                data: [],
+                borderColor: "#3b82f6",
+                backgroundColor: "rgba(59, 130, 246, 0.08)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: "#3b82f6",
+                pointHoverRadius: 6
+            });
+        }
+
+        const isLight = this.state.theme === "light";
+        const gridColor = isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.04)";
+        const gridConfig = { color: gridColor, drawBorder: false };
+
+        this.createOrUpdateChart("chart-pos-trend", "line", {
+            labels: trendData.labels,
+            datasets: datasets
+        }, {
+            plugins: {
+                legend: {
+                    display: true,
+                    position: "top",
+                    labels: {
+                        color: "#94a3b8",
+                        boxWidth: 12,
+                        boxHeight: 12,
+                        usePointStyle: true,
+                        pointStyle: "circle",
+                        font: { size: 11, weight: "bold" },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ` ${ctx.dataset.label}: ${this.formatCurrency(ctx.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                x: { grid: gridConfig },
+                y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
             }
         });
     }

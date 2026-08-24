@@ -472,7 +472,7 @@
                         <div class="charts-grid">
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 50 por Total Vendido</h3>
+                                    <h3>Top 10 por Total Vendido</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -480,7 +480,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Los 50 artículos que más ingresos generaron (IVA incluido) durante el período y filtros seleccionados.
+                                            Los 10 artículos que más ingresos generaron (IVA incluido) durante el período y filtros seleccionados.
                                         </div>
                                     </div>
                                 </div>
@@ -491,7 +491,7 @@
 
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 50 por Unidades Vendidas</h3>
+                                    <h3>Top 10 por Unidades Vendidas</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -499,7 +499,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Los 50 artículos con mayor cantidad de unidades vendidas durante el período y filtros seleccionados.
+                                            Los 10 artículos con mayor cantidad de unidades vendidas durante el período y filtros seleccionados.
                                         </div>
                                     </div>
                                 </div>
@@ -547,7 +547,7 @@
                                                 <td colspan="5" class="text-center text-muted">Sin ventas registradas para los filtros seleccionados.</td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="sortedTopArticles" t-as="a" t-key="a.producto">
+                                        <t t-foreach="sortedTopArticles" t-as="a" t-key="a_index + '-' + a.producto">
                                             <tr>
                                                 <td style="font-weight: 700;"><t t-esc="a_index + 1"/></td>
                                                 <td style="font-weight: 600; color:#fff;"><t t-esc="a.producto"/></td>
@@ -564,6 +564,28 @@
 
                     <!-- TAB: SESSIONS (ARQUEOS) -->
                     <section t-att-class="'tab-pane ' + (state.activeTab === 'sessions' ? 'active' : '')">
+                        <div class="glass-panel" style="margin-bottom: 20px;">
+                            <div class="chart-header" style="position: relative;">
+                                <h3>Evolución Temporal de Ventas por Caja</h3>
+                                <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="badge" t-esc="metricsData.charts.pos_trend.timeframe || 'Diario'">Diario</span>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Compara los ingresos diarios u horarios de cada caja (punto de venta) durante el período seleccionado, para detectar diferencias de volumen entre puestos.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-body" style="height: 300px;">
+                                <canvas id="chart-pos-trend"></canvas>
+                            </div>
+                        </div>
+
                         <div class="glass-panel" style="margin-bottom: 20px;">
                             <div class="chart-header" style="position: relative;">
                                 <h3>Distribución Horaria de Aperturas y Cierres de Caja</h3>
@@ -613,7 +635,7 @@
                                                 <td colspan="10" class="text-center text-muted">No se encontraron sesiones registradas en este período.</td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="sessionsData" t-as="s" t-key="s.sesion_id">
+                                        <t t-foreach="sessionsData" t-as="s" t-key="s_index + '-' + s.sesion_id">
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;">
                                                     <t t-esc="s.sesion_id"/> <span style="font-size:11px;color:var(--text-muted);font-weight:500;">(<t t-esc="s.sesion"/>)</span>
@@ -702,7 +724,7 @@
                                                 <td colspan="10" class="text-center text-muted">No se encontraron transacciones registradas.</td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="transactionsData.sales" t-as="t" t-key="t.orden_id + '-' + t.producto">
+                                        <t t-foreach="transactionsData.sales" t-as="t" t-key="t_index + '-' + t.orden_id + '-' + t.producto">
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="t.numero_orden"/></td>
                                                 <td><t t-esc="t.fecha"/></td>
@@ -792,125 +814,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Card 4: Crecimiento Temporal -->
-                            <div class="kpi-card shadow-glow orange">
-                                <div class="kpi-card-inner">
-                                    <div class="kpi-meta">
-                                        <span class="kpi-title">Crecimiento de Venta Neta</span>
-                                        <div class="kpi-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                                                <polyline points="17 6 23 6 23 12"></polyline>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <div class="growth-indicators">
-                                        <div class="growth-item">
-                                            <span class="growth-label">MoM:</span>
-                                            <span t-att-class="'growth-badge ' + (metricsData.profitability.mom_growth_revenue &gt;= 0 ? 'up' : 'down')">
-                                                <t t-if="metricsData.profitability.mom_growth_revenue &gt;= 0">▲ <t t-esc="metricsData.profitability.mom_growth_revenue"/>%</t>
-                                                <t t-else="">▼ <t t-esc="Math.abs(metricsData.profitability.mom_growth_revenue)"/>%</t>
-                                            </span>
-                                        </div>
-                                        <div class="growth-item">
-                                            <span class="growth-label">YoY:</span>
-                                            <span t-att-class="'growth-badge ' + (metricsData.profitability.yoy_growth_revenue &gt;= 0 ? 'up' : 'down')">
-                                                <t t-if="metricsData.profitability.yoy_growth_revenue &gt;= 0">▲ <t t-esc="metricsData.profitability.yoy_growth_revenue"/>%</t>
-                                                <t t-else="">▼ <t t-esc="Math.abs(metricsData.profitability.yoy_growth_revenue)"/>%</t>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="kpi-footer">
-                                        <span class="kpi-subtext">Comparativo con períodos anteriores</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Side-by-Side widgets: Top Rentables vs Fugas de Rentabilidad -->
-                        <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); margin-bottom: 20px;">
-                            <!-- Top 5 Rentables -->
-                            <div class="chart-container glass-panel padded" style="height: auto;">
-                                <div class="chart-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                                    <h3 class="flex-align-center" style="gap: 8px; display: flex; align-items: center; margin: 0;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="width: 20px; height: 20px;">
-                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                        </svg>
-                                        Top 5 Productos con Mayor Margen ($)
-                                    </h3>
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Muestra los 5 productos que han generado la mayor utilidad bruta acumulada en pesos durante el período. Son tus productos más rentables en términos absolutos.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="rank-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                                    <t t-if="metricsData.profitability.top_profitable.length === 0">
-                                        <div class="text-center text-muted padded">No hay datos suficientes para rankear productos.</div>
-                                    </t>
-                                    <t t-foreach="metricsData.profitability.top_profitable" t-as="item" t-key="'top-prof-' + item.producto">
-                                        <div class="rank-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255, 255, 255, 0.03); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                                            <div class="rank-name-box" style="display: flex; align-items: center; gap: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
-                                                <span class="rank-number badge-green" style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;"><t t-esc="item_index + 1"/></span>
-                                                <span class="rank-name" style="font-weight: 500;" t-esc="item.producto"/>
-                                            </div>
-                                            <div class="rank-value-box" style="display: flex; flex-direction: column; align-items: flex-end;">
-                                                <span class="rank-profit" style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(item.gross_profit)"/></span>
-                                                <span class="rank-meta-percent text-green" style="font-size: 11px; color: #10b981;"><t t-esc="item.margin_percent"/>% marg.</span>
-                                            </div>
-                                        </div>
-                                    </t>
-                                </div>
-                            </div>
-
-                            <!-- Fugas de Rentabilidad (Margen más bajo/negativo) -->
-                            <div class="chart-container glass-panel padded" style="height: auto;">
-                                <div class="chart-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                                    <h3 class="flex-align-center" style="gap: 8px; display: flex; align-items: center; margin: 0;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4899" stroke-width="2.5" style="width: 20px; height: 20px;">
-                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                            <line x1="12" y1="9" x2="12" y2="13"></line>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        Fugas de Rentabilidad (Margen Crítico o Negativo)
-                                    </h3>
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Detecta de forma proactiva los productos que se están vendiendo con margen de ganancia negativo (pérdidas) debido a costos de compra más altos que el precio de venta.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="rank-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                                    <t t-if="metricsData.profitability.bottom_profitable.length === 0">
-                                        <div class="text-center text-muted padded">Sin alertas de margen crítico en este período.</div>
-                                    </t>
-                                    <t t-foreach="metricsData.profitability.bottom_profitable" t-as="item" t-key="'bot-prof-' + item.producto">
-                                        <div class="rank-item warning-hover" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255, 255, 255, 0.03); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                                            <div class="rank-name-box" style="display: flex; align-items: center; gap: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
-                                                <span class="rank-number badge-red" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px;"><t t-esc="item_index + 1"/></span>
-                                                <span class="rank-name" style="font-weight: 500;" t-esc="item.producto"/>
-                                            </div>
-                                            <div class="rank-value-box" style="display: flex; flex-direction: column; align-items: flex-end;">
-                                                <span class="rank-profit text-red" style="font-weight: 600; color: #ef4444;"><t t-esc="formatCurrency(item.gross_profit)"/></span>
-                                                <span t-att-class="'rank-meta-percent ' + (item.margin_percent &lt; 0 ? 'text-red font-bold' : 'text-orange')" style="font-size: 11px;">
-                                                    <t t-esc="item.margin_percent"/>% marg.
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </t>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Product Profitability Table -->
@@ -920,7 +823,17 @@
                                     <h2>Análisis de Margen por Producto</h2>
                                     <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Desglose exhaustivo de ingresos netos, costos estimados y porcentaje de margen</p>
                                 </div>
-                                <div class="header-actions">
+                                <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+                                    <div class="nav-tabs" style="display: flex; gap: 4px;">
+                                        <button t-att-class="'nav-tab ' + (state.marginSign === 'positive' ? 'active' : '')"
+                                                t-on-click="() => this.setMarginSign('positive')">Margen Positivo</button>
+                                        <button t-att-class="'nav-tab ' + (state.marginSign === 'negative' ? 'active' : '')"
+                                                t-on-click="() => this.setMarginSign('negative')">Margen Negativo</button>
+                                    </div>
+                                    <select class="margin-sort-select" t-on-change="onMarginSortChange" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 3px 8px; color: #fff; outline: none; font-size: 12px; height: 28px; width: auto; flex: 0 0 auto;">
+                                        <option value="margin" t-att-selected="state.marginSort === 'margin'">Ordenar por Margen</option>
+                                        <option value="revenue" t-att-selected="state.marginSort === 'revenue'">Ordenar por Facturación</option>
+                                    </select>
                                     <div class="search-box">
                                         <input type="text" placeholder="Filtrar producto..." t-att-value="state.profitabilitySearch" t-on-input="onProfitabilitySearchInput" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 6px 12px; color: #fff; outline: none; font-size: 13px;"/>
                                     </div>
@@ -932,29 +845,34 @@
                                     <thead>
                                         <tr>
                                             <th>Producto</th>
-                                            <th class="text-right" style="text-align: right;">Ventas (Con IVA)</th>
+                                            <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
+                                            <th class="text-right" style="text-align: right;">Costo Unidad</th>
+                                            <th class="text-right" style="text-align: right;">Ventas</th>
                                             <th class="text-right" style="text-align: right;">Costo Total</th>
-                                            <th class="text-right" style="text-align: right;">Utilidad Bruta</th>
                                             <th>% Margen</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="filteredProductMargins.length === 0">
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted">No se encontraron productos registrados.</td>
+                                                <td colspan="6" class="text-center text-muted">
+                                                    <t t-if="state.marginSign === 'negative'">Sin productos con margen negativo en este período.</t>
+                                                    <t t-else="">No se encontraron productos registrados.</t>
+                                                </td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="filteredProductMargins" t-as="p" t-key="p.producto">
+                                        <t t-foreach="filteredProductMargins" t-as="p" t-key="p_index + '-' + p.producto">
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="p.producto"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="p.total_qty"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.unit_cost)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.net_revenue)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.total_cost)"/></td>
-                                                <td class="text-right" style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(p.gross_profit)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
                                                         <div class="margin-progress-container" style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 100px;">
                                                             <div t-att-class="'margin-progress-bar ' + (p.margin_percent &lt; 0 ? 'negative' : (p.margin_percent &gt; 50 ? 'high' : 'medium'))"
-                                                                 t-attf-style="width: {{Math.max(0, Math.min(100, p.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
+                                                                 t-attf-style="width: {{Math.min(100, Math.abs(p.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
                                                         </div>
                                                         <span t-att-class="'margin-percent-text ' + (p.margin_percent &lt; 0 ? 'text-red font-bold' : '')" style="font-size: 12px; font-weight: 600; width: 45px; text-align: right;">
                                                             <t t-esc="p.margin_percent"/>%
@@ -994,7 +912,7 @@
                                                 <td colspan="5" class="text-center text-muted">No se encontraron categorías registradas.</td>
                                             </tr>
                                         </t>
-                                        <t t-foreach="metricsData.profitability.category_margins" t-as="c" t-key="c.categoria">
+                                        <t t-foreach="metricsData.profitability.category_margins" t-as="c" t-key="c_index + '-' + c.categoria">
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="c.categoria"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.net_revenue)"/></td>

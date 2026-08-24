@@ -1252,3 +1252,17 @@
 .pos-dashboard-wrap.theme-light .input-group .multiselect-option:hover {
     background: rgba(15, 23, 42, 0.05);
 }
+
+.pos-dashboard-wrap .margin-sort-select {
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .margin-sort-select:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.pos-dashboard-wrap .margin-sort-select option {
+    background: #1b2130;
+    color: #fff;
+}
