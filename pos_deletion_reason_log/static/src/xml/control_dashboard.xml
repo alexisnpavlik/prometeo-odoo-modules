@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_deletion_reason_log.ControlDashboard">
-        <div t-att-class="'pos-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+        <div t-att-class="'posdrl-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
             <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')">
                 <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
@@ -382,68 +382,70 @@
 
                 <!-- TAB: DETALLE -->
                 <section t-if="state.activeTab === 'detail'" class="tab-pane active">
-                    <div class="section-header">
-                        <div>
-                            <h2>Detalle de operaciones</h2>
-                            <span class="subtitle">
-                                <t t-esc="data.detail.length"/> operaciones · página <t t-esc="state.page + 1"/> de <t t-esc="totalPages"/>
-                            </span>
+                    <div class="glass-panel padded">
+                        <div class="section-header">
+                            <div>
+                                <h2>Detalle de operaciones</h2>
+                                <span class="subtitle">
+                                    <t t-esc="data.detail.length"/> operaciones · página <t t-esc="state.page + 1"/> de <t t-esc="totalPages"/>
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Fecha/hora</th><th>Cajero</th><th>Tipo</th><th>Producto</th>
-                                    <th class="num">Cant.</th><th class="num">Desc. %</th><th class="num">Precio</th>
-                                    <th class="num">Importe</th><th>Motivo</th><th>Nota</th><th>Caja</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr t-foreach="detailPage" t-as="d" t-key="d_index + state.page * 50">
-                                    <td t-esc="d.fecha"/>
-                                    <td t-esc="d.cajero"/>
-                                    <td><span t-att-class="'status-pill t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
-                                    <td class="txt">
-                                        <t t-if="d.productos and d.productos.length > 1">
-                                            <button class="btn-link-products" t-on-click="() => this.openProducts(d)">
-                                                <t t-esc="d.productos.length"/> productos — Ver
-                                            </button>
-                                        </t>
-                                        <t t-elif="d.productos and d.productos.length === 1">
-                                            <t t-esc="d.productos[0]"/>
-                                        </t>
-                                        <t t-else="">
-                                            <t t-esc="d.producto"/>
-                                        </t>
-                                    </td>
-                                    <td class="num" t-esc="d.qty"/>
-                                    <td class="num">
-                                        <t t-if="d.tipo === 'high_discount'"><t t-esc="d.discount"/>%</t>
-                                    </td>
-                                    <td class="num">
-                                        <t t-if="d.tipo === 'price_reduction' or d.tipo === 'price_increase'">
-                                            $<t t-esc="money(d.old_price)"/> → $<t t-esc="money(d.new_price)"/>
-                                        </t>
-                                    </td>
-                                    <td class="num">$ <t t-esc="money(d.amount)"/></td>
-                                    <td class="txt"><span t-esc="d.motivo"/></td>
-                                    <td class="txt"><span t-esc="d.nota" t-att-title="d.nota"/></td>
-                                    <td t-esc="d.caja"/>
-                                </tr>
-                                <tr t-if="!data.detail.length" class="empty-row"><td colspan="11">Sin operaciones en el período.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha/hora</th><th>Cajero</th><th>Tipo</th><th>Producto</th>
+                                        <th class="num">Cant.</th><th class="num">Desc. %</th><th class="num">Precio</th>
+                                        <th class="num">Importe</th><th>Motivo</th><th>Nota</th><th>Caja</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="detailPage" t-as="d" t-key="d_index + state.page * 50">
+                                        <td t-esc="d.fecha"/>
+                                        <td t-esc="d.cajero"/>
+                                        <td><span t-att-class="'status-pill t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
+                                        <td class="txt">
+                                            <t t-if="d.productos and d.productos.length > 1">
+                                                <button class="btn-link-products" t-on-click="() => this.openProducts(d)">
+                                                    <t t-esc="d.productos.length"/> productos — Ver
+                                                </button>
+                                            </t>
+                                            <t t-elif="d.productos and d.productos.length === 1">
+                                                <t t-esc="d.productos[0]"/>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-esc="d.producto"/>
+                                            </t>
+                                        </td>
+                                        <td class="num" t-esc="d.qty"/>
+                                        <td class="num">
+                                            <t t-if="d.tipo === 'high_discount'"><t t-esc="d.discount"/>%</t>
+                                        </td>
+                                        <td class="num">
+                                            <t t-if="d.tipo === 'price_reduction' or d.tipo === 'price_increase'">
+                                                $<t t-esc="money(d.old_price)"/> → $<t t-esc="money(d.new_price)"/>
+                                            </t>
+                                        </td>
+                                        <td class="num">$ <t t-esc="money(d.amount)"/></td>
+                                        <td class="txt"><span t-esc="d.motivo"/></td>
+                                        <td class="txt"><span t-esc="d.nota" t-att-title="d.nota"/></td>
+                                        <td t-esc="d.caja"/>
+                                    </tr>
+                                    <tr t-if="!data.detail.length" class="empty-row"><td colspan="11">Sin operaciones en el período.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div t-if="totalPages > 1" class="table-pager">
-                        <button class="btn btn-secondary" t-att-disabled="state.page === 0"
-                                t-on-click="() => this.prevPage()">Anterior</button>
-                        <span class="pager-info">
-                            <t t-esc="state.page + 1"/> / <t t-esc="totalPages"/>
-                        </span>
-                        <button class="btn btn-secondary" t-att-disabled="state.page >= totalPages - 1"
-                                t-on-click="() => this.nextPage()">Siguiente</button>
+                        <div t-if="totalPages > 1" class="table-pager">
+                            <button class="btn btn-secondary" t-att-disabled="state.page === 0"
+                                    t-on-click="() => this.prevPage()">Anterior</button>
+                            <span class="pager-info">
+                                <t t-esc="state.page + 1"/> / <t t-esc="totalPages"/>
+                            </span>
+                            <button class="btn btn-secondary" t-att-disabled="state.page >= totalPages - 1"
+                                    t-on-click="() => this.nextPage()">Siguiente</button>
+                        </div>
                     </div>
                 </section>
                 </div>

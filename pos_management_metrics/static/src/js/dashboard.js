@@ -643,7 +643,6 @@ class PosDashboardMetrics extends Component {
                     display: true,
                     position: "top",
                     labels: {
-                        color: "#94a3b8",
                         boxWidth: 12,
                         boxHeight: 12,
                         usePointStyle: true,
@@ -900,7 +899,6 @@ class PosDashboardMetrics extends Component {
                     display: true,
                     position: "top",
                     labels: {
-                        color: "#94a3b8",
                         boxWidth: 12,
                         boxHeight: 12,
                         usePointStyle: true,
@@ -963,10 +961,10 @@ class PosDashboardMetrics extends Component {
                 }
             ]
         }, {
-            plugins: { legend: { display: true, position: "top", labels: { color: "#94a3b8" } } },
+            plugins: { legend: { display: true, position: "top", labels: {} } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: gridConfig, beginAtZero: true, ticks: { precision: 0, color: "#94a3b8" } }
+                y: { grid: gridConfig, beginAtZero: true, ticks: { precision: 0 } }
             }
         });
     }
@@ -982,7 +980,7 @@ class PosDashboardMetrics extends Component {
         }
 
         // Estilos base globales para Chart.js
-        Chart.defaults.color = "#94a3b8";
+        Chart.defaults.color = this.state.theme === "light" ? "#475569" : "#94a3b8";
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.font.size = 10;
 

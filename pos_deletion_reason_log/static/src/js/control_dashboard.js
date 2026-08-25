@@ -221,8 +221,8 @@ class PosControlDashboard extends Component {
     renderCharts() {
         if (typeof window.Chart === "undefined") return;
         this.destroyCharts();
-        const tick = this.state.theme === "light" ? "#334155" : "#cbd5e1";
-        const grid = this.state.theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
+        const tick = this.state.theme === "light" ? "#475569" : "#94a3b8";
+        const grid = this.state.theme === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)";
         // En teléfono la leyenda de 7 series se come todo el alto del panel
         const isPhone = window.innerWidth <= 768;
         const legendLabels = { color: tick, boxWidth: 12, boxHeight: 12, padding: 8, font: { size: 11 } };

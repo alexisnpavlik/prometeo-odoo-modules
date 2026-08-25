@@ -130,7 +130,7 @@
 }
 
 .caw-dashboard-wrap.theme-light .data-table th {
-    background: rgba(15, 23, 42, 0.02);
+    background: #f1f5f9;
 }
 
 .caw-dashboard-wrap.theme-light .data-table tbody tr:hover {
@@ -368,8 +368,8 @@
 }
 
 .caw-dashboard-wrap .sidebar-toggle svg {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
 }
 
 .caw-dashboard-wrap .sidebar-toggle:hover {
@@ -777,7 +777,8 @@
 
 .caw-dashboard-wrap .table-responsive {
     width: 100%;
-    overflow-x: auto;
+    overflow: auto;
+    max-height: 70vh;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: rgba(15, 23, 42, 0.3);
@@ -791,11 +792,14 @@
 }
 
 .caw-dashboard-wrap .data-table th {
-    background: rgba(255, 255, 255, 0.02);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: inset 0 -1px 0 var(--border-color);
+    background: #0e131f;
     padding: 12px 16px;
     font-weight: 600;
     color: var(--text-secondary);
-    border-bottom: 1px solid var(--border-color);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -831,37 +835,30 @@
     text-transform: uppercase;
 }
 
-.caw-dashboard-wrap .status-pill.closed {
-    background: var(--color-green-glow);
-    color: var(--color-green);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.caw-dashboard-wrap .status-pill.opened {
-    background: var(--color-red-glow);
-    color: var(--color-red);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.caw-dashboard-wrap .status-pill.closing {
+.caw-dashboard-wrap .status-pill.s-draft,
+.caw-dashboard-wrap .status-pill.s-pending {
     background: var(--color-amber-glow);
     color: var(--color-amber);
     border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
-.caw-dashboard-wrap .status-pill.posted {
+.caw-dashboard-wrap .status-pill.s-delivered,
+.caw-dashboard-wrap .status-pill.s-partial {
+    background: var(--color-blue-glow);
+    color: var(--color-blue);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.caw-dashboard-wrap .status-pill.s-paid,
+.caw-dashboard-wrap .status-pill.on-time {
     background: var(--color-green-glow);
     color: var(--color-green);
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.caw-dashboard-wrap .status-pill.draft {
-    background: var(--color-amber-glow);
-    color: var(--color-amber);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.caw-dashboard-wrap .status-pill.cancel {
+.caw-dashboard-wrap .status-pill.s-cancel,
+.caw-dashboard-wrap .status-pill.s-overdue,
+.caw-dashboard-wrap .status-pill.overdue {
     background: var(--color-red-glow);
     color: var(--color-red);
     border: 1px solid rgba(239, 68, 68, 0.3);

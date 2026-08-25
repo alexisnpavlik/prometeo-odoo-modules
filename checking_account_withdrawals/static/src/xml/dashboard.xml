@@ -274,7 +274,7 @@
                                 </div>
                             </div>
 
-                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.overdue_rate &gt; 0 ? 'orange' : 'green')">
+                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.overdue_rate &gt; 0 ? 'amber' : 'green')">
                                 <div class="kpi-card-inner">
                                     <div class="kpi-meta">
                                         <span class="kpi-title">Tasa de Mora</span>
@@ -467,12 +467,12 @@
                                                 <td style="font-weight: 600; color: #fff;"><t t-esc="formatCurrency(w.amount_total)"/></td>
                                                 <td><t t-esc="formatCurrency(w.residual)"/></td>
                                                 <td>
-                                                    <span t-att-class="'status-pill ' + (w.overdue ? 'overdue' : '')">
+                                                    <span t-att-class="'status-pill ' + (w.overdue ? 'overdue' : 'on-time')">
                                                         <t t-esc="w.overdue ? 'Sí' : 'No'"/>
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <span class="status-pill"><t t-esc="w.state"/></span>
+                                                    <span t-att-class="'status-pill s-' + w.state_key"><t t-esc="w.state"/></span>
                                                 </td>
                                             </tr>
                                         </t>
@@ -544,7 +544,7 @@
                                                 <td><t t-esc="formatCurrency(i.allocated)"/></td>
                                                 <td><t t-esc="formatCurrency(i.residual)"/></td>
                                                 <td>
-                                                    <span class="status-pill"><t t-esc="i.state"/></span>
+                                                    <span t-att-class="'status-pill s-' + i.state_key"><t t-esc="i.state"/></span>
                                                 </td>
                                             </tr>
                                         </t>
