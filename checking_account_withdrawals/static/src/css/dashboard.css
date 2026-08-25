@@ -343,6 +343,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex: 0 0 auto;
 }
 
 .caw-dashboard-wrap .header-left {
@@ -353,16 +354,46 @@
 
 .caw-dashboard-wrap .sidebar-toggle {
     display: none;
-    background: none;
-    border: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     color: var(--text-primary);
     cursor: pointer;
     padding: 4px;
 }
 
 .caw-dashboard-wrap .sidebar-toggle svg {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
+}
+
+.caw-dashboard-wrap .sidebar-toggle:hover {
+    border-color: var(--color-blue);
+}
+
+.caw-dashboard-wrap .sidebar-close {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.caw-dashboard-wrap .sidebar-close svg {
+    width: 16px;
+    height: 16px;
 }
 
 .caw-dashboard-wrap .main-header h1 {
@@ -430,6 +461,9 @@
     gap: 4px;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1px;
+    /* main-content es flex column con altura fija: sin esto las pestañas
+       se comprimen hasta desaparecer cuando el contenido es alto */
+    flex: 0 0 auto;
 }
 
 .caw-dashboard-wrap .nav-tab {
@@ -940,14 +974,15 @@
 
 /* Responsive Desings */
 @media (max-width: 992px) {
+    /* El scroll lo maneja .main-content, igual que en escritorio: con
+       height:auto el wrapper depende del contenedor de Odoo y queda sin scroll */
     .caw-dashboard-wrap {
         flex-direction: column;
         position: relative;
-        height: auto;
-        min-height: 100%;
-        overflow-y: auto;
+        height: 100%;
+        overflow: hidden;
     }
-    
+
     .caw-dashboard-wrap .sidebar {
         width: 100%;
         min-width: 100%;
@@ -958,22 +993,107 @@
         border-bottom: 1px solid var(--border-color);
         position: relative;
         padding: 20px;
+        display: none;
     }
-    
+
+    /* Superpuesto: así el botón del header no se va al fondo de la página */
+    .caw-dashboard-wrap .sidebar.open {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 200;
+        max-height: 100vh;
+        overflow-y: auto;
+        border-bottom: none;
+        background: var(--bg-base);
+    }
+
+    .caw-dashboard-wrap .sidebar.open .sidebar-close { display: flex; }
+    .caw-dashboard-wrap .sidebar-brand { display: none; }
+    .caw-dashboard-wrap .sidebar-toggle { display: inline-flex; }
+
     .caw-dashboard-wrap .main-content {
         max-width: 100%;
         padding: 20px;
-        height: auto;
-        overflow-y: visible;
+        height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
-    
+
     .caw-dashboard-wrap .charts-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .caw-dashboard-wrap .charts-grid .span-two-cols {
         grid-column: span 1;
     }
+}
+
+@media (max-width: 768px) {
+    .caw-dashboard-wrap .main-content { padding: 14px; gap: 16px; overflow-x: hidden; }
+    .caw-dashboard-wrap .sidebar { padding: 14px; gap: 16px; }
+
+    /* Header: título arriba, acciones en su propia fila */
+    .caw-dashboard-wrap .main-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    .caw-dashboard-wrap .main-header h1 { font-size: 18px; }
+    .caw-dashboard-wrap .header-right { gap: 8px; width: 100%; justify-content: space-between; }
+    .caw-dashboard-wrap .sync-status { flex: 1 1 auto; min-width: 0; justify-content: center; }
+    .caw-dashboard-wrap .status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Pestañas: scroll horizontal en vez de romper el layout */
+    .caw-dashboard-wrap .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .caw-dashboard-wrap .nav-tabs::-webkit-scrollbar { display: none; }
+    .caw-dashboard-wrap .nav-tab { flex: 0 0 auto; white-space: nowrap; padding: 10px 12px; font-size: 13px; }
+
+    .caw-dashboard-wrap .kpi-grid { grid-template-columns: 1fr; gap: 12px; }
+    .caw-dashboard-wrap .kpi-card { padding: 16px; }
+    .caw-dashboard-wrap .kpi-value { font-size: 22px; }
+    .caw-dashboard-wrap .tab-pane { gap: 16px; }
+    .caw-dashboard-wrap .glass-panel.padded { padding: 14px; }
+
+    .caw-dashboard-wrap .chart-container { height: 280px; }
+    .caw-dashboard-wrap .chart-header { padding: 12px 14px; }
+    .caw-dashboard-wrap .chart-body { padding: 10px; }
+
+    /* Cabeceras de sección: los controles bajan y ocupan el ancho */
+    .caw-dashboard-wrap .section-header,
+    .caw-dashboard-wrap .header-actions { flex-wrap: wrap; }
+    .caw-dashboard-wrap .header-actions { width: 100%; }
+    .caw-dashboard-wrap .header-actions .search-box,
+    .caw-dashboard-wrap .header-actions .search-box input { width: 100%; box-sizing: border-box; }
+    .caw-dashboard-wrap .header-actions .btn { flex: 1 1 auto; white-space: nowrap; }
+
+    /* Tablas: scroll horizontal con celdas en una línea */
+    .caw-dashboard-wrap .table-responsive { -webkit-overflow-scrolling: touch; }
+    .caw-dashboard-wrap .data-table { font-size: 12px; }
+    .caw-dashboard-wrap .data-table th,
+    .caw-dashboard-wrap .data-table td { white-space: nowrap; }
+
+    /* 16px evita el zoom automático de iOS al enfocar un campo */
+    .caw-dashboard-wrap select,
+    .caw-dashboard-wrap input[type="date"],
+    .caw-dashboard-wrap input[type="text"] { font-size: 16px; }
+
+    /* Objetivos táctiles cómodos */
+    .caw-dashboard-wrap .btn-preset { padding: 10px; font-size: 13px; }
+    .caw-dashboard-wrap .btn { padding: 10px 14px; min-height: 38px; }
+    .caw-dashboard-wrap .pagination { flex-wrap: wrap; justify-content: center; gap: 8px; }
+}
+
+@media (max-width: 480px) {
+    .caw-dashboard-wrap .main-content { padding: 10px; }
+    .caw-dashboard-wrap .main-header h1 { font-size: 16px; }
+    .caw-dashboard-wrap .preset-dates { grid-template-columns: 1fr 1fr; }
+    .caw-dashboard-wrap .chart-container { height: 240px; }
+    .caw-dashboard-wrap .kpi-value { font-size: 20px; }
 }
 
 /* -------------------------------------------------------------

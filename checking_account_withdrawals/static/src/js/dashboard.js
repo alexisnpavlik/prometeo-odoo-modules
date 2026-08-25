@@ -22,7 +22,8 @@ class CawDashboard extends Component {
             activeTab: "general",
             loading: false,
             syncTime: "Cargando...",
-            theme: "dark"
+            theme: "dark",
+            showFilters: false
         });
 
         this.filtersData = useState({
@@ -112,8 +113,14 @@ class CawDashboard extends Component {
         setTimeout(() => this.renderAllCharts(), 50);
     }
 
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
+    }
+
     async applyFilters() {
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -124,6 +131,7 @@ class CawDashboard extends Component {
         this.state.partner = "all";
         this.state.search = "";
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 

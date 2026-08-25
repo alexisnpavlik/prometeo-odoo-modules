@@ -3,7 +3,14 @@
     <t t-name="checking_account_withdrawals.DashboardTemplate">
         <div t-att-class="'caw-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
-            <aside class="sidebar" id="sidebar">
+            <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')" id="sidebar">
+                <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Cerrar filtros</span>
+                </button>
                 <div class="sidebar-brand">
                     <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -98,6 +105,13 @@
                     </div>
 
                     <div class="header-right">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
+                        </button>
                         <!-- Botón de Alternancia de Tema Día/Noche -->
                         <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
                             <t t-if="state.theme === 'light'">
