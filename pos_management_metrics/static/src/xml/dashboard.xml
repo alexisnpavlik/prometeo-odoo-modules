@@ -817,7 +817,7 @@
                             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Producto</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Desglose exhaustivo de ingresos netos, costos estimados y porcentaje de margen</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo por unidad, ventas con IVA y porcentaje de margen por producto</p>
                                 </div>
                                 <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
                                     <div class="nav-tabs" style="display: flex; gap: 4px;">
@@ -887,7 +887,7 @@
                             <div class="section-header" style="margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Categoría</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Evaluación de la rentabilidad promedio agrupada por categorías de producto</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo por unidad, ventas con IVA y porcentaje de margen por categoría</p>
                                 </div>
                             </div>
                             
@@ -896,29 +896,31 @@
                                     <thead>
                                         <tr>
                                             <th>Categoría</th>
-                                            <th class="text-right" style="text-align: right;">Ventas (Con IVA)</th>
+                                            <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
+                                            <th class="text-right" style="text-align: right;">Costo Unidad</th>
+                                            <th class="text-right" style="text-align: right;">Ventas</th>
                                             <th class="text-right" style="text-align: right;">Costo Total</th>
-                                            <th class="text-right" style="text-align: right;">Utilidad Bruta</th>
                                             <th>% Margen</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="metricsData.profitability.category_margins.length === 0">
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted">No se encontraron categorías registradas.</td>
+                                                <td colspan="6" class="text-center text-muted">No se encontraron categorías registradas.</td>
                                             </tr>
                                         </t>
                                         <t t-foreach="metricsData.profitability.category_margins" t-as="c" t-key="c_index + '-' + c.categoria">
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="c.categoria"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="c.total_qty"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.unit_cost)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.net_revenue)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.total_cost)"/></td>
-                                                <td class="text-right" style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(c.gross_profit)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
                                                         <div class="margin-progress-container">
                                                             <div t-att-class="'margin-progress-bar ' + (c.margin_percent &lt; 0 ? 'negative' : (c.margin_percent &gt; 50 ? 'high' : 'medium'))"
-                                                                 t-attf-style="width: {{Math.max(0, Math.min(100, c.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
+                                                                 t-attf-style="width: {{Math.min(100, Math.abs(c.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
                                                         </div>
                                                         <span t-att-class="'margin-percent-text ' + (c.margin_percent &lt; 0 ? 'text-red font-bold' : '')" style="font-size: 12px; font-weight: 600; width: 45px; text-align: right;">
                                                             <t t-esc="c.margin_percent"/>%

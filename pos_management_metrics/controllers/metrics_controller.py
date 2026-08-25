@@ -785,6 +785,7 @@ class PosMetricsController(http.Controller):
         cat_margin_query = f"""
             SELECT
                 ic.name AS categoria,
+                SUM(pol.qty) AS total_qty,
                 SUM(pol.price_subtotal_incl) AS net_revenue,
                 SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS total_cost,
                 SUM(pol.price_subtotal_incl) - SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS gross_profit
@@ -811,10 +812,12 @@ class PosMetricsController(http.Controller):
         cr.execute(cat_margin_query, cat_margin_params)
         category_margins = cr.dictfetchall()
         for c in category_margins:
+            c['total_qty'] = round(float(c['total_qty'] or 0.0), 2)
             c['net_revenue'] = round(float(c['net_revenue'] or 0.0), 2)
             c['total_cost'] = round(float(c['total_cost'] or 0.0), 2)
             c['gross_profit'] = round(float(c['gross_profit'] or 0.0), 2)
             c['margin_percent'] = round((c['gross_profit'] / c['net_revenue'] * 100.0), 2) if c['net_revenue'] > 0 else 0.0
+            c['unit_cost'] = round(c['total_cost'] / c['total_qty'], 2) if c['total_qty'] else 0.0
         category_margins = [c for c in category_margins if c['margin_percent'] < 95.0]
 
         # 12. Productos con mayor rentabilidad absoluta y fugas de rentabilidad (solo margen negativo)
