@@ -29,6 +29,7 @@ class PosDashboardMetrics extends Component {
             profitabilitySearch: "",
             marginSign: "positive",
             marginSort: "revenue",
+            showFilters: false,
             page: 1,
             perPage: 15,
             activeTab: "general",
@@ -259,6 +260,10 @@ class PosDashboardMetrics extends Component {
     onMarginSortChange(ev) {
         this.state.marginSort = ev.target.value;
     }
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
+    }
     onPresetClick(preset) {
         this.state.preset = preset;
         this.setPresetDates(preset);
@@ -311,6 +316,8 @@ class PosDashboardMetrics extends Component {
 
     async applyFilters() {
         this.state.page = 1;
+        // En móvil el panel está superpuesto: se cierra para dejar ver los gráficos
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -330,6 +337,7 @@ class PosDashboardMetrics extends Component {
         this.state.search = "";
         this.state.profitabilitySearch = "";
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -635,7 +643,6 @@ class PosDashboardMetrics extends Component {
                     display: true,
                     position: "top",
                     labels: {
-                        color: "#94a3b8",
                         boxWidth: 12,
                         boxHeight: 12,
                         usePointStyle: true,
@@ -711,26 +718,7 @@ class PosDashboardMetrics extends Component {
             }
         });
 
-        // 3. Top Productos (Horizontal Bar)
-        this.createOrUpdateChart("chart-top-products", "bar", {
-            labels: this.metricsData.charts.top_products.labels.map(l => l.length > 25 ? l.substring(0, 22) + "..." : l),
-            datasets: [{
-                label: "Total Ventas",
-                data: this.metricsData.charts.top_products.values,
-                backgroundColor: "rgba(59, 130, 246, 0.65)",
-                borderColor: "#3b82f6",
-                borderWidth: 1.5,
-                borderRadius: 4
-            }]
-        }, {
-            indexAxis: "y",
-            scales: {
-                x: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } },
-                y: { grid: { display: false } }
-            }
-        });
-
-        // 4. Top Categorías (Horizontal Bar)
+        // 3. Top Categorías (Horizontal Bar)
         this.createOrUpdateChart("chart-top-categories", "bar", {
             labels: this.metricsData.charts.top_categories.labels.map(l => l.length > 20 ? l.substring(0, 17) + "..." : l),
             datasets: [{
@@ -799,7 +787,7 @@ class PosDashboardMetrics extends Component {
         this.createOrUpdateChart("chart-top-articles-revenue", "bar", {
             labels: byRevenue.map(r => shorten(r.producto)),
             datasets: [{
-                label: "Total Vendido",
+                label: "Total Facturado",
                 data: byRevenue.map(r => r.facturacion),
                 backgroundColor: "rgba(59, 130, 246, 0.65)",
                 borderColor: "#3b82f6",
@@ -814,7 +802,7 @@ class PosDashboardMetrics extends Component {
                     callbacks: {
                         label: (context) => {
                             const row = byRevenue[context.dataIndex];
-                            return ` ${this.formatCurrency(row.facturacion)} (${row.unidades} un.)`;
+                            return ` ${this.formatCurrency(row.facturacion)} (${row.unidades} un. · ${this.formatCurrency(row.precio_unitario)}/u)`;
                         }
                     }
                 }
@@ -844,7 +832,7 @@ class PosDashboardMetrics extends Component {
                     callbacks: {
                         label: (context) => {
                             const row = byUnits[context.dataIndex];
-                            return ` ${row.unidades} un. (${this.formatCurrency(row.facturacion)})`;
+                            return ` ${row.unidades} un. (${this.formatCurrency(row.facturacion)} · ${this.formatCurrency(row.precio_unitario)}/u)`;
                         }
                     }
                 }
@@ -911,7 +899,6 @@ class PosDashboardMetrics extends Component {
                     display: true,
                     position: "top",
                     labels: {
-                        color: "#94a3b8",
                         boxWidth: 12,
                         boxHeight: 12,
                         usePointStyle: true,
@@ -974,10 +961,10 @@ class PosDashboardMetrics extends Component {
                 }
             ]
         }, {
-            plugins: { legend: { display: true, position: "top", labels: { color: "#94a3b8" } } },
+            plugins: { legend: { display: true, position: "top", labels: {} } },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: gridConfig, beginAtZero: true, ticks: { precision: 0, color: "#94a3b8" } }
+                y: { grid: gridConfig, beginAtZero: true, ticks: { precision: 0 } }
             }
         });
     }
@@ -993,7 +980,7 @@ class PosDashboardMetrics extends Component {
         }
 
         // Estilos base globales para Chart.js
-        Chart.defaults.color = "#94a3b8";
+        Chart.defaults.color = this.state.theme === "light" ? "#475569" : "#94a3b8";
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.font.size = 10;
 

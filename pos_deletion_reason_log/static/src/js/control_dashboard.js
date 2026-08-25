@@ -3,7 +3,9 @@
 import { registry } from "@web/core/registry";
 import { Component, onWillStart, onMounted, onWillUnmount, useState, useRef } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
-import { loadJS } from "@web/core/assets";
+import { loadBundle } from "@web/core/assets";
+
+const DETAIL_PAGE_SIZE = 50;
 
 const TYPE_LABELS = {
     order: "Orden eliminada",
@@ -43,6 +45,8 @@ class PosControlDashboard extends Component {
             company: "all",
             dtype: "all",
             productsModal: { open: false, subtitle: "", items: [] },
+            showFilters: false,
+            page: 0,
         });
         this.filtersData = useState({ cajas: [], cajeros: [], empresas: [] });
         this.data = useState({
@@ -63,7 +67,12 @@ class PosControlDashboard extends Component {
         this._charts = {};
 
         onWillStart(async () => {
-            await loadJS("https://cdn.jsdelivr.net/npm/chart.js");
+            try {
+                await loadBundle("web.chartjs_lib");
+            } catch (e) {
+                // Sin gráficos, pero el resto del dashboard tiene que abrir igual
+                console.warn("Chart.js no disponible; el dashboard sigue sin gráficos", e);
+            }
             this.setPresetDates(this.state.preset);
             await this.loadFilters();
             await this.fetchMetrics();
@@ -74,7 +83,8 @@ class PosControlDashboard extends Component {
 
     // ---- Fechas / presets ----
     setPresetDates(preset) {
-        const fmt = (d) => d.toISOString().slice(0, 10);
+        const fmt = (d) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const today = new Date();
         let start = new Date();
         if (preset === "today") {
@@ -128,6 +138,7 @@ class PosControlDashboard extends Component {
                 dtype: this.state.dtype,
             });
             Object.assign(this.data, res);
+            this.state.page = 0;
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
             this.renderCharts();
         } catch (e) {
@@ -136,6 +147,21 @@ class PosControlDashboard extends Component {
         } finally {
             this.state.loading = false;
         }
+    }
+
+    // ---- Paginación del detalle ----
+    get totalPages() {
+        return Math.max(1, Math.ceil(this.data.detail.length / DETAIL_PAGE_SIZE));
+    }
+    get detailPage() {
+        const from = this.state.page * DETAIL_PAGE_SIZE;
+        return this.data.detail.slice(from, from + DETAIL_PAGE_SIZE);
+    }
+    prevPage() {
+        if (this.state.page > 0) this.state.page--;
+    }
+    nextPage() {
+        if (this.state.page < this.totalPages - 1) this.state.page++;
     }
 
     switchTab(tab) {
@@ -147,7 +173,14 @@ class PosControlDashboard extends Component {
         }
     }
 
-    applyFilters() { this.fetchMetrics(); }
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
+    }
+    applyFilters() {
+        this.state.showFilters = false;
+        this.fetchMetrics();
+    }
     clearFilters() {
         this.state.preset = "30days";
         this.setPresetDates("30days");
@@ -155,6 +188,7 @@ class PosControlDashboard extends Component {
         this.state.cashier = "all";
         this.state.company = "all";
         this.state.dtype = "all";
+        this.state.showFilters = false;
         this.fetchMetrics();
     }
     toggleTheme() {
@@ -187,8 +221,11 @@ class PosControlDashboard extends Component {
     renderCharts() {
         if (typeof window.Chart === "undefined") return;
         this.destroyCharts();
-        const tick = this.state.theme === "light" ? "#334155" : "#cbd5e1";
-        const grid = this.state.theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
+        const tick = this.state.theme === "light" ? "#475569" : "#94a3b8";
+        const grid = this.state.theme === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.04)";
+        // En teléfono la leyenda de 7 series se come todo el alto del panel
+        const isPhone = window.innerWidth <= 768;
+        const legendLabels = { color: tick, boxWidth: 12, boxHeight: 12, padding: 8, font: { size: 11 } };
 
         // Ranking de cajeros (barras apiladas por tipo)
         if (this.cashiersRef.el && this.data.cashiers.length) {
@@ -209,10 +246,10 @@ class PosControlDashboard extends Component {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: tick } } },
+                    plugins: { legend: { display: !isPhone, labels: legendLabels } },
                     scales: {
-                        x: { stacked: true, ticks: { color: tick }, grid: { color: grid } },
-                        y: { stacked: true, ticks: { color: tick }, grid: { color: grid }, beginAtZero: true },
+                        x: { stacked: true, ticks: { color: tick, maxRotation: isPhone ? 0 : 50, autoSkip: true }, grid: { color: grid } },
+                        y: { stacked: true, ticks: { color: tick, maxTicksLimit: isPhone ? 5 : 11 }, grid: { color: grid }, beginAtZero: true },
                     },
                 },
             });
@@ -228,7 +265,7 @@ class PosControlDashboard extends Component {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: "right", labels: { color: tick } } },
+                    plugins: { legend: { position: isPhone ? "bottom" : "right", labels: legendLabels } },
                 },
             });
         }
@@ -238,7 +275,7 @@ class PosControlDashboard extends Component {
             this._charts.trend = new window.Chart(this.trendRef.el, {
                 type: "line",
                 data: {
-                    labels: this.data.trend.map((t) => t.dia),
+                    labels: this.data.trend.map((t) => t.dia.slice(5).replace("-", "/")),
                     datasets: [
                         { label: "Eventos", data: this.data.trend.map((t) => t.total), borderColor: COLORS.order, backgroundColor: "rgba(239,68,68,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
                         { label: "Reembolsos", data: this.data.trend.map((t) => t.n_refund), borderColor: COLORS.refund, backgroundColor: "rgba(249,115,22,0.15)", fill: true, tension: 0.3, yAxisID: "y" },
@@ -247,11 +284,22 @@ class PosControlDashboard extends Component {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: tick } } },
+                    plugins: {
+                        legend: { labels: legendLabels },
+                        tooltip: { callbacks: { title: (items) => this.data.trend[items[0].dataIndex].dia } },
+                    },
                     scales: {
-                        x: { ticks: { color: tick }, grid: { color: grid } },
-                        y: { position: "left", ticks: { color: tick }, grid: { color: grid }, beginAtZero: true },
-                        y1: { position: "right", ticks: { color: tick }, grid: { drawOnChartArea: false }, beginAtZero: true },
+                        x: { ticks: { color: tick, maxRotation: 0, autoSkip: true, autoSkipPadding: 8 }, grid: { color: grid } },
+                        y: { position: "left", ticks: { color: tick, maxTicksLimit: 6 }, grid: { color: grid }, beginAtZero: true },
+                        y1: {
+                            position: "right", beginAtZero: true, grid: { drawOnChartArea: false },
+                            ticks: {
+                                color: tick, maxTicksLimit: 5,
+                                callback: (v) => Math.abs(v) >= 1000
+                                    ? `${(v / 1000).toLocaleString("es-AR", { maximumFractionDigits: 1 })}k`
+                                    : v,
+                            },
+                        },
                     },
                 },
             });

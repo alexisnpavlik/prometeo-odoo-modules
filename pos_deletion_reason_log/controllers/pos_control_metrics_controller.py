@@ -24,17 +24,21 @@ class PosControlMetricsController(http.Controller):
 
     def _build_where(
         self, start_date=None, end_date=None, pos="all", cashier="all",
-        company="all", dtype="all",
+        company="all", dtype="all", exclude_refund=True,
     ):
         """WHERE compartido sobre pos_control_log (alias dl).
 
         Excluye los eventos 'refund': los reembolsos se miden desde la data
         nativa (pos_order_line), y el evento 'refund' del log solo guarda el
         motivo. Contarlos acá los duplicaría en KPIs, ranking, tendencia y
-        detalle.
+        detalle. La distribución por motivo es la excepción (exclude_refund=False):
+        ahí el log es la única fuente del motivo y hay un solo evento por
+        reembolso, así que no duplica nada.
         """
         allowed = tuple(request.env.companies.ids) or (0,)
-        where = "dl.company_id IN %s AND dl.event_type != 'refund'"
+        where = "dl.company_id IN %s"
+        if exclude_refund:
+            where += " AND dl.event_type != 'refund'"
         params = [allowed]
         tz = self._get_timezone()
 
@@ -241,13 +245,32 @@ class PosControlMetricsController(http.Controller):
         if pos and pos != "all":
             ord_where += " AND pc.name = %s"
             ord_params.append(pos)
+        if cashier and cashier != "all":
+            ord_where += " AND rp.name = %s"
+            ord_params.append(cashier)
+        if company and company != "all":
+            ord_where += " AND rc.name = %s"
+            ord_params.append(company)
         cr.execute(
-            f"SELECT COUNT(*) FROM pos_order po LEFT JOIN pos_config pc ON pc.id = po.config_id WHERE {ord_where}",
+            f"""
+            SELECT COUNT(*)
+            FROM pos_order po
+            LEFT JOIN pos_config pc ON pc.id = po.config_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+            LEFT JOIN res_company rc ON rc.id = po.company_id
+            WHERE {ord_where}
+            """,
             ord_params,
         )
         orders_period = int(cr.fetchone()[0] or 0)
-        denom = orders_period + kpis["n_order"]
-        kpis["deletion_rate"] = round(100.0 * kpis["n_order"] / denom, 2) if denom else 0.0
+        # Con un filtro de tipo distinto de 'order' el numerador es 0 por definición:
+        # la tasa no aplica y mostrar 0,00% haría creer que no hubo eliminaciones.
+        if dtype and dtype not in ("all", "order"):
+            kpis["deletion_rate"] = None
+        else:
+            denom = orders_period + kpis["n_order"]
+            kpis["deletion_rate"] = round(100.0 * kpis["n_order"] / denom, 2) if denom else 0.0
 
         # --- Ranking de cajeros (conteo por tipo + importe) ---
         # Se arma como dict por nombre para poder fusionar los reembolsos
@@ -318,16 +341,21 @@ class PosControlMetricsController(http.Controller):
         )[:15]
 
         # --- Distribución por motivo ---
+        # Único bloque que incluye los eventos 'refund' del log: el motivo del
+        # reembolso solo existe ahí y se graba una vez por orden reembolsada.
+        reasons_where, reasons_params = self._build_where(
+            start_date, end_date, pos, cashier, company, dtype, exclude_refund=False
+        )
         cr.execute(
             f"""
             SELECT COALESCE(pdr.name->>%s, pdr.name->>'en_US', 'Sin motivo') AS motivo,
                    COUNT(*) AS total
             {self._JOINS}
-            WHERE {where}
+            WHERE {reasons_where}
             GROUP BY 1
             ORDER BY total DESC
             """,
-            [lang] + params,
+            [lang] + reasons_params,
         )
         reasons = [{"motivo": r["motivo"], "total": int(r["total"])} for r in cr.dictfetchall()]
 
@@ -429,8 +457,8 @@ class PosControlMetricsController(http.Controller):
                 SELECT to_char((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s), 'YYYY-MM-DD HH24:MI') AS fecha,
                        rp.name AS cajero,
                        COUNT(*) AS n_lineas,
-                       COALESCE(SUM(pol.qty), 0) AS qty,
-                       COALESCE(SUM(pol.price_subtotal_incl), 0) AS amount,
+                       COALESCE(ABS(SUM(pol.qty)), 0) AS qty,
+                       COALESCE(ABS(SUM(pol.price_subtotal_incl)), 0) AS amount,
                        COALESCE(po.pos_reference, po.name, '') AS nota,
                        pc.name AS caja,
                        MAX(COALESCE(rdr.name->>%s, rdr.name->>'en_US', '')) AS motivo,

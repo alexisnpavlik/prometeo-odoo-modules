@@ -314,6 +314,7 @@ class CawDashboardController(http.Controller):
                 "allocated": record.amount_allocated,
                 "residual": record.amount_residual,
                 "state": INSTALLMENT_STATES.get(record.state, record.state),
+                "state_key": record.state,
             }
         return {
             "id": record.id,
@@ -325,6 +326,7 @@ class CawDashboardController(http.Controller):
             "residual": record.amount_residual,
             "overdue": record.is_overdue,
             "state": WITHDRAWAL_STATES.get(record.state, record.state),
+            "state_key": record.state,
         }
 
     @http.route("/checking_account_withdrawals/export", type="http", auth="user")
@@ -342,7 +344,8 @@ class CawDashboardController(http.Controller):
         rows = [self._caw_serialize(record, model) for record in records]
         output = io.StringIO()
         if rows:
-            writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()), delimiter=";")
+            fieldnames = [k for k in rows[0].keys() if not k.endswith("_key")]
+            writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
             writer.writeheader()
             writer.writerows(rows)
         filename = f"cuenta_corriente_{model}.csv"
