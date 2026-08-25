@@ -509,7 +509,7 @@
                                     <h2>Detalle Top Artículos</h2>
                                     <p class="subtitle">Ranking con total facturado, unidades y precio por unidad de cada artículo</p>
                                 </div>
-                                <div style="display: flex; gap: 8px;">
+                                <div class="header-actions">
                                     <button t-att-class="'nav-tab ' + (state.topSort === 'revenue' ? 'active' : '')"
                                             t-on-click="() => this.setTopSort('revenue')">Por Total Facturado</button>
                                     <button t-att-class="'nav-tab ' + (state.topSort === 'units' ? 'active' : '')"

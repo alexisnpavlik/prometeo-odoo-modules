@@ -1509,6 +1509,17 @@
         width: 100%;
     }
 
+    /* Los botones de la cabecera se reparten el ancho en vez de desbordar */
+    .pos-dashboard-wrap .header-actions .btn {
+        flex: 1 1 auto;
+        white-space: nowrap;
+    }
+
+    .pos-dashboard-wrap .header-actions .nav-tab {
+        flex: 1 1 auto;
+        text-align: center;
+    }
+
     .pos-dashboard-wrap .header-actions .search-box,
     .pos-dashboard-wrap .header-actions .search-box input {
         width: 100%;
