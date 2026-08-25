@@ -719,26 +719,7 @@ class PosDashboardMetrics extends Component {
             }
         });
 
-        // 3. Top Productos (Horizontal Bar)
-        this.createOrUpdateChart("chart-top-products", "bar", {
-            labels: this.metricsData.charts.top_products.labels.map(l => l.length > 25 ? l.substring(0, 22) + "..." : l),
-            datasets: [{
-                label: "Total Ventas",
-                data: this.metricsData.charts.top_products.values,
-                backgroundColor: "rgba(59, 130, 246, 0.65)",
-                borderColor: "#3b82f6",
-                borderWidth: 1.5,
-                borderRadius: 4
-            }]
-        }, {
-            indexAxis: "y",
-            scales: {
-                x: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } },
-                y: { grid: { display: false } }
-            }
-        });
-
-        // 4. Top Categorías (Horizontal Bar)
+        // 3. Top Categorías (Horizontal Bar)
         this.createOrUpdateChart("chart-top-categories", "bar", {
             labels: this.metricsData.charts.top_categories.labels.map(l => l.length > 20 ? l.substring(0, 17) + "..." : l),
             datasets: [{
