@@ -1537,6 +1537,7 @@
     /* Tablas: scroll horizontal con celdas en una línea */
     .pos-dashboard-wrap .table-responsive {
         -webkit-overflow-scrolling: touch;
+        max-height: none;
     }
 
     .pos-dashboard-wrap .data-table {

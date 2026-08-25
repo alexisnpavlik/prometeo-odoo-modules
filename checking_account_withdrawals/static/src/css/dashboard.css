@@ -1069,7 +1069,8 @@
     .caw-dashboard-wrap .header-actions .btn { flex: 1 1 auto; white-space: nowrap; }
 
     /* Tablas: scroll horizontal con celdas en una línea */
-    .caw-dashboard-wrap .table-responsive { -webkit-overflow-scrolling: touch; }
+    .caw-dashboard-wrap .table-responsive { -webkit-overflow-scrolling: touch;
+        max-height: none; }
     .caw-dashboard-wrap .data-table { font-size: 12px; }
     .caw-dashboard-wrap .data-table th,
     .caw-dashboard-wrap .data-table td { white-space: nowrap; }
