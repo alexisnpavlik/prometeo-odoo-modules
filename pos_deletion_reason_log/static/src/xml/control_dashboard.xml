@@ -331,8 +331,16 @@
                                     </svg>
                                 </div>
                             </div>
-                            <div class="kpi-value"><t t-esc="data.kpis.deletion_rate"/>%</div>
-                            <div class="kpi-footer"><span class="kpi-subtext">Órdenes elim. / total órdenes</span></div>
+                            <div class="kpi-value">
+                                <t t-if="data.kpis.deletion_rate === null">—</t>
+                                <t t-else=""><t t-esc="data.kpis.deletion_rate"/>%</t>
+                            </div>
+                            <div class="kpi-footer">
+                                <span class="kpi-subtext">
+                                    <t t-if="data.kpis.deletion_rate === null">No aplica con este filtro de tipo</t>
+                                    <t t-else="">Órdenes elim. / total órdenes</t>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -346,7 +354,7 @@
                         </div>
                         <div class="chart-body">
                             <canvas t-ref="cashiersChart"/>
-                            <p t-if="!data.cashiers.length" class="text-muted" style="text-align:center; padding-top: 40px;">Sin datos en el período.</p>
+                            <p t-if="!data.cashiers.length" class="text-muted chart-empty">Sin datos en el período.</p>
                         </div>
                     </div>
 
@@ -354,7 +362,7 @@
                         <div class="chart-header"><h3>Por motivo</h3></div>
                         <div class="chart-body">
                             <canvas t-ref="reasonsChart"/>
-                            <p t-if="!data.reasons.length" class="text-muted" style="text-align:center; padding-top: 40px;">Sin datos.</p>
+                            <p t-if="!data.reasons.length" class="text-muted chart-empty">Sin datos.</p>
                         </div>
                     </div>
 
@@ -365,7 +373,7 @@
                         </div>
                         <div class="chart-body">
                             <canvas t-ref="trendChart"/>
-                            <p t-if="!data.trend.length" class="text-muted" style="text-align:center; padding-top: 40px;">Sin datos.</p>
+                            <p t-if="!data.trend.length" class="text-muted chart-empty">Sin datos.</p>
                         </div>
                     </div>
                 </div>
@@ -373,11 +381,13 @@
                 </section>
 
                 <!-- TAB: DETALLE -->
-                <section t-att-class="'tab-pane ' + (state.activeTab === 'detail' ? 'active' : '')">
+                <section t-if="state.activeTab === 'detail'" class="tab-pane active">
                     <div class="section-header">
                         <div>
                             <h2>Detalle de operaciones</h2>
-                            <span class="subtitle">Últimos 500 registros</span>
+                            <span class="subtitle">
+                                <t t-esc="data.detail.length"/> operaciones · página <t t-esc="state.page + 1"/> de <t t-esc="totalPages"/>
+                            </span>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -390,11 +400,11 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr t-foreach="data.detail" t-as="d" t-key="d_index">
+                                <tr t-foreach="detailPage" t-as="d" t-key="d_index + state.page * 50">
                                     <td t-esc="d.fecha"/>
                                     <td t-esc="d.cajero"/>
                                     <td><span t-att-class="'status-pill t-' + d.tipo" t-esc="typeLabel(d.tipo)"/></td>
-                                    <td>
+                                    <td class="txt">
                                         <t t-if="d.productos and d.productos.length > 1">
                                             <button class="btn-link-products" t-on-click="() => this.openProducts(d)">
                                                 <t t-esc="d.productos.length"/> productos — Ver
@@ -417,13 +427,23 @@
                                         </t>
                                     </td>
                                     <td class="num">$ <t t-esc="money(d.amount)"/></td>
-                                    <td t-esc="d.motivo"/>
-                                    <td t-esc="d.nota"/>
+                                    <td class="txt"><span t-esc="d.motivo"/></td>
+                                    <td class="txt"><span t-esc="d.nota" t-att-title="d.nota"/></td>
                                     <td t-esc="d.caja"/>
                                 </tr>
                                 <tr t-if="!data.detail.length" class="empty-row"><td colspan="11">Sin operaciones en el período.</td></tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div t-if="totalPages > 1" class="table-pager">
+                        <button class="btn btn-secondary" t-att-disabled="state.page === 0"
+                                t-on-click="() => this.prevPage()">Anterior</button>
+                        <span class="pager-info">
+                            <t t-esc="state.page + 1"/> / <t t-esc="totalPages"/>
+                        </span>
+                        <button class="btn btn-secondary" t-att-disabled="state.page >= totalPages - 1"
+                                t-on-click="() => this.nextPage()">Siguiente</button>
                     </div>
                 </section>
                 </div>
