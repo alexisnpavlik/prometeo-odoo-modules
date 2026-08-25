@@ -43,6 +43,7 @@ class PosControlDashboard extends Component {
             company: "all",
             dtype: "all",
             productsModal: { open: false, subtitle: "", items: [] },
+            showFilters: false,
         });
         this.filtersData = useState({ cajas: [], cajeros: [], empresas: [] });
         this.data = useState({
@@ -147,7 +148,14 @@ class PosControlDashboard extends Component {
         }
     }
 
-    applyFilters() { this.fetchMetrics(); }
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
+    }
+    applyFilters() {
+        this.state.showFilters = false;
+        this.fetchMetrics();
+    }
     clearFilters() {
         this.state.preset = "30days";
         this.setPresetDates("30days");
@@ -155,6 +163,7 @@ class PosControlDashboard extends Component {
         this.state.cashier = "all";
         this.state.company = "all";
         this.state.dtype = "all";
+        this.state.showFilters = false;
         this.fetchMetrics();
     }
     toggleTheme() {

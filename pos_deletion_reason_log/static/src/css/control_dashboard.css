@@ -300,7 +300,7 @@
     overflow-y: auto; height: 100%;
 }
 
-.pos-dashboard-wrap .main-header { display: flex; justify-content: space-between; align-items: center; }
+.pos-dashboard-wrap .main-header { display: flex; justify-content: space-between; align-items: center; flex: 0 0 auto; }
 .pos-dashboard-wrap .header-left { display: flex; align-items: center; gap: 12px; }
 
 .pos-dashboard-wrap .main-header h1 {
@@ -502,6 +502,9 @@
 
 /* Navegación por Pestañas (Tabs) */
 .pos-dashboard-wrap .nav-tabs {
+    /* main-content es flex column con altura fija: sin esto las pestañas
+       se comprimen hasta desaparecer cuando el contenido es alto */
+    flex: 0 0 auto;
     display: flex;
     gap: 4px;
     border-bottom: 1px solid var(--border-color);
@@ -540,14 +543,131 @@
 .pos-dashboard-wrap .tab-pane { display: none; flex-direction: column; gap: 24px; width: 100%; }
 .pos-dashboard-wrap .tab-pane.active { display: flex; }
 
+.pos-dashboard-wrap .sidebar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .sidebar-toggle:hover { border-color: var(--color-blue); }
+.pos-dashboard-wrap .sidebar-toggle svg { width: 18px; height: 18px; }
+
+.pos-dashboard-wrap .sidebar-close {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pos-dashboard-wrap .sidebar-close svg { width: 16px; height: 16px; }
+
 /* Responsive */
 @media (max-width: 992px) {
-    .pos-dashboard-wrap { flex-direction: column; position: relative; height: auto; min-height: 100%; overflow-y: auto; }
+    /* El scroll lo maneja .main-content, igual que en escritorio: con
+       height:auto el wrapper depende del contenedor de Odoo y queda sin scroll */
+    .pos-dashboard-wrap { flex-direction: column; position: relative; height: 100%; overflow: hidden; }
+
     .pos-dashboard-wrap .sidebar {
         width: 100%; min-width: 100%; height: auto; max-height: none; overflow-y: visible;
         border-right: none; border-bottom: 1px solid var(--border-color); position: relative; padding: 20px;
+        display: none;
     }
-    .pos-dashboard-wrap .main-content { max-width: 100%; padding: 20px; height: auto; overflow-y: visible; }
+
+    /* Superpuesto: así el botón del header no se va al fondo de la página */
+    .pos-dashboard-wrap .sidebar.open {
+        display: flex;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 200;
+        max-height: 100vh;
+        overflow-y: auto;
+        border-bottom: none;
+        background: var(--bg-base);
+    }
+
+    .pos-dashboard-wrap .sidebar.open .sidebar-close { display: flex; }
+    .pos-dashboard-wrap .sidebar-brand { display: none; }
+    .pos-dashboard-wrap .sidebar-toggle { display: inline-flex; }
+
+    .pos-dashboard-wrap .main-content {
+        max-width: 100%; padding: 20px; height: 100%;
+        overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+
     .pos-dashboard-wrap .charts-grid { grid-template-columns: 1fr; }
     .pos-dashboard-wrap .charts-grid .span-two-cols { grid-column: span 1; }
+}
+
+@media (max-width: 768px) {
+    .pos-dashboard-wrap .main-content { padding: 14px; gap: 16px; overflow-x: hidden; }
+    .pos-dashboard-wrap .sidebar { padding: 14px; gap: 16px; }
+
+    /* Header: título arriba, acciones en su propia fila */
+    .pos-dashboard-wrap .main-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    .pos-dashboard-wrap .main-header h1 { font-size: 18px; }
+    .pos-dashboard-wrap .header-right { gap: 8px; width: 100%; justify-content: space-between; }
+    .pos-dashboard-wrap .sync-status { flex: 1 1 auto; min-width: 0; justify-content: center; }
+    .pos-dashboard-wrap .status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Pestañas: scroll horizontal en vez de romper el layout */
+    .pos-dashboard-wrap .nav-tabs {
+        flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .pos-dashboard-wrap .nav-tabs::-webkit-scrollbar { display: none; }
+    .pos-dashboard-wrap .nav-tab { flex: 0 0 auto; white-space: nowrap; padding: 10px 12px; font-size: 13px; }
+
+    .pos-dashboard-wrap .kpi-grid { grid-template-columns: 1fr; gap: 12px; }
+    .pos-dashboard-wrap .kpi-card { padding: 16px; }
+    .pos-dashboard-wrap .kpi-value { font-size: 22px; }
+    .pos-dashboard-wrap .tab-pane { gap: 16px; }
+
+    .pos-dashboard-wrap .chart-container { height: 280px; }
+    .pos-dashboard-wrap .chart-header { padding: 12px 14px; }
+    .pos-dashboard-wrap .chart-body { padding: 10px; }
+
+    /* Cabeceras de sección: los controles bajan y ocupan el ancho */
+    .pos-dashboard-wrap .section-header { flex-wrap: wrap; }
+
+    /* Tablas: scroll horizontal con celdas en una línea */
+    .pos-dashboard-wrap .table-responsive { -webkit-overflow-scrolling: touch; }
+    .pos-dashboard-wrap .data-table { font-size: 12px; }
+    .pos-dashboard-wrap .data-table th,
+    .pos-dashboard-wrap .data-table td { white-space: nowrap; }
+
+    /* 16px evita el zoom automático de iOS al enfocar un campo */
+    .pos-dashboard-wrap select,
+    .pos-dashboard-wrap input[type="date"],
+    .pos-dashboard-wrap input[type="text"] { font-size: 16px; }
+
+    /* Objetivos táctiles cómodos */
+    .pos-dashboard-wrap .btn-preset { padding: 10px; font-size: 13px; }
+    .pos-dashboard-wrap .btn { padding: 10px 14px; min-height: 38px; }
+
+    .products-modal-overlay { padding: 12px; }
+    .products-modal { max-height: 85vh; padding: 16px; }
+}
+
+@media (max-width: 480px) {
+    .pos-dashboard-wrap .main-content { padding: 10px; }
+    .pos-dashboard-wrap .main-header h1 { font-size: 16px; }
+    .pos-dashboard-wrap .preset-dates { grid-template-columns: 1fr 1fr; }
+    .pos-dashboard-wrap .chart-container { height: 240px; }
+    .pos-dashboard-wrap .kpi-value { font-size: 20px; }
 }
