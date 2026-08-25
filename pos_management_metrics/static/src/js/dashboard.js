@@ -316,6 +316,8 @@ class PosDashboardMetrics extends Component {
 
     async applyFilters() {
         this.state.page = 1;
+        // En móvil el panel está superpuesto: se cierra para dejar ver los gráficos
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -335,6 +337,7 @@ class PosDashboardMetrics extends Component {
         this.state.search = "";
         this.state.profitabilitySearch = "";
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
