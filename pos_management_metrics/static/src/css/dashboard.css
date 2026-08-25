@@ -343,6 +343,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex: 0 0 auto;
 }
 
 .pos-dashboard-wrap .header-left {
@@ -440,6 +441,9 @@
     gap: 4px;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1px;
+    /* main-content es flex column con altura fija: sin esto las pestañas
+       se comprimen hasta desaparecer cuando el contenido es alto */
+    flex: 0 0 auto;
 }
 
 .pos-dashboard-wrap .nav-tab {
