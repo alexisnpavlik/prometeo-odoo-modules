@@ -353,11 +353,21 @@
 
 .pos-dashboard-wrap .sidebar-toggle {
     display: none;
-    background: none;
-    border: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     color: var(--text-primary);
     cursor: pointer;
-    padding: 4px;
+    transition: var(--transition-smooth);
+}
+
+.pos-dashboard-wrap .sidebar-toggle:hover {
+    border-color: var(--color-blue);
 }
 
 .pos-dashboard-wrap .sidebar-toggle svg {
@@ -931,12 +941,13 @@
 
 /* Responsive Desings */
 @media (max-width: 992px) {
+    /* El scroll lo maneja .main-content, igual que en escritorio: con
+       height:auto el wrapper depende del contenedor de Odoo y queda sin scroll */
     .pos-dashboard-wrap {
         flex-direction: column;
         position: relative;
-        height: auto;
-        min-height: 100%;
-        overflow-y: auto;
+        height: 100%;
+        overflow: hidden;
     }
     
     .pos-dashboard-wrap .sidebar {
@@ -954,8 +965,9 @@
     .pos-dashboard-wrap .main-content {
         max-width: 100%;
         padding: 20px;
-        height: auto;
-        overflow-y: visible;
+        height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
     .pos-dashboard-wrap .charts-grid {
@@ -1375,7 +1387,7 @@
 }
 
 @media (max-width: 768px) {
-    .pos-dashboard-wrap {
+    .pos-dashboard-wrap .main-content {
         overflow-x: hidden;
     }
 

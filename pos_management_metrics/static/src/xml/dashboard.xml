@@ -205,17 +205,6 @@
                 <!-- Header -->
                 <header class="main-header">
                     <div class="header-left">
-                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="3" y1="6" x2="21" y2="6"></line>
-                                <line x1="7" y1="12" x2="17" y2="12"></line>
-                                <line x1="10" y1="18" x2="14" y2="18"></line>
-                            </svg>
-                        </button>
-                        <h1>Dashboard de Ventas POS</h1>
-                    </div>
-                    
-                    <div class="header-right">
                         <!-- Botón de Alternancia de Tema Día/Noche -->
                         <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
                             <t t-if="state.theme === 'light'">
@@ -237,7 +226,17 @@
                                 </svg>
                             </t>
                         </button>
-
+                        <h1>Dashboard de Ventas POS</h1>
+                    </div>
+                    
+                    <div class="header-right">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
+                        </button>
                         <div class="sync-status">
                             <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
                             <span class="status-text" t-esc="state.syncTime">Cargando...</span>
