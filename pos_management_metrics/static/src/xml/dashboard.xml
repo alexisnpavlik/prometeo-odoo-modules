@@ -3,7 +3,15 @@
     <t t-name="pos_management_metrics.DashboardTemplate">
         <div t-att-class="'pos-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
-            <aside class="sidebar" id="sidebar">
+            <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')" id="sidebar">
+                <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Cerrar filtros</span>
+                </button>
+
                 <div class="sidebar-brand">
                     <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -197,6 +205,13 @@
                 <!-- Header -->
                 <header class="main-header">
                     <div class="header-left">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
+                        </button>
                         <h1>Dashboard de Ventas POS</h1>
                     </div>
                     
@@ -484,7 +499,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="chart-body" style="height: 520px;">
+                                <div class="chart-body chart-h-tall">
                                     <canvas id="chart-top-articles-revenue"></canvas>
                                 </div>
                             </div>
@@ -503,7 +518,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="chart-body" style="height: 520px;">
+                                <div class="chart-body chart-h-tall">
                                     <canvas id="chart-top-articles-units"></canvas>
                                 </div>
                             </div>
@@ -581,7 +596,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="chart-body" style="height: 300px;">
+                            <div class="chart-body chart-h-md">
                                 <canvas id="chart-pos-trend"></canvas>
                             </div>
                         </div>
@@ -600,7 +615,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="chart-body" style="height: 280px;">
+                            <div class="chart-body chart-h-md">
                                 <canvas id="chart-session-hours"></canvas>
                             </div>
                         </div>
@@ -830,12 +845,12 @@
                                         <button t-att-class="'nav-tab ' + (state.marginSign === 'negative' ? 'active' : '')"
                                                 t-on-click="() => this.setMarginSign('negative')">Margen Negativo</button>
                                     </div>
-                                    <select class="margin-sort-select" t-on-change="onMarginSortChange" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 3px 8px; color: #fff; outline: none; font-size: 12px; height: 28px; width: auto; flex: 0 0 auto;">
+                                    <select class="margin-sort-select" t-on-change="onMarginSortChange">
                                         <option value="margin" t-att-selected="state.marginSort === 'margin'">Ordenar por Margen</option>
                                         <option value="revenue" t-att-selected="state.marginSort === 'revenue'">Ordenar por Facturación</option>
                                     </select>
                                     <div class="search-box">
-                                        <input type="text" placeholder="Filtrar producto..." t-att-value="state.profitabilitySearch" t-on-input="onProfitabilitySearchInput" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 6px 12px; color: #fff; outline: none; font-size: 13px;"/>
+                                        <input type="text" class="panel-search-input" placeholder="Filtrar producto..." t-att-value="state.profitabilitySearch" t-on-input="onProfitabilitySearchInput"/>
                                     </div>
                                 </div>
                             </div>
@@ -870,7 +885,7 @@
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.total_cost)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
-                                                        <div class="margin-progress-container" style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 100px;">
+                                                        <div class="margin-progress-container">
                                                             <div t-att-class="'margin-progress-bar ' + (p.margin_percent &lt; 0 ? 'negative' : (p.margin_percent &gt; 50 ? 'high' : 'medium'))"
                                                                  t-attf-style="width: {{Math.min(100, Math.abs(p.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
                                                         </div>
@@ -920,7 +935,7 @@
                                                 <td class="text-right" style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(c.gross_profit)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
-                                                        <div class="margin-progress-container" style="flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; min-width: 100px;">
+                                                        <div class="margin-progress-container">
                                                             <div t-att-class="'margin-progress-bar ' + (c.margin_percent &lt; 0 ? 'negative' : (c.margin_percent &gt; 50 ? 'high' : 'medium'))"
                                                                  t-attf-style="width: {{Math.max(0, Math.min(100, c.margin_percent))}}%; height: 100%; border-radius: 3px;"></div>
                                                         </div>

@@ -29,6 +29,7 @@ class PosDashboardMetrics extends Component {
             profitabilitySearch: "",
             marginSign: "positive",
             marginSort: "revenue",
+            showFilters: false,
             page: 1,
             perPage: 15,
             activeTab: "general",
@@ -258,6 +259,10 @@ class PosDashboardMetrics extends Component {
     }
     onMarginSortChange(ev) {
         this.state.marginSort = ev.target.value;
+    }
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
     }
     onPresetClick(preset) {
         this.state.preset = preset;

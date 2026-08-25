@@ -920,6 +920,15 @@
     100% { transform: rotate(360deg); }
 }
 
+/* Alturas de gráficos (antes inline, así se pueden reducir en móvil) */
+.pos-dashboard-wrap .chart-body.chart-h-tall {
+    height: 520px;
+}
+
+.pos-dashboard-wrap .chart-body.chart-h-md {
+    height: 300px;
+}
+
 /* Responsive Desings */
 @media (max-width: 992px) {
     .pos-dashboard-wrap {
@@ -1013,6 +1022,7 @@
     background: rgba(255, 255, 255, 0.05);
     border-radius: 3px;
     overflow: hidden;
+    min-width: 100px;
 }
 
 .pos-dashboard-wrap.theme-light .margin-progress-container {
@@ -1254,9 +1264,43 @@
 }
 
 .pos-dashboard-wrap .margin-sort-select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: #fff;
+    outline: none;
+    font-size: 12px;
+    height: 28px;
+    width: auto;
+    flex: 0 0 auto;
     cursor: pointer;
     transition: var(--transition-smooth);
 }
+
+.pos-dashboard-wrap.theme-light .margin-sort-select {
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    background: rgba(15, 23, 42, 0.03);
+}
+
+.pos-dashboard-wrap .panel-search-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #fff;
+    outline: none;
+    font-size: 13px;
+}
+
+.pos-dashboard-wrap.theme-light .panel-search-input {
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    background: rgba(15, 23, 42, 0.03);
+}
+
+
 
 .pos-dashboard-wrap .margin-sort-select:hover {
     border-color: rgba(255, 255, 255, 0.25);
@@ -1265,4 +1309,268 @@
 .pos-dashboard-wrap .margin-sort-select option {
     background: #1b2130;
     color: #fff;
+}
+
+/* -------------------------------------------------------------
+   Responsive: tablets y teléfonos
+   ------------------------------------------------------------- */
+.pos-dashboard-wrap .sidebar-close {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pos-dashboard-wrap .sidebar-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Tablet / móvil: el panel de filtros se pliega detrás del botón del header */
+@media (max-width: 992px) {
+    .pos-dashboard-wrap .sidebar-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .pos-dashboard-wrap .sidebar {
+        display: none;
+    }
+
+    /* Superpuesto: así el botón del header no se va al fondo de la página */
+    .pos-dashboard-wrap .sidebar.open {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 200;
+        max-height: 100vh;
+        overflow-y: auto;
+        border-bottom: none;
+        background: var(--bg-base);
+    }
+
+    .pos-dashboard-wrap .sidebar.open .sidebar-close {
+        display: flex;
+    }
+
+    .pos-dashboard-wrap .sidebar-brand {
+        display: none;
+    }
+
+    .pos-dashboard-wrap .chart-body.chart-h-tall {
+        height: 420px;
+    }
+}
+
+@media (max-width: 768px) {
+    .pos-dashboard-wrap {
+        overflow-x: hidden;
+    }
+
+    .pos-dashboard-wrap .main-content {
+        padding: 14px;
+        gap: 16px;
+    }
+
+    .pos-dashboard-wrap .sidebar {
+        padding: 14px;
+        gap: 16px;
+    }
+
+    /* Header: título arriba, acciones en su propia fila */
+    .pos-dashboard-wrap .main-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .pos-dashboard-wrap .main-header h1 {
+        font-size: 18px;
+    }
+
+    .pos-dashboard-wrap .header-right {
+        gap: 8px;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .pos-dashboard-wrap .sync-status {
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    .pos-dashboard-wrap .sync-status {
+        padding: 4px 10px;
+    }
+
+    .pos-dashboard-wrap .status-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Pestañas: scroll horizontal en vez de romper el layout */
+    .pos-dashboard-wrap .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .pos-dashboard-wrap .nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pos-dashboard-wrap .nav-tab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    /* KPIs y paneles */
+    .pos-dashboard-wrap .kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .pos-dashboard-wrap .kpi-card {
+        padding: 16px;
+    }
+
+    .pos-dashboard-wrap .kpi-value {
+        font-size: 22px;
+    }
+
+    .pos-dashboard-wrap .glass-panel.padded {
+        padding: 14px;
+    }
+
+    .pos-dashboard-wrap .tab-pane {
+        gap: 16px;
+    }
+
+    .pos-dashboard-wrap .chart-header {
+        padding: 12px 14px;
+    }
+
+    .pos-dashboard-wrap .chart-body {
+        padding: 10px;
+    }
+
+    .pos-dashboard-wrap .chart-container {
+        height: 280px;
+    }
+
+    .pos-dashboard-wrap .chart-body.chart-h-tall {
+        height: 380px;
+    }
+
+    .pos-dashboard-wrap .chart-body.chart-h-md {
+        height: 240px;
+    }
+
+    /* Cabeceras de sección: los controles bajan y ocupan el ancho */
+    .pos-dashboard-wrap .section-header,
+    .pos-dashboard-wrap .header-actions {
+        flex-wrap: wrap;
+    }
+
+    .pos-dashboard-wrap .header-actions {
+        width: 100%;
+    }
+
+    .pos-dashboard-wrap .header-actions .search-box,
+    .pos-dashboard-wrap .header-actions .search-box input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .pos-dashboard-wrap .header-actions .margin-sort-select {
+        flex: 1 1 auto;
+    }
+
+    /* Tablas: scroll horizontal con celdas en una línea */
+    .pos-dashboard-wrap .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .pos-dashboard-wrap .data-table {
+        font-size: 12px;
+    }
+
+    .pos-dashboard-wrap .data-table th,
+    .pos-dashboard-wrap .data-table td {
+        white-space: nowrap;
+    }
+
+    .pos-dashboard-wrap .margin-progress-container {
+        min-width: 60px;
+    }
+
+    /* 16px evita el zoom automático de iOS al enfocar un campo */
+    .pos-dashboard-wrap select,
+    .pos-dashboard-wrap input[type="date"],
+    .pos-dashboard-wrap input[type="text"] {
+        font-size: 16px;
+    }
+
+    .pos-dashboard-wrap .multiselect-panel {
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+
+    /* Objetivos táctiles cómodos */
+    .pos-dashboard-wrap .btn-preset {
+        padding: 10px;
+        font-size: 13px;
+    }
+
+    .pos-dashboard-wrap .btn {
+        padding: 10px 14px;
+        min-height: 38px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pos-dashboard-wrap .main-content {
+        padding: 10px;
+    }
+
+    .pos-dashboard-wrap .main-header h1 {
+        font-size: 16px;
+    }
+
+    .pos-dashboard-wrap .preset-dates {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .pos-dashboard-wrap .chart-container {
+        height: 240px;
+    }
+
+    .pos-dashboard-wrap .chart-body.chart-h-tall {
+        height: 320px;
+    }
+
+    .pos-dashboard-wrap .chart-body.chart-h-md {
+        height: 220px;
+    }
+
+    .pos-dashboard-wrap .kpi-value {
+        font-size: 20px;
+    }
 }
