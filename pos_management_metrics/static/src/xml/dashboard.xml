@@ -466,7 +466,7 @@
                         <div class="charts-grid">
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Top 10 por Total Vendido</h3>
+                                    <h3>Top 10 por Total Facturado</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -474,7 +474,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Los 10 artículos que más ingresos generaron (IVA incluido) durante el período y filtros seleccionados.
+                                            Los 10 artículos que más facturaron (IVA incluido) durante el período y filtros seleccionados.
                                         </div>
                                     </div>
                                 </div>
@@ -507,11 +507,11 @@
                             <div class="section-header">
                                 <div>
                                     <h2>Detalle Top Artículos</h2>
-                                    <p class="subtitle">Ranking con total vendido y unidades de cada artículo</p>
+                                    <p class="subtitle">Ranking con total facturado, unidades y precio por unidad de cada artículo</p>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
                                     <button t-att-class="'nav-tab ' + (state.topSort === 'revenue' ? 'active' : '')"
-                                            t-on-click="() => this.setTopSort('revenue')">Por Total Vendido</button>
+                                            t-on-click="() => this.setTopSort('revenue')">Por Total Facturado</button>
                                     <button t-att-class="'nav-tab ' + (state.topSort === 'units' ? 'active' : '')"
                                             t-on-click="() => this.setTopSort('units')">Por Unidades</button>
                                     <button class="btn btn-secondary btn-icon" t-on-click="exportTopArticlesExcel">
@@ -531,14 +531,15 @@
                                             <th>#</th>
                                             <th>Artículo</th>
                                             <th>Categoría</th>
-                                            <th>Total Vendido</th>
+                                            <th>Total Facturado</th>
                                             <th>Unidades</th>
+                                            <th>Precio Unitario</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="sortedTopArticles.length === 0">
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted">Sin ventas registradas para los filtros seleccionados.</td>
+                                                <td colspan="6" class="text-center text-muted">Sin ventas registradas para los filtros seleccionados.</td>
                                             </tr>
                                         </t>
                                         <t t-foreach="sortedTopArticles" t-as="a" t-key="a_index + '-' + a.producto">
@@ -548,6 +549,7 @@
                                                 <td><t t-esc="a.categoria"/></td>
                                                 <td style="font-weight: 600;"><t t-esc="formatCurrency(a.facturacion)"/></td>
                                                 <td><t t-esc="a.unidades"/></td>
+                                                <td><t t-esc="formatCurrency(a.precio_unitario)"/></td>
                                             </tr>
                                         </t>
                                     </tbody>

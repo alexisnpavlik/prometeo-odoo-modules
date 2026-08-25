@@ -788,7 +788,7 @@ class PosDashboardMetrics extends Component {
         this.createOrUpdateChart("chart-top-articles-revenue", "bar", {
             labels: byRevenue.map(r => shorten(r.producto)),
             datasets: [{
-                label: "Total Vendido",
+                label: "Total Facturado",
                 data: byRevenue.map(r => r.facturacion),
                 backgroundColor: "rgba(59, 130, 246, 0.65)",
                 borderColor: "#3b82f6",
@@ -803,7 +803,7 @@ class PosDashboardMetrics extends Component {
                     callbacks: {
                         label: (context) => {
                             const row = byRevenue[context.dataIndex];
-                            return ` ${this.formatCurrency(row.facturacion)} (${row.unidades} un.)`;
+                            return ` ${this.formatCurrency(row.facturacion)} (${row.unidades} un. · ${this.formatCurrency(row.precio_unitario)}/u)`;
                         }
                     }
                 }
@@ -833,7 +833,7 @@ class PosDashboardMetrics extends Component {
                     callbacks: {
                         label: (context) => {
                             const row = byUnits[context.dataIndex];
-                            return ` ${row.unidades} un. (${this.formatCurrency(row.facturacion)})`;
+                            return ` ${row.unidades} un. (${this.formatCurrency(row.facturacion)} · ${this.formatCurrency(row.precio_unitario)}/u)`;
                         }
                     }
                 }

@@ -992,6 +992,7 @@ class PosMetricsController(http.Controller):
                 "categoria": r["categoria"],
                 "facturacion": float(r["facturacion"] or 0.0),
                 "unidades": float(r["unidades"] or 0.0),
+                "precio_unitario": round(float(r["facturacion"] or 0.0) / float(r["unidades"]), 2) if r["unidades"] else 0.0,
             }
             for r in cr.dictfetchall()
         ]
@@ -1126,7 +1127,7 @@ class PosMetricsController(http.Controller):
 
             periodo = f"Período: {start_date or 'inicio'} a {end_date or 'hoy'}"
             sheets = [
-                (f"Top {limit} por Total Vendido", data.get("by_revenue") or []),
+                (f"Top {limit} por Total Facturado", data.get("by_revenue") or []),
                 (f"Top {limit} por Unidades", data.get("by_units") or []),
             ]
 
@@ -1135,11 +1136,11 @@ class PosMetricsController(http.Controller):
                 sheet.set_column(0, 0, 6)
                 sheet.set_column(1, 1, 50)
                 sheet.set_column(2, 2, 30)
-                sheet.set_column(3, 4, 18)
+                sheet.set_column(3, 5, 18)
 
                 sheet.write(0, 0, sheet_name, fmt_title)
                 sheet.write(1, 0, periodo)
-                for col, header in enumerate(['#', 'Artículo', 'Categoría', 'Total Vendido', 'Unidades']):
+                for col, header in enumerate(['#', 'Artículo', 'Categoría', 'Total Facturado', 'Unidades', 'Precio Unitario']):
                     sheet.write(3, col, header, fmt_header)
 
                 for idx, row in enumerate(rows):
@@ -1149,6 +1150,7 @@ class PosMetricsController(http.Controller):
                     sheet.write_string(line, 2, row.get('categoria') or '', fmt_text)
                     sheet.write_number(line, 3, float(row.get('facturacion') or 0.0), fmt_money)
                     sheet.write_number(line, 4, round(float(row.get('unidades') or 0.0)), fmt_qty)
+                    sheet.write_number(line, 5, float(row.get('precio_unitario') or 0.0), fmt_money)
 
                 sheet.freeze_panes(4, 0)
 
