@@ -164,6 +164,21 @@ class PosControlDashboard extends Component {
         if (this.state.page < this.totalPages - 1) this.state.page++;
     }
 
+    // ---- Exportación ----
+    exportDetailExcel() {
+        // Exporta el detalle con los filtros activos. Va por GET a un endpoint
+        // http (no rpc) para que el navegador maneje la descarga del archivo.
+        const params = new URLSearchParams({
+            start_date: this.state.startDate || "",
+            end_date: this.state.endDate || "",
+            pos: this.state.pos,
+            cashier: this.state.cashier,
+            company: this.state.company,
+            dtype: this.state.dtype,
+        });
+        window.open(`/pos_control_metrics/export_detail?${params.toString()}`, "_blank");
+    }
+
     switchTab(tab) {
         this.state.activeTab = tab;
         if (tab === "general") {

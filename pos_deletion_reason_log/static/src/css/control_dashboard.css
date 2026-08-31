@@ -411,6 +411,13 @@
     display: flex; justify-content: space-between; align-items: flex-start;
     margin-bottom: 20px; gap: 16px; flex-wrap: wrap;
 }
+/* Acciones de cabecera (ej. Exportar Excel): .btn-secondary trae flex:1 para
+   la barra de filtros, acá tiene que quedar del ancho de su contenido. */
+.posdrl-dashboard-wrap .section-header .header-actions {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.posdrl-dashboard-wrap .section-header .header-actions .btn { flex: 0 0 auto; }
+
 .posdrl-dashboard-wrap .section-header h2 { font-size: 18px; font-weight: 700; margin: 0 0 2px 0; color: #ffffff; }
 .posdrl-dashboard-wrap .section-header .subtitle { font-size: 12px; color: var(--text-secondary); }
 
@@ -699,6 +706,8 @@
 
     /* Cabeceras de sección: los controles bajan y ocupan el ancho */
     .posdrl-dashboard-wrap .section-header { flex-wrap: wrap; }
+    .posdrl-dashboard-wrap .section-header .header-actions { width: 100%; }
+    .posdrl-dashboard-wrap .section-header .header-actions .btn { flex: 1 1 auto; }
 
     /* Tablas: scroll horizontal con celdas en una línea */
     .posdrl-dashboard-wrap .table-responsive { -webkit-overflow-scrolling: touch;
