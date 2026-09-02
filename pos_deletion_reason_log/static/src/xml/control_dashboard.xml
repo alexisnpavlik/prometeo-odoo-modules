@@ -368,7 +368,7 @@
 
                     <div class="chart-container span-two-cols glass-panel">
                         <div class="chart-header">
-                            <h3>Tendencia diaria</h3>
+                            <h3>Evolución Temporal</h3>
                             <span class="badge">Eventos + Importe</span>
                         </div>
                         <div class="chart-body">

@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, onWillUnmount, useState, useRef } from "@odoo/owl";
+import { Component, onWillStart, onWillUnmount, useEffect, useState, useRef } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 import { loadBundle } from "@web/core/assets";
 
@@ -77,7 +77,21 @@ class PosControlDashboard extends Component {
             await this.loadFilters();
             await this.fetchMetrics();
         });
-        onMounted(() => this.renderCharts());
+        // Los gráficos se dibujan DESPUÉS de que OWL parchea el DOM. Con el
+        // requestAnimationFrame que hacía switchTab, el callback corría antes
+        // del patch: el pane general seguía en display:none, Chart.js medía
+        // 0x0 y el canvas quedaba muerto (ningún resize posterior lo
+        // recupera). Se notaba sobre todo en Evolución Temporal, el último
+        // gráfico de la grilla. useEffect corre dentro del patch, con la
+        // pestaña ya visible.
+        useEffect(
+            (tab) => {
+                if (tab === "general") {
+                    this.renderCharts();
+                }
+            },
+            () => [this.state.activeTab]
+        );
         onWillUnmount(() => this.destroyCharts());
     }
 
@@ -180,12 +194,8 @@ class PosControlDashboard extends Component {
     }
 
     switchTab(tab) {
+        // El redibujo de los gráficos lo dispara el useEffect de setup().
         this.state.activeTab = tab;
-        if (tab === "general") {
-            // El canvas queda oculto (display:none) mientras esa pestaña no está
-            // activa; Chart.js necesita un resize una vez que vuelve a ser visible.
-            requestAnimationFrame(() => this.renderCharts());
-        }
     }
 
     toggleFilters() {
@@ -285,7 +295,7 @@ class PosControlDashboard extends Component {
             });
         }
 
-        // Tendencia diaria (línea: conteo + importe)
+        // Evolución temporal (línea: conteo + importe)
         if (this.trendRef.el && this.data.trend.length) {
             this._charts.trend = new window.Chart(this.trendRef.el, {
                 type: "line",
