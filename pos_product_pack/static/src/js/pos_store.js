@@ -61,7 +61,15 @@ patch(PosStore.prototype, {
                     const compProduct = this.data.models[
                         "product.product"
                     ].get(compProductId);
-                    if (compProduct) {
+                    if (!compProduct) {
+                        // El componente no entró en el set precargado del POS.
+                        // No se puede facturar la línea, pero el backend
+                        // descuenta igual el stock al validar el pedido.
+                        console.error(
+                            `pos_product_pack: componente ${compProductId} del pack ` +
+                                `${product.id} no está cargado en el POS, la línea no se crea.`
+                        );
+                    } else {
                         let compPrice = 0;
                         if (compPriceType === "detailed") {
                             compPrice = compProduct.lst_price;
@@ -70,6 +78,7 @@ patch(PosStore.prototype, {
                             product_id: compProduct,
                             qty: (vals.qty || 1) * line.quantity,
                             price_unit: compPrice,
+                            is_pack_component: true,
                         };
                         await super.addLineToOrder(
                             compVals,
