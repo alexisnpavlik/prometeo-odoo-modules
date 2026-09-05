@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Global Surcharge Button",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "category": "Sales/Point Of Sale",
     "summary": "Botón de recargo porcentual global en la pantalla principal del POS.",
     "description": """
@@ -21,6 +21,7 @@
         "point_of_sale._assets_pos": [
             "pos_global_surcharge_button/static/src/js/control_buttons_patch.js",
             "pos_global_surcharge_button/static/src/js/pos_order_line_patch.js",
+            "pos_global_surcharge_button/static/src/js/order_summary_patch.js",
             "pos_global_surcharge_button/static/src/xml/control_buttons.xml",
         ],
     },
