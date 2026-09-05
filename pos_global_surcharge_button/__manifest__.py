@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Global Surcharge Button",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Sales/Point Of Sale",
     "summary": "Botón de recargo porcentual global en la pantalla principal del POS.",
     "description": """
