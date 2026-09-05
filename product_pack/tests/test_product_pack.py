@@ -1,10 +1,7 @@
 # Copyright 2021 ACSONE SA/NV
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
-from psycopg2 import IntegrityError
-
 from odoo import Command, exceptions
 from odoo.tests import Form
-from odoo.tools import mute_logger
 
 from .common import ProductPackCommon
 
@@ -17,12 +14,22 @@ class TestProductPack(ProductPackCommon):
                 Command.create({"product_id": self.pack.id, "quantity": 1.0})
             ]
 
-    @mute_logger("odoo.sql_db")
     def test_product_in_pack_unique(self):
         """Add product that is already in the pack and check the constraint raises."""
-        with self.assertRaises(IntegrityError), self.env.cr.savepoint():
+        with self.assertRaises(exceptions.ValidationError):
             self.pack.pack_line_ids = [
                 Command.create({"product_id": self.component1.id, "quantity": 1.0})
+            ]
+
+    def test_product_twice_in_same_write(self):
+        """The same component twice in one write is rejected before the INSERT."""
+        component = self.env["product.product"].create(
+            {"name": "Pack component 3", "list_price": 5, "company_id": self.company.id}
+        )
+        with self.assertRaises(exceptions.ValidationError):
+            self.pack.pack_line_ids = [
+                Command.create({"product_id": component.id, "quantity": 1.0}),
+                Command.create({"product_id": component.id, "quantity": 1.0}),
             ]
 
     def test_get_pack_line_price(self):
