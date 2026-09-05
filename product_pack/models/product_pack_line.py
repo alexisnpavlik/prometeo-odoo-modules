@@ -40,6 +40,46 @@ class ProductPackLine(models.Model):
         ),
     ]
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._check_duplicated_pack_lines(vals_list)
+        return super().create(vals_list)
+
+    def _check_duplicated_pack_lines(self, vals_list):
+        """Reject repeated components before the INSERT reaches the database.
+
+        The product_uniq SQL constraint already forbids them, but letting the
+        query fail logs a `bad query` error on every attempt. The lookup is
+        done in sudo so a record rule hiding an existing line cannot make the
+        check pass and blow up on the constraint anyway.
+        """
+        seen = set()
+        for vals in vals_list:
+            key = (vals.get("parent_product_id"), vals.get("product_id"))
+            if not all(key):
+                continue
+            if key in seen:
+                self._raise_duplicated_pack_line(key[1])
+            seen.add(key)
+        if not seen:
+            return
+        duplicated = self.sudo().search(
+            [
+                ("parent_product_id", "in", [key[0] for key in seen]),
+                ("product_id", "in", [key[1] for key in seen]),
+            ]
+        )
+        for line in duplicated:
+            if (line.parent_product_id.id, line.product_id.id) in seen:
+                self._raise_duplicated_pack_line(line.product_id.id)
+
+    def _raise_duplicated_pack_line(self, product_id):
+        product = self.env["product.product"].browse(product_id)
+        raise ValidationError(
+            _("Product must be only once on a pack!\nProduct: %s")
+            % product.display_name
+        )
+
     @api.constrains("product_id")
     def _check_recursion(self):
         """Check recursion on packs."""
