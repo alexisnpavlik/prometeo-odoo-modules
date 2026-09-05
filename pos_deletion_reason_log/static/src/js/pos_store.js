@@ -12,7 +12,10 @@ patch(PosStore.prototype, {
      * unitario 0 (producto sin precio cargado) o negativo, cada uno con su
      * propio toggle de configuración. Se excluyen las líneas que legítimamente
      * van en 0 o negativo: hijos de combo (el precio lo lleva la línea padre),
-     * líneas de recompensa (loyalty) y la línea del producto de descuento global
+     * componentes de pack (pos_product_pack los explota a precio 0 cuando el
+     * pack está configurado con pack_component_price 'ignored' o 'totalized';
+     * el campo no existe si ese módulo no está instalado y la exclusión queda
+     * inerte), líneas de recompensa (loyalty) y la línea del producto de descuento global
      * (pos_discount la agrega a precio negativo) — si no se excluyera, aplicar un
      * descuento global dejaría la orden imposible de cobrar.
      */
@@ -30,6 +33,7 @@ patch(PosStore.prototype, {
         const lines = (order?.get_orderlines() || []).filter(
             (line) =>
                 !line.combo_parent_id &&
+                !line.is_pack_component &&
                 !line.is_reward_line &&
                 line.get_product() !== discountProduct
         );
