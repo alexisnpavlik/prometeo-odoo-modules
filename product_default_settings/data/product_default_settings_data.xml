@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Default de instalación: la pestaña Punto de venta se ve, el resto no.
+         Va con noupdate="1" para que un `-u` no vuelva a prender lo que el
+         usuario haya apagado después desde Ajustes.
+         Las bases donde el módulo ya estaba instalado se cubren con
+         migrations/18.0.1.1.0/post-migration.py -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('product_default_settings.group_show_page_pos'))]"/>
+    </record>
+</odoo>
