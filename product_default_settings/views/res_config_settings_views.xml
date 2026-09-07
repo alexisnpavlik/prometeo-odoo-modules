@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_product_defaults" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.product.default.settings</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='product_setting_container']" position="after">
+                <block title="Formulario de producto" name="product_default_settings_container">
+                    <setting string="Pestaña Atributos y variantes" help="Muestra la pestaña de atributos y variantes en la ficha del producto. Apagada, los productos se cargan sin variantes. Prenderla activa además la funcionalidad nativa de variantes.">
+                        <field name="group_show_page_variants"/>
+                    </setting>
+                    <setting string="Pestaña Ventas" help="Muestra la pestaña Ventas de la ficha del producto: etiquetas de producto y descripción para cotizaciones.">
+                        <field name="group_show_page_sales"/>
+                    </setting>
+                    <setting string="Pestaña Compras" help="Muestra la pestaña Compras de la ficha del producto: proveedores, UdM de compra y descripción de compra.">
+                        <field name="group_show_page_purchase"/>
+                    </setting>
+                    <setting string="Pestaña Inventario" help="Muestra la pestaña Inventario de la ficha del producto: peso, volumen, rutas, embalajes y descripciones para albaranes. El stock a mano se sigue viendo en el botón de arriba.">
+                        <field name="group_show_page_inventory"/>
+                    </setting>
+                    <setting string="Pestaña Punto de venta" help="Muestra la pestaña Punto de venta de la ficha del producto: categorías de POS y si el producto es pesable. Activada por defecto.">
+                        <field name="group_show_page_pos"/>
+                    </setting>
+                    <setting string="Permitir editar los valores por defecto" help="Habilita editar los campos que el módulo deja bloqueados: Tipo de producto, Rastrear inventario, Política de facturación, Ventas, Compras y Punto de venta. Apagado, esos campos quedan en gris con el valor por defecto.">
+                        <field name="group_edit_product_defaults"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
