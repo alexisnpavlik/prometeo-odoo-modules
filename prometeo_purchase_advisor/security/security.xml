@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_purchase_advisor" model="ir.module.category">
+        <field name="name">Recomendador de compra</field>
+        <field name="description">Sugerencias de compra basadas en la demanda real</field>
+        <field name="sequence">25</field>
+    </record>
+
+    <record id="group_purchase_advisor_user" model="res.groups">
+        <field name="name">Operador de compras</field>
+        <field name="category_id" ref="module_category_purchase_advisor"/>
+        <field name="comment">Crea y edita sugerencias de compra y genera las órdenes. No configura los modelos de demanda ni las reglas de asignación.</field>
+    </record>
+
+    <record id="group_purchase_advisor_manager" model="res.groups">
+        <field name="name">Manager de compras</field>
+        <field name="category_id" ref="module_category_purchase_advisor"/>
+        <field name="comment">Además de lo del Operador: configura modelos de demanda, reglas de asignación y parámetros por compañía.</field>
+        <field name="implied_ids" eval="[(4, ref('group_purchase_advisor_user'))]"/>
+    </record>
+
+    <record id="suggestion_company_rule" model="ir.rule">
+        <field name="name">prometeo.purchase.suggestion: multi-compañía</field>
+        <field name="model_id" ref="model_prometeo_purchase_suggestion"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="suggestion_line_company_rule" model="ir.rule">
+        <field name="name">prometeo.purchase.suggestion.line: multi-compañía</field>
+        <field name="model_id" ref="model_prometeo_purchase_suggestion_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="demand_model_company_rule" model="ir.rule">
+        <field name="name">prometeo.demand.model: multi-compañía</field>
+        <field name="model_id" ref="model_prometeo_demand_model"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="demand_model_rule_company_rule" model="ir.rule">
+        <field name="name">prometeo.demand.model.rule: multi-compañía</field>
+        <field name="model_id" ref="model_prometeo_demand_model_rule"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+</odoo>
