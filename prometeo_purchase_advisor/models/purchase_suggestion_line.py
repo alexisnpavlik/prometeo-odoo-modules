@@ -5,11 +5,9 @@ from datetime import timedelta
 from odoo import api, fields, models
 
 from .product_product import ABC_SELECTION, XYZ_SELECTION
+from .res_partner import FALLBACK_LEAD_TIME_DAYS
 
 _logger = logging.getLogger(__name__)
-
-# Días de lead time asumidos cuando no hay historia ni configuración del proveedor.
-FALLBACK_LEAD_TIME_DAYS = 7.0
 
 
 class PrometeoPurchaseSuggestionLine(models.Model):

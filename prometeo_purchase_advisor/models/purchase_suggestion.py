@@ -79,7 +79,8 @@ class PrometeoPurchaseSuggestion(models.Model):
         string="Total estimado", compute="_compute_totals", store=True,
         currency_field="currency_id",
     )
-    line_count = fields.Integer(string="Líneas", compute="_compute_totals", store=True)
+    line_count = fields.Integer(
+        string="Cantidad de líneas", compute="_compute_totals", store=True)
     low_confidence_count = fields.Integer(
         string="Líneas de baja confianza", compute="_compute_totals", store=True,
     )

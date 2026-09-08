@@ -28,11 +28,12 @@ y da la dimensión de almacén de forma natural.
 | 3 | Lead time medido, stock de seguridad, cantidad, packaging y `min_qty` | hecha |
 | 4 | Clasificación ABC/XYZ, exclusiones, filtros | hecha |
 | 5 | Explicabilidad, advertencias, crons | hecha |
-| 6 | Validación de extensibilidad con un estimador en módulo satélite | pendiente |
+| 6 | Validación de extensibilidad con un estimador en módulo satélite | hecha |
 
-El circuito completo funciona. Falta solamente la fase 6, que no agrega
-funcionalidad: implementa un segundo estimador en un módulo satélite para
-verificar que se puede extender sin tocar el core.
+Las seis fases están implementadas. El módulo satélite
+[`prometeo_purchase_advisor_ewma`](../prometeo_purchase_advisor_ewma/README.md)
+agrega un segundo método de estimación sin modificar una línea de este módulo:
+el core no menciona `ewma` en ningún lado.
 
 ## Cómo se usa
 

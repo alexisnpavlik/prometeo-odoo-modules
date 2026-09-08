@@ -32,7 +32,8 @@
                         <group string="Método">
                             <field name="method"/>
                             <field name="weight_config" invisible="method != 'weighted_ma'"/>
-                            <field name="alpha" invisible="method not in ('ewma',)"/>
+                            <!-- Lo muestra el módulo que provea un método que lo use. -->
+                            <field name="alpha" invisible="1"/>
                             <field name="active" invisible="1"/>
                         </group>
                         <group string="Ventana de datos">
