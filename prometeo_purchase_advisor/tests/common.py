@@ -124,14 +124,27 @@ class PurchaseAdvisorCommon(TransactionCase):
         move.write({"state": "done", "date": self._local_dt(day)})
         return move
 
-    def _sell_daily(self, product, qty, days_back_from, days_back_to):
+    def _sell_daily(self, product, qty, days_back_from, days_back_to,
+                    warehouse=None):
         """Vende `qty` por día en el rango [days_back_from, days_back_to).
 
         Los índices son días hacia atrás desde hoy: 1 es ayer.
         """
         today = self._today()
         for offset in range(days_back_to, days_back_from):
-            self._make_move(product, qty, today - timedelta(days=offset))
+            self._make_move(product, qty, today - timedelta(days=offset),
+                            warehouse=warehouse)
+
+    def _isolated_company(self, name="Compañía aislada"):
+        """Compañía nueva con su almacén, para clasificar sin datos ajenos.
+
+        La clasificación ABC es relativa: un solo producto con historia previa
+        en la base se lleva todo el acumulado y deja al resto en C.
+        """
+        company = self.env["res.company"].create({"name": name})
+        warehouse = self.env["stock.warehouse"].search(
+            [("company_id", "=", company.id)], limit=1)
+        return company, warehouse
 
     def _build_series(self, model, products, lookback=None):
         """Serie de demanda cruda, sin pasar por una sugerencia."""

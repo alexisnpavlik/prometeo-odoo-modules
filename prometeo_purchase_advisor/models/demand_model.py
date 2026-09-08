@@ -288,6 +288,39 @@ class PrometeoDemandModel(models.Model):
             scores.append(0.5)
         return round(min(scores), 2)
 
+    def _confidence_warnings(self, series, product_id, adu, sigma):
+        """Por qué la confianza es baja, en texto.
+
+        "Esta línea tiene poca confianza" no le sirve a nadie si no dice cuál
+        de los cuatro problemas es: la acción del operador es distinta si le
+        falta historia que si el producto estuvo agotado la mitad del tiempo.
+        """
+        self.ensure_one()
+        warnings = []
+        history = series.history_days(product_id)
+        if history < self.min_history_days:
+            warnings.append(_(
+                "Solo %(days)s días de historia, por debajo de los %(minimum)s "
+                "que pide el modelo.", days=history, minimum=self.min_history_days,
+            ))
+        moves = series.moves(product_id)
+        if moves < CONFIDENCE_MIN_MOVES:
+            warnings.append(_(
+                "Apenas %(moves)s movimientos de salida en la ventana.", moves=moves,
+            ))
+        ratio = series.stockout_ratio(product_id)
+        if ratio > CONFIDENCE_MAX_STOCKOUT_RATIO:
+            warnings.append(_(
+                "Estuvo sin stock el %(pct)s%% de los días: la demanda real "
+                "puede ser bastante mayor.", pct=round(ratio * 100),
+            ))
+        if adu > 0 and (sigma / adu) > CONFIDENCE_MAX_CV:
+            warnings.append(_(
+                "La venta diaria es muy irregular: el desvío supera vez y media "
+                "al promedio."
+            ))
+        return warnings
+
     # ------------------------------------------------------------------
     # Explicación
     # ------------------------------------------------------------------
@@ -425,6 +458,7 @@ class PrometeoDemandModel(models.Model):
         adu = max(adu, 0.0)
         usable = [(days, weight) for days, weight, _rate in contributions]
 
+        warnings += self._confidence_warnings(series, product_id, adu, sigma)
         return Estimate(
             adu=adu,
             sigma=sigma,

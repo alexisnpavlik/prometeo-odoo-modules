@@ -27,6 +27,7 @@
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
         "data/demand_model_data.xml",
+        "data/ir_cron.xml",
         "views/demand_model_views.xml",
         "views/demand_model_rule_views.xml",
         "views/purchase_suggestion_views.xml",

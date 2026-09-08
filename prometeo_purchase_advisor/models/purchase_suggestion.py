@@ -83,6 +83,22 @@ class PrometeoPurchaseSuggestion(models.Model):
     low_confidence_count = fields.Integer(
         string="Líneas de baja confianza", compute="_compute_totals", store=True,
     )
+    # Métricas de calidad del modelo. Comparar lo sugerido contra lo que el
+    # usuario finalmente pidió dice más sobre si el módulo sirve que cualquier
+    # métrica estadística de error.
+    edit_rate = fields.Float(
+        string="Tasa de edición", compute="_compute_quality_metrics", store=True,
+        digits=(3, 2),
+        help="Proporción de líneas cuya cantidad el usuario cambió. Por encima "
+             "del 50% el modelo está mal calibrado para este negocio.",
+    )
+    mean_deviation = fields.Float(
+        string="Desvío medio", compute="_compute_quality_metrics", store=True,
+        digits=(16, 2),
+        help="Promedio de lo que el usuario sumó o restó a la cantidad "
+             "sugerida. Sistemáticamente positivo significa que el modelo "
+             "sugiere de menos.",
+    )
 
     # ------------------------------------------------------------------
     # Computes
@@ -96,6 +112,20 @@ class PrometeoPurchaseSuggestion(models.Model):
             suggestion.low_confidence_count = len(lines.filtered(
                 lambda line: line.confidence < LOW_CONFIDENCE_THRESHOLD
             ))
+
+    @api.depends("line_ids.was_edited", "line_ids.qty_final", "line_ids.qty_suggested")
+    def _compute_quality_metrics(self):
+        for suggestion in self:
+            lines = suggestion.line_ids.filtered(lambda line: not line.is_manual)
+            if not lines:
+                suggestion.edit_rate = 0.0
+                suggestion.mean_deviation = 0.0
+                continue
+            edited = lines.filtered("was_edited")
+            suggestion.edit_rate = len(edited) / len(lines)
+            suggestion.mean_deviation = sum(
+                line.qty_final - line.qty_suggested for line in lines
+            ) / len(lines)
 
     @api.depends("purchase_order_ids")
     def _compute_purchase_order_count(self):
@@ -262,6 +292,21 @@ class PrometeoPurchaseSuggestion(models.Model):
             qty, precision_rounding=product.uom_id.rounding or 0.01,
             rounding_method="UP")
 
+    def _should_include(self, product, estimate, coverage, lead_time, on_hand):
+        """Filtro de prioridad: qué productos vale la pena mostrar.
+
+        Los C son la cola larga del surtido. Listarlos todos cada semana
+        entierra los A y B, que son los que mueven la caja, así que solo
+        aparecen cuando van a quebrar antes de que llegue la reposición.
+        """
+        self.ensure_one()
+        if estimate.adu <= 0 and on_hand > 0:
+            # Stock muerto: no se vendió nada en la ventana y todavía queda.
+            return False
+        if product.abc_class == "c" and not self.company_id.suggestion_always_include_c:
+            return coverage < lead_time
+        return True
+
     def _coverage_days(self, on_hand, adu):
         """Cuántos días aguanta el stock actual al ritmo estimado."""
         if adu <= 0:
@@ -313,11 +358,16 @@ class PrometeoPurchaseSuggestion(models.Model):
             incoming = product.incoming_qty
             outgoing = product.outgoing_qty
 
+            coverage = self._coverage_days(on_hand, estimate.adu)
+            keep = product.id in existing
+            if not keep and not self._should_include(
+                    product, estimate, coverage, lead_time, on_hand):
+                continue
+
             raw = self._target_quantity(
                 estimate, lead_time, safety_stock, on_hand, incoming, outgoing)
             qty = self._apply_supplier_constraints(product, seller, raw)
 
-            keep = product.id in existing
             if float_compare(qty, 0.0, precision_digits=rounding) <= 0 and not keep:
                 continue
 
@@ -329,7 +379,7 @@ class PrometeoPurchaseSuggestion(models.Model):
                 "adu": estimate.adu,
                 "sigma": estimate.sigma,
                 "confidence": estimate.confidence,
-                "coverage_days_current": self._coverage_days(on_hand, estimate.adu),
+                "coverage_days_current": coverage,
                 "qty_on_hand": on_hand,
                 "qty_incoming": incoming,
                 "lead_time_days": lead_time,
@@ -379,13 +429,16 @@ class PrometeoPurchaseSuggestion(models.Model):
 
     def action_compute(self):
         """Recalcula las líneas preservando las ediciones manuales."""
+        computed = 0
+        preserved = 0
         for suggestion in self:
             if suggestion.state not in ("draft", "computed"):
                 raise UserError(_(
                     "Solo se pueden recalcular sugerencias en borrador o calculadas."
                 ))
             metrics = suggestion._run_engine()
-            preserved = suggestion._apply_metrics(metrics)
+            preserved += suggestion._apply_metrics(metrics)
+            computed += len(metrics)
             suggestion.write({
                 "state": "computed",
                 "date_computed": fields.Datetime.now(),
@@ -394,7 +447,27 @@ class PrometeoPurchaseSuggestion(models.Model):
                 "Sugerencia %s recalculada: %s líneas, %s ediciones preservadas",
                 suggestion.name, len(suggestion.line_ids), preserved,
             )
-        return True
+        return self._compute_notification(computed, preserved)
+
+    def _compute_notification(self, computed, preserved):
+        """Aviso de qué pasó, para que un recálculo no parezca no haber hecho nada."""
+        if preserved:
+            message = _(
+                "%(computed)s líneas recalculadas, %(preserved)s ediciones "
+                "manuales preservadas.",
+                computed=computed, preserved=preserved,
+            )
+        else:
+            message = _("%(computed)s líneas recalculadas.", computed=computed)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "type": "success" if computed else "warning",
+                "message": message or _("No se encontró ningún producto a reponer."),
+                "next": {"type": "ir.actions.act_window_close"},
+            },
+        }
 
     def _apply_metrics(self, metrics):
         """Vuelca las métricas del motor en las líneas.
@@ -531,3 +604,53 @@ class PrometeoPurchaseSuggestion(models.Model):
             action["views"] = [(False, "form")]
             action["res_id"] = self.purchase_order_ids.id
         return action
+
+    # ------------------------------------------------------------------
+    # Automatización
+    # ------------------------------------------------------------------
+    @api.model
+    def _cron_generate_suggestions(self):
+        """Genera y calcula una sugerencia por almacén configurado.
+
+        Sin esto el módulo depende de que alguien se acuerde de entrar. Con
+        esto la sugerencia aparece sola y con una actividad asignada, que es la
+        diferencia entre una herramienta que se usa y una que no.
+        """
+        warehouses = self.env["stock.warehouse"].search([
+            ("auto_suggestion", "=", True),
+        ])
+        created = self.browse()
+        for warehouse in warehouses:
+            suggestion = self.with_company(warehouse.company_id).create({
+                "warehouse_id": warehouse.id,
+                "user_id": (warehouse.suggestion_user_id
+                            or self.env.ref("base.user_admin")).id,
+            })
+            try:
+                suggestion.action_compute()
+            except Exception:
+                _logger.exception(
+                    "Falló el cálculo automático de la sugerencia de %s",
+                    warehouse.display_name)
+                continue
+            suggestion._schedule_review_activity()
+            created |= suggestion
+        _logger.info("Sugerencias automáticas generadas: %s", len(created))
+        return created
+
+    def _schedule_review_activity(self):
+        """Deja una actividad de revisión al responsable del almacén."""
+        for suggestion in self:
+            user = suggestion.warehouse_id.suggestion_user_id or suggestion.user_id
+            if not user:
+                continue
+            suggestion.activity_schedule(
+                "mail.mail_activity_data_todo",
+                user_id=user.id,
+                summary=_("Revisar la sugerencia de compra de %(warehouse)s",
+                          warehouse=suggestion.warehouse_id.display_name),
+                note=_("%(lines)s líneas sugeridas por un total de %(total)s.",
+                       lines=suggestion.line_count,
+                       total=suggestion.total_amount),
+            )
+        return True

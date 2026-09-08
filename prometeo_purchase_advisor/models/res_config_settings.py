@@ -17,6 +17,12 @@ class ResCompany(models.Model):
         string="Días de cobertura objetivo", default=30,
         help="Cuántos días de venta se quiere tener cubiertos además del lead time.",
     )
+    suggestion_always_include_c = fields.Boolean(
+        string="Incluir siempre los productos C",
+        help="Sin esto, los productos de clase C solo aparecen cuando van a "
+             "quebrar antes de que llegue la reposición. Activarlo llena la "
+             "sugerencia con la cola larga del surtido.",
+    )
 
     @api.model
     def _prometeo_default_demand_model(self):
@@ -44,4 +50,8 @@ class ResConfigSettings(models.TransientModel):
     suggestion_coverage_days = fields.Integer(
         related="company_id.suggestion_coverage_days", readonly=False,
         string="Días de cobertura objetivo",
+    )
+    suggestion_always_include_c = fields.Boolean(
+        related="company_id.suggestion_always_include_c", readonly=False,
+        string="Incluir siempre los productos C",
     )

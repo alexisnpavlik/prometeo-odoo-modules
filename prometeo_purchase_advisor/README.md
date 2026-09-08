@@ -26,13 +26,39 @@ y da la dimensión de almacén de forma natural.
 | 1 | Modelos, vistas, seguridad, generación de órdenes por proveedor | hecha |
 | 2 | Motor de demanda: `DemandSeries` en SQL, corrección por quiebres, `weighted_ma` | hecha |
 | 3 | Lead time medido, stock de seguridad, cantidad, packaging y `min_qty` | hecha |
-| 4 | Clasificación ABC/XYZ, exclusiones, filtros | pendiente |
-| 5 | Explicabilidad, advertencias, crons | pendiente |
+| 4 | Clasificación ABC/XYZ, exclusiones, filtros | hecha |
+| 5 | Explicabilidad, advertencias, crons | hecha |
 | 6 | Validación de extensibilidad con un estimador en módulo satélite | pendiente |
 
-`action_compute()` ya produce sugerencias reales. Falta la clasificación ABC/XYZ
-que decide qué productos entran (hoy entran todos los que tengan proveedor) y
-los crons que disparan la corrida sola.
+El circuito completo funciona. Falta solamente la fase 6, que no agrega
+funcionalidad: implementa un segundo estimador en un módulo satélite para
+verificar que se puede extender sin tocar el core.
+
+## Cómo se usa
+
+1. *Recomendador → Sugerencias de compra*, crear una, elegir el almacén.
+2. **Calcular**. Cada línea explica en castellano por qué sugiere esa cantidad;
+   el botón de expandir la fila muestra el detalle completo.
+3. Editar cantidades, agregar o quitar productos. Un recálculo posterior
+   respeta lo que se editó a mano.
+4. **Confirmar** y **Crear órdenes de compra**: quedan en borrador, agrupadas
+   por proveedor.
+
+La pestaña *Calidad del cálculo* muestra la tasa de edición: si supera el 50%,
+el modelo está mal calibrado para el negocio y conviene revisar los días de
+cobertura y el nivel de servicio.
+
+## Automatización
+
+Tres crons, configurables en *Ajustes técnicos*:
+
+- **Clasificar ABC/XYZ** (semanal, activo): valor de consumo de los últimos 180
+  días y variabilidad de la demanda.
+- **Medir proveedores** (semanal, activo): plazo real y nivel de cumplimiento
+  del último año.
+- **Generar sugerencias** (semanal, **inactivo** por defecto): crea y calcula
+  una sugerencia por cada almacén con *Sugerencia automática* tildada, y le
+  deja una actividad al responsable.
 
 El spec completo está en
 `docs/superpowers/specs/2026-09-08-prometeo-purchase-advisor-design.md`.

@@ -17,6 +17,10 @@
                                  help="Cuántos días de venta se quiere cubrir además del lead time del proveedor.">
                             <field name="suggestion_coverage_days"/>
                         </setting>
+                        <setting string="Incluir siempre los productos C"
+                                 help="Sin esto, los productos de clase C solo aparecen cuando van a quebrar antes de que llegue la reposición.">
+                            <field name="suggestion_always_include_c"/>
+                        </setting>
                     </block>
                 </app>
             </xpath>
