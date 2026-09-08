@@ -50,21 +50,54 @@ class TestQuantity(PurchaseAdvisorCommon):
         self.assertEqual(sample, 3)
         self.assertAlmostEqual(days, 12.0, places=1)
 
+        seller = self.product_a.seller_ids[0]
+        used, source = self.supplier_a._lead_time_for_suggestion(
+            {self.supplier_a.id: seller})[self.supplier_a.id]
+        self.assertAlmostEqual(used, 12.0, places=1)
+        self.assertEqual(source, "measured")
+
+    def test_same_day_receipts_do_not_count_as_a_lead_time(self):
+        """Si la orden se carga cuando la mercadería ya llegó, no hay plazo que
+        medir: el promedio da minutos y haría desaparecer el stock de seguridad."""
+        for _index in range(4):
+            self._receive_po(self.supplier_a, self.product_a, 5, 30, 30)
+        measured = self.supplier_a._measure_lead_times()
+        days, sample = measured[self.supplier_a.id]
+        self.assertEqual(sample, 4)
+        self.assertLess(days, 1.0)
+
+        seller = self.product_a.seller_ids[0]
+        used, source = self.supplier_a._lead_time_for_suggestion(
+            {self.supplier_a.id: seller})[self.supplier_a.id]
+        self.assertAlmostEqual(used, 10.0, msg="cae al delay configurado")
+        self.assertEqual(source, "configured")
+
+    def test_unmeasurable_lead_time_is_reported_on_the_line(self):
+        self._sell_daily(self.product_a, 10, 91, 1)
+        self.product_a.seller_ids.delay = 0
+        suggestion = self._make_suggestion(coverage_days=30)
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(
+            lambda l: l.product_id == self.product_a)
+        self.assertAlmostEqual(line.lead_time_days, 7.0)
+        self.assertIn("no se pudo medir", (line.warnings or "").lower())
+
     def test_small_sample_falls_back_to_configured_delay(self):
         """Con una sola orden el promedio no significa nada: manda el configurado."""
         self._receive_po(self.supplier_a, self.product_a, 5, 40, 28)
         seller = self.product_a.seller_ids[0]
-        lead_times = self.supplier_a._lead_time_for_suggestion(
-            {self.supplier_a.id: seller})
-        self.assertAlmostEqual(lead_times[self.supplier_a.id], 10.0,
-                               msg="delay del supplierinfo")
+        days, source = self.supplier_a._lead_time_for_suggestion(
+            {self.supplier_a.id: seller})[self.supplier_a.id]
+        self.assertAlmostEqual(days, 10.0, msg="delay del supplierinfo")
+        self.assertEqual(source, "configured")
 
     def test_without_history_or_config_uses_one_week(self):
         seller = self.product_a.seller_ids[0]
         seller.delay = 0
-        lead_times = self.supplier_a._lead_time_for_suggestion(
-            {self.supplier_a.id: seller})
-        self.assertAlmostEqual(lead_times[self.supplier_a.id], 7.0)
+        days, source = self.supplier_a._lead_time_for_suggestion(
+            {self.supplier_a.id: seller})[self.supplier_a.id]
+        self.assertAlmostEqual(days, 7.0)
+        self.assertEqual(source, "fallback")
 
     def test_fill_rate_is_measured(self):
         self._receive_po(self.supplier_a, self.product_a, 10, 30, 20)
@@ -180,6 +213,77 @@ class TestQuantity(PurchaseAdvisorCommon):
         qty = suggestion._apply_supplier_constraints(
             self.product_a, self.product_a.seller_ids[0], -8.0)
         self.assertAlmostEqual(qty, 0.0)
+
+    # ------------------------------------------------------------------
+    # Proveedor en otra compañía
+    # ------------------------------------------------------------------
+    def test_seller_of_another_company_is_still_used(self):
+        """La lista de precios de compra suele estar centralizada en una sola
+        compañía, no cargada en cada sucursal."""
+        other_company = self.env["res.company"].create({"name": "Casa central"})
+        product = self.env["product.product"].create({
+            "name": "Centralizado", "type": "consu", "is_storable": True,
+            "purchase_ok": True,
+        })
+        self.env["product.supplierinfo"].create({
+            "partner_id": self.supplier_a.id,
+            "product_tmpl_id": product.product_tmpl_id.id,
+            "company_id": other_company.id,
+            "price": 150.0, "delay": 12,
+        })
+        suggestion = self._make_suggestion()
+        seller = suggestion._pick_seller(product)
+        self.assertTrue(seller, "Un proveedor de otra compañía sigue sirviendo")
+        self.assertEqual(seller.partner_id, self.supplier_a)
+
+    def test_seller_of_own_company_wins(self):
+        """Si la sucursal negoció su propio precio, ese manda."""
+        other_company = self.env["res.company"].create({"name": "Casa central 2"})
+        product = self.env["product.product"].create({
+            "name": "Con precio propio", "type": "consu", "is_storable": True,
+            "purchase_ok": True,
+        })
+        self.env["product.supplierinfo"].create({
+            "partner_id": self.supplier_a.id,
+            "product_tmpl_id": product.product_tmpl_id.id,
+            "company_id": other_company.id, "price": 150.0, "sequence": 1,
+        })
+        self.env["product.supplierinfo"].create({
+            "partner_id": self.supplier_b.id,
+            "product_tmpl_id": product.product_tmpl_id.id,
+            "company_id": self.company.id, "price": 900.0, "sequence": 9,
+        })
+        suggestion = self._make_suggestion()
+        seller = suggestion._pick_seller(product)
+        self.assertEqual(seller.partner_id, self.supplier_b)
+
+    # ------------------------------------------------------------------
+    # Stock negativo
+    # ------------------------------------------------------------------
+    def test_negative_stock_does_not_inflate_the_quantity(self):
+        """Stock negativo son recepciones sin registrar, no demanda a cubrir."""
+        suggestion = self._make_suggestion(coverage_days=30)
+        qty = suggestion._target_quantity(
+            self._estimate_stub(adu=0.33), lead_time_days=10.0,
+            safety_stock=0.0, on_hand=-473.0, incoming=0.0, outgoing=0.0)
+        self.assertAlmostEqual(qty, 0.33 * 40, places=2,
+                               msg="El faltante negativo no se compra de vuelta")
+
+    def test_negative_stock_has_no_coverage(self):
+        suggestion = self._make_suggestion()
+        self.assertAlmostEqual(suggestion._coverage_days(-473.0, 0.33), 0.0)
+
+    def test_negative_stock_is_reported_on_the_line(self):
+        self._sell_daily(self.product_a, 1, 91, 1)
+        self._set_stock(self.product_a, -50)
+        suggestion = self._make_suggestion(coverage_days=30)
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(
+            lambda l: l.product_id == self.product_a)
+        self.assertTrue(line, "La línea se crea igual")
+        self.assertAlmostEqual(line.qty_on_hand, -50.0,
+                               msg="El campo muestra la verdad")
+        self.assertIn("negativo", (line.warnings or "").lower())
 
     # ------------------------------------------------------------------
     # Integración

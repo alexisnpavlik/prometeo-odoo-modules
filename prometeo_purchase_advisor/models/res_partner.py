@@ -14,6 +14,10 @@ _logger = logging.getLogger(__name__)
 MEASUREMENT_WINDOW_DAYS = 365
 # Con menos órdenes que esto el promedio no significa nada.
 MIN_SAMPLE_SIZE = 3
+# Por debajo de un día no es un plazo de entrega: es que la orden se carga
+# cuando la mercadería ya llegó. Medirlo así da cero y hace desaparecer el
+# stock de seguridad, que se calcula sobre la raíz del plazo.
+MIN_MEASURABLE_LEAD_TIME_DAYS = 1.0
 # Último recurso cuando el proveedor no tiene historia ni plazo configurado.
 FALLBACK_LEAD_TIME_DAYS = 7.0
 
@@ -104,22 +108,30 @@ class ResPartner(models.Model):
         }
 
     def _lead_time_for_suggestion(self, sellers_by_partner=None):
-        """{partner_id: días de plazo} con la cascada de respaldo.
+        """{partner_id: (días de plazo, origen)} con la cascada de respaldo.
 
-        Medido si hay muestra suficiente, si no el plazo configurado en el
-        proveedor del producto, y si tampoco hay, una semana.
+        El origen es `measured`, `configured` o `fallback`, y sirve para
+        avisarle al usuario cuándo el número es una medición y cuándo una
+        suposición.
+
+        Una medición por debajo de un día se descarta: significa que la orden
+        de compra se carga cuando la mercadería ya está en el depósito, así que
+        la base no tiene registro del plazo real del proveedor.
         """
         measured = self._measure_lead_times()
         sellers_by_partner = sellers_by_partner or {}
         result = {}
         for partner in self:
             days, sample = measured.get(partner.id, (0.0, 0))
-            if sample >= MIN_SAMPLE_SIZE and days > 0:
-                result[partner.id] = days
+            if sample >= MIN_SAMPLE_SIZE and days >= MIN_MEASURABLE_LEAD_TIME_DAYS:
+                result[partner.id] = (days, "measured")
                 continue
             seller = sellers_by_partner.get(partner.id)
             configured = seller.delay if seller else 0
-            result[partner.id] = float(configured or FALLBACK_LEAD_TIME_DAYS)
+            if configured:
+                result[partner.id] = (float(configured), "configured")
+            else:
+                result[partner.id] = (FALLBACK_LEAD_TIME_DAYS, "fallback")
         return result
 
     def action_refresh_purchase_metrics(self):

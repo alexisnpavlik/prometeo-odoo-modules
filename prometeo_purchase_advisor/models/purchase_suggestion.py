@@ -8,6 +8,8 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_round
 
+from .res_partner import FALLBACK_LEAD_TIME_DAYS
+
 _logger = logging.getLogger(__name__)
 
 LOW_CONFIDENCE_THRESHOLD = 0.5
@@ -238,18 +240,27 @@ class PrometeoPurchaseSuggestion(models.Model):
         """Proveedor con el que se va a comprar este producto.
 
         Se elige por secuencia y precio, no con `_select_seller`: ese método
-        filtra por cantidad, y acá todavía no se sabe cuánto se va a pedir.
+        filtra por cantidad mínima, y acá todavía no se sabe cuánto se va a
+        pedir.
+
+        No se exige que el proveedor sea de la compañía de la sugerencia. Odoo
+        tampoco lo hace en `_get_filtered_sellers`: deja el alcance en manos de
+        la regla de registro, y lo que el usuario puede leer es lo que puede
+        usar. Exigir la igualdad rompe el caso normal de una lista de precios
+        de compra centralizada en una compañía y sucursales que compran contra
+        ella. Si la sucursal tiene su propio precio negociado, ese gana.
         """
         self.ensure_one()
         today = fields.Date.context_today(self)
         sellers = product.seller_ids.filtered(lambda seller: (
-            (not seller.company_id or seller.company_id == self.company_id)
-            and (not seller.date_start or seller.date_start <= today)
+            (not seller.date_start or seller.date_start <= today)
             and (not seller.date_end or seller.date_end >= today)
         ))
         if not sellers:
             return self.env["product.supplierinfo"]
-        return min(sellers, key=lambda seller: (seller.sequence, seller.price))
+        own = sellers.filtered(lambda seller: seller.company_id == self.company_id)
+        return min(own or sellers,
+                   key=lambda seller: (seller.sequence, seller.price))
 
     # ------------------------------------------------------------------
     # Cantidad
@@ -260,10 +271,16 @@ class PrometeoPurchaseSuggestion(models.Model):
 
         Lo comprometido en salidas pendientes suma: esa mercadería ya está
         vendida aunque siga en el depósito.
+
+        El stock negativo se toma como cero. Restar un número negativo lo
+        sumaría a la compra, y el módulo terminaría pidiendo cuatro años de
+        stock de un producto que vende un tercio de unidad por día. En Odoo un
+        saldo negativo casi nunca es demanda insatisfecha: son recepciones sin
+        registrar. Se avisa en la línea en vez de comprar contra el error.
         """
         self.ensure_one()
         target = estimate.adu * (lead_time_days + self.coverage_days) + safety_stock
-        return target - on_hand - incoming + outgoing
+        return target - max(on_hand, 0.0) - incoming + outgoing
 
     def _apply_supplier_constraints(self, product, seller, qty):
         """Ajusta la cantidad a lo que el proveedor realmente acepta vender.
@@ -309,10 +326,15 @@ class PrometeoPurchaseSuggestion(models.Model):
         return True
 
     def _coverage_days(self, on_hand, adu):
-        """Cuántos días aguanta el stock actual al ritmo estimado."""
+        """Cuántos días aguanta el stock actual al ritmo estimado.
+
+        Con saldo negativo la cobertura es cero, no negativa: no hay stock que
+        dure menos que nada, y una cobertura de -1400 días ordena la lista por
+        magnitud del error de inventario en vez de por urgencia real.
+        """
         if adu <= 0:
             return NO_DEMAND_COVERAGE_DAYS
-        return on_hand / adu
+        return max(on_hand, 0.0) / adu
 
     # ------------------------------------------------------------------
     # Motor
@@ -352,7 +374,9 @@ class PrometeoPurchaseSuggestion(models.Model):
                 continue
             seller = sellers[product.id]
             model = models.get(product.id)
-            lead_time = lead_times.get(seller.partner_id.id, 0.0) if seller else 0.0
+            lead_time, lead_source = lead_times.get(
+                seller.partner_id.id, (FALLBACK_LEAD_TIME_DAYS, "fallback")
+            ) if seller else (FALLBACK_LEAD_TIME_DAYS, "fallback")
             safety_stock = model._safety_stock(
                 estimate.sigma, lead_time, estimate.adu) if model else 0.0
             on_hand = product.qty_available
@@ -396,9 +420,44 @@ class PrometeoPurchaseSuggestion(models.Model):
                 ),
                 "explanation": self._build_line_explanation(
                     estimate, on_hand, incoming, lead_time, safety_stock),
-                "warnings": "\n".join(estimate.warnings) or False,
+                "warnings": "\n".join(
+                    estimate.warnings
+                    + self._stock_warnings(product, on_hand)
+                    + self._lead_time_warnings(seller, lead_time, lead_source)
+                ) or False,
             }
         return values
+
+    def _stock_warnings(self, product, on_hand):
+        """Avisos sobre la calidad del dato de stock, no sobre la demanda."""
+        self.ensure_one()
+        if on_hand >= 0:
+            return []
+        return [_(
+            "El stock figura en negativo (%(qty)s): probablemente falten "
+            "recepciones por registrar. Se calculó como si fuera cero, así que "
+            "la cantidad sugerida no contempla ese faltante.",
+            qty=round(on_hand, 2),
+        )]
+
+    def _lead_time_warnings(self, seller, lead_time, source):
+        """Avisa cuándo el plazo es una suposición y no una medición."""
+        self.ensure_one()
+        if source == "measured":
+            return []
+        if source == "configured":
+            return [_(
+                "El plazo de %(days)s días es el cargado en la ficha del "
+                "proveedor: no hay suficientes compras recibidas para medirlo.",
+                days=round(lead_time, 1),
+            )]
+        return [_(
+            "No se pudo medir el plazo del proveedor ni hay uno cargado en su "
+            "ficha, así que se supusieron %(days)s días. Si las órdenes de "
+            "compra se registran cuando la mercadería ya llegó, la base no "
+            "tiene forma de saber el plazo real: conviene cargarlo a mano.",
+            days=round(lead_time, 1),
+        )]
 
     def _build_line_explanation(self, estimate, on_hand, incoming, lead_time,
                                 safety_stock):
