@@ -433,3 +433,19 @@ class PrometeoDemandModel(models.Model):
             explanation=self._build_explanation(series, product_id, adu, usable),
             warnings=warnings,
         )
+
+    # ------------------------------------------------------------------
+    # Stock de seguridad
+    # ------------------------------------------------------------------
+    def _safety_stock(self, sigma, lead_time_days, adu):
+        """Colchón para absorber la variabilidad durante el plazo de entrega.
+
+        SS = Z x sigma x raíz(lead time). Con desvío cero se usa medio día de
+        venta como piso: una demanda perfectamente constante casi siempre
+        significa pocos datos, no estabilidad real, y dejar el colchón en cero
+        garantiza quebrar ante el primer día raro.
+        """
+        self.ensure_one()
+        if sigma <= 0:
+            return max(adu, 0.0) * 0.5
+        return self._z_value() * sigma * math.sqrt(max(lead_time_days, 0.0))

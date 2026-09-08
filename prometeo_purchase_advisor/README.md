@@ -25,14 +25,14 @@ y da la dimensión de almacén de forma natural.
 |---|---|---|
 | 1 | Modelos, vistas, seguridad, generación de órdenes por proveedor | hecha |
 | 2 | Motor de demanda: `DemandSeries` en SQL, corrección por quiebres, `weighted_ma` | hecha |
-| 3 | Lead time medido, stock de seguridad, cantidad, packaging y `min_qty` | pendiente |
+| 3 | Lead time medido, stock de seguridad, cantidad, packaging y `min_qty` | hecha |
 | 4 | Clasificación ABC/XYZ, exclusiones, filtros | pendiente |
 | 5 | Explicabilidad, advertencias, crons | pendiente |
 | 6 | Validación de extensibilidad con un estimador en módulo satélite | pendiente |
 
-`action_compute()` todavía no puebla líneas: la estimación de demanda ya
-funciona (`_estimate_demand`), pero traducirla a una cantidad a comprar necesita
-el lead time medido y el stock de seguridad de la fase 3.
+`action_compute()` ya produce sugerencias reales. Falta la clasificación ABC/XYZ
+que decide qué productos entran (hoy entran todos los que tengan proveedor) y
+los crons que disparan la corrida sola.
 
 El spec completo está en
 `docs/superpowers/specs/2026-09-08-prometeo-purchase-advisor-design.md`.

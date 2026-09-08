@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 import logging
+import math
 from collections import defaultdict
 from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import float_compare, float_round
 
 _logger = logging.getLogger(__name__)
 
 LOW_CONFIDENCE_THRESHOLD = 0.5
+
+# Cobertura que se le asigna a un producto sin demanda estimada. Es un centinela
+# alto a propósito: el listado ordena por cobertura ascendente, y lo que no se
+# vende tiene que quedar último, no primero.
+NO_DEMAND_COVERAGE_DAYS = 9999.0
 
 
 class PrometeoPurchaseSuggestion(models.Model):
@@ -162,24 +169,213 @@ class PrometeoPurchaseSuggestion(models.Model):
         return grouped
 
     def _estimate_demand(self, products):
-        """Estima la demanda de cada producto. Devuelve {product_id: Estimate}."""
+        """Estima la demanda de cada producto.
+
+        Devuelve ({product_id: Estimate}, {product_id: modelo usado}). El modelo
+        vuelve para poder dejarlo asentado en la línea: sin eso no hay forma de
+        saber después con qué parámetros salió cada número.
+        """
         self.ensure_one()
         estimates = {}
+        models = {}
         for model, model_products in self._products_by_demand_model(products).items():
             series = self._build_demand_series(model, model_products)
             estimates.update(model.estimate(series))
-        return estimates
+            for product in model_products:
+                models[product.id] = model
+        return estimates, models
 
-    def _run_engine(self):
-        """Calcula las métricas de demanda de la sugerencia.
+    # ------------------------------------------------------------------
+    # Selección de productos
+    # ------------------------------------------------------------------
+    def _candidate_domain(self):
+        """Dominio de los productos que pueden entrar en la sugerencia."""
+        self.ensure_one()
+        return [
+            ("is_storable", "=", True),
+            ("purchase_ok", "=", True),
+            ("exclude_from_suggestion", "=", False),
+            ("seller_ids", "!=", False),
+            ("company_id", "in", [False, self.company_id.id]),
+        ]
 
-        Devuelve {product_id: dict de valores para la línea}. La estimación de
-        demanda ya funciona (`_estimate_demand`), pero traducirla a una cantidad
-        a comprar necesita lead time y stock de seguridad, que todavía no están.
-        Hasta entonces devuelve vacío en vez de inventar números.
+    def _candidate_products(self):
+        self.ensure_one()
+        return self.env["product.product"].search(self._candidate_domain())
+
+    def _pick_seller(self, product):
+        """Proveedor con el que se va a comprar este producto.
+
+        Se elige por secuencia y precio, no con `_select_seller`: ese método
+        filtra por cantidad, y acá todavía no se sabe cuánto se va a pedir.
         """
         self.ensure_one()
-        return {}
+        today = fields.Date.context_today(self)
+        sellers = product.seller_ids.filtered(lambda seller: (
+            (not seller.company_id or seller.company_id == self.company_id)
+            and (not seller.date_start or seller.date_start <= today)
+            and (not seller.date_end or seller.date_end >= today)
+        ))
+        if not sellers:
+            return self.env["product.supplierinfo"]
+        return min(sellers, key=lambda seller: (seller.sequence, seller.price))
+
+    # ------------------------------------------------------------------
+    # Cantidad
+    # ------------------------------------------------------------------
+    def _target_quantity(self, estimate, lead_time_days, safety_stock,
+                         on_hand, incoming, outgoing):
+        """Cuánto falta para cubrir el plazo de entrega más los días objetivo.
+
+        Lo comprometido en salidas pendientes suma: esa mercadería ya está
+        vendida aunque siga en el depósito.
+        """
+        self.ensure_one()
+        target = estimate.adu * (lead_time_days + self.coverage_days) + safety_stock
+        return target - on_hand - incoming + outgoing
+
+    def _apply_supplier_constraints(self, product, seller, qty):
+        """Ajusta la cantidad a lo que el proveedor realmente acepta vender.
+
+        El mínimo se aplica antes del bulto y no al revés como decía el spec:
+        redondear al bulto primero y después subir al mínimo deja una cantidad
+        que no es múltiplo de nada.
+
+        Todo se calcula en la unidad de stock. La conversión a la unidad de
+        compra se hace recién al armar la orden.
+        """
+        self.ensure_one()
+        if qty <= 0:
+            return 0.0
+        if seller and seller.min_qty:
+            min_qty = seller.min_qty
+            if seller.product_uom and seller.product_uom != product.uom_id:
+                min_qty = seller.product_uom._compute_quantity(
+                    min_qty, product.uom_id)
+            qty = max(qty, min_qty)
+        packagings = product.packaging_ids.filtered(
+            lambda pack: pack.purchase and pack.qty > 0)
+        if packagings:
+            pack = min(packagings, key=lambda pack: pack.qty)
+            qty = math.ceil(qty / pack.qty) * pack.qty
+        return float_round(
+            qty, precision_rounding=product.uom_id.rounding or 0.01,
+            rounding_method="UP")
+
+    def _coverage_days(self, on_hand, adu):
+        """Cuántos días aguanta el stock actual al ritmo estimado."""
+        if adu <= 0:
+            return NO_DEMAND_COVERAGE_DAYS
+        return on_hand / adu
+
+    # ------------------------------------------------------------------
+    # Motor
+    # ------------------------------------------------------------------
+    def _run_engine(self):
+        """Calcula las líneas de la sugerencia.
+
+        Devuelve {product_id: dict de valores para la línea}.
+        """
+        self.ensure_one()
+        products = self._candidate_products()
+        if not products:
+            return {}
+        estimates, models = self._estimate_demand(products)
+        return self._build_line_values(products, estimates, models)
+
+    def _build_line_values(self, products, estimates, models):
+        self.ensure_one()
+        warehouse = self.warehouse_id
+        scoped = products.with_context(warehouse_id=warehouse.id)
+
+        sellers = {product.id: self._pick_seller(product) for product in scoped}
+        sellers_by_partner = {}
+        for seller in sellers.values():
+            if seller:
+                sellers_by_partner.setdefault(seller.partner_id.id, seller)
+        partners = self.env["res.partner"].browse(list(sellers_by_partner))
+        lead_times = partners._lead_time_for_suggestion(sellers_by_partner)
+
+        existing = set(self.line_ids.mapped("product_id").ids)
+        rounding = self.env["decimal.precision"].precision_get(
+            "Product Unit of Measure")
+        values = {}
+        for product in scoped:
+            estimate = estimates.get(product.id)
+            if not estimate:
+                continue
+            seller = sellers[product.id]
+            model = models.get(product.id)
+            lead_time = lead_times.get(seller.partner_id.id, 0.0) if seller else 0.0
+            safety_stock = model._safety_stock(
+                estimate.sigma, lead_time, estimate.adu) if model else 0.0
+            on_hand = product.qty_available
+            incoming = product.incoming_qty
+            outgoing = product.outgoing_qty
+
+            raw = self._target_quantity(
+                estimate, lead_time, safety_stock, on_hand, incoming, outgoing)
+            qty = self._apply_supplier_constraints(product, seller, raw)
+
+            keep = product.id in existing
+            if float_compare(qty, 0.0, precision_digits=rounding) <= 0 and not keep:
+                continue
+
+            values[product.id] = {
+                "supplier_id": seller.partner_id.id if seller else False,
+                "price_unit": seller.price if seller else 0.0,
+                "qty_suggested": qty,
+                "qty_final": qty,
+                "adu": estimate.adu,
+                "sigma": estimate.sigma,
+                "confidence": estimate.confidence,
+                "coverage_days_current": self._coverage_days(on_hand, estimate.adu),
+                "qty_on_hand": on_hand,
+                "qty_incoming": incoming,
+                "lead_time_days": lead_time,
+                "safety_stock": safety_stock,
+                "abc_class": product.abc_class,
+                "xyz_class": product.xyz_class,
+                "demand_model_id": model.id if model else False,
+                "method_used": estimate.method_used,
+                "params_snapshot": dict(
+                    model._params_snapshot() if model else {},
+                    coverage_days=self.coverage_days,
+                    lead_time_days=lead_time,
+                ),
+                "explanation": self._build_line_explanation(
+                    estimate, on_hand, incoming, lead_time, safety_stock),
+                "warnings": "\n".join(estimate.warnings) or False,
+            }
+        return values
+
+    def _build_line_explanation(self, estimate, on_hand, incoming, lead_time,
+                                safety_stock):
+        """Texto completo: la demanda que estimó el motor más el contexto de stock."""
+        self.ensure_one()
+        parts = [estimate.explanation] if estimate.explanation else []
+        coverage = self._coverage_days(on_hand, estimate.adu)
+        if coverage < NO_DEMAND_COVERAGE_DAYS:
+            parts.append(_(
+                "Quedan %(on_hand)s unidades, que cubren %(days)s días.",
+                on_hand=round(on_hand, 2), days=round(coverage, 1),
+            ))
+        else:
+            parts.append(_(
+                "Quedan %(on_hand)s unidades y no hay demanda estimada.",
+                on_hand=round(on_hand, 2),
+            ))
+        if incoming:
+            parts.append(_(
+                "Ya hay %(incoming)s unidades en camino.", incoming=round(incoming, 2),
+            ))
+        parts.append(_(
+            "Plazo de entrega del proveedor: %(lead)s días. Se compra para "
+            "cubrir %(coverage)s días más, con %(safety)s unidades de colchón.",
+            lead=round(lead_time, 1), coverage=self.coverage_days,
+            safety=round(safety_stock, 2),
+        ))
+        return " ".join(parts)
 
     def action_compute(self):
         """Recalcula las líneas preservando las ediciones manuales."""

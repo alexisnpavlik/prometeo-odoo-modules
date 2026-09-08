@@ -74,8 +74,10 @@ class TestPurchaseGeneration(PurchaseAdvisorCommon):
                         "La línea descartada queda como registro")
 
     def test_line_without_supplier_blocks(self):
+        """Un producto sin proveedor cargado a mano no puede llegar a una orden."""
         suggestion = self._make_suggestion(lines=[
-            {"product_id": self.product_a.id, "qty_final": 10, "price_unit": 100.0},
+            {"product_id": self.product_no_seller.id, "qty_final": 10,
+             "price_unit": 100.0},
         ])
         suggestion.action_compute()
         suggestion.action_confirm()

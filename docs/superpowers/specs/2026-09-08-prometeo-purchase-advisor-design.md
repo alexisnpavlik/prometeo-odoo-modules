@@ -646,7 +646,11 @@ Instrumentar desde v1, porque son la base para decidir si hace falta un segundo 
 El spec dice "Odoo 17/18". El target real de este repo es **18.0**. Tres puntos del spec cambian de forma en 18:
 
 1. **§5.8 — "tipo almacenable"**: en Odoo 18 `product.template.type` ya no tiene el valor `'product'`. Los almacenables son `type = 'consu'` **+** `is_storable = True`. La exclusión se implementa contra `is_storable`.
-2. **§5.6 — join de picking a PO**: `sp.origin = po.name` es frágil (el `origin` se pisa con merges y devoluciones). En 18 `stock.picking` tiene `purchase_id` (lo agrega `purchase_stock`). Se usa `sp.purchase_id = po.id`.
-3. **§5.5 — packaging**: `product.packaging` sigue existiendo en 18 con campo `qty`, pero el `supplierinfo` no lo referencia. El redondeo se hace contra el packaging del producto de menor `qty` disponible para el proveedor, y si no hay ninguno se omite el paso.
+2. **§5.6 — join de picking a PO**: `sp.origin = po.name` es frágil (el `origin` se pisa con merges y devoluciones). `stock.picking.purchase_id` **no sirve como alternativa**: es un related sin `store=True`, así que no existe como columna. El join real pasa por el movimiento, que sí guarda la línea de compra: `stock_move.purchase_line_id → purchase_order_line.order_id`. Además se toma la **primera** recepción de cada orden (`MIN(date_done)`), no la última: para reponer importa cuándo empezó a haber mercadería.
+3. **§5.5 — packaging**: `product.packaging` sigue existiendo en 18 con campo `qty` y un booleano `purchase` que agrega el módulo `purchase`. El redondeo se hace contra el packaging de menor `qty` marcado como de compra, y si no hay ninguno se omite el paso.
+4. **§5.5 — orden de las restricciones**: el spec aplica el packaging antes que el `min_qty`. Se invirtió: redondear al bulto y después subir al mínimo deja una cantidad que no es múltiplo de nada. Primero el mínimo, después el bulto.
+5. **§5.3 — recorte de outliers**: el spec lo aplica solo al desvío, pero su propio comentario dice que sirve para proteger el ADU. Se aplica a los dos. Además se desactiva cuando el percentil cae en cero, que es lo que pasa con demanda esporádica.
+6. **§5.3 — ventanas sin días utilizables**: se descartan y su peso se reparte entre las que quedan. Con la fórmula original el escenario de quiebre de §12 daba 2 en vez de 10.
+7. **§4.5 — campos calculados**: `abc_class`, `xyz_class`, `measured_lead_time` y `fill_rate` son campos almacenados que escribe el cron, no `compute` con `store=True`. Un compute almacenado sin dependencias reales se recalcula cuando no corresponde.
 
 Estas tres adaptaciones no cambian ninguna decisión de arquitectura del spec.
