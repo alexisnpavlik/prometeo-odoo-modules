@@ -1,10 +1,25 @@
 # -*- coding: utf-8 -*-
 import logging
+import math
+import statistics
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools.misc import formatLang
+
+from .datatypes import Estimate
 
 _logger = logging.getLogger(__name__)
+
+# Umbrales de confianza. La historia mínima no está acá porque es
+# configurable por modelo (campo `min_history_days`).
+CONFIDENCE_MIN_MOVES = 10
+
+# Por debajo de esta cantidad de días la serie es demasiado corta para que un
+# percentil signifique algo, y recortar haría más daño que el outlier.
+MIN_VALUES_TO_WINSORIZE = 10
+CONFIDENCE_MAX_STOCKOUT_RATIO = 0.5
+CONFIDENCE_MAX_CV = 1.5
 
 # Cuantiles de la normal estándar. Se hardcodea para no depender de scipy.
 Z_TABLE = {
@@ -210,3 +225,211 @@ class PrometeoDemandModel(models.Model):
                 name=self.name, method=self.method,
             ))
         return method_fn(series)
+
+    # ------------------------------------------------------------------
+    # Estadística sin dependencias externas
+    # ------------------------------------------------------------------
+    def _outlier_cap(self, values):
+        """Valor del percentil de recorte, o None si no corresponde recortar.
+
+        Devuelve None cuando el percentil cae en cero, que es lo que pasa con
+        demanda esporádica: un producto que vende 100 unidades una vez por mes
+        tiene 87 días en cero sobre 90, y recortar a cero lo dejaría con
+        demanda nula. El outlier molesta menos que eso.
+        """
+        self.ensure_one()
+        percentile = self.outlier_percentile
+        if not percentile or len(values) < MIN_VALUES_TO_WINSORIZE:
+            return None
+        ordered = sorted(values)
+        index = int(math.ceil(percentile * len(ordered))) - 1
+        index = min(max(index, 0), len(ordered) - 1)
+        cap = ordered[index]
+        return cap if cap > 0 else None
+
+    def _winsorize(self, values, cap=None):
+        """Recorta los valores por encima del tope.
+
+        Una venta mayorista puntual de 500 unidades sobre una demanda de 10 por
+        día no solo dispara el desvío: también triplica el promedio, y el
+        sistema termina comprando para un cliente que no va a volver. Se recorta
+        el pico y el resto de la serie queda intacta.
+        """
+        self.ensure_one()
+        if cap is None:
+            cap = self._outlier_cap(values)
+        if cap is None:
+            return list(values)
+        return [min(value, cap) for value in values]
+
+    def _stdev(self, values):
+        """Desvío estándar muestral. Con menos de dos puntos no hay desvío."""
+        if len(values) < 2:
+            return 0.0
+        return statistics.stdev(values)
+
+    def _confidence(self, series, product_id, adu, sigma):
+        """Qué tan confiable es la estimación, de 0 a 1.
+
+        Se toma el mínimo de todas las penalizaciones que apliquen: alcanza con
+        un solo problema serio para que la línea haya que mirarla a mano.
+        """
+        self.ensure_one()
+        history = series.history_days(product_id)
+        base = 0.8 + 0.2 * min(history / (self.lookback_days or 1), 1.0)
+        scores = [min(base, 1.0)]
+        if history < self.min_history_days:
+            scores.append(0.2)
+        if series.moves(product_id) < CONFIDENCE_MIN_MOVES:
+            scores.append(0.3)
+        if series.stockout_ratio(product_id) > CONFIDENCE_MAX_STOCKOUT_RATIO:
+            scores.append(0.4)
+        if adu > 0 and (sigma / adu) > CONFIDENCE_MAX_CV:
+            scores.append(0.5)
+        return round(min(scores), 2)
+
+    # ------------------------------------------------------------------
+    # Explicación
+    # ------------------------------------------------------------------
+    def _format_number(self, value, digits=2):
+        return formatLang(self.env, value, digits=digits)
+
+    def _build_explanation(self, series, product_id, adu, windows):
+        """Por qué salió ese número, en castellano y sin jerga."""
+        self.ensure_one()
+        window_txt = "/".join(str(days) for days, _weight in windows)
+        parts = [_(
+            "Vendés %(adu)s unidades por día (promedio ponderado de las ventanas "
+            "de %(windows)s días).",
+            adu=self._format_number(adu, digits=2), windows=window_txt,
+        )]
+        stockout = len(series.stockout_days.get(product_id) or ())
+        if stockout and self.ignore_stockout_days:
+            parts.append(_(
+                "Se descontaron %(days)s días sin stock del cálculo.", days=stockout,
+            ))
+        elif stockout:
+            parts.append(_(
+                "Hubo %(days)s días sin stock que igual cuentan como venta cero.",
+                days=stockout,
+            ))
+        history = series.history_days(product_id)
+        if history < self.lookback_days:
+            parts.append(_(
+                "Historia disponible: %(days)s días de los %(lookback)s pedidos.",
+                days=history, lookback=self.lookback_days,
+            ))
+        if self.outlier_percentile:
+            parts.append(_(
+                "Los días por encima del percentil %(pct)s se recortaron.",
+                pct=self._format_number(self.outlier_percentile * 100, digits=0),
+            ))
+        return " ".join(parts)
+
+    # ------------------------------------------------------------------
+    # Estimadores
+    # ------------------------------------------------------------------
+    def _estimate_weighted_ma(self, series):
+        """Promedio móvil ponderado de varias ventanas.
+
+        Las ventanas cortas pesan más para que el modelo reaccione a un cambio
+        de ritmo, y las largas amortiguan el ruido. Si un producto no tiene
+        historia para una ventana, esa ventana se descarta y los pesos se
+        renormalizan sobre las que quedan.
+        """
+        self.ensure_one()
+        weights = self._parse_weight_config()
+        result = {}
+        for product_id in series.product_ids:
+            result[product_id] = self._estimate_one_weighted_ma(
+                series, product_id, weights)
+        return result
+
+    def _estimate_one_weighted_ma(self, series, product_id, weights):
+        self.ensure_one()
+        warnings = series.product_notes(product_id)
+        history = series.history_days(product_id)
+        if history <= 0:
+            return Estimate(
+                method_used="weighted_ma", confidence=0.0,
+                explanation=_("El producto no tiene movimientos en el almacén."),
+                warnings=warnings + [_("Sin historia en la ventana analizada.")],
+            )
+        if self.ignore_stockout_days and series.days_with_stock(product_id) <= 0:
+            return Estimate(
+                method_used="weighted_ma", confidence=0.0,
+                explanation=_(
+                    "El producto estuvo sin stock toda la ventana: no hay demanda "
+                    "observable para estimar."),
+                warnings=warnings + [_("Sin stock en toda la ventana.")],
+            )
+
+        usable = [(days, weight) for days, weight in weights if days <= history]
+        if not usable:
+            # Producto nuevo: ninguna ventana entra en su historia. Se usa la
+            # más corta sobre los días que sí existen.
+            shortest = min(days for days, _weight in weights)
+            usable = [(shortest, 1.0)]
+            warnings.append(_(
+                "Solo hay %(days)s días de historia: se estimó con la ventana "
+                "más corta.", days=history,
+            ))
+
+        # El tope de recorte se calcula una sola vez sobre la ventana larga, y
+        # se aplica igual en todas las ventanas: si cada una calculara su propio
+        # percentil, el mismo día podría contar recortado en una y entero en otra.
+        only_with_stock = self.ignore_stockout_days
+        lookback_values = series.daily_values(
+            product_id, days=self.lookback_days, only_with_stock=only_with_stock)
+        cap = self._outlier_cap(lookback_values)
+        sigma = self._stdev(self._winsorize(lookback_values, cap))
+
+        # Una ventana sin días utilizables no aporta información: se descarta y
+        # su peso se reparte entre las que sí la tienen. Dejarla valiendo cero
+        # hundiría el promedio de un producto que estuvo agotado justo en la
+        # ventana corta, que es el caso que más urge reponer.
+        contributions = []
+        for days, weight in usable:
+            values = series.daily_values(
+                product_id, days=days, only_with_stock=only_with_stock)
+            if not values:
+                continue
+            rate = sum(self._winsorize(values, cap)) / len(values)
+            contributions.append((days, weight, rate))
+
+        if not contributions:
+            return Estimate(
+                method_used="weighted_ma", confidence=0.0,
+                explanation=_(
+                    "No hay ningún día con stock en las ventanas analizadas."),
+                warnings=warnings + [_("Sin días utilizables para estimar.")],
+            )
+        if len(contributions) < len(usable):
+            dropped = len(usable) - len(contributions)
+            warnings.append(_(
+                "Se descartaron %(count)s ventana(s) sin días con stock y se "
+                "repartió su peso entre las restantes.", count=dropped,
+            ))
+
+        total_weight = sum(weight for _days, weight, _rate in contributions)
+        if total_weight <= 0:
+            total_weight = float(len(contributions))
+            contributions = [(days, 1.0, rate) for days, _w, rate in contributions]
+
+        adu = sum(
+            rate * (weight / total_weight)
+            for _days, weight, rate in contributions
+        )
+        # Las devoluciones pueden superar a las ventas en una ventana corta.
+        # Demanda negativa no existe: es cero.
+        adu = max(adu, 0.0)
+        usable = [(days, weight) for days, weight, _rate in contributions]
+
+        return Estimate(
+            adu=adu,
+            sigma=sigma,
+            confidence=self._confidence(series, product_id, adu, sigma),
+            method_used="weighted_ma",
+            explanation=self._build_explanation(series, product_id, adu, usable),
+            warnings=warnings,
+        )

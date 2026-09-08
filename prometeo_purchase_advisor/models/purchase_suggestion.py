@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from collections import defaultdict
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -119,12 +120,63 @@ class PrometeoPurchaseSuggestion(models.Model):
     # ------------------------------------------------------------------
     # Motor
     # ------------------------------------------------------------------
+    def _demand_window(self, model):
+        """Ventana de análisis: [date_from, date_to), con date_to exclusivo.
+
+        Termina ayer a propósito. El día en curso está incompleto y meterlo
+        arrastra el promedio para abajo, sobre todo si se calcula a la mañana.
+        """
+        self.ensure_one()
+        builder = self.env["prometeo.demand.series.builder"]
+        date_to = builder._today(builder._timezone())
+        return date_to - timedelta(days=model.lookback_days), date_to
+
+    def _build_demand_series(self, model, products):
+        """Serie de demanda de esos productos según la ventana del modelo."""
+        self.ensure_one()
+        builder = self.env["prometeo.demand.series.builder"]
+        date_from, date_to = self._demand_window(model)
+        return builder.build(self.warehouse_id, products.ids, date_from, date_to)
+
+    def _products_by_demand_model(self, products):
+        """Agrupa los productos por el modelo de demanda que les toca.
+
+        Cada modelo tiene su propia ventana de historia, así que se arma una
+        serie por modelo en vez de una sola para todos.
+        """
+        self.ensure_one()
+        if self.demand_model_id:
+            return {self.demand_model_id: products}
+        resolved = self.env["prometeo.demand.model.rule"]._resolve_model_for_products(
+            products)
+        grouped = defaultdict(lambda: self.env["product.product"])
+        for product in products:
+            model = resolved.get(product.id)
+            if model:
+                grouped[model] |= product
+            else:
+                _logger.warning(
+                    "Producto %s sin modelo de demanda resoluble: se omite",
+                    product.display_name,
+                )
+        return grouped
+
+    def _estimate_demand(self, products):
+        """Estima la demanda de cada producto. Devuelve {product_id: Estimate}."""
+        self.ensure_one()
+        estimates = {}
+        for model, model_products in self._products_by_demand_model(products).items():
+            series = self._build_demand_series(model, model_products)
+            estimates.update(model.estimate(series))
+        return estimates
+
     def _run_engine(self):
         """Calcula las métricas de demanda de la sugerencia.
 
-        Devuelve {product_id: dict de valores para la línea}. En esta fase el
-        motor todavía no existe: devuelve vacío en vez de inventar números, que
-        es lo único peor que no sugerir nada.
+        Devuelve {product_id: dict de valores para la línea}. La estimación de
+        demanda ya funciona (`_estimate_demand`), pero traducirla a una cantidad
+        a comprar necesita lead time y stock de seguridad, que todavía no están.
+        Hasta entonces devuelve vacío en vez de inventar números.
         """
         self.ensure_one()
         return {}

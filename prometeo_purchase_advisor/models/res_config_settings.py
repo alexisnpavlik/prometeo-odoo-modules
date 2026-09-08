@@ -5,7 +5,10 @@ from odoo import api, fields, models
 class ResCompany(models.Model):
     _inherit = "res.company"
 
-    default_demand_model_id = fields.Many2one(
+    # No se llama default_* a propósito: res.config.settings reserva ese
+    # prefijo para los campos que fijan valores por defecto de otro modelo, y
+    # explota al abrir la pantalla de ajustes.
+    suggestion_demand_model_id = fields.Many2one(
         "prometeo.demand.model", string="Modelo de demanda por defecto",
         help="Modelo usado cuando el producto, su categoría y las reglas no "
              "resuelven ninguno.",
@@ -22,7 +25,7 @@ class ResCompany(models.Model):
         Si la compañía no tiene uno configurado cae al modelo de datos del
         módulo, para que el recomendador nunca quede sin método utilizable.
         """
-        model = self.env.company.default_demand_model_id
+        model = self.env.company.suggestion_demand_model_id
         if model:
             return model
         return self.env.ref(
@@ -34,8 +37,8 @@ class ResCompany(models.Model):
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
-    default_demand_model_id = fields.Many2one(
-        related="company_id.default_demand_model_id", readonly=False,
+    suggestion_demand_model_id = fields.Many2one(
+        related="company_id.suggestion_demand_model_id", readonly=False,
         string="Modelo de demanda por defecto",
     )
     suggestion_coverage_days = fields.Integer(

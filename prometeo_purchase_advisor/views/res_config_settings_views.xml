@@ -11,7 +11,7 @@
                     <block title="Cálculo de sugerencias">
                         <setting string="Modelo de demanda por defecto"
                                  help="Se usa cuando el producto, su categoría y las reglas no resuelven ninguno.">
-                            <field name="default_demand_model_id"/>
+                            <field name="suggestion_demand_model_id"/>
                         </setting>
                         <setting string="Días de cobertura objetivo"
                                  help="Cuántos días de venta se quiere cubrir además del lead time del proveedor.">
