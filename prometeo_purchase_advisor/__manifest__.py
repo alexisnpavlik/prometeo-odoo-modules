@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Prometeo - Recomendador de compra",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Inventory/Purchase",
     "summary": "Sugerencias de compra a partir de la demanda real observada, revisables y convertibles en órdenes de compra",
     "description": """
@@ -21,7 +21,7 @@
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["base", "mail", "product", "stock", "purchase"],
+    "depends": ["base", "mail", "product", "stock", "purchase_stock"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

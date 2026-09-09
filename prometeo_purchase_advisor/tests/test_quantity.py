@@ -12,6 +12,42 @@ from .common import PurchaseAdvisorCommon
 class TestQuantity(PurchaseAdvisorCommon):
     """Fase 3: lead time medido, stock de seguridad y restricciones del proveedor."""
 
+    def test_configured_lead_time_is_per_product(self):
+        """Compartir proveedor no implica compartir plazo entre productos."""
+        self._sell_daily(self.product_a, 1, 31, 1)
+        self._sell_daily(self.product_b, 1, 31, 1)
+        self.product_a.seller_ids.delay = 2
+        self.product_b.seller_ids.delay = 20
+        suggestion = self._make_suggestion()
+        suggestion.action_compute()
+        lines = {line.product_id.id: line for line in suggestion.line_ids}
+        self.assertEqual(lines[self.product_a.id].lead_time_days, 2)
+        self.assertEqual(lines[self.product_b.id].lead_time_days, 20)
+
+    def test_excluded_product_is_removed_on_recompute(self):
+        """Excluir un producto no debe dejar su cantidad anterior lista para comprar."""
+        self._sell_daily(self.product_a, 1, 31, 1)
+        suggestion = self._make_suggestion()
+        suggestion.action_compute()
+        self.product_a.exclude_from_suggestion = True
+        suggestion.action_compute()
+        self.assertFalse(suggestion.line_ids.filtered(lambda line: line.product_id == self.product_a))
+
+    def test_supplier_price_is_normalized_to_stock_unit(self):
+        """Un precio de 120 por docena equivale a 10 por unidad en la sugerencia."""
+        self.product_a.uom_po_id = self.uom_dozen
+        self.product_a.seller_ids.price = 120
+        self._sell_daily(self.product_a, 1, 31, 1)
+        suggestion = self._make_suggestion()
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(lambda line: line.product_id == self.product_a)
+        self.assertEqual(line.price_unit, 10)
+        line.qty_final = 24
+        self.assertEqual(line.subtotal, 240)
+        suggestion.action_confirm()
+        suggestion.action_create_purchase_orders()
+        self.assertEqual(suggestion.purchase_order_ids.order_line.price_unit, 120)
+
     # ------------------------------------------------------------------
     # Lead time
     # ------------------------------------------------------------------

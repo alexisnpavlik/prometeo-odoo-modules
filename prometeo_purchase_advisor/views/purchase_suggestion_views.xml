@@ -64,16 +64,28 @@
                     <group>
                         <group>
                             <field name="warehouse_id" readonly="state != 'draft'"/>
+                            <field name="supply_mode" readonly="state != 'draft'"/>
+                            <field name="demand_warehouse_ids" widget="many2many_tags"
+                                   domain="[('id', '!=', warehouse_id)]"
+                                   invisible="supply_mode != 'centralized'" readonly="state != 'draft'"/>
+                            <button name="action_detect_demand_warehouses" type="object"
+                                    string="Detectar sucursales por movimientos"
+                                    invisible="supply_mode != 'centralized' or state != 'draft'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="user_id"/>
                         </group>
                         <group>
                             <field name="coverage_days" readonly="state not in ('draft', 'computed')"/>
+                            <field name="transfer_days" invisible="supply_mode != 'centralized'"
+                                   readonly="state not in ('draft', 'computed')"/>
                             <field name="demand_model_id" readonly="state not in ('draft', 'computed')"/>
                             <field name="date_computed"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
                     </group>
+                    <div class="alert alert-warning" role="alert" invisible="not calculation_notes">
+                        <field name="calculation_notes" nolabel="1"/>
+                    </div>
                     <notebook>
                         <page string="Líneas" name="lines">
                             <field name="line_ids" readonly="state in ('done', 'cancel')">

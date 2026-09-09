@@ -83,7 +83,7 @@ class PrometeoDemandModelRule(models.Model):
         que matchea, default de la compañía. Devuelve {product_id: demand_model}.
         """
         history_days_by_product = history_days_by_product or {}
-        rules = self.search([("company_id", "in", [False] + self.env.companies.ids)])
+        rules = self.search([("company_id", "in", [False, self.env.company.id])])
         default_model = self.env["res.company"]._prometeo_default_demand_model()
         result = {}
         for product in products:

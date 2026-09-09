@@ -37,13 +37,60 @@ el core no menciona `ewma` en ningún lado.
 
 ## Cómo se usa
 
-1. *Recomendador → Sugerencias de compra*, crear una, elegir el almacén.
+1. *Recomendador → Sugerencias de compra*, crear una y elegir el **almacén receptor**.
+   Para comprar directamente en una sucursal, usar **Compra directa al almacén**.
+   Para comprar en el central, usar **Compra centralizada para sucursales** y
+   **Detectar sucursales por movimientos**. La detección considera despachos
+   hechos en los últimos 180 días, dentro de las compañías habilitadas; revisar
+   la selección según lo que abastecerá esta compra.
 2. **Calcular**. Cada línea explica en castellano por qué sugiere esa cantidad;
    el botón de expandir la fila muestra el detalle completo.
 3. Editar cantidades, agregar o quitar productos. Un recálculo posterior
    respeta lo que se editó a mano.
 4. **Confirmar** y **Crear órdenes de compra**: quedan en borrador, agrupadas
    por proveedor.
+
+### Cómo calcula una compra centralizada
+
+Cada sucursal usa su propia demanda, disponibilidad histórica, stock y entradas
+confirmadas. Se suman sus faltantes positivos; el exceso de una sucursal no se
+supone disponible para otra. El central cubre esos faltantes con su disponibilidad
+libre y se compra la diferencia. Los mínimos y bultos se aplican una sola vez.
+
+Los traslados entre compañías no cuentan como ventas a clientes, incluso cuando
+su destino técnico es una ubicación de cliente. Las recepciones pendientes de
+las sucursales descuentan necesidades tanto si provienen de una compra directa
+como del central. Los despachos preparados sin recepción contraparte se acreditan
+al destino identificado, evitando duplicar compras antes de validar el traslado.
+
+**Días de distribución** agrega el plazo del central a las sucursales. Cero
+supone distribución inmediata. No se mide automáticamente: los pendientes viejos
+y las recepciones registradas tarde no permiten inferirlo con suficiente confianza.
+La generación de órdenes no crea ni valida transferencias entre compañías.
+
+Las cantidades y los precios nuevos de la sugerencia se expresan por unidad de
+stock, en la moneda de la compañía compradora. La orden convierte ambos a la unidad
+de compra. La actualización conserva el significado de los precios ya guardados.
+
+Para consultar una sugerencia centralizada hacen falta permisos sobre todas las
+compañías seleccionadas y sobre aquellas cuyas métricas siguen guardadas en las
+líneas. La explicación conserva el desglose por almacén.
+
+### Límites que hay que revisar antes de comprar
+
+- Los productos sin proveedor quedan fuera del motor; la pantalla avisa cuántos
+  tuvieron ventas en los últimos 90 días.
+- El stock negativo se trata como cero y se advierte en la línea. No se corrige
+  el inventario automáticamente.
+- Las entradas confirmadas pendientes descuentan stock aunque estén atrasadas.
+  Revisar recepciones antiguas antes de confiar en la propuesta.
+- Las órdenes en borrador no reservan abastecimiento. Confirmar o cancelar las
+  anteriores antes de repetir una compra para las mismas sucursales.
+- La compra centralizada no aplica el filtro ABC global para ocultar faltantes:
+  las clases actuales todavía se guardan por producto, no por almacén/compañía.
+
+La auditoría con datos reales y las limitaciones restantes están en
+[auditoria-2026-09-09.md](auditoria-2026-09-09.md).
 
 La pestaña *Calidad del cálculo* muestra la tasa de edición: si supera el 50%,
 el modelo está mal calibrado para el negocio y conviene revisar los días de

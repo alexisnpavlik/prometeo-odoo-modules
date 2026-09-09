@@ -49,6 +49,10 @@ class PrometeoPurchaseSuggestionLine(models.Model):
     price_unit = fields.Float(
         string="Precio unitario", digits="Product Price",
     )
+    price_in_stock_uom = fields.Boolean(
+        default=True, readonly=True,
+        help="Distingue los precios por unidad de stock de las sugerencias anteriores a la actualización.",
+    )
     subtotal = fields.Monetary(
         string="Subtotal", compute="_compute_subtotal", store=True,
         currency_field="currency_id",
@@ -118,10 +122,13 @@ class PrometeoPurchaseSuggestionLine(models.Model):
     # ------------------------------------------------------------------
     # Computes
     # ------------------------------------------------------------------
-    @api.depends("qty_final", "price_unit")
+    @api.depends("qty_final", "price_unit", "price_in_stock_uom", "product_id.uom_po_id", "product_id.uom_id")
     def _compute_subtotal(self):
         for line in self:
-            line.subtotal = line.qty_final * line.price_unit
+            price = line.price_unit
+            if not line.price_in_stock_uom:
+                price = line.product_id.uom_po_id._compute_price(price, line.product_id.uom_id)
+            line.subtotal = line.qty_final * price
 
     @api.depends("qty_final", "qty_suggested")
     def _compute_was_edited(self):
@@ -142,7 +149,8 @@ class PrometeoPurchaseSuggestionLine(models.Model):
             seller = line._find_seller()
             if seller:
                 line.supplier_id = seller.partner_id
-                line.price_unit = seller.price
+                line.price_unit = line.suggestion_id._seller_price(line.product_id, seller)
+                line.price_in_stock_uom = True
             line.qty_on_hand = line._current_qty_on_hand()
 
     def _find_seller(self):
@@ -176,6 +184,8 @@ class PrometeoPurchaseSuggestionLine(models.Model):
         # qty_final está en la unidad de stock; la compra puede usar otra.
         qty = product.uom_id._compute_quantity(self.qty_final, product.uom_po_id)
         price = self.price_unit
+        if self.price_in_stock_uom:
+            price = product.uom_id._compute_price(price, product.uom_po_id)
         if order.currency_id and order.currency_id != self.currency_id:
             price = self.currency_id._convert(
                 price, order.currency_id, order.company_id,

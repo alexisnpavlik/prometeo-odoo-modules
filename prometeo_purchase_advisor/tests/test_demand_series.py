@@ -10,6 +10,21 @@ from .common import PurchaseAdvisorCommon
 class TestDemandSeries(PurchaseAdvisorCommon):
     """Fase 2: lectura de movimientos y reconstrucción de disponibilidad."""
 
+    def test_intercompany_delivery_is_not_customer_demand(self):
+        """Una salida a cliente cuyo contacto es una compañía es un traslado."""
+        other, _warehouse = self._isolated_company()
+        move = self._make_move(self.product_a, 50, self._today() - timedelta(days=2))
+        picking = self.env["stock.picking"].create({
+            "partner_id": other.partner_id.id,
+            "picking_type_id": self.warehouse.out_type_id.id,
+            "location_id": move.location_id.id,
+            "location_dest_id": move.location_dest_id.id,
+        })
+        move.picking_id = picking
+        self._make_move(self.product_a, 3, self._today() - timedelta(days=1))
+        series = self._build_series(None, self.product_a, lookback=30)
+        self.assertEqual(series.total_qty(self.product_a.id), 3)
+
     def test_daily_demand_is_aggregated_per_day(self):
         today = self._today()
         self._make_move(self.product_a, 3, today - timedelta(days=1))

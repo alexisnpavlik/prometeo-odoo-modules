@@ -171,12 +171,12 @@ class PrometeoPurchaseSuggestion(models.Model):
         date_to = builder._today(builder._timezone())
         return date_to - timedelta(days=model.lookback_days), date_to
 
-    def _build_demand_series(self, model, products):
+    def _build_demand_series(self, model, products, warehouse=None):
         """Serie de demanda de esos productos según la ventana del modelo."""
         self.ensure_one()
         builder = self.env["prometeo.demand.series.builder"]
         date_from, date_to = self._demand_window(model)
-        return builder.build(self.warehouse_id, products.ids, date_from, date_to)
+        return builder.build(warehouse or self.warehouse_id, products.ids, date_from, date_to)
 
     def _products_by_demand_model(self, products):
         """Agrupa los productos por el modelo de demanda que les toca.
@@ -201,7 +201,7 @@ class PrometeoPurchaseSuggestion(models.Model):
                 )
         return grouped
 
-    def _estimate_demand(self, products):
+    def _estimate_demand(self, products, warehouse=None):
         """Estima la demanda de cada producto.
 
         Devuelve ({product_id: Estimate}, {product_id: modelo usado}). El modelo
@@ -212,7 +212,7 @@ class PrometeoPurchaseSuggestion(models.Model):
         estimates = {}
         models = {}
         for model, model_products in self._products_by_demand_model(products).items():
-            series = self._build_demand_series(model, model_products)
+            series = self._build_demand_series(model, model_products, warehouse=warehouse)
             estimates.update(model.estimate(series))
             for product in model_products:
                 models[product.id] = model
@@ -255,12 +255,23 @@ class PrometeoPurchaseSuggestion(models.Model):
         sellers = product.seller_ids.filtered(lambda seller: (
             (not seller.date_start or seller.date_start <= today)
             and (not seller.date_end or seller.date_end >= today)
+            and (not seller.product_id or seller.product_id == product)
         ))
         if not sellers:
             return self.env["product.supplierinfo"]
         own = sellers.filtered(lambda seller: seller.company_id == self.company_id)
         return min(own or sellers,
                    key=lambda seller: (seller.sequence, seller.price))
+
+    def _seller_price(self, product, seller):
+        """Precio por unidad de stock, expresado en la moneda de la sugerencia."""
+        self.ensure_one()
+        if not seller:
+            return 0.0
+        price = (seller.product_uom or product.uom_po_id)._compute_price(
+            seller.price, product.uom_id)
+        return seller.currency_id._convert(
+            price, self.currency_id, self.company_id, fields.Date.context_today(self))
 
     # ------------------------------------------------------------------
     # Cantidad
@@ -351,9 +362,11 @@ class PrometeoPurchaseSuggestion(models.Model):
         estimates, models = self._estimate_demand(products)
         return self._build_line_values(products, estimates, models)
 
-    def _build_line_values(self, products, estimates, models):
+    def _build_line_values(self, products, estimates, models, warehouse=None,
+                           include_all=False, incoming_adjustments=None):
+        """Métricas por almacén; la compra centralizada aplica los mínimos al final."""
         self.ensure_one()
-        warehouse = self.warehouse_id
+        warehouse = warehouse or self.warehouse_id
         scoped = products.with_context(warehouse_id=warehouse.id)
 
         sellers = {product.id: self._pick_seller(product) for product in scoped}
@@ -362,7 +375,10 @@ class PrometeoPurchaseSuggestion(models.Model):
             if seller:
                 sellers_by_partner.setdefault(seller.partner_id.id, seller)
         partners = self.env["res.partner"].browse(list(sellers_by_partner))
-        lead_times = partners._lead_time_for_suggestion(sellers_by_partner)
+        measured = partners.with_context(
+            allowed_company_ids=[self.company_id.id],
+            advisor_receipt_warehouse_id=self.warehouse_id.id,
+        )._measure_lead_times()
 
         existing = set(self.line_ids.mapped("product_id").ids)
         rounding = self.env["decimal.precision"].precision_get(
@@ -374,31 +390,33 @@ class PrometeoPurchaseSuggestion(models.Model):
                 continue
             seller = sellers[product.id]
             model = models.get(product.id)
-            lead_time, lead_source = lead_times.get(
-                seller.partner_id.id, (FALLBACK_LEAD_TIME_DAYS, "fallback")
-            ) if seller else (FALLBACK_LEAD_TIME_DAYS, "fallback")
+            lead_time, lead_source = self.env["res.partner"]._lead_time_from_measurement(
+                seller, measured.get(seller.partner_id.id, (0, 0)) if seller else (0, 0))
+            if warehouse != self.warehouse_id:
+                lead_time += self.transfer_days
             safety_stock = model._safety_stock(
                 estimate.sigma, lead_time, estimate.adu) if model else 0.0
             on_hand = product.qty_available
-            incoming = product.incoming_qty
+            incoming = product.incoming_qty + (incoming_adjustments or {}).get(product.id, 0)
             outgoing = product.outgoing_qty
 
             coverage = self._coverage_days(on_hand, estimate.adu)
             keep = product.id in existing
-            if not keep and not self._should_include(
+            if not include_all and not keep and not self._should_include(
                     product, estimate, coverage, lead_time, on_hand):
                 continue
 
             raw = self._target_quantity(
                 estimate, lead_time, safety_stock, on_hand, incoming, outgoing)
-            qty = self._apply_supplier_constraints(product, seller, raw)
+            qty = raw if include_all else self._apply_supplier_constraints(product, seller, raw)
 
-            if float_compare(qty, 0.0, precision_digits=rounding) <= 0 and not keep:
+            if not include_all and float_compare(qty, 0.0, precision_digits=rounding) <= 0 and not keep:
                 continue
 
             values[product.id] = {
                 "supplier_id": seller.partner_id.id if seller else False,
-                "price_unit": seller.price if seller else 0.0,
+                "price_unit": self._seller_price(product, seller),
+                "price_in_stock_uom": True,
                 "qty_suggested": qty,
                 "qty_final": qty,
                 "adu": estimate.adu,
@@ -496,7 +514,7 @@ class PrometeoPurchaseSuggestion(models.Model):
                 raise UserError(_(
                     "Solo se pueden recalcular sugerencias en borrador o calculadas."
                 ))
-            metrics = suggestion._run_engine()
+            metrics = suggestion.with_company(suggestion.company_id)._run_engine()
             preserved += suggestion._apply_metrics(metrics)
             computed += len(metrics)
             suggestion.write({
@@ -539,6 +557,15 @@ class PrometeoPurchaseSuggestion(models.Model):
         self.ensure_one()
         preserved = 0
         existing = {line.product_id.id: line for line in self.line_ids}
+        to_create = []
+        for product_id, line in existing.items():
+            if product_id not in metrics:
+                if line.is_manual or line.was_edited:
+                    line.write({"qty_suggested": 0, "warnings": _(
+                        "El producto ya no participa del cálculo. Se conserva la decisión manual; revisala.")})
+                    preserved += 1
+                else:
+                    line.unlink()
         for product_id, vals in metrics.items():
             line = existing.get(product_id)
             if line:
@@ -546,12 +573,15 @@ class PrometeoPurchaseSuggestion(models.Model):
                 line_vals = dict(vals)
                 if keep_qty:
                     line_vals.pop("qty_final", None)
+                    line_vals.pop("supplier_id", None)
+                    line_vals.pop("price_unit", None)
+                    line_vals.pop("price_in_stock_uom", None)
                     preserved += 1
                 line.write(line_vals)
             else:
-                self.env["prometeo.purchase.suggestion.line"].create(
-                    dict(vals, suggestion_id=self.id, product_id=product_id)
-                )
+                to_create.append(dict(vals, suggestion_id=self.id, product_id=product_id))
+        if to_create:
+            self.env["prometeo.purchase.suggestion.line"].create(to_create)
         return preserved
 
     # ------------------------------------------------------------------
@@ -641,7 +671,7 @@ class PrometeoPurchaseSuggestion(models.Model):
     def _create_purchase_order(self, supplier, lines):
         """Crea una orden en borrador para un proveedor. Nunca la confirma."""
         self.ensure_one()
-        order = self.env["purchase.order"].create({
+        order = self.env["purchase.order"].with_company(self.company_id).create({
             "partner_id": supplier.id,
             "company_id": self.company_id.id,
             "picking_type_id": self.warehouse_id.in_type_id.id,

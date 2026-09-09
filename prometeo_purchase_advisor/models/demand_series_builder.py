@@ -70,6 +70,8 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
         # validación de albarán, un ajuste), sin esto lee datos viejos.
         self.env.flush_all()
 
+        warehouse.check_access("read")
+
         tz_name = self._timezone()
         wh_path = (warehouse.view_location_id.parent_path or "") + "%"
         params = {
@@ -104,11 +106,16 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
               FROM stock_move sm
               JOIN stock_location src  ON src.id  = sm.location_id
               JOIN stock_location dest ON dest.id = sm.location_dest_id
+              LEFT JOIN stock_picking picking ON picking.id = sm.picking_id
              WHERE sm.state = 'done'
                AND sm.company_id = %(company_id)s
                AND sm.product_id = ANY(%(product_ids)s)
                AND sm.date >= %(date_from)s
                AND sm.date <  %(date_to)s
+               AND NOT EXISTS (
+                   SELECT 1 FROM res_company company
+                    WHERE company.partner_id = COALESCE(picking.partner_id, sm.partner_id)
+               )
                AND (
                      (dest.usage = 'customer' AND src.usage = 'internal'
                       AND src.parent_path LIKE %(wh_path)s)

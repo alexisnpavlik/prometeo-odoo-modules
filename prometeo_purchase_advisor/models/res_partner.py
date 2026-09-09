@@ -72,6 +72,7 @@ class ResPartner(models.Model):
                      WHERE sp.state = 'done'
                        AND spt.code = 'incoming'
                        AND sp.date_done IS NOT NULL
+                       AND (%s IS NULL OR spt.warehouse_id = %s)
                      GROUP BY pol.order_id
                    ) r ON r.order_id = po.id
              WHERE po.state IN ('purchase', 'done')
@@ -79,8 +80,11 @@ class ResPartner(models.Model):
                AND po.date_approve >= (NOW() - (%s || ' days')::interval)
                AND r.first_done >= po.date_approve
                AND po.partner_id = ANY(%s)
+               AND po.company_id = ANY(%s)
              GROUP BY po.partner_id
-        """, (MEASUREMENT_WINDOW_DAYS, self.ids))
+        """, (self.env.context.get("advisor_receipt_warehouse_id"),
+              self.env.context.get("advisor_receipt_warehouse_id"),
+              MEASUREMENT_WINDOW_DAYS, self.ids, self.env.companies.ids))
         return {
             partner_id: (float(lead_days or 0.0), int(sample or 0))
             for partner_id, lead_days, sample in self.env.cr.fetchall()
@@ -100,8 +104,9 @@ class ResPartner(models.Model):
                AND po.date_approve IS NOT NULL
                AND po.date_approve >= (NOW() - (%s || ' days')::interval)
                AND po.partner_id = ANY(%s)
+               AND po.company_id = ANY(%s)
              GROUP BY po.partner_id
-        """, (MEASUREMENT_WINDOW_DAYS, self.ids))
+        """, (MEASUREMENT_WINDOW_DAYS, self.ids, self.env.companies.ids))
         return {
             partner_id: float(rate or 0.0)
             for partner_id, rate in self.env.cr.fetchall()
@@ -122,17 +127,20 @@ class ResPartner(models.Model):
         sellers_by_partner = sellers_by_partner or {}
         result = {}
         for partner in self:
-            days, sample = measured.get(partner.id, (0.0, 0))
-            if sample >= MIN_SAMPLE_SIZE and days >= MIN_MEASURABLE_LEAD_TIME_DAYS:
-                result[partner.id] = (days, "measured")
-                continue
             seller = sellers_by_partner.get(partner.id)
-            configured = seller.delay if seller else 0
-            if configured:
-                result[partner.id] = (float(configured), "configured")
-            else:
-                result[partner.id] = (FALLBACK_LEAD_TIME_DAYS, "fallback")
+            result[partner.id] = self._lead_time_from_measurement(
+                seller, measured.get(partner.id, (0.0, 0)))
         return result
+
+    @api.model
+    def _lead_time_from_measurement(self, seller, measurement):
+        """El plazo medido es por proveedor; el respaldo configurado es por producto."""
+        days, sample = measurement
+        if sample >= MIN_SAMPLE_SIZE and days >= MIN_MEASURABLE_LEAD_TIME_DAYS:
+            return days, "measured"
+        if seller and seller.delay > 0:
+            return float(seller.delay), "configured"
+        return FALLBACK_LEAD_TIME_DAYS, "fallback"
 
     def action_refresh_purchase_metrics(self):
         """Recalcula y guarda las métricas de estos proveedores."""
