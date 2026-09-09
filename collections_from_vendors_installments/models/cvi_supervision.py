@@ -109,10 +109,10 @@ class CviSupervisionVisit(models.Model):
     )
     note = fields.Text(string="Observaciones generales")
     card_count = fields.Integer(
-        string="Tarjetas revisadas", compute="_compute_result", store=True,
+        string="Tarjetas revisadas", compute="_compute_counts", store=True,
     )
     issue_count = fields.Integer(
-        string="Con observación", compute="_compute_result", store=True,
+        string="Con observación", compute="_compute_counts", store=True,
     )
 
     @api.model_create_multi
@@ -133,13 +133,17 @@ class CviSupervisionVisit(models.Model):
                 ))
 
     @api.depends("line_ids.has_issue")
-    def _compute_result(self):
-        """Propone el resultado a partir de las tarjetas revisadas (HU-22)."""
+    def _compute_counts(self):
+        """Cuenta las líneas incluso cuando el formulario envía un resultado manual."""
         for visit in self:
             visit.card_count = len(visit.line_ids)
-            issues = visit.line_ids.filtered("has_issue")
-            visit.issue_count = len(issues)
-            visit.result = "issues" if issues else "compliant"
+            visit.issue_count = len(visit.line_ids.filtered("has_issue"))
+
+    @api.depends("line_ids.has_issue")
+    def _compute_result(self):
+        """Propone el resultado sin compartir el cálculo con campos de solo lectura."""
+        for visit in self:
+            visit.result = "issues" if any(visit.line_ids.mapped("has_issue")) else "compliant"
 
     def action_load_cards(self):
         """Trae las tarjetas de la cartera del cobrador en el período auditado.

@@ -2,7 +2,7 @@
 from datetime import timedelta
 
 from odoo.exceptions import UserError
-from odoo.tests import tagged
+from odoo.tests import Form, tagged
 from odoo.tests.common import freeze_time
 
 from .common import CviCommon
@@ -89,7 +89,8 @@ class TestCviRecovery(CviCommon):
             self.card.action_mark_to_recover()
 
     def test_marking_records_who_and_when(self):
-        self.card.to_recover_reason = "Cuatro meses sin pagar, no atiende."
+        with Form(self.card) as form:
+            form.to_recover_reason = "Cuatro meses sin pagar, no atiende."
         self.card.action_mark_to_recover()
         self.assertTrue(self.card.to_recover)
         self.assertEqual(self.card.to_recover_user_id, self.env.user)

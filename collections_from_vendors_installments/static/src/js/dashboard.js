@@ -139,8 +139,8 @@ class CviDashboard extends Component {
 
     setPresetDates(preset) {
         const today = new Date();
-        let start = new Date();
-        let end = new Date();
+        let start = new Date(today);
+        let end = new Date(today);
         switch (preset) {
             case "today":
                 break;
@@ -149,16 +149,16 @@ class CviDashboard extends Component {
                 end.setDate(today.getDate() - 1);
                 break;
             case "7days":
-                start.setDate(today.getDate() - 7);
+                start.setDate(today.getDate() - 6);
                 break;
             case "30days":
-                start.setDate(today.getDate() - 30);
+                start.setDate(today.getDate() - 29);
                 break;
             case "60days":
-                start.setDate(today.getDate() - 60);
+                start.setDate(today.getDate() - 59);
                 break;
             case "90days":
-                start.setDate(today.getDate() - 90);
+                start.setDate(today.getDate() - 89);
                 break;
             case "all":
                 start = null;
