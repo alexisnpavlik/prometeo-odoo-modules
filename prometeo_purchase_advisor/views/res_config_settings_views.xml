@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_res_config_settings_advisor" model="ir.ui.view">
+        <field name="name">res.config.settings.purchase.advisor</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Recomendador de compra" name="prometeo_purchase_advisor"
+                     groups="prometeo_purchase_advisor.group_purchase_advisor_manager">
+                    <block title="Cálculo de sugerencias">
+                        <setting string="Modelo de demanda por defecto"
+                                 help="Se usa cuando el producto, su categoría y las reglas no resuelven ninguno.">
+                            <field name="suggestion_demand_model_id"/>
+                        </setting>
+                        <setting string="Días de cobertura objetivo"
+                                 help="Cuántos días de venta se quiere cubrir además del lead time del proveedor.">
+                            <field name="suggestion_coverage_days"/>
+                        </setting>
+                        <setting string="Incluir siempre los productos C"
+                                 help="Sin esto, los productos de clase C solo aparecen cuando van a quebrar antes de que llegue la reposición.">
+                            <field name="suggestion_always_include_c"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

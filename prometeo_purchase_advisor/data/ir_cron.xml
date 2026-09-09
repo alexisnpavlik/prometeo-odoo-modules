@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="cron_classify_products" model="ir.cron">
+        <field name="name">Recomendador: clasificar productos ABC/XYZ</field>
+        <field name="model_id" ref="product.model_product_product"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_classify_products()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 02:00:00')"/>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_refresh_purchase_metrics" model="ir.cron">
+        <field name="name">Recomendador: medir plazos y cumplimiento de proveedores</field>
+        <field name="model_id" ref="base.model_res_partner"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_refresh_purchase_metrics()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 03:00:00')"/>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_generate_suggestions" model="ir.cron">
+        <field name="name">Recomendador: generar sugerencias semanales</field>
+        <field name="model_id" ref="model_prometeo_purchase_suggestion"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_suggestions()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 06:00:00')"/>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>
