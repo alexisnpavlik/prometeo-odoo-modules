@@ -117,6 +117,9 @@
                                     <field name="qty_on_hand" string="Stock" readonly="1"/>
                                     <field name="qty_incoming" string="Tránsito" readonly="1"/>
                                     <field name="adu" string="Venta/día" readonly="1"/>
+                                    <field name="sales_data_available" column_invisible="True"/>
+                                    <field name="qty_sold" optional="show" invisible="not sales_data_available"/>
+                                    <field name="sales_period" optional="hide"/>
                                     <field name="qty_suggested" string="Sugerido" readonly="1"/>
                                     <field name="qty_final" string="Cantidad"/>
                                     <field name="supplier_id"/>
@@ -204,6 +207,12 @@
                         </group>
                         <group string="Demanda estimada">
                             <field name="adu"/>
+                            <field name="sales_data_available" invisible="1"/>
+                            <field name="qty_sold" invisible="not sales_data_available"/>
+                            <field name="sales_period" invisible="not sales_data_available"/>
+                            <div class="text-muted" invisible="sales_data_available">
+                                Recalculá la sugerencia para ver las unidades vendidas en el período.
+                            </div>
                             <field name="sigma"/>
                             <field name="safety_stock"/>
                             <field name="confidence"/>

@@ -95,6 +95,13 @@ que quedó fuera, debés quitar esa línea o ponerla en cero antes de generar ó
 
 ## Revisar y generar la compra
 
+La columna **Vendidos (netos)** muestra unidades entregadas a clientes menos
+devoluciones en la ventana del cálculo, sin ajustes estadísticos. En compras
+conjuntas suma los almacenes incluidos. **Período de ventas** está disponible como
+columna opcional y en el detalle de la línea. Se conservan los datos de esa corrida;
+las sugerencias calculadas antes de incorporar esta columna deben recalcularse
+para completarla. Es informativa y no modifica las cantidades sugeridas.
+
 1. Leé los avisos generales y abrí las líneas con advertencias mediante el botón
    de abrir formulario de la fila. Ahí están **Por qué esta cantidad** y el detalle
    de stock, demanda y plazo.
