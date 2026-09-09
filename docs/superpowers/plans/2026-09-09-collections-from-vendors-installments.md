@@ -86,4 +86,3 @@
 - [ ] Ejecutar `python3 -m compileall -q collections_from_vendors_installments`, parseo XML/CSV y `git diff --check`.
 - [ ] Revisar que no haya migración ni índices sin medición.
 - [ ] Commit: `docs(cvi): align README with implemented scope`.
-

@@ -51,12 +51,18 @@ class CviDashboardController(http.Controller):
         """Valida la empresa del filtro y devuelve su id, o ``None`` para todas."""
         if company is None or company == "all":
             return None
-        if isinstance(company, bool):
+        if (
+            isinstance(company, bool)
+            or not isinstance(company, (int, str))
+            or isinstance(company, str) and not company.isdecimal()
+        ):
             raise UserError(_("La empresa seleccionada no es válida."))
         try:
             company_id = int(company)
         except (TypeError, ValueError):
             raise UserError(_("La empresa seleccionada no es válida.")) from None
+        if company_id < 1:
+            raise UserError(_("La empresa seleccionada no es válida."))
         if company_id not in env.companies.ids:
             raise UserError(_("No tenés acceso a la empresa seleccionada."))
         return company_id

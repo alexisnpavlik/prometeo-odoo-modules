@@ -33,8 +33,10 @@ class TestCviPaymentConcurrency(BaseCase):
                 "name": "CVI concurrency test", "dni": uuid4().hex,
                 "company_id": self.company_id,
             })
-            product = env["product.product"].create({
-                "name": "CVI concurrency test", "available_in_pos": False,
+            product = env["product.product"].with_context(
+                default_available_in_pos=False
+            ).create({
+                "name": "CVI concurrency test",
             })
             frequency = (
                 "weekly" if env.company.cvi_allowed_frequencies == "weekly" else "monthly"

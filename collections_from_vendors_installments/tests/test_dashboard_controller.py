@@ -300,7 +300,11 @@ class TestCviDashboardController(CviCommon):
             self.assertIn(self.card, model.search(domain))
 
     def test_invalid_company_is_a_functional_error(self):
-        for company in ("not-a-company", "99999999", 0):
+        for company in (
+            "not-a-company", "99999999", "1.0", " 1", "+1", "-1",
+            0, -1, True, float(self.company.id) + 0.9,
+            float("inf"), float("nan"),
+        ):
             with self.subTest(company=company), self.assertRaises(UserError):
                 self.controller._cvi_parse_company(self.env, company)
 
