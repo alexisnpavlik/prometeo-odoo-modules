@@ -99,18 +99,48 @@ Ajustes > Venta en cuotas:
 - **Días de tolerancia de mora** — atraso tolerado antes de marcar una cuota
   como vencida. Un cron diario recalcula las vencidas.
 
-## Fuera de alcance de esta versión
+## Operación, seguimiento y tablero
 
-Etapa 2 (rendición de caja, supervisión, morosidad, retiro del mueble, clientes
-problemáticos) y etapa 3 (geolocalización de la venta, fotos de DNI y vivienda,
-tablero de indicadores) no están implementadas. Cuando se implementen, la
-decisión tomada es que el sistema **advierte pero no bloquea** ante falta de GPS,
-falta de foto o cliente con antecedentes.
+Esta versión también incluye:
+
+- **Rendiciones de caja** por cobrador: reúnen los cobros pendientes, calculan
+  diferencias y dejan la revisión del administrador asentada.
+- **Supervisión**: asignación temporal de cobradores, visitas con tarjetas
+  revisadas y observaciones trazables.
+- **Mora y recuperaciones**: el cron diario actualiza cuotas vencidas y la
+  antigüedad de la deuda; se pueden marcar tarjetas para retiro y registrar el
+  reingreso del mueble recuperado.
+- **Clientes y antecedentes**: historial, sugerencia y marca manual de cliente
+  problemático con motivo; la marca puede levantarse si corresponde.
+- **Evidencia de venta**: ubicación GPS opcional, enlace de mapa con respaldo
+  por dirección y fotos opcionales de DNI y vivienda.
+- **Tablero de indicadores** para administradores de cobranzas: KPIs, gráficos,
+  mora por antigüedad, rendiciones con diferencia, stock en vendedores, mapa,
+  listados y exportación CSV.
+
+GPS, fotos y antecedentes son avisos operativos: **no bloquean** la venta. Si no
+hay GPS, la agenda usa la dirección del cliente como respaldo.
+
+### Validaciones del tablero
+
+El tablero solo permite elegir empresas a las que el usuario tiene acceso. Sus
+listados aceptan únicamente las pestañas publicadas (ventas o cuotas); la página
+debe ser un entero mayor o igual a 1 y la cantidad por página un entero entre 1
+y 200. Los valores inválidos se rechazan con un error funcional, sin corregir la
+consulta silenciosamente.
+
+### Concurrencia de cobros
+
+Para desarrollo, una prueba con dos cursores PostgreSQL reales verifica la
+garantía bajo el aislamiento `REPEATABLE READ` de Odoo: dos cobros concurrentes
+no pueden imputar más que el saldo de una misma cuota. Uno se confirma y el otro
+recibe un conflicto de serialización; al reintentar, ve el saldo actualizado y
+se rechaza si excede la deuda. No se agregó un bloqueo de aplicación adicional.
 
 ## Tests
 
 ```bash
 docker exec odoo-odoo-1 odoo -d calidad -u collections_from_vendors_installments \
   --test-enable --test-tags /collections_from_vendors_installments \
-  --stop-after-init --no-http
+  --stop-after-init --workers=0 --http-port=8068
 ```

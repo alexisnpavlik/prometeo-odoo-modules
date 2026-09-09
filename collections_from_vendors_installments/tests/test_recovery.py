@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
+
 from odoo.exceptions import UserError
-from odoo.tests import tagged
+from odoo.tests import Form, tagged
+from odoo.tests.common import freeze_time
 
 from .common import CviCommon
 
@@ -46,6 +49,18 @@ class TestCviRecovery(CviCommon):
         expected = (odoo_fields.Date.context_today(self.card) - oldest).days
         self.assertEqual(self.card.days_overdue, expected)
 
+    def test_cron_refreshes_days_overdue_for_open_overdue_installments(self):
+        """El cron diario actualiza la antigüedad aunque la cuota ya esté vencida."""
+        from odoo import fields as odoo_fields
+
+        days_before_cron = self.card.days_overdue
+        tomorrow = odoo_fields.Date.context_today(self.card) + timedelta(days=1)
+
+        with freeze_time("%s 12:00:00" % tomorrow):
+            self.env["cvi.installment"]._cron_update_overdue()
+            self.card.invalidate_recordset(["days_overdue", "amount_overdue"])
+            self.assertEqual(self.card.days_overdue, days_before_cron + 1)
+
     def test_commission_is_not_counted_as_client_debt(self):
         """La primera cuota es del vendedor: no es deuda del cliente en mora."""
         commission = self.card.installment_ids.filtered("is_commission")
@@ -74,7 +89,8 @@ class TestCviRecovery(CviCommon):
             self.card.action_mark_to_recover()
 
     def test_marking_records_who_and_when(self):
-        self.card.to_recover_reason = "Cuatro meses sin pagar, no atiende."
+        with Form(self.card) as form:
+            form.to_recover_reason = "Cuatro meses sin pagar, no atiende."
         self.card.action_mark_to_recover()
         self.assertTrue(self.card.to_recover)
         self.assertEqual(self.card.to_recover_user_id, self.env.user)

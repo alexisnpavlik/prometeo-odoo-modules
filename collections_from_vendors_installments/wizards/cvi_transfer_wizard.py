@@ -22,6 +22,19 @@ class CviTransferWizard(models.TransientModel):
     reason = fields.Char(string="Motivo de la transferencia", required=True)
     card_count = fields.Integer(string="Tarjetas seleccionadas", compute="_compute_card_count")
 
+    @api.model
+    def default_get(self, fields_list):
+        """Precarga la selección de tarjetas; desde el menú el asistente abre vacío."""
+        defaults = super().default_get(fields_list)
+        if (
+            "card_ids" in fields_list
+            and "card_ids" not in defaults
+            and self.env.context.get("active_model") == "cvi.card"
+            and self.env.context.get("active_ids")
+        ):
+            defaults["card_ids"] = [(6, 0, self.env.context["active_ids"])]
+        return defaults
+
     @api.depends("card_ids")
     def _compute_card_count(self):
         """Cuántas tarjetas se van a transferir."""
