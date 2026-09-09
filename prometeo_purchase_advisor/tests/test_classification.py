@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo.tests import tagged
+from odoo import Command
 
 from .common import PurchaseAdvisorCommon
 
@@ -119,6 +120,27 @@ class TestClassification(PurchaseAdvisorCommon):
     def test_product_without_supplier_is_a_candidate(self):
         suggestion = self._make_suggestion()
         self.assertIn(self.product_no_seller, suggestion._candidate_products())
+
+    def test_category_selection_supports_multiple_and_descendants(self):
+        """El filtro combina categorías y puede limitarse a las categorías exactas."""
+        categories = self.env['product.category']
+        parent = categories.create({'name': 'Muebles seleccionados'})
+        child = categories.create({'name': 'Sillas seleccionadas', 'parent_id': parent.id})
+        other = categories.create({'name': 'Decoración seleccionada'})
+        self.product_a.categ_id = parent
+        self.product_b.categ_id = child
+        self.product_c.categ_id = other
+        suggestion = self._make_suggestion(category_ids=[Command.set(parent.ids)])
+        self.assertIn(self.product_a, suggestion._candidate_products())
+        self.assertIn(self.product_b, suggestion._candidate_products())
+        self.assertNotIn(self.product_c, suggestion._candidate_products())
+        suggestion.write({'include_subcategories': False,
+                          'category_ids': [Command.set((parent | other).ids)]})
+        self.assertIn(self.product_a, suggestion._candidate_products())
+        self.assertNotIn(self.product_b, suggestion._candidate_products())
+        self.assertIn(self.product_c, suggestion._candidate_products())
+        suggestion.category_ids = [Command.clear()]
+        self.assertIn(self.product_b, suggestion._candidate_products())
 
     def test_non_storable_product_is_not_a_candidate(self):
         service = self.env["product.product"].create({

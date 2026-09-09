@@ -260,6 +260,10 @@ class PurchaseSuggestionNetwork(models.Model):
         """Advierte sobre proveedores faltantes y antigüedad de los movimientos."""
         self.ensure_one()
         warehouses = self._supply_warehouses()
+        categories = self.category_ids
+        if categories and self.include_subcategories:
+            categories = self.env["product.category"].search([("id", "child_of", categories.ids)])
+        self.env.flush_all()
         self.env.cr.execute("""
             SELECT COUNT(DISTINCT move.product_id) FILTER (WHERE NOT EXISTS (
                        SELECT 1 FROM product_supplierinfo seller
@@ -268,17 +272,19 @@ class PurchaseSuggestionNetwork(models.Model):
                    MAX(move.date)
               FROM stock_move move
               JOIN product_product product ON product.id = move.product_id
+              JOIN product_template template ON template.id = product.product_tmpl_id
               JOIN stock_location src ON src.id = move.location_id
               JOIN stock_location dest ON dest.id = move.location_dest_id
               LEFT JOIN stock_picking picking ON picking.id = move.picking_id
              WHERE move.state = 'done' AND move.company_id = ANY(%s)
                AND src.usage = 'internal' AND src.parent_path LIKE ANY(%s)
                AND dest.usage = 'customer' AND move.date >= %s
+               AND (%s OR template.categ_id = ANY(%s))
                AND NOT EXISTS (SELECT 1 FROM res_company company
                                WHERE company.partner_id = COALESCE(picking.partner_id, move.partner_id))
         """, (warehouses.company_id.ids,
               [warehouse.view_location_id.parent_path + "%" for warehouse in warehouses],
-              fields.Datetime.now() - timedelta(days=90)))
+              fields.Datetime.now() - timedelta(days=90), not bool(self.category_ids), categories.ids))
         missing, last_sale = self.env.cr.fetchone()
         notes = []
         if missing:
