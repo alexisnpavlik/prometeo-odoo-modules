@@ -38,7 +38,7 @@ de seguir agregando métodos.
 
 ## Uso
 
-*Recomendador → Configuración → Modelos de demanda*: crear un modelo con método
+*Compras → Recomendador de compra → Configuración → Modelos de demanda*: crear un modelo con método
 **Suavizado exponencial (EWMA)** y ajustar `alpha`. Se asigna a los productos
 por la misma cascada que cualquier otro modelo (producto → categoría → reglas →
 default de la compañía).
