@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-import threading
 from contextlib import ExitStack
 from uuid import uuid4
 
@@ -90,67 +89,50 @@ class TestCviPaymentConcurrency(BaseCase):
     @mute_logger("odoo.sql_db")
     def test_concurrent_payments_cannot_overallocate_same_residual(self):
         """Dos snapshots con deuda 10000 no pueden confirmar imputaciones por 20000."""
-        barrier = threading.Barrier(2, timeout=10)
-
-        results = [None, None]
-        errors = []
-
-        def post(index, env, payment_id):
-            """Lee antes de la barrera y confirma (o revierte) una transacción real."""
-            try:
-                cr = env.cr
-                try:
-                    self._set_timeouts(cr)
-                    cr.execute("SELECT pg_backend_pid(), txid_current(), current_setting('transaction_isolation')")
-                    identity = cr.fetchone()
-                    self.assertEqual(identity[2], "repeatable read")
-                    payment = env["cvi.payment"].browse(payment_id)
-                    candidates = payment._cvi_target_installments()
-                    self.assertEqual(candidates.ids, [self.installment_id])
-                    self.assertEqual(candidates.amount_residual, 10000.0)
-                    barrier.wait()
-                    try:
-                        payment.action_post()
-                        # Include deferred stored computes and the real commit in the race.
-                        cr.commit()
-                    except SerializationFailure as exc:
-                        query = cr._obj.query.decode()
-                        cr.rollback()
-                        _logger.info("CVI concurrent rejection: SQLSTATE=%s query=%s", exc.pgcode, query)
-                        results[index] = payment_id, identity, "serialization_failure"
-                        return
-                    results[index] = payment_id, identity, "posted"
-                except BaseException as exc:
-                    errors.append(exc)
-                    barrier.abort()
-            finally:
-                cr.rollback()
-
+        results = []
         with ExitStack() as stack:
-            # The test loader holds Registry._lock in the main thread. Construct
-            # environments here, then give each worker exclusive use of its cursor.
             envs = [
                 api.Environment(stack.enter_context(self.registry.cursor()), SUPERUSER_ID, self.context)
                 for _ in self.payment_ids
             ]
-            threads = [
-                threading.Thread(target=post, args=(index, env, payment_id), daemon=True)
-                for index, (env, payment_id) in enumerate(zip(envs, self.payment_ids))
+            payments = [
+                env["cvi.payment"].browse(payment_id)
+                for env, payment_id in zip(envs, self.payment_ids)
             ]
-            for thread in threads:
-                thread.start()
+            for env, payment_id, payment in zip(envs, self.payment_ids, payments):
+                cr = env.cr
+                self._set_timeouts(cr)
+                cr.execute(
+                    "SELECT pg_backend_pid(), txid_current(), "
+                    "current_setting('transaction_isolation')"
+                )
+                identity = cr.fetchone()
+                self.assertEqual(identity[2], "repeatable read")
+                candidates = payment._cvi_target_installments()
+                self.assertEqual(candidates.ids, [self.installment_id])
+                self.assertEqual(candidates.amount_residual, 10000.0)
+                results.append([payment_id, identity, None])
+
+            payments[0].action_post()
+            envs[0].cr.commit()
+            results[0][2] = "posted"
             try:
-                for thread in threads:
-                    thread.join(timeout=40)
+                payments[1].action_post()
+                envs[1].cr.commit()
+            except SerializationFailure as exc:
+                query = envs[1].cr._obj.query
+                if isinstance(query, bytes):
+                    query = query.decode()
+                envs[1].cr.rollback()
+                _logger.info(
+                    "CVI concurrent rejection: SQLSTATE=%s query=%s",
+                    exc.pgcode,
+                    query,
+                )
+                results[1][2] = "serialization_failure"
             finally:
-                barrier.abort()
-                for thread, env in zip(threads, envs):
-                    if thread.is_alive():
-                        env.cr._cnx.cancel()
-                        thread.join(timeout=20)
-                self.assertFalse(any(thread.is_alive() for thread in threads), "Concurrent payment timed out")
-            if errors:
-                raise errors[0]
+                for env in envs:
+                    env.cr.rollback()
 
         _logger.info("CVI concurrent transactions: %s", results)
         self.assertEqual(len({result[1][0] for result in results}), 2, "Distinct PostgreSQL backends")
