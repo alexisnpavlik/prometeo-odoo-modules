@@ -305,7 +305,10 @@ class TestCviDashboardController(CviCommon):
                 self.controller._cvi_parse_company(self.env, company)
 
     def test_invalid_pagination_is_a_functional_error(self):
-        for page, per_page in (("not-a-page", 15), (1, "not-a-page"), (0, 15)):
+        for page, per_page in (
+            ("not-a-page", 15), (1, "not-a-page"), (0, 15),
+            (1.9, 15), (1, 15.9), (True, 15), (1, True),
+        ):
             with self.subTest(page=page, per_page=per_page), self.assertRaises(UserError):
                 self.controller._cvi_parse_pagination(page, per_page)
 

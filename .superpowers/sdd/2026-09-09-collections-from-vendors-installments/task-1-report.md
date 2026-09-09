@@ -109,3 +109,54 @@ Ambos terminaron sin salida ni error.
   de traducción detectado. Las excepciones usan `_()` y la suite final no tuvo fallos.
 - La última corrida registró avisos de GC de filestore por archivos ausentes en la DB
   compartida `calidad`; no corresponden a estos archivos ni afectaron el resultado.
+
+---
+
+## Fix round 1/5 — validación estricta de paginación
+
+### Hallazgo atendido
+
+`int()` aceptaba booleanos y truncaba flotantes, por lo que `True`, `1.9` y `15.9`
+podían corregirse silenciosamente. `_cvi_parse_pagination()` ahora acepta únicamente
+`int` no booleanos o cadenas decimales, antes de convertirlos; cualquier otro tipo o
+representación no entera levanta el mismo `UserError` traducible.
+
+### RED
+
+```bash
+docker exec odoo-odoo-1 odoo -d calidad -u collections_from_vendors_installments \
+  --test-enable \
+  --test-tags /collections_from_vendors_installments:TestCviDashboardController.test_invalid_pagination_is_a_functional_error \
+  --workers 0 --http-port 8079 --stop-after-init --no-http
+```
+
+Salida relevante:
+
+```text
+FAIL: Subtest ...test_invalid_pagination_is_a_functional_error (page=1.9, per_page=15)
+FAIL: Subtest ...test_invalid_pagination_is_a_functional_error (page=1, per_page=15.9)
+FAIL: Subtest ...test_invalid_pagination_is_a_functional_error (page=True, per_page=15)
+FAIL: Subtest ...test_invalid_pagination_is_a_functional_error (page=1, per_page=True)
+ERROR ... 4 failed, 0 error(s) of 1 tests
+```
+
+### GREEN
+
+```bash
+docker exec odoo-odoo-1 odoo -d calidad -u collections_from_vendors_installments \
+  --test-enable --test-tags /collections_from_vendors_installments:TestCviDashboardController \
+  --workers 0 --http-port 8079 --stop-after-init --no-http
+```
+
+Salida relevante:
+
+```text
+collections_from_vendors_installments: 29 tests 15.96s 6728 queries
+0 failed, 0 error(s) of 27 tests when loading database 'calidad'
+```
+
+### Archivos
+
+- `collections_from_vendors_installments/controllers/dashboard_controller.py`
+- `collections_from_vendors_installments/tests/test_dashboard_controller.py`
+- `.superpowers/sdd/2026-09-09-collections-from-vendors-installments/task-1-report.md`

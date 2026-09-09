@@ -68,6 +68,14 @@ class CviDashboardController(http.Controller):
 
     def _cvi_parse_pagination(self, page, per_page):
         """Valida los enteros de paginación sin corregir silenciosamente la petición."""
+        values = (page, per_page)
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, str))
+            or isinstance(value, str) and not value.isdecimal()
+            for value in values
+        ):
+            raise UserError(_("La paginación ingresada no es válida."))
         try:
             page = int(page)
             per_page = int(per_page)
