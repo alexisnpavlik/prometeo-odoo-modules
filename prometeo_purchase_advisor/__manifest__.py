@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Prometeo - Recomendador de compra",
-    "version": "18.0.1.2.2",
+    "version": "18.0.1.3.0",
     "category": "Inventory/Purchase",
     "summary": "Sugerencias de compra a partir de la demanda real observada, revisables y convertibles en órdenes de compra",
     "description": """

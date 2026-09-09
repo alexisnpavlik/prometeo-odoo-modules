@@ -4,6 +4,8 @@ from . import demand_model
 from . import demand_model_rule
 from . import purchase_suggestion
 from . import purchase_suggestion_network
+from . import purchase_suggestion_transfer
+from . import purchase_transfer
 from . import purchase_suggestion_line
 from . import product_product
 from . import res_partner
