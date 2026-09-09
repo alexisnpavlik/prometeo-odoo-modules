@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
 
 from ..controllers.dashboard_controller import CviDashboardController
@@ -33,6 +33,45 @@ class TestCviDashboardController(CviCommon):
 
     def _charts(self, start=None, end=None):
         return self.controller._cvi_charts(self.env, start, end, "all")
+
+    def _multi_company_env(self, company):
+        """Habilita ``company`` además de la principal para simular el selector web."""
+        self.env.user.company_ids = [(4, company.id)]
+        self.env.invalidate_all()
+        return self.env(context={
+            **self.env.context,
+            "allowed_company_ids": [self.company.id, company.id],
+        })
+
+    def _other_company_card(self, company):
+        """Crea una tarjeta mínima en otra empresa para las consultas del tablero."""
+        customer = self.env["cvi.customer"].create({
+            "name": "Cliente Otra Empresa",
+            "dni": "30999999",
+            "company_id": company.id,
+        })
+        vendor = self.env["res.users"].create({
+            "name": "Vendedor Otra Empresa",
+            "login": "cvi_vendor_other_company",
+            "company_id": company.id,
+            "company_ids": [(6, 0, [company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("collections_from_vendors_installments.group_cvi_vendor").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        card = self.env["cvi.card"].create({
+            "company_id": company.id,
+            "customer_id": customer.id,
+            "vendor_id": vendor.id,
+            "product_id": self.product.id,
+            "date_sale": "2020-01-15",
+            "plan_id": self.plan_3.id,
+            "charge_day_month": 10,
+            "collector_id": self.collector_user.id,
+        })
+        card.state = "active"
+        return card, vendor
 
     # --- permisos ---
 
@@ -170,6 +209,62 @@ class TestCviDashboardController(CviCommon):
         stock = self._charts()["vendor_stock"]
         self.assertIn(self.vendor_location.display_name, stock["labels"])
 
+    def test_selected_company_filters_collected_by_collector(self):
+        """Los cobros de otra empresa no inflan la cartera del cobrador seleccionado."""
+        other_company = self.env["res.company"].create({"name": "Empresa Dos"})
+        other_env = self._multi_company_env(other_company)
+        other_card, _vendor = self._other_company_card(other_company)
+        self.env["cvi.payment"].create({
+            "card_id": self.card.id,
+            "amount": 1000.0,
+            "date": "2020-03-10",
+            "user_id": self.collector_user.id,
+            "state": "posted",
+        })
+        self.env["cvi.payment"].create({
+            "card_id": other_card.id,
+            "amount": 7000.0,
+            "date": "2020-03-10",
+            "user_id": self.collector_user.id,
+            "state": "posted",
+        })
+
+        portfolio = self.controller._cvi_charts(
+            other_env, None, None, str(other_company.id)
+        )["portfolio_by_collector"]
+
+        position = portfolio["labels"].index(self.collector_user.display_name)
+        self.assertEqual(portfolio["collected"][position], 7000.0)
+
+    def test_selected_company_filters_vendor_stock(self):
+        """El stock de otra empresa no aparece al elegir una empresa concreta."""
+        other_company = self.env["res.company"].create({"name": "Empresa Dos"})
+        other_env = self._multi_company_env(other_company)
+        parent = self.env["stock.location"].sudo().create({
+            "name": "Vendedores Empresa Dos",
+            "usage": "view",
+            "company_id": other_company.id,
+        })
+        other_location = self.env["stock.location"].sudo().create({
+            "name": "Vendedor Empresa Dos",
+            "usage": "internal",
+            "location_id": parent.id,
+            "company_id": other_company.id,
+            "cvi_is_vendor_location": True,
+        })
+        self.env["stock.quant"].with_context(inventory_mode=True).create({
+            "product_id": self.product.id,
+            "location_id": other_location.id,
+            "inventory_quantity": 17,
+        }).action_apply_inventory()
+
+        stock = self.controller._cvi_charts(
+            other_env, None, None, str(other_company.id)
+        )["vendor_stock"]
+
+        self.assertEqual(stock["labels"], [other_location.display_name])
+        self.assertEqual(stock["values"], [17.0])
+
     # --- mapa ---
 
     def test_map_only_includes_sales_with_coordinates(self):
@@ -195,6 +290,30 @@ class TestCviDashboardController(CviCommon):
         )
         self.assertEqual(model._name, "cvi.installment")
         self.assertEqual(date_field, "date_due")
+
+    def test_records_domain_searches_customers_by_name_and_dni(self):
+        """El Many2one conserva ambas claves de búsqueda declaradas por cvi.customer."""
+        for search in (self.customer.name, self.customer.dni):
+            domain, model, _date_field = self.controller._cvi_records_domain(
+                self.env, "cards", None, None, "all", search
+            )
+            self.assertIn(self.card, model.search(domain))
+
+    def test_invalid_company_is_a_functional_error(self):
+        for company in ("not-a-company", "99999999", 0):
+            with self.subTest(company=company), self.assertRaises(UserError):
+                self.controller._cvi_parse_company(self.env, company)
+
+    def test_invalid_pagination_is_a_functional_error(self):
+        for page, per_page in (("not-a-page", 15), (1, "not-a-page"), (0, 15)):
+            with self.subTest(page=page, per_page=per_page), self.assertRaises(UserError):
+                self.controller._cvi_parse_pagination(page, per_page)
+
+    def test_invalid_records_model_is_a_functional_error(self):
+        with self.assertRaises(UserError):
+            self.controller._cvi_records_domain(
+                self.env, "not-a-model", None, None, "all", None
+            )
 
     def test_serialization_of_a_card(self):
         data = self.controller._cvi_serialize(self.card, "cards")

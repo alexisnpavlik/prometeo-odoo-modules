@@ -3,8 +3,8 @@ import csv
 import io
 import logging
 
-from odoo import http
-from odoo.exceptions import AccessError
+from odoo import _, http
+from odoo.exceptions import AccessError, UserError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -47,7 +47,47 @@ class CviDashboardController(http.Controller):
                 "No tenés permisos para acceder al tablero de venta en cuotas."
             )
 
-    def _cvi_where(self, env, start_date, end_date, company, alias="c"):
+    def _cvi_parse_company(self, env, company):
+        """Valida la empresa del filtro y devuelve su id, o ``None`` para todas."""
+        if company is None or company == "all":
+            return None
+        if isinstance(company, bool):
+            raise UserError(_("La empresa seleccionada no es válida."))
+        try:
+            company_id = int(company)
+        except (TypeError, ValueError):
+            raise UserError(_("La empresa seleccionada no es válida.")) from None
+        if company_id not in env.companies.ids:
+            raise UserError(_("No tenés acceso a la empresa seleccionada."))
+        return company_id
+
+    def _cvi_company_ids(self, env, company):
+        """Devuelve las empresas habilitadas por el filtro, ya validado."""
+        company_id = self._cvi_parse_company(env, company)
+        return (company_id,) if company_id else tuple(env.companies.ids)
+
+    def _cvi_parse_pagination(self, page, per_page):
+        """Valida los enteros de paginación sin corregir silenciosamente la petición."""
+        try:
+            page = int(page)
+            per_page = int(per_page)
+        except (TypeError, ValueError):
+            raise UserError(_("La paginación ingresada no es válida.")) from None
+        if page < 1:
+            raise UserError(_("La página debe ser mayor o igual a 1."))
+        if not 1 <= per_page <= 200:
+            raise UserError(_("La cantidad por página debe estar entre 1 y 200."))
+        return page, per_page
+
+    def _cvi_parse_records_model(self, model):
+        """Restringe las pestañas del listado a los dos modelos publicados."""
+        if model not in ("cards", "installments"):
+            raise UserError(_("El tipo de listado seleccionado no es válido."))
+        return model
+
+    def _cvi_where(
+        self, env, start_date, end_date, company, alias="c", company_ids=None
+    ):
         """WHERE parametrizado sobre cvi_card, scopeado a las empresas del usuario.
 
         Excluye borradores y anuladas: una venta sin confirmar no es negocio.
@@ -56,16 +96,14 @@ class CviDashboardController(http.Controller):
             f"{alias}.state NOT IN ('draft', 'cancel') "
             f"AND {alias}.company_id IN %s"
         )
-        params = [tuple(env.companies.ids)]
+        company_ids = company_ids or self._cvi_company_ids(env, company)
+        params = [company_ids]
         if start_date:
             where += f" AND {alias}.date_sale >= %s"
             params.append(start_date)
         if end_date:
             where += f" AND {alias}.date_sale <= %s"
             params.append(end_date)
-        if company and company != "all":
-            where += f" AND {alias}.company_id = %s"
-            params.append(int(company))
         return where, params
 
     def _resolve_names(self, env, model, ids):
@@ -78,7 +116,10 @@ class CviDashboardController(http.Controller):
     def _cvi_kpis(self, env, start_date, end_date, company):
         """Indicadores de cabecera del período."""
         env.flush_all()
-        where, params = self._cvi_where(env, start_date, end_date, company)
+        company_ids = self._cvi_company_ids(env, company)
+        where, params = self._cvi_where(
+            env, start_date, end_date, company, company_ids=company_ids
+        )
 
         env.cr.execute(f"""
             SELECT COUNT(*) AS card_count,
@@ -108,16 +149,13 @@ class CviDashboardController(http.Controller):
         # Lo cobrado se mide por fecha del cobro, no por fecha de la venta: si no, un
         # cobro de este mes sobre una venta vieja no aparecería en ningún período.
         pay_where = "p.state = 'posted' AND p.company_id IN %s AND NOT p.is_commission"
-        pay_params = [tuple(env.companies.ids)]
+        pay_params = [company_ids]
         if start_date:
             pay_where += " AND p.date >= %s"
             pay_params.append(start_date)
         if end_date:
             pay_where += " AND p.date <= %s"
             pay_params.append(end_date)
-        if company and company != "all":
-            pay_where += " AND p.company_id = %s"
-            pay_params.append(int(company))
         env.cr.execute(f"""
             SELECT COALESCE(SUM(p.amount), 0) AS collected, COUNT(*) AS payment_count
             FROM cvi_payment p WHERE {pay_where}
@@ -144,7 +182,10 @@ class CviDashboardController(http.Controller):
     def _cvi_charts(self, env, start_date, end_date, company):
         """Las series de los reportes mínimos que enumera HU-32."""
         env.flush_all()
-        where, params = self._cvi_where(env, start_date, end_date, company)
+        company_ids = self._cvi_company_ids(env, company)
+        where, params = self._cvi_where(
+            env, start_date, end_date, company, company_ids=company_ids
+        )
 
         # 1. Ventas por vendedor y por período.
         env.cr.execute(f"""
@@ -188,7 +229,7 @@ class CviDashboardController(http.Controller):
                 "p.state = 'posted' AND p.company_id IN %s AND NOT p.is_commission "
                 "AND p.user_id IN %s"
             )
-            pay_params = [tuple(env.companies.ids), tuple(collector_ids)]
+            pay_params = [company_ids, tuple(collector_ids)]
             if start_date:
                 pay_where += " AND p.date >= %s"
                 pay_params.append(start_date)
@@ -225,16 +266,13 @@ class CviDashboardController(http.Controller):
 
         # 4. Rendiciones con diferencias.
         settle_where = "s.company_id IN %s AND s.has_difference"
-        settle_params = [tuple(env.companies.ids)]
+        settle_params = [company_ids]
         if start_date:
             settle_where += " AND s.date_to >= %s"
             settle_params.append(start_date)
         if end_date:
             settle_where += " AND s.date_to <= %s"
             settle_params.append(end_date)
-        if company and company != "all":
-            settle_where += " AND s.company_id = %s"
-            settle_params.append(int(company))
         env.cr.execute(f"""
             SELECT s.collector_id,
                    COALESCE(SUM(s.amount_difference), 0) AS difference,
@@ -259,7 +297,7 @@ class CviDashboardController(http.Controller):
             HAVING SUM(q.quantity) > 0
             ORDER BY qty DESC
             LIMIT 15
-        """, [tuple(env.companies.ids)])
+        """, [company_ids])
         stock_rows = env.cr.dictfetchall()
         location_names = self._resolve_names(
             env, "stock.location", [r["location_id"] for r in stock_rows]
@@ -355,9 +393,8 @@ class CviDashboardController(http.Controller):
 
     def _cvi_records_domain(self, env, model, start_date, end_date, company, search):
         """Dominio compartido por la tabla paginada y el CSV, para que filtren igual."""
-        domain = [("company_id", "in", env.companies.ids)]
-        if company and company != "all":
-            domain.append(("company_id", "=", int(company)))
+        model = self._cvi_parse_records_model(model)
+        domain = [("company_id", "in", self._cvi_company_ids(env, company))]
         if model == "installments":
             record_model = env["cvi.installment"]
             date_field = "date_due"
@@ -379,8 +416,7 @@ class CviDashboardController(http.Controller):
         """Listado paginado de ventas o cuotas para las pestañas del tablero."""
         self._check_access()
         env = request.env
-        page = max(int(page or 1), 1)
-        per_page = min(max(int(per_page or 15), 1), 200)
+        page, per_page = self._cvi_parse_pagination(page, per_page)
         domain, record_model, date_field = self._cvi_records_domain(
             env, model, start_date, end_date, company, search
         )
