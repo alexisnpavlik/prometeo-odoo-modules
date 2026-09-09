@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.tools.misc import format_date
 
 from .product_product import ABC_SELECTION, XYZ_SELECTION
 from .res_partner import FALLBACK_LEAD_TIME_DAYS
@@ -67,6 +68,34 @@ class PrometeoPurchaseSuggestionLine(models.Model):
     )
 
     # --- métricas de demanda -------------------------------------------
+    qty_sold = fields.Float(
+        string="Vendidos (netos)", compute="_compute_recorded_sales",
+        digits="Product Unit of Measure",
+        help="Unidades entregadas a clientes menos devoluciones durante el período "
+             "del cálculo, sin recortar picos ni ajustar por días sin stock. "
+             "En compra conjunta suma los almacenes incluidos. "
+             "Recalculá las sugerencias anteriores para completar este dato.",
+    )
+    sales_period = fields.Char(string="Período de ventas", compute="_compute_recorded_sales")
+    sales_data_available = fields.Boolean(compute="_compute_recorded_sales")
+
+    @api.depends("params_snapshot")
+    @api.depends_context("lang")
+    def _compute_recorded_sales(self):
+        """Muestra ventas observadas de la corrida, sin alterar cantidades de compra."""
+        for line in self:
+            snapshot = line.params_snapshot or {}
+            warehouses = snapshot.get("warehouses") or []
+            sources = [row.get("parameters") or {} for row in warehouses] if warehouses else [snapshot]
+            sales = [source.get("observed_sales") or {} for source in sources]
+            available = all("qty" in row and row.get("date_from") and row.get("date_to") for row in sales)
+            line.sales_data_available = available
+            line.qty_sold = sum(row["qty"] for row in sales) if available else 0
+            periods = sorted({(row["date_from"], row["date_to"]) for row in sales}) if available else []
+            line.sales_period = "; ".join(
+                "%s – %s" % (format_date(line.env, start), format_date(line.env, end))
+                for start, end in periods) or False
+
     adu = fields.Float(
         string="Venta diaria", readonly=True, digits=(16, 3),
         help="Demanda diaria promedio estimada.",

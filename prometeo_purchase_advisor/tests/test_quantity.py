@@ -349,6 +349,9 @@ class TestQuantity(PurchaseAdvisorCommon):
             lambda l: l.product_id == self.product_a)
         self.assertEqual(len(line), 1)
         self.assertAlmostEqual(line.adu, 10.0, places=2)
+        self.assertTrue(line.sales_data_available)
+        self.assertEqual(line.qty_sold, 900)
+        self.assertTrue(line.sales_period)
         self.assertAlmostEqual(line.lead_time_days, 10.0,
                                msg="delay del supplierinfo")
         self.assertAlmostEqual(line.safety_stock, 5.0,

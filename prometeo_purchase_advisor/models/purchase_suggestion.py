@@ -224,6 +224,12 @@ class PrometeoPurchaseSuggestion(models.Model):
             estimates.update(model.estimate(series))
             for product in model_products:
                 models[product.id] = model
+                if product.id in estimates:
+                    estimates[product.id].observed_sales = {
+                        "qty": series.total_qty(product.id),
+                        "date_from": series.date_from.isoformat(),
+                        "date_to": (series.date_to - timedelta(days=1)).isoformat(),
+                    }
         return estimates, models
 
     # ------------------------------------------------------------------
@@ -450,6 +456,7 @@ class PrometeoPurchaseSuggestion(models.Model):
                     model._params_snapshot() if model else {},
                     coverage_days=self.coverage_days,
                     lead_time_days=lead_time,
+                    observed_sales=estimate.observed_sales,
                 ),
                 "explanation": self._build_line_explanation(
                     estimate, on_hand, incoming, lead_time, safety_stock),
