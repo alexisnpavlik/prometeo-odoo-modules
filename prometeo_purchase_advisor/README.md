@@ -3,7 +3,7 @@
 Guía de uso para comprar directamente en una sucursal o recibir mercadería en
 el depósito central y distribuirla después. Versión del módulo: `18.0.1.1.1`.
 
-**Inicio rápido:** **Recomendador → Sugerencias de compra → Nuevo**.
+**Inicio rápido:** **Compras → Recomendador de compra → Sugerencias de compra → Nuevo**.
 Elegí el almacén receptor y seguí **Calcular → revisar → Confirmar → Crear órdenes de compra**.
 
 ## Qué hace
@@ -51,7 +51,7 @@ al que se agrega el stock de seguridad y se le descuenta la disponibilidad.
 
 ### Compra directa en una sucursal
 
-1. Abrí **Recomendador → Sugerencias de compra → Nuevo**.
+1. Abrí **Compras → Recomendador de compra → Sugerencias de compra → Nuevo**.
 2. Elegí la sucursal en **Almacén de recepción** y **Compra directa al almacén** en **Modalidad**.
    La compañía compradora se toma del almacén.
 3. Indicá **Días de cobertura** y **Responsable**. Dejá **Modelo de demanda** vacío
@@ -61,7 +61,7 @@ al que se agrega el stock de seguridad y se le descuenta la disponibilidad.
 
 ### Compra centralizada para sucursales
 
-1. Abrí **Recomendador → Compra para varias sucursales → Nuevo**. La modalidad
+1. Abrí **Compras → Recomendador de compra → Compra para varias sucursales → Nuevo**. La modalidad
    centralizada ya viene seleccionada. Elegí el depósito en **Almacén de recepción**.
 2. Seleccioná una o varias **Sucursales a abastecer**. Opcionalmente pulsá
    **Sugerir sucursales según movimientos**, que revisa despachos completados
@@ -206,7 +206,7 @@ aciertos contra ventas futuras ni demuestra por sí sola mala calibración.
 
 ## Configurar el modelo de demanda
 
-En **Recomendador → Configuración → Modelos de demanda**, abrí
+En **Compras → Recomendador de compra → Configuración → Modelos de demanda**, abrí
 **Promedio ponderado 14/30/90**. Como punto de partida, conservá sus valores:
 
 | Parámetro | Valor inicial | Efecto |
@@ -244,7 +244,7 @@ La evaluación disponible no justifica cambiar todas las sucursales a ese métod
 
 | Situación | Qué revisar |
 |---|---|
-| No aparece el menú Recomendador | Grupo Operador de compras y módulo instalado en esa base. |
+| No aparece Compras → Recomendador de compra | Grupo Operador de compras y módulo instalado en esa base. |
 | No aparece un producto | Posibilidad de compra, producto activo y casilla de exclusión en su pestaña Compra. También puede no tener necesidad de reposición o quedar fuera por el filtro C. La falta de proveedor no lo excluye. |
 | La cantidad es menor de lo esperado | Stock y entradas pendientes; en centralizado, revisá el desglose y las compras directas de cada sucursal. |
 | El stock reconstruido es inconsistente | Revisá inventario y movimientos. El motor usa días calendario y confianza como máximo 0,2; no corrige existencias. |
