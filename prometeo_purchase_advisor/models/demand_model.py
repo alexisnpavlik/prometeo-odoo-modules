@@ -67,7 +67,9 @@ class PrometeoDemandModel(models.Model):
     )
     min_history_days = fields.Integer(
         string="Historia mínima (días)", default=21,
-        help="Por debajo de este umbral la estimación se marca como de baja confianza.",
+        help="Por debajo de este umbral la estimación se marca como de baja confianza. "
+             "En el promedio ponderado también exige esta cantidad de días con stock "
+             "por ventana, limitada por la duración de la ventana y la historia disponible.",
     )
     weight_config = fields.Char(
         string="Pesos por ventana", default="14:0.5,30:0.3,90:0.2",
@@ -341,22 +343,30 @@ class PrometeoDemandModel(models.Model):
     def _format_number(self, value, digits=2):
         return formatLang(self.env, value, digits=digits)
 
-    def _build_explanation(self, series, product_id, adu, windows):
+    def _build_explanation(self, series, product_id, adu, windows,
+                           only_with_stock=None, clipped=False):
         """Por qué salió ese número, en castellano y sin jerga."""
         self.ensure_one()
         window_txt = "/".join(str(days) for days, _weight in windows)
         parts = [_(
-            "Vendés %(adu)s unidades por día (promedio ponderado de las ventanas "
+            "Demanda estimada: %(adu)s unidades por día (promedio ponderado de las ventanas "
             "de %(windows)s días).",
             adu=self._format_number(adu, digits=2), windows=window_txt,
         )]
-        stockout = len(series.stockout_days.get(product_id) or ())
+        history = series.history_days(product_id)
+        parts.append(_(
+            "Ventas netas registradas: %(qty)s unidades en %(days)s días calendario.",
+            qty=self._format_number(series.total_qty(product_id)), days=history,
+        ))
+        stockout = history - series.days_with_stock(product_id)
+        if only_with_stock is None:
+            only_with_stock = self._stockout_correction_enabled(series, product_id)
         if product_id in series.unreliable_stock_ids:
             parts.append(_(
                 "Se usaron días calendario porque el stock reconstruido es "
                 "inconsistente. La estimación refleja ventas registradas."
             ))
-        elif stockout and self._stockout_correction_enabled(series, product_id):
+        elif stockout and only_with_stock:
             parts.append(_(
                 "Se descontaron %(days)s días sin stock del cálculo.", days=stockout,
             ))
@@ -365,13 +375,12 @@ class PrometeoDemandModel(models.Model):
                 "Hubo %(days)s días sin stock que igual cuentan como venta cero.",
                 days=stockout,
             ))
-        history = series.history_days(product_id)
         if history < self.lookback_days:
             parts.append(_(
                 "Historia disponible: %(days)s días de los %(lookback)s pedidos.",
                 days=history, lookback=self.lookback_days,
             ))
-        if self.outlier_percentile:
+        if clipped:
             parts.append(_(
                 "Los días por encima del percentil %(pct)s se recortaron.",
                 pct=self._format_number(self.outlier_percentile * 100, digits=0),
@@ -432,10 +441,21 @@ class PrometeoDemandModel(models.Model):
         # se aplica igual en todas las ventanas: si cada una calculara su propio
         # percentil, el mismo día podría contar recortado en una y entero en otra.
         only_with_stock = self._stockout_correction_enabled(series, product_id)
+        calendar_fallback = (only_with_stock and series.days_with_stock(product_id)
+                             < min(self.min_history_days, history))
+        if calendar_fallback:
+            only_with_stock = False
+            usable = [(history, 1.0)]
+            warnings.append(_(
+                "Días con stock insuficientes para extrapolar la demanda: se usó "
+                "el promedio por día calendario de toda la historia disponible. "
+                "Revisá la cantidad antes de comprar."
+            ))
         lookback_values = series.daily_values(
             product_id, days=self.lookback_days, only_with_stock=only_with_stock)
         cap = self._outlier_cap(lookback_values)
         sigma = self._stdev(self._winsorize(lookback_values, cap))
+        clipped = cap is not None and any(value > cap for value in lookback_values)
 
         # Una ventana sin días utilizables no aporta información: se descarta y
         # su peso se reparte entre las que sí la tienen. Dejarla valiendo cero
@@ -447,21 +467,28 @@ class PrometeoDemandModel(models.Model):
                 product_id, days=days, only_with_stock=only_with_stock)
             if not values:
                 continue
-            rate = sum(self._winsorize(values, cap)) / len(values)
+            if only_with_stock and len(values) < min(self.min_history_days, days, history):
+                continue
+            # None means no clipping on the shared lookback, not a new cap per window.
+            rate = sum(min(value, cap) if cap is not None else value
+                       for value in values) / len(values)
             contributions.append((days, weight, rate))
 
-        if not contributions:
-            return Estimate(
-                method_used="weighted_ma", confidence=0.0,
-                explanation=_(
-                    "No hay ningún día con stock en las ventanas analizadas."),
-                warnings=warnings + [_("Sin días utilizables para estimar.")],
-            )
         if len(contributions) < len(usable):
             dropped = len(usable) - len(contributions)
             warnings.append(_(
-                "Se descartaron %(count)s ventana(s) sin días con stock y se "
-                "repartió su peso entre las restantes.", count=dropped,
+                "Se descartaron %(count)s ventana(s) con días con stock "
+                "insuficientes.", count=dropped,
+            ))
+        if not contributions:
+            # An older product can have useful history without completing the
+            # longest configured window. Do not extrapolate one recent sale.
+            values = self._winsorize(lookback_values, cap)
+            contributions = [(history, 1.0, sum(values) / len(values))]
+            warnings.append(_(
+                "Se usó toda la historia disponible (%(days)s días) porque "
+                "ninguna ventana configurada tiene suficientes días con stock.",
+                days=history,
             ))
 
         total_weight = sum(weight for _days, weight, _rate in contributions)
@@ -482,9 +509,12 @@ class PrometeoDemandModel(models.Model):
         return Estimate(
             adu=adu,
             sigma=sigma,
-            confidence=self._confidence(series, product_id, adu, sigma),
+            confidence=min(self._confidence(series, product_id, adu, sigma),
+                           0.2 if calendar_fallback else 1.0),
             method_used="weighted_ma",
-            explanation=self._build_explanation(series, product_id, adu, usable),
+            explanation=self._build_explanation(
+                series, product_id, adu, usable, only_with_stock=only_with_stock,
+                clipped=clipped),
             warnings=warnings,
         )
 

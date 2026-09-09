@@ -26,8 +26,8 @@ class PurchaseAdvisorCommon(TransactionCase):
         cls.product_a = cls._make_product("Producto A", cls.supplier_a, price=100.0)
         cls.product_b = cls._make_product("Producto B", cls.supplier_a, price=250.0)
         cls.product_c = cls._make_product("Producto C", cls.supplier_b, price=80.0)
-        # Sin supplierinfo: el motor no lo toca, así que sirve para probar los
-        # controles sobre líneas que el usuario carga a mano.
+        # Sin supplierinfo: permite verificar el cálculo sin proveedor y el
+        # bloqueo de órdenes hasta completar la asignación.
         cls.product_no_seller = cls.env["product.product"].create({
             "name": "Producto sin proveedor",
             "type": "consu", "is_storable": True, "purchase_ok": True,

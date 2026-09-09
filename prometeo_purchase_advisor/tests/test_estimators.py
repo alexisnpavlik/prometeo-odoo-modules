@@ -66,6 +66,41 @@ class TestEstimators(PurchaseAdvisorCommon):
         estimate = self._estimate(self.product_a, self._make_model())
         self.assertLessEqual(estimate.confidence, 0.4)
 
+    def test_single_stock_day_does_not_dominate_partial_history(self):
+        today = self._today()
+        self._make_move(self.product_a, 37, today - timedelta(days=73),
+                        outgoing=False)
+        for qty, offset in ((1, 44), (2, 44), (34, 30)):
+            self._make_move(self.product_a, qty, today - timedelta(days=offset))
+        model = self._make_model()
+        series = self._build_series(model, self.product_a)
+        self.assertEqual(series.days_with_stock(self.product_a.id), 44)
+        estimate = model.estimate(series)[self.product_a.id]
+        self.assertAlmostEqual(estimate.adu, 37 / 44)
+        self.assertIn("29 días sin stock", estimate.explanation)
+        self.assertIn("73 días calendario", estimate.explanation)
+        self.assertNotIn("se recortaron", estimate.explanation)
+
+    def test_sparse_short_window_uses_supported_long_window(self):
+        today = self._today()
+        self._make_move(self.product_a, 37, today - timedelta(days=90),
+                        outgoing=False)
+        self._make_move(self.product_a, 3, today - timedelta(days=44))
+        self._make_move(self.product_a, 34, today - timedelta(days=30))
+        estimate = self._estimate(self.product_a, self._make_model())
+        self.assertAlmostEqual(estimate.adu, 37 / 61)
+
+    def test_insufficient_stock_history_uses_calendar_with_warning(self):
+        today = self._today()
+        self._make_move(self.product_a, 34, today - timedelta(days=30),
+                        outgoing=False)
+        self._make_move(self.product_a, 34, today - timedelta(days=30))
+        estimate = self._estimate(self.product_a, self._make_model())
+        self.assertAlmostEqual(estimate.adu, 34 / 30)
+        self.assertLessEqual(estimate.confidence, 0.2)
+        self.assertTrue(any("insuficientes" in w for w in estimate.warnings))
+        self.assertNotIn("Se descontaron", estimate.explanation)
+
     def test_invalid_inventory_does_not_inflate_sparse_sales(self):
         """Un saldo imposible no prueba que los días sin ventas fueran quiebres."""
         self._make_move(self.product_a, 10, self._today() - timedelta(days=30))
