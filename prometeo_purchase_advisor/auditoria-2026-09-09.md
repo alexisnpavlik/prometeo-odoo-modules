@@ -3,10 +3,12 @@
 ## Qué muestran los movimientos reales
 
 Se consultó `prod` en modo lectura y se probó sobre una copia separada,
-`advisor_prod_review_20260909`. La base contiene 245.718 movimientos terminados,
+`advisor_prod_review_20260909`. Alexis aclaró que `prod` en Docker ya es una copia
+de la base real, no producción en vivo. La base contiene 245.718 movimientos terminados,
 14 almacenes y compañías distintas para las sucursales. El último movimiento
 terminado registrado es del 5 de septiembre de 2026; no representa ventas en vivo
-hasta el día de esta auditoría.
+hasta el día de esta auditoría. Esa antigüedad no demuestra fallas de actualización
+en la base real.
 
 Los contactos de destino y las contrapartes de `stock_intercompany` identifican
 **12 sucursales abastecidas desde el depósito central**: Impacto, Barranqueras,
@@ -61,7 +63,9 @@ que es una suposición para la comparación, no un plazo real medido.
 **Estas cantidades son resultados de prueba, no órdenes recomendadas para ejecutar
 sin revisión.** De las 448 líneas centralizadas, 445 tienen baja confianza. La
 estimación está limitada por proveedores faltantes, stock inconsistente,
-quiebres reconstruidos y movimientos desactualizados.
+quiebres reconstruidos. Estas cifras se calcularon respecto del día de la auditoría
+en una copia histórica: su desfase temporal no diagnostica falta de ventas en la
+base real. La evaluación posterior de predicciones utiliza cortes dentro de la copia.
 
 La pantalla detectó **5.693 productos con ventas externas en los últimos 90 días
 sin proveedor cargado**. Además, hay **17.443 registros de stock negativo en

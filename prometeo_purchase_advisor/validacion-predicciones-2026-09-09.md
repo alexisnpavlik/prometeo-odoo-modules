@@ -28,13 +28,13 @@ Core y EWMA ahora incluyen todos los días calendario cuando la reconstrucción 
 
 ## Datos y procedimiento
 
-Se trabajó con la copia `advisor_prod_review_20260909`, creada desde `prod`, usando cron y correo deshabilitados. Producción conserva el código anterior. Las consultas de evaluación no crean compras, movimientos ni registros de negocio.
+Se trabajó con `advisor_prod_review_20260909`, clon de la base Docker llamada `prod`, usando cron y correo deshabilitados. Alexis confirmó que esa base `prod` ya es una copia de la base real: no es producción en vivo. La instancia Docker original conserva el código anterior. Las consultas de evaluación no crean compras, movimientos ni registros de negocio.
 
-La consulta de configuración en producción confirmó un único modelo: ponderado de 90 días, ventanas 14/30/90 con pesos 0,5/0,3/0,2, corrección por faltantes activada y percentil 95. Son los parámetros utilizados para el baseline del ensayo.
+La consulta de configuración en la copia `prod` confirmó un único modelo: ponderado de 90 días, ventanas 14/30/90 con pesos 0,5/0,3/0,2, corrección por faltantes activada y percentil 95. Son los parámetros utilizados para el baseline del ensayo.
 
 Se extrajeron 26.315 casos: 9.751 de validación y 16.564 del período final, incluyendo central. Cada caso contiene hasta 90 días anteriores al corte, al menos 28 días desde el primer movimiento conocido y venta neta positiva en entrenamiento. Se incluyeron productos archivados. La elegibilidad no usa ventas futuras. La serie representa movimientos completados hacia clientes, menos devoluciones, excluyendo contrapartes de las propias empresas.
 
-Los últimos movimientos de clientes de la mayoría de sucursales son del **19 de agosto**, y los de Mayorista del **5 de septiembre**. El día final se excluyó por potencialmente incompleto. No se completó agosto–septiembre con ceros hasta la fecha actual. Esto no prueba que las sucursales estuvieran cerradas o sin demanda.
+Los últimos movimientos de clientes de la mayoría de sucursales son del **19 de agosto**, y los de Mayorista del **5 de septiembre**. La ausencia de datos hasta hoy se explica por trabajar con una copia; no es evidencia de fallas de carga en la base real. No se conoce la fecha exacta de extracción ni se deduce que todas las sucursales tengan el mismo último día de actividad. El día final se excluyó por potencialmente incompleto. No se completó agosto–septiembre con ceros hasta la fecha actual: el ensayo reserva períodos históricos dentro de la copia.
 
 Para la mayoría de sucursales, los cortes fueron 24 de junio, 8 de julio y 22 de julio. Las dos validaciones abarcan 14 días cada una; el período final abarca **22 de julio–18 de agosto**, 28 días. Mayorista usa cortes 11 de julio, 25 de julio y 8 de agosto, con período final **8 de agosto–4 de septiembre**. Central termina un día antes que las sucursales. No todos los almacenes califican en los primeros cortes.
 
@@ -58,7 +58,7 @@ Central registra grandes salidas manuales a clientes y ventas posteriores muy pe
 
 Mantener el ponderado corregido, con revisión de líneas de confianza baja. **No hay evidencia en esta muestra para migrar universalmente a otro algoritmo.** EWMA calendario con p95 fue mejor en la validación retail (RMSE 7,33), pero empeoró en el período final (13,91 frente a 10,39 del corregido). Los candidatos SBA y TSB ensayados tampoco mejoran el resultado principal; esto no descarta toda la familia de modelos intermitentes.
 
-La siguiente mejora de mayor valor es obtener saldos diarios confiables y fechas de carga completas. Con esos datos, registrar predicciones antes de conocer el resultado y evaluar varios cortes de **28 días**, separados por sucursal y frecuencia de venta. Comparar demanda y política de compra por separado, incorporando proveedor/plazo/costo. Solo cambiar de método por segmento cuando mejore en períodos posteriores y bajo un costo de inventario explícito.
+La siguiente mejora de mayor valor es revisar los saldos inconsistentes de la copia y ampliar la evaluación con cortes históricos de **28 días** contenidos en ella, separados por sucursal y frecuencia de venta. Para una validación prospectiva, registrar predicciones y saldos diarios antes de conocer el resultado. La antigüedad de la copia no exige corregir la carga de datos de la base real. Comparar demanda y política de compra por separado, incorporando proveedor/plazo/costo. Solo cambiar de método por segmento cuando mejore en períodos posteriores y bajo un costo de inventario explícito.
 
 ## Evidencia reproducible
 
