@@ -66,6 +66,28 @@ class TestEstimators(PurchaseAdvisorCommon):
         estimate = self._estimate(self.product_a, self._make_model())
         self.assertLessEqual(estimate.confidence, 0.4)
 
+    def test_invalid_inventory_does_not_inflate_sparse_sales(self):
+        """Un saldo imposible no prueba que los días sin ventas fueran quiebres."""
+        self._make_move(self.product_a, 10, self._today() - timedelta(days=30))
+        self._set_stock(self.product_a, -100)
+        estimate = self._estimate(self.product_a, self._make_model(
+            weight_config="30:1.0", lookback_days=30, outlier_percentile=0))
+        self.assertAlmostEqual(estimate.adu, 10 / 30)
+        self.assertLessEqual(estimate.confidence, 0.2)
+        self.assertTrue(any("stock" in warning.lower() for warning in estimate.warnings))
+
+    def test_positive_current_stock_with_impossible_history_uses_calendar(self):
+        self._make_move(self.product_a, 10, self._today() - timedelta(days=30))
+        self._make_move(
+            self.product_a, 100, self._today() - timedelta(days=1), outgoing=False)
+        self._set_stock(self.product_a, 10)
+        model = self._make_model(
+            weight_config="30:1.0", lookback_days=30, outlier_percentile=0)
+        estimate = self._estimate(self.product_a, model)
+        self.assertAlmostEqual(estimate.adu, 10 / 30)
+        self.assertLessEqual(estimate.confidence, 0.2)
+        self.assertIn("calendario", estimate.explanation)
+
     # ------------------------------------------------------------------
     # Historia corta
     # ------------------------------------------------------------------

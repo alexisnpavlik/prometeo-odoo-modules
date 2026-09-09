@@ -31,6 +31,7 @@ class DemandSeries:
     first_move_date: dict = field(default_factory=dict)  # {product_id: date}
     move_count: dict = field(default_factory=dict)       # {product_id: int}
     notes: dict = field(default_factory=dict)            # {product_id: [str]}
+    unreliable_stock_ids: set = field(default_factory=set)
 
     # ------------------------------------------------------------------
     # Ventanas

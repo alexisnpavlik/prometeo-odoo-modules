@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Recomendador de compra - Suavizado exponencial",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.1",
     "category": "Inventory/Purchase",
     "summary": "Agrega el método de estimación EWMA al recomendador de compra",
     "description": """

@@ -204,6 +204,7 @@ class PrometeoDemandModel(models.Model):
             "outlier_percentile": self.outlier_percentile,
             "min_history_days": self.min_history_days,
             "weight_config": self.weight_config,
+            "alpha": self.alpha,
         }
 
     # ------------------------------------------------------------------
@@ -268,6 +269,11 @@ class PrometeoDemandModel(models.Model):
             return 0.0
         return statistics.stdev(values)
 
+    def _stockout_correction_enabled(self, series, product_id):
+        """Un saldo imposible no demuestra que los días sin venta sean quiebres."""
+        return (self.ignore_stockout_days
+                and product_id not in series.unreliable_stock_ids)
+
     def _confidence(self, series, product_id, adu, sigma):
         """Qué tan confiable es la estimación, de 0 a 1.
 
@@ -278,6 +284,8 @@ class PrometeoDemandModel(models.Model):
         history = series.history_days(product_id)
         base = 0.8 + 0.2 * min(history / (self.lookback_days or 1), 1.0)
         scores = [min(base, 1.0)]
+        if product_id in series.unreliable_stock_ids:
+            scores.append(0.2)
         if history < self.min_history_days:
             scores.append(0.2)
         if series.moves(product_id) < CONFIDENCE_MIN_MOVES:
@@ -309,7 +317,13 @@ class PrometeoDemandModel(models.Model):
                 "Apenas %(moves)s movimientos de salida en la ventana.", moves=moves,
             ))
         ratio = series.stockout_ratio(product_id)
-        if ratio > CONFIDENCE_MAX_STOCKOUT_RATIO:
+        if product_id in series.unreliable_stock_ids:
+            warnings.append(_(
+                "Stock inconsistente: se estimaron ventas por día calendario, "
+                "sin corrección por faltantes. Revisá el inventario; las ventas "
+                "perdidas no se pueden cuantificar con estos datos."
+            ))
+        elif ratio > CONFIDENCE_MAX_STOCKOUT_RATIO:
             warnings.append(_(
                 "Estuvo sin stock el %(pct)s%% de los días: la demanda real "
                 "puede ser bastante mayor.", pct=round(ratio * 100),
@@ -337,7 +351,12 @@ class PrometeoDemandModel(models.Model):
             adu=self._format_number(adu, digits=2), windows=window_txt,
         )]
         stockout = len(series.stockout_days.get(product_id) or ())
-        if stockout and self.ignore_stockout_days:
+        if product_id in series.unreliable_stock_ids:
+            parts.append(_(
+                "Se usaron días calendario porque el stock reconstruido es "
+                "inconsistente. La estimación refleja ventas registradas."
+            ))
+        elif stockout and self._stockout_correction_enabled(series, product_id):
             parts.append(_(
                 "Se descontaron %(days)s días sin stock del cálculo.", days=stockout,
             ))
@@ -388,7 +407,8 @@ class PrometeoDemandModel(models.Model):
                 explanation=_("El producto no tiene movimientos en el almacén."),
                 warnings=warnings + [_("Sin historia en la ventana analizada.")],
             )
-        if self.ignore_stockout_days and series.days_with_stock(product_id) <= 0:
+        if (self._stockout_correction_enabled(series, product_id)
+                and series.days_with_stock(product_id) <= 0):
             return Estimate(
                 method_used="weighted_ma", confidence=0.0,
                 explanation=_(
@@ -411,7 +431,7 @@ class PrometeoDemandModel(models.Model):
         # El tope de recorte se calcula una sola vez sobre la ventana larga, y
         # se aplica igual en todas las ventanas: si cada una calculara su propio
         # percentil, el mismo día podría contar recortado en una y entero en otra.
-        only_with_stock = self.ignore_stockout_days
+        only_with_stock = self._stockout_correction_enabled(series, product_id)
         lookback_values = series.daily_values(
             product_id, days=self.lookback_days, only_with_stock=only_with_stock)
         cap = self._outlier_cap(lookback_values)

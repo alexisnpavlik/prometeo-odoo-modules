@@ -40,7 +40,7 @@ class PrometeoDemandModel(models.Model):
 
     def _estimate_one_ewma(self, series, product_id, alpha, fallback_weights):
         self.ensure_one()
-        only_with_stock = self.ignore_stockout_days
+        only_with_stock = self._stockout_correction_enabled(series, product_id)
         values = series.daily_values(
             product_id, days=self.lookback_days, only_with_stock=only_with_stock)
 
@@ -88,7 +88,12 @@ class PrometeoDemandModel(models.Model):
             alpha=self._format_number(alpha, digits=2),
         )]
         stockout = len(series.stockout_days.get(product_id) or ())
-        if stockout and self.ignore_stockout_days:
+        if product_id in series.unreliable_stock_ids:
+            parts.append(_(
+                "Se usaron días calendario porque el stock reconstruido es "
+                "inconsistente. La estimación refleja ventas registradas."
+            ))
+        elif stockout and self._stockout_correction_enabled(series, product_id):
             parts.append(_(
                 "Se descontaron %(days)s días sin stock del cálculo.", days=stockout,
             ))

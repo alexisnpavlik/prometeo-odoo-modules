@@ -115,3 +115,11 @@ El spec completo está en
 
 - **Operador de compras** — crea y edita sugerencias, genera las órdenes.
 - **Manager de compras** — además configura modelos de demanda y reglas.
+
+## Validación con datos reales
+
+La [evaluación de predicciones del 9 de septiembre de 2026](validacion-predicciones-2026-09-09.md)
+documenta el error observado, la comparación de algoritmos y sus límites.
+Cuando la reconstrucción de inventario produce saldos negativos, el estimador
+usa días calendario, avisa al operador y limita la confianza a 0,2. Ese indicador
+describe calidad de datos; no expresa una probabilidad de acertar.

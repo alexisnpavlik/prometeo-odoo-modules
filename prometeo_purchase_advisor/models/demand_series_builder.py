@@ -221,7 +221,7 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
         missing = set()
         running = qty_now
         day = today
-        clamped = False
+        clamped = qty_now < -NEGATIVE_STOCK_TOLERANCE
         while day >= series.date_from:
             had_stock = running > 0 or outbound.get(day, 0.0) > 0
             if not had_stock and series.date_from <= day < series.date_to:
@@ -237,7 +237,8 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
         if missing:
             series.stockout_days[product_id] = missing
         if clamped:
+            series.unreliable_stock_ids.add(product_id)
             series.add_note(product_id, (
-                "La reconstrucción de stock dio saldos negativos: los días sin "
-                "stock son aproximados."
+                "La reconstrucción de stock dio saldos negativos: no permite "
+                "identificar con fiabilidad los días sin stock."
             ))

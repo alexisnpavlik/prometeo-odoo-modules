@@ -56,6 +56,17 @@ class TestEwma(PurchaseAdvisorCommon):
             self.product_a, self._make_model(method="ewma", alpha=0.05))
         self.assertGreater(fast.adu, slow.adu)
 
+    def test_invalid_stock_keeps_calendar_zeros(self):
+        self._make_move(self.product_a, 10, self._today() - timedelta(days=30))
+        self._set_stock(self.product_a, -100)
+        model = self._make_model(
+            method="ewma", alpha=0.3, lookback_days=30, outlier_percentile=0)
+        estimate = self._estimate(self.product_a, model)
+        self.assertEqual(estimate.method_used, "ewma")
+        self.assertAlmostEqual(estimate.adu, 10 * 0.7 ** 29)
+        self.assertLessEqual(estimate.confidence, 0.2)
+        self.assertIn("calendario", estimate.explanation)
+
     def test_degrades_when_there_is_not_enough_history(self):
         """No falla ni inventa: usa el promedio ponderado y lo deja asentado."""
         today = self._today()

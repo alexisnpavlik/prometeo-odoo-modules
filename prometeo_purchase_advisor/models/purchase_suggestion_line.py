@@ -77,8 +77,9 @@ class PrometeoPurchaseSuggestionLine(models.Model):
     )
     confidence = fields.Float(
         string="Confianza", readonly=True, digits=(3, 2),
-        help="Qué tan confiable es la estimación, de 0 a 1. Por debajo de 0,5 "
-             "conviene revisar la línea a mano.",
+        help="Indicador heurístico de calidad de datos, de 0 a 1; no es una "
+             "probabilidad de acertar ni un intervalo estadístico. Por debajo "
+             "de 0,5 conviene revisar la línea a mano.",
     )
     coverage_days_current = fields.Float(
         string="Cobertura (días)", readonly=True, digits=(16, 1),
