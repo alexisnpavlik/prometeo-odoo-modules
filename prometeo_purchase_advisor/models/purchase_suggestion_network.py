@@ -31,6 +31,31 @@ class PurchaseSuggestionNetwork(models.Model):
         "suggestion_id", "warehouse_id", compute="_compute_metric_warehouses", store=True,
         string="Almacenes de las métricas guardadas",
     )
+    has_forbidden_warehouses = fields.Boolean(
+        compute="_compute_has_forbidden_warehouses",
+        search="_search_has_forbidden_warehouses",
+        string="Incluye almacenes de compañías no seleccionadas",
+    )
+
+    @api.depends("demand_warehouse_ids.company_id", "metric_warehouse_ids.company_id")
+    @api.depends_context("allowed_company_ids", "uid")
+    def _compute_has_forbidden_warehouses(self):
+        """Evalúa permisos en memoria sin ocultar los almacenes que deben bloquearlos."""
+        company_ids = set(self.env.companies.ids)
+        for suggestion in self:
+            scoped = suggestion.sudo()
+            warehouses = scoped.demand_warehouse_ids | scoped.metric_warehouse_ids
+            suggestion.has_forbidden_warehouses = any(
+                warehouse.company_id.id not in company_ids for warehouse in warehouses
+            )
+
+    def _search_has_forbidden_warehouses(self, operator, value):
+        """Deja la subconsulta dinámica dentro del compilador SQL, fuera de ir.rule."""
+        if operator not in ("=", "!=") or not isinstance(value, bool):
+            raise ValueError("El filtro de acceso requiere una comparación booleana.")
+        forbidden = value if operator == "=" else not value
+        query = self.env.user._purchase_advisor_forbidden_suggestions(self.env.companies.ids)
+        return [("id", "in" if forbidden else "not in", query)]
 
     @api.depends("line_ids.params_snapshot")
     def _compute_metric_warehouses(self):
@@ -232,7 +257,7 @@ class PurchaseSuggestionNetwork(models.Model):
         return result
 
     def _data_quality_notes(self):
-        """Cuenta ventas omitidas por falta de proveedor en los almacenes elegidos."""
+        """Advierte sobre proveedores faltantes y antigüedad de los movimientos."""
         self.ensure_one()
         warehouses = self._supply_warehouses()
         self.env.cr.execute("""
@@ -259,7 +284,8 @@ class PurchaseSuggestionNetwork(models.Model):
         if missing:
             notes.append(_(
                 "%(count)s productos con ventas en los últimos 90 días no tienen proveedor "
-                "y quedan fuera del cálculo automático.", count=missing))
+                "asignado. La falta de proveedor no los excluye del cálculo. "
+                "Asigná uno a las líneas a comprar antes de generar las órdenes.", count=missing))
         if last_sale and last_sale < fields.Datetime.now() - timedelta(days=2):
             notes.append(_("La última salida a cliente registrada es del %(date)s. "
                            "Verificá que los movimientos estén actualizados.", date=last_sale))

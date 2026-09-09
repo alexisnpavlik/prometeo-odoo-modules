@@ -6,11 +6,11 @@ class ResUsers(models.Model):
     _inherit = "res.users"
 
     def _purchase_advisor_forbidden_suggestions(self, company_ids):
-        """Subconsulta de autorización evaluada en cada lectura, sin sudo.
+        """Subconsulta de autorización usada por el search del campo de acceso.
 
-        La regla cachea SQL, no una lista de IDs: los almacenes creados después
-        siguen protegidos. Se comprueba tanto la selección como las métricas
-        persistidas, que pueden pertenecer a un cálculo anterior.
+        No se inserta SQL en ir.rule: filtered_domain evalúa esa regla en Python.
+        La búsqueda sigue siendo dinámica para proteger almacenes nuevos y tanto
+        la selección actual como las métricas guardadas de un cálculo anterior.
         """
         suggestion_fields = self.env["prometeo.purchase.suggestion"]._fields
         return SQL("""(

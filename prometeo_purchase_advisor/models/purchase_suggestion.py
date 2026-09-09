@@ -228,7 +228,6 @@ class PrometeoPurchaseSuggestion(models.Model):
             ("is_storable", "=", True),
             ("purchase_ok", "=", True),
             ("exclude_from_suggestion", "=", False),
-            ("seller_ids", "!=", False),
             ("company_id", "in", [False, self.company_id.id]),
         ]
 
@@ -442,6 +441,9 @@ class PrometeoPurchaseSuggestion(models.Model):
                     estimate.warnings
                     + self._stock_warnings(product, on_hand)
                     + self._lead_time_warnings(seller, lead_time, lead_source)
+                    + ([] if seller else [_(
+                        "Sin proveedor: asigná uno y completá el precio antes de "
+                        "generar la orden de compra.")])
                 ) or False,
             }
         return values

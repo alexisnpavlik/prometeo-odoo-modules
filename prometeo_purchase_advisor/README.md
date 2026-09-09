@@ -29,7 +29,8 @@ y da la dimensión de almacén de forma natural.
    necesita **Manager de compras**. Verificá también los permisos habituales de
    Compras y las compañías habilitadas en Odoo.
 2. Revisá en los productos sus proveedores, precios, unidades de compra y plazos
-   de entrega. Los productos sin proveedor no entran automáticamente en el cálculo.
+   de entrega. Los productos sin proveedor también se calculan y se muestran con
+   una advertencia; completá proveedor y precio antes de generar la orden.
 3. Revisá existencias y recepciones pendientes. Una recepción vieja que sigue
    abierta puede reducir la cantidad sugerida.
 4. En **Ajustes → Recomendador de compra**, elegí el modelo por defecto y los
@@ -167,8 +168,9 @@ líneas. La explicación conserva el desglose por almacén.
 
 ### Límites que hay que revisar antes de comprar
 
-- Los productos sin proveedor quedan fuera del motor; la pantalla avisa cuántos
-  tuvieron ventas en los últimos 90 días.
+- Los productos sin proveedor participan del cálculo con las mismas reglas de
+  reposición. La pantalla avisa cuántos tuvieron ventas en los últimos 90 días
+  y marca sus líneas; proveedor y precio quedan pendientes de completar.
 - El stock negativo se trata como cero y se advierte en la línea. No se corrige
   el inventario automáticamente.
 - Las entradas confirmadas pendientes descuentan stock aunque estén atrasadas.
@@ -195,10 +197,17 @@ En **Recomendador → Configuración → Modelos de demanda**, abrí
 |---|---|---|
 | Ventana de historia | 90 días | Cuánto pasado se analiza. |
 | Pesos por ventana | `14:0.5,30:0.3,90:0.2` | Da más peso al ritmo reciente; los pesos suman 1. |
-| Historia mínima | 21 días | Menos historia reduce la confianza; no impide toda estimación. |
+| Historia mínima | 21 días | Reduce la confianza y exige una muestra de días con stock por ventana, limitada por su duración y la historia disponible. |
 | Ignorar días sin stock | Activado | Descuenta faltantes cuando la reconstrucción de inventario es consistente. |
 | Percentil de recorte | `0.95` | Reduce el efecto de picos; `0` desactiva el recorte. |
 | Nivel de servicio | `0.95` | Objetivo usado para calcular stock de seguridad; no garantiza 95% de acierto. |
+
+El promedio ponderado descarta ventanas con pocos días con stock y redistribuye
+sus pesos. Si ninguna alcanza la muestra mínima, usa toda la historia disponible.
+Si tampoco esa historia reúne suficientes días con stock, usa el promedio por
+día calendario y advierte que requiere revisión. Así, una salida de 34 unidades
+en el único día con stock de una ventana no se extrapola como 34 ventas diarias.
+La explicación distingue la demanda estimada de las ventas netas registradas.
 
 Si **Modelo de demanda** está vacío en la sugerencia, el orden de asignación es
 **producto → categoría → primera regla coincidente → modelo de la compañía**.
@@ -220,7 +229,7 @@ La evaluación disponible no justifica cambiar todas las sucursales a ese métod
 | Situación | Qué revisar |
 |---|---|
 | No aparece el menú Recomendador | Grupo Operador de compras y módulo instalado en esa base. |
-| No aparece un producto | Proveedor, posibilidad de compra, producto activo y casilla de exclusión en su pestaña Compra. También puede no tener necesidad de reposición o quedar fuera por el filtro C. |
+| No aparece un producto | Posibilidad de compra, producto activo y casilla de exclusión en su pestaña Compra. También puede no tener necesidad de reposición o quedar fuera por el filtro C. La falta de proveedor no lo excluye. |
 | La cantidad es menor de lo esperado | Stock y entradas pendientes; en centralizado, revisá el desglose y las compras directas de cada sucursal. |
 | El stock reconstruido es inconsistente | Revisá inventario y movimientos. El motor usa días calendario y confianza como máximo 0,2; no corrige existencias. |
 | El recálculo mantiene mi cantidad | Es intencional: conserva ediciones manuales. Compará Cantidad con Sugerido y ajustá si corresponde. |

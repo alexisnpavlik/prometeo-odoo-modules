@@ -116,9 +116,9 @@ class TestClassification(PurchaseAdvisorCommon):
         suggestion = self._make_suggestion()
         self.assertNotIn(self.product_a, suggestion._candidate_products())
 
-    def test_product_without_supplier_is_not_a_candidate(self):
+    def test_product_without_supplier_is_a_candidate(self):
         suggestion = self._make_suggestion()
-        self.assertNotIn(self.product_no_seller, suggestion._candidate_products())
+        self.assertIn(self.product_no_seller, suggestion._candidate_products())
 
     def test_non_storable_product_is_not_a_candidate(self):
         service = self.env["product.product"].create({

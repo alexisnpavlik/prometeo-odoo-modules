@@ -22,14 +22,14 @@
     <record id="suggestion_company_rule" model="ir.rule">
         <field name="name">prometeo.purchase.suggestion: multi-compañía</field>
         <field name="model_id" ref="model_prometeo_purchase_suggestion"/>
-        <field name="domain_force">[('company_id', 'in', company_ids), ('id', 'not in', user._purchase_advisor_forbidden_suggestions(company_ids))]</field>
+        <field name="domain_force">[('company_id', 'in', company_ids), ('has_forbidden_warehouses', '=', False)]</field>
         <field name="global" eval="True"/>
     </record>
 
     <record id="suggestion_line_company_rule" model="ir.rule">
         <field name="name">prometeo.purchase.suggestion.line: multi-compañía</field>
         <field name="model_id" ref="model_prometeo_purchase_suggestion_line"/>
-        <field name="domain_force">[('company_id', 'in', company_ids), ('suggestion_id', 'not in', user._purchase_advisor_forbidden_suggestions(company_ids))]</field>
+        <field name="domain_force">[('company_id', 'in', company_ids), ('suggestion_id.has_forbidden_warehouses', '=', False)]</field>
         <field name="global" eval="True"/>
     </record>
 

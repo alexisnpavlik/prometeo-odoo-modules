@@ -36,6 +36,18 @@ class TestSupplyNetwork(PurchaseAdvisorCommon):
         self.assertEqual(suggestion.purchase_order_ids.company_id, self.company)
         self.assertEqual(suggestion.purchase_order_ids.picking_type_id, self.warehouse.in_type_id)
 
+    def test_centralized_calculation_includes_product_without_supplier(self):
+        """Consolida demanda de sucursales aunque falte completar el proveedor."""
+        suggestion, a, b = self._network()
+        self._sell_daily(self.product_no_seller, 2, 31, 1, warehouse=a)
+        self._sell_daily(self.product_no_seller, 3, 31, 1, warehouse=b)
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(lambda row: row.product_id == self.product_no_seller)
+        self.assertEqual(len(line), 1)
+        self.assertGreater(line.qty_suggested, 0)
+        self.assertFalse(line.supplier_id)
+        self.assertIn("Sin proveedor", line.warnings)
+
     def test_branch_surplus_is_not_assumed_available_to_other_branches(self):
         suggestion, _a, b = self._network()
         self._set_stock(self.product_a, 1000, location=b.lot_stock_id)
@@ -148,3 +160,43 @@ class TestSupplyNetwork(PurchaseAdvisorCommon):
             supply_mode="centralized", demand_warehouse_ids=[Command.set(new_warehouse.ids)])
         self.assertFalse(restricted.search([("id", "=", new_suggestion.id)]),
                          "La caché de permisos no debe omitir almacenes nuevos")
+
+    def test_operator_can_read_authorized_suggestions_and_lines(self):
+        """La lectura del listado web evalúa permisos después de buscar registros."""
+        suggestion = self._make_suggestion(lines=[{
+            "product_id": self.product_a.id,
+            "supplier_id": self.supplier_a.id,
+            "qty_suggested": 2,
+        }])
+        operator = new_test_user(
+            self.env, login="advisor_read_operator", company_id=self.company.id,
+            company_ids=[Command.set(self.company.ids)],
+            groups="base.group_user,stock.group_stock_user,prometeo_purchase_advisor.group_purchase_advisor_user")
+        restricted = suggestion.with_user(operator).with_context(
+            allowed_company_ids=self.company.ids)
+        result = restricted.web_search_read(
+            [("id", "=", suggestion.id)], {"name": {}, "total_amount": {}})
+        self.assertEqual(result["length"], 1)
+        self.assertEqual(result["records"][0]["id"], suggestion.id)
+        self.assertEqual(restricted.read(["name"])[0]["id"], suggestion.id)
+        lines = suggestion.line_ids.with_user(operator).with_context(
+            allowed_company_ids=self.company.ids).read(["qty_suggested"])
+        self.assertEqual(len(lines), 1)
+
+    def test_authorized_network_read_tracks_selected_companies(self):
+        """Cambiar compañías no reutiliza un permiso calculado con otro alcance."""
+        suggestion, a, b = self._network()
+        suggestion.action_compute()
+        companies = self.company | a.company_id | b.company_id
+        operator = new_test_user(
+            self.env, login="advisor_network_reader", company_id=self.company.id,
+            company_ids=[Command.set(companies.ids)],
+            groups="base.group_user,stock.group_stock_user,prometeo_purchase_advisor.group_purchase_advisor_user")
+        allowed = suggestion.with_user(operator).with_context(allowed_company_ids=companies.ids)
+        self.assertEqual(allowed.read(["total_amount"])[0]["id"], suggestion.id)
+        self.assertTrue(allowed.line_ids.read(["params_snapshot"]))
+        restricted = allowed.with_context(allowed_company_ids=self.company.ids)
+        self.assertFalse(restricted.search([("id", "=", suggestion.id)]))
+        with self.assertRaises(AccessError):
+            restricted.read(["total_amount"])
+        self.assertEqual(allowed.read(["total_amount"])[0]["id"], suggestion.id)

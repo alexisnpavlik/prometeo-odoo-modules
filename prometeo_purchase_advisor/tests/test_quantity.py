@@ -12,6 +12,22 @@ from .common import PurchaseAdvisorCommon
 class TestQuantity(PurchaseAdvisorCommon):
     """Fase 3: lead time medido, stock de seguridad y restricciones del proveedor."""
 
+    def test_product_without_supplier_is_calculated_with_warning(self):
+        """La falta de proveedor no oculta una necesidad real de reposición."""
+        product = self.product_no_seller
+        product.standard_price = 25
+        self._sell_daily(product, 2, 31, 1)
+        suggestion = self._make_suggestion()
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(lambda row: row.product_id == product)
+        self.assertEqual(len(line), 1)
+        self.assertGreater(line.qty_suggested, 0)
+        self.assertFalse(line.supplier_id)
+        self.assertEqual(line.price_unit, 0)
+        self.assertIn("Sin proveedor", line.warnings)
+        self.assertIn("no tienen proveedor", suggestion.calculation_notes)
+        self.assertNotIn("fuera del cálculo", suggestion.calculation_notes)
+
     def test_configured_lead_time_is_per_product(self):
         """Compartir proveedor no implica compartir plazo entre productos."""
         self._sell_daily(self.product_a, 1, 31, 1)
