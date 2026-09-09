@@ -35,7 +35,7 @@ class PrometeoPurchaseSuggestion(models.Model):
             ("draft", "Borrador"),
             ("computed", "Calculada"),
             ("confirmed", "Confirmada"),
-            ("done", "Órdenes generadas"),
+            ("done", "Abastecimiento preparado"),
             ("cancel", "Cancelada"),
         ],
         string="Estado", default="draft", required=True, tracking=True, copy=False,

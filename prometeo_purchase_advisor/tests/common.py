@@ -58,6 +58,8 @@ class PurchaseAdvisorCommon(TransactionCase):
         vals = {
             "warehouse_id": self.warehouse.id,
             "coverage_days": 30,
+            # Existing cases explicitly exercise purchase-only behavior.
+            "prioritize_transfers": False,
         }
         vals.update(kwargs)
         suggestion = self.env["prometeo.purchase.suggestion"].create(vals)

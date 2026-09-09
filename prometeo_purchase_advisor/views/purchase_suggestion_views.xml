@@ -32,13 +32,19 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_prepare_transfers" type="object" string="Preparar traslados"
+                            groups="stock.group_stock_user" class="oe_highlight"
+                            invisible="state not in ('computed', 'confirmed') or pending_transfer_count == 0 or transfer_recompute_required"
+                            confirm="Se crearán y reservarán los traslados propuestos. Las entregas y recepciones se validan desde Inventario. Después deberás recalcular la compra."/>
+                    <button name="action_finish_transfers" type="object" string="Finalizar sin compra"
+                            invisible="state not in ('computed', 'confirmed') or has_purchase_quantity or pending_transfer_count or transfer_recompute_required or transfer_picking_count == 0"/>
                     <button name="action_compute" type="object" string="Calcular"
                             class="oe_highlight" invisible="state not in ('draft', 'computed')"/>
                     <button name="action_confirm" type="object" string="Confirmar"
                             class="oe_highlight" invisible="state != 'computed'"/>
                     <button name="action_create_purchase_orders" type="object"
                             string="Crear órdenes de compra" class="oe_highlight"
-                            invisible="state != 'confirmed'"
+                            invisible="state != 'confirmed' or not has_purchase_quantity"
                             confirm="Se van a crear órdenes de compra en borrador agrupadas por proveedor. ¿Seguimos?"/>
                     <button name="action_draft" type="object" string="Volver a borrador"
                             invisible="state not in ('computed', 'confirmed', 'cancel')"/>
@@ -49,6 +55,10 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
+                        <button name="action_view_transfers" type="object" class="oe_stat_button"
+                                icon="fa-exchange" invisible="transfer_picking_count == 0" groups="stock.group_stock_user">
+                            <field name="transfer_picking_count" widget="statinfo" string="Traslados"/>
+                        </button>
                         <button name="action_view_purchase_orders" type="object"
                                 class="oe_stat_button" icon="fa-shopping-cart"
                                 invisible="purchase_order_count == 0">
@@ -94,6 +104,10 @@
                         El reparto posterior a las sucursales se gestiona por separado.
                     </div>
                     <group string="Productos a comprar">
+                        <field name="prioritize_transfers" readonly="state != 'draft'"/>
+                        <field name="source_warehouse_ids" widget="many2many_tags" options="{'no_create': True}"
+                               invisible="not prioritize_transfers" readonly="state != 'draft'"
+                               placeholder="Todos los almacenes de compañías activas"/>
                         <field name="category_ids" widget="many2many_tags"
                                placeholder="Todas las categorías" options="{'no_create': True}"
                                readonly="state != 'draft'"/>
@@ -103,6 +117,22 @@
                     <div class="alert alert-warning" role="alert" invisible="not calculation_notes">
                         <field name="calculation_notes" nolabel="1"/>
                     </div>
+                    <field name="pending_transfer_count" invisible="1"/>
+                    <field name="has_purchase_quantity" invisible="1"/>
+                    <field name="transfer_recompute_required" invisible="1"/>
+                    <field name="transfers_calculated" invisible="1"/>
+                    <field name="transfer_picking_count" invisible="1"/>
+                    <div class="alert alert-warning" role="alert" invisible="pending_transfer_count == 0">
+                        Hay traslados propuestos. Preparalos desde aquí con permisos de Inventario,
+                        o registralos en Inventario, y recalculá antes de comprar.
+                        La propuesta todavía no reserva mercadería.
+                    </div>
+                    <div class="alert alert-info" role="status" invisible="not transfer_recompute_required">
+                        Traslados preparados: pulsá Calcular para actualizar el faltante a comprar.
+                    </div>
+                    <div class="alert alert-info" role="status" invisible="not prioritize_transfers or transfers_calculated or state == 'draft'">
+                        Este cálculo es anterior a la búsqueda de excedentes. Volvé a borrador y recalculá antes de comprar.
+                    </div>
                     <notebook>
                         <page string="Líneas" name="lines">
                             <field name="line_ids" readonly="state in ('done', 'cancel')">
@@ -110,7 +140,7 @@
                                       decoration-danger="coverage_days_current &lt; lead_time_days and qty_final &gt; 0"
                                       decoration-warning="confidence &lt; 0.5 and confidence &gt; 0"
                                       decoration-info="is_manual"
-                                      decoration-muted="qty_final == 0">
+                                      decoration-muted="qty_final == 0 and qty_to_transfer == 0">
                                     <field name="product_id"
                                            domain="[('categ_id', 'child_of' if parent.include_subcategories else 'in', parent.category_ids)] if parent.category_ids else []"/>
                                     <field name="coverage_days_current" string="Cobertura" readonly="1"/>
@@ -120,7 +150,8 @@
                                     <field name="sales_data_available" column_invisible="True"/>
                                     <field name="qty_sold" optional="show" invisible="not sales_data_available"/>
                                     <field name="sales_period" optional="hide"/>
-                                    <field name="qty_suggested" string="Sugerido" readonly="1"/>
+                                    <field name="qty_to_transfer" optional="show"/>
+                                    <field name="qty_suggested" string="A comprar" readonly="1"/>
                                     <field name="qty_final" string="Cantidad"/>
                                     <field name="supplier_id"/>
                                     <field name="price_unit"/>
@@ -142,6 +173,19 @@
                             <group class="oe_subtotal_footer oe_right">
                                 <field name="total_amount"/>
                             </group>
+                        </page>
+                        <page string="Traslados propuestos" name="transfers">
+                            <field name="transfer_plan_ids" readonly="1">
+                                <list create="0" edit="0" delete="0">
+                                    <field name="product_id"/>
+                                    <field name="source_warehouse_id"/>
+                                    <field name="destination_warehouse_id"/>
+                                    <field name="quantity"/>
+                                    <field name="state"/>
+                                    <field name="picking_id" groups="stock.group_stock_user"/>
+                                    <field name="receipt_id" groups="stock.group_stock_user"/>
+                                </list>
+                            </field>
                         </page>
                         <page string="Calidad del cálculo" name="quality"
                               invisible="state == 'draft'">

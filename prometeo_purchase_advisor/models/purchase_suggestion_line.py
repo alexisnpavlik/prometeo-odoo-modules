@@ -68,6 +68,8 @@ class PrometeoPurchaseSuggestionLine(models.Model):
     )
 
     # --- métricas de demanda -------------------------------------------
+    qty_to_transfer = fields.Float(string='A transferir', readonly=True, digits='Product Unit of Measure',
+                                   help='Unidades propuestas desde otros almacenes; requieren preparar el traslado.')
     qty_sold = fields.Float(
         string="Vendidos (netos)", compute="_compute_recorded_sales",
         digits="Product Unit of Measure",
