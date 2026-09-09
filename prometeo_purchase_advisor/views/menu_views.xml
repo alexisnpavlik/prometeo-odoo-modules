@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_purchase_advisor_root"
+              name="Recomendador"
+              web_icon="prometeo_purchase_advisor,static/description/icon.png"
+              sequence="46"
+              groups="prometeo_purchase_advisor.group_purchase_advisor_user"/>
+
+    <menuitem id="menu_purchase_suggestion"
+              name="Sugerencias de compra"
+              parent="menu_purchase_advisor_root"
+              action="action_purchase_suggestion"
+              sequence="10"/>
+
+    <menuitem id="menu_purchase_advisor_config"
+              name="Configuración"
+              parent="menu_purchase_advisor_root"
+              sequence="90"
+              groups="prometeo_purchase_advisor.group_purchase_advisor_manager"/>
+
+    <menuitem id="menu_demand_model"
+              name="Modelos de demanda"
+              parent="menu_purchase_advisor_config"
+              action="action_demand_model"
+              sequence="10"/>
+
+    <menuitem id="menu_demand_model_rule"
+              name="Reglas de asignación"
+              parent="menu_purchase_advisor_config"
+              action="action_demand_model_rule"
+              sequence="20"/>
+</odoo>
