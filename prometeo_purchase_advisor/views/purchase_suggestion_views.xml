@@ -7,6 +7,9 @@
             <list decoration-muted="state == 'cancel'" decoration-success="state == 'done'">
                 <field name="name"/>
                 <field name="warehouse_id"/>
+                <field name="supply_mode" optional="show"/>
+                <field name="demand_warehouse_ids" widget="many2many_tags" optional="hide"/>
+                <field name="category_ids" widget="many2many_tags" optional="hide"/>
                 <field name="date_computed"/>
                 <field name="user_id" optional="show"/>
                 <field name="line_count" string="Líneas"/>
@@ -63,13 +66,15 @@
                     </div>
                     <group>
                         <group>
-                            <field name="warehouse_id" readonly="state != 'draft'"/>
-                            <field name="supply_mode" readonly="state != 'draft'"/>
+                            <field name="supply_mode" widget="radio" readonly="state != 'draft'"/>
+                            <field name="warehouse_id" string="Almacén de recepción"
+                                   options="{'no_create': True}" readonly="state != 'draft'"/>
                             <field name="demand_warehouse_ids" widget="many2many_tags"
                                    domain="[('id', '!=', warehouse_id)]"
+                                   options="{'no_create': True}"
                                    invisible="supply_mode != 'centralized'" readonly="state != 'draft'"/>
                             <button name="action_detect_demand_warehouses" type="object"
-                                    string="Detectar sucursales por movimientos"
+                                    string="Sugerir sucursales según movimientos"
                                     invisible="supply_mode != 'centralized' or state != 'draft'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="user_id"/>
@@ -83,6 +88,18 @@
                             <field name="currency_id" invisible="1"/>
                         </group>
                     </group>
+                    <div class="alert alert-info" role="status" invisible="supply_mode != 'centralized'">
+                        Se suman las necesidades de las sucursales seleccionadas y del almacén de recepción.
+                        Se genera una orden por proveedor, recibida en ese almacén.
+                        El reparto posterior a las sucursales se gestiona por separado.
+                    </div>
+                    <group string="Productos a comprar">
+                        <field name="category_ids" widget="many2many_tags"
+                               placeholder="Todas las categorías" options="{'no_create': True}"
+                               readonly="state != 'draft'"/>
+                        <field name="include_subcategories" invisible="not category_ids"
+                               readonly="state != 'draft'"/>
+                    </group>
                     <div class="alert alert-warning" role="alert" invisible="not calculation_notes">
                         <field name="calculation_notes" nolabel="1"/>
                     </div>
@@ -94,7 +111,8 @@
                                       decoration-warning="confidence &lt; 0.5 and confidence &gt; 0"
                                       decoration-info="is_manual"
                                       decoration-muted="qty_final == 0">
-                                    <field name="product_id"/>
+                                    <field name="product_id"
+                                           domain="[('categ_id', 'child_of' if parent.include_subcategories else 'in', parent.category_ids)] if parent.category_ids else []"/>
                                     <field name="coverage_days_current" string="Cobertura" readonly="1"/>
                                     <field name="qty_on_hand" string="Stock" readonly="1"/>
                                     <field name="qty_incoming" string="Tránsito" readonly="1"/>
@@ -238,6 +256,19 @@
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Creá tu primera sugerencia de compra</p>
             <p>Elegí un almacén, calculá, revisá las cantidades y generá las órdenes agrupadas por proveedor.</p>
+        </field>
+    </record>
+
+    <record id="action_purchase_suggestion_centralized" model="ir.actions.act_window">
+        <field name="name">Compra para varias sucursales</field>
+        <field name="res_model">prometeo.purchase.suggestion</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('supply_mode', '=', 'centralized')]</field>
+        <field name="context">{'default_supply_mode': 'centralized', 'search_default_not_cancelled': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Prepará una compra conjunta para tus sucursales</p>
+            <p>Elegí dónde recibir, las sucursales a abastecer y las categorías que querés comprar.
+               Calculá y revisá las cantidades para generar una orden por proveedor.</p>
         </field>
     </record>
 </odoo>

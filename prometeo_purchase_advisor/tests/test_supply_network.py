@@ -48,6 +48,45 @@ class TestSupplyNetwork(PurchaseAdvisorCommon):
         self.assertFalse(line.supplier_id)
         self.assertIn("Sin proveedor", line.warnings)
 
+    def test_centralized_category_purchase_consolidates_selected_products(self):
+        """Dos sucursales, una categoría y un proveedor generan una única orden."""
+        suggestion, a, b = self._network()
+        category = self.env['product.category'].create({'name': 'Compra selectiva'})
+        self.product_a.categ_id = category
+        self._sell_daily(self.product_b, 5, 31, 1, warehouse=a)
+        self._sell_daily(self.product_b, 6, 31, 1, warehouse=b)
+        self._sell_daily(self.product_no_seller, 1, 31, 1, warehouse=b)
+        suggestion.category_ids = [Command.set(category.ids)]
+        suggestion.action_compute()
+        self.assertEqual(suggestion.line_ids.product_id, self.product_a)
+        self.assertNotIn('no tienen proveedor', suggestion.calculation_notes or '')
+        suggestion.action_confirm()
+        suggestion.action_create_purchase_orders()
+        self.assertEqual(len(suggestion.purchase_order_ids), 1)
+        self.assertEqual(suggestion.purchase_order_ids.order_line.product_id, self.product_a)
+        self.assertEqual(suggestion.purchase_order_ids.order_line.product_qty, 223)
+
+    def test_category_change_preserves_manual_line_but_blocks_its_purchase(self):
+        """Una edición previa fuera del filtro no se compra accidentalmente."""
+        suggestion, a, _b = self._network()
+        category = self.env['product.category'].create({'name': 'Categoría limitada'})
+        self.product_a.categ_id = category
+        self._sell_daily(self.product_b, 1, 31, 1, warehouse=a)
+        suggestion.action_compute()
+        line = suggestion.line_ids.filtered(lambda row: row.product_id == self.product_b)
+        line.qty_final = 99
+        suggestion.action_draft()
+        suggestion.category_ids = [Command.set(category.ids)]
+        suggestion.action_compute()
+        self.assertEqual(line.qty_final, 99)
+        suggestion.action_confirm()
+        with self.assertRaisesRegex(UserError, 'categorías seleccionadas'):
+            suggestion.action_create_purchase_orders()
+        self.assertFalse(suggestion.purchase_order_ids)
+        line.qty_final = 0
+        suggestion.action_create_purchase_orders()
+        self.assertEqual(suggestion.purchase_order_ids.order_line.product_id, self.product_a)
+
     def test_branch_surplus_is_not_assumed_available_to_other_branches(self):
         suggestion, _a, b = self._network()
         self._set_stock(self.product_a, 1000, location=b.lot_stock_id)

@@ -67,6 +67,14 @@ class PrometeoPurchaseSuggestion(models.Model):
         help="Fuerza un modelo para toda la corrida. Vacío usa la cascada "
              "producto → categoría → reglas → default de la compañía.",
     )
+    category_ids = fields.Many2many(
+        "product.category", string="Categorías a comprar",
+        help="Elegí una o varias categorías. Vacío incluye todas las categorías.",
+    )
+    include_subcategories = fields.Boolean(
+        string="Incluir subcategorías", default=True,
+        help="Incluye también las categorías descendientes de las seleccionadas.",
+    )
     line_ids = fields.One2many(
         "prometeo.purchase.suggestion.line", "suggestion_id", string="Líneas",
         copy=True,
@@ -224,12 +232,20 @@ class PrometeoPurchaseSuggestion(models.Model):
     def _candidate_domain(self):
         """Dominio de los productos que pueden entrar en la sugerencia."""
         self.ensure_one()
-        return [
+        return self._category_product_domain() + [
             ("is_storable", "=", True),
             ("purchase_ok", "=", True),
             ("exclude_from_suggestion", "=", False),
             ("company_id", "in", [False, self.company_id.id]),
         ]
+
+    def _category_product_domain(self):
+        """Alcance común para calcular y validar los productos que se compran."""
+        self.ensure_one()
+        if not self.category_ids:
+            return []
+        return [("categ_id", "child_of" if self.include_subcategories else "in",
+                 self.category_ids.ids)]
 
     def _candidate_products(self):
         self.ensure_one()
@@ -628,6 +644,16 @@ class PrometeoPurchaseSuggestion(models.Model):
                 "No hay ninguna línea con cantidad mayor a cero en %(name)s.",
                 name=self.name,
             ))
+        if self.category_ids:
+            allowed = self.env["product.product"].search(
+                self._category_product_domain() + [("id", "in", lines.product_id.ids)])
+            outside = lines.product_id - allowed
+            if outside:
+                raise UserError(_(
+                    "Hay productos fuera de las categorías seleccionadas. "
+                    "Quitalos o dejá su cantidad en cero antes de comprar:\n%(products)s",
+                    products="\n".join(outside.mapped("display_name")),
+                ))
         without_supplier = lines.filtered(lambda line: not line.supplier_id)
         if without_supplier:
             raise UserError(_(

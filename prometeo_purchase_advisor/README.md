@@ -52,7 +52,7 @@ al que se agrega el stock de seguridad y se le descuenta la disponibilidad.
 ### Compra directa en una sucursal
 
 1. Abrí **Recomendador → Sugerencias de compra → Nuevo**.
-2. Elegí la sucursal en **Almacén** y **Compra directa al almacén** en **Modalidad**.
+2. Elegí la sucursal en **Almacén de recepción** y **Compra directa al almacén** en **Modalidad**.
    La compañía compradora se toma del almacén.
 3. Indicá **Días de cobertura** y **Responsable**. Dejá **Modelo de demanda** vacío
    para usar las asignaciones configuradas; seleccionarlo fuerza ese modelo para
@@ -61,9 +61,10 @@ al que se agrega el stock de seguridad y se le descuenta la disponibilidad.
 
 ### Compra centralizada para sucursales
 
-1. Creá una sugerencia con el depósito central en **Almacén** y
-   **Compra centralizada para sucursales** en **Modalidad**.
-2. Pulsá **Detectar sucursales por movimientos**. Revisa despachos completados
+1. Abrí **Recomendador → Compra para varias sucursales → Nuevo**. La modalidad
+   centralizada ya viene seleccionada. Elegí el depósito en **Almacén de recepción**.
+2. Seleccioná una o varias **Sucursales a abastecer**. Opcionalmente pulsá
+   **Sugerir sucursales según movimientos**, que revisa despachos completados
    de los últimos 180 días entre las compañías habilitadas.
 3. Revisá **Sucursales a abastecer**: agregá o quitá destinos según esta compra.
    La detección propone destinos históricos; no define una lista fija ni garantiza
@@ -76,6 +77,21 @@ Si una sucursal no aparece, verificá las compañías activadas y tus permisos.
 También podés seleccionarla manualmente si tenés acceso. Si ya calculaste y
 necesitás cambiar almacén, modalidad o destinos, usá **Volver a borrador** y
 recalculá antes de confirmar.
+
+El resultado suma las necesidades de las sucursales elegidas y del almacén
+receptor. Genera una orden por proveedor para recibir allí; el reparto posterior
+a cada sucursal se gestiona por separado.
+
+### Comprar solo algunas categorías
+
+En **Productos a comprar → Categorías a comprar**, seleccioná una o varias
+categorías. Vacío incluye todas. **Incluir subcategorías** viene activado; apagalo
+si querés únicamente las categorías exactas. El filtro funciona tanto en compra
+directa como conjunta y también limita los avisos de proveedores faltantes.
+
+Para cambiar la selección después de calcular, volvé a borrador y recalculá.
+Las cantidades editadas se conservan, pero si alguna pertenece a una categoría
+que quedó fuera, debés quitar esa línea o ponerla en cero antes de generar órdenes.
 
 ## Revisar y generar la compra
 
