@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 Alexis Medina
+     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html). -->
+<odoo>
+    <record id="group_intercompany_manager" model="res.groups">
+        <field name="name">Intercompany: editar transferencias validadas</field>
+        <field name="category_id" ref="base.module_category_usability" />
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]" />
+        <field
+            name="comment"
+        >Permite corregir cantidades y agregar o quitar productos en transferencias intercompany ya validadas. Además del grupo, el usuario debe tener habilitadas las dos compañías involucradas.</field>
+    </record>
+</odoo>

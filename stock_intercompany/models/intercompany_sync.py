@@ -1,0 +1,111 @@
+# Copyright 2026 Alexis Medina
+# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
+"""Helpers compartidos por los tres modelos que participan del espejo intercompany."""
+
+import logging
+
+from odoo import _
+
+_logger = logging.getLogger(__name__)
+
+# Marca una escritura como "ya propagada": el override de la contraparte la ve
+# y sale temprano, cortando el eco en un solo salto.
+SYNC_CONTEXT_KEY = "skip_intercompany_sync"
+
+
+def is_propagation(env):
+    """Verdadero si la escritura en curso ya viene propagada desde la contraparte."""
+    return bool(env.context.get(SYNC_CONTEXT_KEY))
+
+
+def as_propagation(records):
+    """Devuelve el recordset listo para recibir la propagación: sudo y con el flag."""
+    return records.sudo().with_context(**{SYNC_CONTEXT_KEY: True})
+
+
+def get_counterpart(record, field_name):
+    """Resuelve la contraparte en cualquiera de los dos sentidos del vínculo.
+
+    El campo `field_name` solo lo llena el registro espejo apuntando al origen,
+    así que desde el origen hay que buscarlo al revés.
+    """
+    record.ensure_one()
+    counterpart = record[field_name]
+    if counterpart:
+        return counterpart
+    if not record.id:
+        return record.browse()
+    return record.sudo().search([(field_name, "=", record.id)], limit=1)
+
+
+def map_lot(lot, company):
+    """Devuelve el lote equivalente en `company`, creándolo si no existe.
+
+    `stock.lot` es por compañía: el lote de la entrega no sirve en la recepción.
+    El equivalente se identifica por nombre y producto.
+
+    Ronda de corrección 1 (Tarea 9), Critical 1: un lote sin `company_id` ya
+    sirve en cualquier compañía -es el caso normal para los productos
+    intercompany, que son compartidos (`company_id = False`):
+    NOTA (review final, one-liner 1): `lot` es SIEMPRE un recordset de
+    `stock.lot` (vacío o no), y el retorno también lo es —nunca `False`—.
+    Antes, el caso "sin lote" devolvía el `False` crudo, así que el tipo de
+    retorno era a veces `bool` y a veces recordset, y la comparación
+    `mapped != counterpart.lot_id` en `stock_move_line.write()` daba
+    `False != stock.lot()` → `True`: un `write({'lot_id': False})` espurio
+    sobre una línea `done` de la otra compañía (con el undo/redo de quants
+    que eso implica) aunque la contraparte tampoco tuviera lote.
+    `stock.lot._compute_company_id` (core) hace `lot.company_id =
+    lot.product_id.company_id`, así que un lote creado desde la UI sobre uno
+    de estos productos nace SIN compañía-. Sin este corte, `lot.company_id ==
+    company` daba falso, la búsqueda por `company_id = company.id` no lo
+    encontraba, e intentaba crear un duplicado que chocaba contra
+    `_check_unique_lot` (core, que sí cruza los lotes sin compañía) con un
+    `ValidationError` que bloqueaba la validación de cualquier entrega
+    intercompany con un lote recién creado por el flujo normal.
+    """
+    if not lot:
+        return lot.browse()
+    if not lot.company_id or lot.company_id == company:
+        return lot
+    lot_model = lot.sudo().with_company(company)
+    existing = lot_model.search(
+        [
+            ("name", "=", lot.name),
+            ("product_id", "=", lot.product_id.id),
+            ("company_id", "=", company.id),
+        ],
+        limit=1,
+    )
+    if existing:
+        return existing
+    _logger.info(
+        "Intercompany: creando lote %s del producto %s en la compañía %s",
+        lot.name,
+        lot.product_id.display_name,
+        company.name,
+    )
+    return lot_model.create(
+        {
+            "name": lot.name,
+            "product_id": lot.product_id.id,
+            "company_id": company.id,
+        }
+    )
+
+
+def post_sync_note(picking, body, source_picking=None):
+    """Postea la nota de auditoría en el chatter del picking.
+
+    Cuando el cambio llega propagado, la nota nombra el picking de origen y el
+    usuario que lo originó, que puede ser de la otra compañía.
+    """
+    if source_picking:
+        body = _(
+            "%(body)s — propagado desde %(origin)s (%(company)s) por %(user)s",
+            body=body,
+            origin=source_picking.name,
+            company=source_picking.company_id.name,
+            user=picking.env.user.name,
+        )
+    picking.sudo().message_post(body=body)
