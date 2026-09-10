@@ -29,6 +29,25 @@
                             <field name="cvi_settlement_frequency"/>
                         </setting>
                     </block>
+                    <block title="Datos obligatorios del cliente"
+                           name="cvi_customer_required_data_block">
+                        <setting string="Exigir celular">
+                            <field name="cvi_customer_mobile_required"/>
+                        </setting>
+                        <setting string="Exigir dirección">
+                            <field name="cvi_customer_street_required"/>
+                        </setting>
+                        <setting string="Exigir ciudad">
+                            <field name="cvi_customer_city_required"/>
+                        </setting>
+                        <setting string="Exigir código postal">
+                            <field name="cvi_customer_zip_required"/>
+                        </setting>
+                        <setting string="Exigir fotos del DNI"
+                                 help="Obliga a cargar el frente y el dorso del documento">
+                            <field name="cvi_customer_dni_photos_required"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

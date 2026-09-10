@@ -130,19 +130,13 @@ class CviCard(models.Model):
         default=fields.Date.context_today,
         tracking=True,
     )
-    # Fotos que el vendedor saca en el domicilio (HU-08). Opcionales: la venta se
-    # confirma sin ellas.
+    # Foto que el vendedor saca en el domicilio (HU-08). Opcional: la venta se confirma
+    # sin ella. El documento del cliente NO está acá: frente y dorso viven en la ficha
+    # de cvi.customer, porque son de la persona y no de cada compra.
     #
     # max_width/max_height hacen que Odoo redimensione al guardar. Sin eso, cada foto de
-    # un celular moderno entra al filestore con varios megas: dos por venta, miles de
-    # ventas. 1600 px alcanza de sobra para leer un documento o reconocer una casa.
-    photo_dni = fields.Image(
-        string="Foto del DNI",
-        max_width=1600,
-        max_height=1600,
-        copy=False,
-        help="Documento del cliente. Opcional.",
-    )
+    # un celular moderno entra al filestore con varios megas, por miles de ventas.
+    # 1600 px alcanza de sobra para reconocer una casa.
     photo_house = fields.Image(
         string="Foto de la vivienda",
         max_width=1600,
@@ -168,7 +162,7 @@ class CviCard(models.Model):
         string="Tiene antecedentes", compute="_compute_partner_alert",
     )
     has_photos = fields.Boolean(
-        string="Tiene fotos",
+        string="Tiene foto de la vivienda",
         compute="_compute_has_photos",
         store=True,
     )
@@ -611,11 +605,11 @@ class CviCard(models.Model):
                 card.partner_alert = "\n".join(avisos)
                 card.has_partner_alert = True
 
-    @api.depends("photo_dni", "photo_house")
+    @api.depends("photo_house")
     def _compute_has_photos(self):
-        """Si la venta tiene alguna de las dos fotos cargadas."""
+        """Si la venta tiene cargada la foto de la vivienda."""
         for card in self:
-            card.has_photos = bool(card.photo_dni or card.photo_house)
+            card.has_photos = bool(card.photo_house)
 
     @api.depends("cvi_latitude", "cvi_longitude")
     def _compute_has_geolocation(self):

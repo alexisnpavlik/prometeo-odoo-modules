@@ -28,3 +28,5 @@ from . import test_agenda
 from . import test_full_flow
 from . import test_roles
 from . import test_menus
+from . import test_customer_notes
+from . import test_customer_contact

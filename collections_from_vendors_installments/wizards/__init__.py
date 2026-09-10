@@ -6,3 +6,4 @@ from . import cvi_transfer_wizard
 from . import cvi_vendor_delivery_wizard
 from . import cvi_sale_start_wizard
 from . import cvi_payment_wizard
+from . import cvi_problematic_wizard

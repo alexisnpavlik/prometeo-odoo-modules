@@ -14,7 +14,7 @@ class TestCviGeolocation(CviCommon):
 
     def setUp(self):
         super().setUp()
-        self.customer.write({"street": "Av. Siempreviva 742", "city": "Resistencia"})
+        self.customer.write({"street": "Av. Siempreviva 742", "city_id": self.city.id})
         self.card = self.env["cvi.card"].create({
             "customer_id": self.customer.id,
             "vendor_id": self.vendor_user.id,
@@ -64,6 +64,8 @@ class TestCviGeolocation(CviCommon):
         installment = self._installment()
         self.assertFalse(installment.map_is_gps)
         self.assertIn("Siempreviva", installment.map_url)
+        self.assertIn("Resistencia", installment.map_url)
+        self.assertIn("Chaco", installment.map_url)
 
     def test_zero_coordinates_do_not_count_as_a_location(self):
         """(0, 0) es el punto nulo del Atlántico: significa vacío, no una venta ahí."""

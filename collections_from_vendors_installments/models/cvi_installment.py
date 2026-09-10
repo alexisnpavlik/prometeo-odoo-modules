@@ -37,8 +37,8 @@ class CviInstallment(models.Model):
     street = fields.Char(
         related="customer_id.street", store=True, string="Dirección"
     )
-    city = fields.Char(related="customer_id.city", store=True, string="Ciudad")
-    phone = fields.Char(related="customer_id.phone", string="Teléfono")
+    city = fields.Char(related="customer_id.city_id.name", store=True, string="Ciudad")
+    mobile = fields.Char(related="customer_id.mobile", string="Celular")
     card_residual = fields.Monetary(
         related="card_id.amount_residual",
         string="Saldo de la tarjeta",
@@ -233,7 +233,7 @@ class CviInstallment(models.Model):
         "card_id.has_geolocation",
         "card_id.map_url",
         "customer_id.street",
-        "customer_id.city",
+        "customer_id.city_id",
         "customer_id.zip",
     )
     def _compute_map_url(self):
@@ -253,7 +253,12 @@ class CviInstallment(models.Model):
                 continue
             installment.map_is_gps = False
             customer = installment.customer_id
-            parts = [customer.street, customer.city, customer.zip]
+            parts = [
+                customer.street,
+                customer.city_id.name,
+                customer.state_id.name,
+                customer.zip,
+            ]
             address = ", ".join(part for part in parts if part)
             if address:
                 query = url_encode({"api": "1", "query": address})

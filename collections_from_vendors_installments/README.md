@@ -111,9 +111,11 @@ Esta versión también incluye:
   antigüedad de la deuda; se pueden marcar tarjetas para retiro y registrar el
   reingreso del mueble recuperado.
 - **Clientes y antecedentes**: historial, sugerencia y marca manual de cliente
-  problemático con motivo; la marca puede levantarse si corresponde.
+  problemático con motivo pedido al marcar; la marca puede levantarse si
+  corresponde. La ficha guarda frente y dorso del DNI, con filtro para encontrar
+  a quién le falta, y las notas se registran en el historial del cliente.
 - **Evidencia de venta**: ubicación GPS opcional, enlace de mapa con respaldo
-  por dirección y fotos opcionales de DNI y vivienda.
+  por dirección y foto opcional de la vivienda.
 - **Tablero de indicadores** para administradores de cobranzas: KPIs, gráficos,
   mora por antigüedad, rendiciones con diferencia, stock en vendedores, mapa,
   listados y exportación CSV.

@@ -36,3 +36,23 @@ class ResCompany(models.Model):
         default="both",
         required=True,
     )
+    cvi_customer_mobile_required = fields.Boolean(
+        string="Exigir celular del cliente",
+        default=True,
+    )
+    cvi_customer_street_required = fields.Boolean(
+        string="Exigir dirección del cliente",
+        default=True,
+    )
+    cvi_customer_city_required = fields.Boolean(
+        string="Exigir ciudad del cliente",
+        default=True,
+    )
+    cvi_customer_zip_required = fields.Boolean(
+        string="Exigir código postal del cliente",
+        default=True,
+    )
+    cvi_customer_dni_photos_required = fields.Boolean(
+        string="Exigir fotos del DNI",
+        default=False,
+    )

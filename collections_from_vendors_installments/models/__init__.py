@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from . import cvi_audit_mixin
+from . import cvi_city
 from . import cvi_customer
 from . import cvi_product_plan
 from . import cvi_card
