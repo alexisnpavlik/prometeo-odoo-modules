@@ -13,6 +13,7 @@ STATE_SELECTION = [
     ("partial", "Parcial"),
     ("paid", "Pagada"),
     ("overdue", "Vencida"),
+    ("cancelled", "Cancelada"),
 ]
 
 
@@ -108,9 +109,20 @@ class CviInstallment(models.Model):
         ),
     ]
 
-    @api.depends("amount", "allocation_ids.amount", "allocation_ids.payment_id.state")
+    @api.depends(
+        "amount",
+        "allocation_ids.amount",
+        "allocation_ids.payment_id.state",
+        "card_id.state",
+    )
     def _compute_amounts(self):
-        """Cobrado = imputaciones de cobros publicados. Residual nunca es negativo."""
+        """Cobrado = imputaciones de cobros publicados. Residual nunca es negativo.
+
+        Si el mueble se retiró, lo que faltaba pagar deja de ser saldo: la deuda se
+        dio por perdida junto con la mercadería y no se reclama más (HU-26). Lo
+        cobrado hasta ahí no se toca, y la pérdida sigue siendo calculable como
+        amount_total menos amount_paid_at_recovery en la tarjeta.
+        """
         for installment in self:
             paid = sum(
                 installment.allocation_ids
@@ -118,7 +130,10 @@ class CviInstallment(models.Model):
                 .mapped("amount")
             )
             installment.amount_paid = paid
-            installment.amount_residual = max(installment.amount - paid, 0.0)
+            if installment.card_id.state == "recovered":
+                installment.amount_residual = 0.0
+            else:
+                installment.amount_residual = max(installment.amount - paid, 0.0)
 
     @api.depends("allocation_ids.payment_id.state", "allocation_ids.payment_id.user_id")
     def _compute_collected_by(self):
@@ -130,14 +145,25 @@ class CviInstallment(models.Model):
                 .mapped("payment_id.user_id")
             )
 
-    @api.depends("amount", "amount_paid", "amount_residual", "date_due", "company_id.cvi_overdue_days")
+    @api.depends(
+        "amount", "amount_paid", "amount_residual", "date_due",
+        "company_id.cvi_overdue_days", "card_id.state",
+    )
     def _compute_state(self):
-        """Estado de la cuota. Solo es pagada cuando el residual llega a cero."""
+        """Estado de la cuota. Solo es pagada cuando el residual llega a cero.
+
+        La rama de cancelada va primero: con el mueble retirado el residual queda en
+        cero, y sin este orden una cuota que nunca se cobró figuraría como Pagada.
+        """
         today = fields.Date.context_today(self)
         for installment in self:
             rounding = installment.currency_id.rounding or 0.01
             tolerance = installment.company_id.cvi_overdue_days or 0
-            if float_is_zero(installment.amount_residual, precision_rounding=rounding):
+            if installment.card_id.state == "recovered" and (
+                installment.amount_paid < installment.amount
+            ):
+                installment.state = "cancelled"
+            elif float_is_zero(installment.amount_residual, precision_rounding=rounding):
                 installment.state = "paid"
             elif installment.date_due and (today - installment.date_due).days > tolerance:
                 installment.state = "overdue"

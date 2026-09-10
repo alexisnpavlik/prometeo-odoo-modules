@@ -48,6 +48,12 @@
                             <field name="cvi_customer_dni_photos_required"/>
                         </setting>
                     </block>
+                    <block title="Mercadería en la calle" name="cvi_stock_block">
+                        <setting string="Permitir entregar sin stock"
+                                 help="La entrega al vendedor no se traba por falta de stock: el faltante queda como negativo en fábrica. Las devoluciones del vendedor se siguen chequeando.">
+                            <field name="cvi_allow_negative_stock"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

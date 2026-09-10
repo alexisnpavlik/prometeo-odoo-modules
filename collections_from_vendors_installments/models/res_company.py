@@ -52,6 +52,14 @@ class ResCompany(models.Model):
         string="Exigir código postal del cliente",
         default=True,
     )
+    cvi_allow_negative_stock = fields.Boolean(
+        string="Permitir entregar sin stock",
+        default=True,
+        help="Deja entregar mercadería al vendedor aunque el depósito no tenga las "
+             "unidades: el faltante queda como stock negativo en fábrica, que se "
+             "regulariza cuando termina la producción. Las devoluciones del vendedor "
+             "se siguen chequeando siempre.",
+    )
     cvi_customer_dni_photos_required = fields.Boolean(
         string="Exigir fotos del DNI",
         default=False,

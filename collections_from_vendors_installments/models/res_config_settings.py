@@ -37,6 +37,10 @@ class ResConfigSettings(models.TransientModel):
         related="company_id.cvi_customer_zip_required",
         readonly=False,
     )
+    cvi_allow_negative_stock = fields.Boolean(
+        related="company_id.cvi_allow_negative_stock",
+        readonly=False,
+    )
     cvi_customer_dni_photos_required = fields.Boolean(
         related="company_id.cvi_customer_dni_photos_required",
         readonly=False,

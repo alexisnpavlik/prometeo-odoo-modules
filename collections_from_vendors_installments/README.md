@@ -12,7 +12,10 @@ cuota como comisión y enruta la tarjeta a un cobrador que gestiona el resto.
 2. **Entrega al vendedor** — Venta en cuotas > Depósito > *Entregar / recibir
    mercadería*, con dirección "Entrega al vendedor". Genera un albarán interno
    de `WH/Stock` a `Vendedores/<nombre>`. La ubicación del vendedor se crea sola
-   la primera vez.
+   la primera vez. Con el ajuste *Permitir entregar sin stock* (activo por
+   defecto) la entrega no se traba por falta de existencias: el faltante queda
+   como stock negativo en `WH/Stock` y se regulariza al cerrar la producción. La
+   devolución del vendedor a fábrica se sigue chequeando siempre.
 3. **Venta** — Venta en cuotas > Vendedor > *Mis ventas*. Se carga el cliente,
    el modelo de mueble y uno de los planes de cuotas de ese mueble. El plan fija
    cantidad de cuotas, importe de cuota y frecuencia; el precio total sale de

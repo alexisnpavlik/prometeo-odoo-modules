@@ -129,6 +129,63 @@ class TestCviRecovery(CviCommon):
 
     # --- registrar el retiro (HU-26) ---
 
+    def _recover(self):
+        """Marca y registra el retiro, que es la secuencia obligada."""
+        self.card.to_recover_reason = "Sin pagar."
+        self.card.action_mark_to_recover()
+        self.card.action_register_recovery()
+
+    def test_recovery_cancels_what_was_left_to_collect(self):
+        """Retirar el mueble cancela las cuotas pendientes (HU-26).
+
+        No se reclaman más: la deuda se dio por perdida junto con el mueble, y
+        dejarlas Pendientes hacía que la tarjeta siguiera mostrando saldo vivo.
+        """
+        self._recover()
+        unpaid = self.card.installment_ids.filtered(lambda i: i.amount_paid < i.amount)
+        self.assertTrue(unpaid, "la tarjeta tiene que tener cuotas sin cobrar")
+        self.assertEqual(set(unpaid.mapped("state")), {"cancelled"})
+
+    def test_recovered_card_shows_no_outstanding_balance(self):
+        """El saldo queda en cero: no hay nada más que cobrar."""
+        self._recover()
+        self.assertEqual(self.card.amount_residual, 0.0)
+
+    def test_an_already_paid_installment_stays_paid(self):
+        """Lo que el cliente pagó no se convierte en cancelado."""
+        payment = self.env["cvi.payment"].create({
+            "card_id": self.card.id, "amount": 10000.0, "date": "2020-03-10",
+        })
+        payment.action_post()
+        collected = self.card.installment_ids.filtered(lambda i: not i.is_commission)[0]
+        self.assertEqual(collected.state, "paid")
+        self._recover()
+        self.assertEqual(collected.state, "paid")
+        self.assertEqual(self.card.amount_paid, 10000.0)
+
+    def test_recovered_card_leaves_the_overdue_report(self):
+        """Sin cuotas vencidas, la tarjeta retirada sale del listado de morosos."""
+        self.assertGreater(self.card.amount_overdue, 0.0)
+        self._recover()
+        self.assertEqual(self.card.amount_overdue, 0.0)
+        self.assertEqual(self.card.days_overdue, 0)
+
+    def test_a_recovered_card_cannot_be_collected_anymore(self):
+        """Con las cuotas canceladas no queda dónde imputar un cobro nuevo."""
+        self._recover()
+        payment = self.env["cvi.payment"].create({
+            "card_id": self.card.id, "amount": 1000.0, "date": "2020-04-10",
+        })
+        with self.assertRaises(UserError):
+            payment.action_post()
+
+    def test_the_recovered_location_is_flagged_for_its_report(self):
+        """La ubicación de recuperados está marcada: es lo que filtra el reporte."""
+        location = self.env.ref(
+            "collections_from_vendors_installments.stock_location_recovered"
+        )
+        self.assertTrue(location.cvi_is_recovered_location)
+
     def test_recovery_needs_the_card_marked_first(self):
         with self.assertRaises(UserError):
             self.card.action_register_recovery()
