@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="background" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#183c62"/>
+      <stop offset="55%" stop-color="#08162d"/>
+      <stop offset="100%" stop-color="#030711"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.24"/>
+      <stop offset="48%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="glass_edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#35f2ff"/>
+      <stop offset="52%" stop-color="#7a7cff"/>
+      <stop offset="100%" stop-color="#ff3da4"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#45f6ff"/>
+      <stop offset="100%" stop-color="#8b75ff"/>
+    </linearGradient>
+    <linearGradient id="blocked" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffb12b"/>
+      <stop offset="100%" stop-color="#ff3d9a"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2defff" stop-opacity="0.52"/>
+      <stop offset="55%" stop-color="#7a5cff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7a5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.46"/>
+      <stop offset="22%" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="108" fill="url(#background)"/>
+
+  <g stroke="#6fe9ff" stroke-opacity="0.08" stroke-width="1.5">
+    <path d="M64 0V112 M160 0V78 M352 0V78 M448 0V112"/>
+    <path d="M64 400V512 M160 434V512 M352 434V512 M448 400V512"/>
+    <path d="M0 64H112 M0 160H78 M434 160H512 M400 64H512"/>
+    <path d="M0 352H78 M0 448H112 M434 352H512 M400 448H512"/>
+  </g>
+
+  <circle cx="256" cy="248" r="176" fill="url(#halo)"/>
+  <ellipse cx="256" cy="414" rx="148" ry="30" fill="#000000" fill-opacity="0.48"/>
+
+  <g transform="translate(256 250) rotate(-7) translate(-256 -250)">
+    <rect x="124" y="118" width="264" height="264" rx="58"
+          fill="url(#glass)" stroke="#38eaff" stroke-opacity="0.28" stroke-width="3"/>
+  </g>
+
+  <rect x="112" y="106" width="288" height="288" rx="64"
+        fill="url(#glass)" stroke="url(#glass_edge)" stroke-width="5"/>
+  <rect x="122" y="116" width="268" height="268" rx="55"
+        fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M145 120H343C367 120 386 139 386 163V184C318 147 230 142 145 166Z"
+        fill="url(#sheen)" opacity="0.68"/>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M167 183H345C361 183 374 196 374 212V291C374 307 361 320 345 320H264L209 358L217 320H167C151 320 138 307 138 291V212C138 196 151 183 167 183Z"
+          stroke="#2af3ff" stroke-opacity="0.18" stroke-width="24"/>
+    <path d="M167 183H345C361 183 374 196 374 212V291C374 307 361 320 345 320H264L209 358L217 320H167C151 320 138 307 138 291V212C138 196 151 183 167 183Z"
+          stroke="url(#bubble)" stroke-width="10"/>
+    <path d="M181 227H329 M181 257H301 M181 287H269"
+          stroke="#d7fdff" stroke-opacity="0.94" stroke-width="10"/>
+
+    <path d="M151 151L365 365" stroke="#ff3d9a" stroke-opacity="0.22" stroke-width="34"/>
+    <path d="M151 151L365 365" stroke="#fff4f8" stroke-width="20"/>
+    <path d="M151 151L365 365" stroke="url(#blocked)" stroke-width="13"/>
+  </g>
+
+  <ellipse cx="176" cy="154" rx="105" ry="62" fill="url(#halo)" opacity="0.28"/>
+  <circle cx="137" cy="132" r="7" fill="#ffffff" fill-opacity="0.78"/>
+  <circle cx="366" cy="377" r="5" fill="#ff55bc" fill-opacity="0.8"/>
+</svg>
