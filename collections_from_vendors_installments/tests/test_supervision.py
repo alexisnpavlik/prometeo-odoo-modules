@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests import tagged
+from odoo.tests import Form, tagged
 
 from .common import CviCommon
 
@@ -170,6 +170,42 @@ class TestCviSupervision(CviCommon):
         visit.action_load_cards()
         with self.assertRaises(ValidationError):
             visit.line_ids[0].write({"has_issue": True})
+
+    def test_form_save_preserves_issue_count_and_closing_log(self):
+        """El resultado enviado por el formulario no debe congelar los contadores."""
+        visit = self._visit()
+        visit.action_load_cards()
+        self.env.flush_all()
+        with Form(visit) as form:
+            with form.line_ids.edit(0) as line:
+                line.verified = True
+                line.has_issue = True
+                line.note = "El cliente niega el pago."
+            self.assertEqual(form.issue_count, 1)
+            self.assertEqual(form.result, "issues")
+        self.env.flush_all()
+        visit.invalidate_recordset()
+        self.assertEqual(visit.issue_count, 1)
+        self.assertEqual(visit.card_count, 1)
+        visit.action_close()
+        self.assertIn("1 con observación", visit.message_ids[0].body)
+
+    def test_explicit_result_does_not_prevent_counting_new_lines(self):
+        """La corrección manual del resultado conserva el recuento real."""
+        visit = self._visit()
+        visit.write({
+            "result": "compliant",
+            "line_ids": [(0, 0, {
+                "card_id": self.card.id,
+                "has_issue": True,
+                "note": "Observación resuelta durante la visita.",
+            })],
+        })
+        self.env.flush_all()
+        visit.invalidate_recordset()
+        self.assertEqual(visit.result, "compliant")
+        self.assertEqual(visit.card_count, 1)
+        self.assertEqual(visit.issue_count, 1)
 
     def test_closing_records_the_result(self):
         visit = self._visit()

@@ -209,19 +209,23 @@ class CviInstallment(models.Model):
 
     @api.model
     def _cron_update_overdue(self):
-        """Cron diario: recalcula el estado de las cuotas impagas ya vencidas (HU-23 parcial).
+        """Cron diario: refresca la mora de cuotas vencidas de tarjetas abiertas.
 
         El estado es computado y almacenado pero depende de la fecha de hoy, que no es un
-        campo. Este cron fuerza el recálculo invalidando la caché de las candidatas.
+        campo. También se recalcula el resumen almacenado de cada tarjeta para que la
+        antigüedad de mora avance aunque la cuota ya estuviera marcada como vencida.
         """
         today = fields.Date.context_today(self)
         candidates = self.search([
             ("date_due", "<", today),
-            ("state", "in", ("pending", "partial")),
-            ("card_id.state", "not in", ("draft", "cancel")),
+            ("state", "in", ("pending", "partial", "overdue")),
+            ("card_id.state", "in", ("sold", "routed", "active")),
         ])
+        cards = candidates.mapped("card_id")
         candidates.invalidate_recordset(["state"])
         candidates._compute_state()
+        cards.invalidate_recordset(["days_overdue", "amount_overdue"])
+        cards._compute_overdue_info()
         _logger.info("Cron de cuotas vencidas: %s cuotas revisadas", len(candidates))
         return True
 

@@ -5,13 +5,17 @@
 import base64
 import json
 import logging
-import sys
-import traceback
 from datetime import datetime
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_repr
+
+from odoo.addons.l10n_ar_afipws.afip_errors import (
+    afip_connection_message,
+    describe_error,
+    is_afip_unreachable,
+)
 
 from ..afip_utils import get_invoice_number_from_response
 
@@ -274,27 +278,36 @@ class AccountMove(models.Model):
             # Request the authorization! (call the AFIP webservice method)
             vto = None
             msg = False
+            request_error = None
             try:
                 # Pido autorizacion
                 inv.pyafipws_request_autorization(ws, afip_ws)
             except Exception as e:
-                msg = e
-            except Exception:
-                if ws.Excepcion:
-                    # get the exception already parsed by the helper
-                    msg = ws.Excepcion
-                else:
-                    # avoid encoding problem when raising error
-                    msg = traceback.format_exception_only(sys.exc_type, sys.exc_value)[0]
+                # El segundo "except Exception" que había acá era inalcanzable y
+                # usaba sys.exc_type/sys.exc_value, que no existen en Python 3.
+                request_error = e
+                msg = ws.Excepcion or describe_error(e)
             if msg:
                 _logger.error(
                     _("AFIP Validation Error. %s") % msg
                     + " XML Request: %s XML Response: %s" % (ws.XmlRequest, ws.XmlResponse)
                 )
 
-            msg = "\n".join([ws.Obs or "", ws.ErrMsg or ""])
+            msg = "\n".join([ws.Obs or "", ws.ErrMsg or ""]).strip()
             if not ws.CAE or ws.Resultado != "A":
                 r_invoices += inv
+
+                if not msg:
+                    # AFIP no devolvió ni Obs ni ErrMsg: la factura se marcaba
+                    # como rechazada con afip_message vacío y el usuario veía un
+                    # diálogo en blanco. Solo aplica al rechazo: en una factura
+                    # aceptada, afip_message vacío es lo normal.
+                    if request_error is None:
+                        msg = _("AFIP no devolvió CAE ni motivo de rechazo.")
+                    elif is_afip_unreachable(request_error):
+                        msg = afip_connection_message()
+                    else:
+                        msg = describe_error(request_error)
 
                 vals = {
                     "name": "/",

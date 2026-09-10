@@ -23,8 +23,15 @@ class ResCompany(models.Model):
     )
     caw_cutoff_day = fields.Integer(
         string="Día de corte",
-        default=0,
+        default=20,
         help="Día del mes al que se ajustan los vencimientos. 0 = sin día de corte.",
+    )
+    caw_pricelist_id = fields.Many2one(
+        comodel_name="product.pricelist",
+        string="Lista de precios para retiros",
+        domain="['|', ('company_id', '=', False), ('company_id', '=', id)]",
+        help="Lista con la que se cotizan los productos de un retiro. "
+             "Si está vacía se usa el precio base del producto.",
     )
     caw_picking_type_id = fields.Many2one(
         comodel_name="stock.picking.type",

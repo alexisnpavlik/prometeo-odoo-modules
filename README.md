@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (55 Módulos)](#-catálogo-completo-de-módulos-55-módulos)
+- [📂 Catálogo Completo de Módulos (56 Módulos)](#-catálogo-completo-de-módulos-56-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -40,7 +40,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (55 Módulos)
+## 📂 Catálogo Completo de Módulos (56 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -135,6 +135,7 @@ Tableros OWL con Chart.js sobre datos en vivo, más monitoreo de errores en prod
 | **Métricas de Listas de Precios** | [`pricelist_management_metrics`](./pricelist_management_metrics) | Comparativa de precio base vs. precio vigente por lista/sucursal, filtrable por categoría. |
 | **Cambios de Precio (Góndola)** | [`product_price_change_metrics`](./product_price_change_metrics) | Lista de trabajo por sucursal con los productos que cambiaron de precio para reetiquetar en góndola. |
 | **Sentry Monitoring** | [`prometeo_sentry_monitoring`](./prometeo_sentry_monitoring) | Captura excepciones de frontend (backend web y POS) y las envía a Sentry (`SENTRY_DSN`). |
+| **Aviso de Pago del Servicio** | [`prometeo_payment_notice`](./prometeo_payment_notice) | Aviso amistoso en backend web y POS cuando el pago mensual del servicio de Prometeo no figura registrado. |
 
 ### 7. Interfaz de Usuario & Base (Web)
 

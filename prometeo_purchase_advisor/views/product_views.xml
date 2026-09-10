@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_template_form_advisor" model="ir.ui.view">
+        <field name="name">product.template.form.purchase.advisor</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='purchase']//group" position="inside">
+                <group string="Recomendador de compra"
+                       groups="prometeo_purchase_advisor.group_purchase_advisor_user">
+                    <field name="exclude_from_suggestion"/>
+                    <field name="demand_model_id"
+                           groups="prometeo_purchase_advisor.group_purchase_advisor_manager"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_product_category_form_advisor" model="ir.ui.view">
+        <field name="name">product.category.form.purchase.advisor</field>
+        <field name="model">product.category</field>
+        <field name="inherit_id" ref="product.product_category_form_view"/>
+        <field name="arch" type="xml">
+            <field name="parent_id" position="after">
+                <field name="demand_model_id"
+                       groups="prometeo_purchase_advisor.group_purchase_advisor_manager"/>
+            </field>
+        </field>
+    </record>
+    <record id="view_product_form_advisor" model="ir.ui.view">
+        <field name="name">product.product.form.purchase.advisor</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='purchase']//group" position="inside">
+                <group string="Clasificación del recomendador"
+                       groups="prometeo_purchase_advisor.group_purchase_advisor_user">
+                    <field name="abc_class"/>
+                    <field name="xyz_class"/>
+                    <field name="abc_xyz_date"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_product_search_advisor" model="ir.ui.view">
+        <field name="name">product.product.search.purchase.advisor</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_search_form_view"/>
+        <field name="arch" type="xml">
+            <search position="inside">
+                <separator/>
+                <filter name="abc_a" string="Clase A" domain="[('abc_class', '=', 'a')]"/>
+                <filter name="abc_b" string="Clase B" domain="[('abc_class', '=', 'b')]"/>
+                <filter name="abc_c" string="Clase C" domain="[('abc_class', '=', 'c')]"/>
+                <separator/>
+                <filter name="excluded_from_suggestion" string="Excluidos del recomendador"
+                        domain="[('exclude_from_suggestion', '=', True)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_abc" string="Clase ABC" context="{'group_by': 'abc_class'}"/>
+                    <filter name="group_xyz" string="Clase XYZ" context="{'group_by': 'xyz_class'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_warehouse_form_advisor" model="ir.ui.view">
+        <field name="name">stock.warehouse.form.purchase.advisor</field>
+        <field name="model">stock.warehouse</field>
+        <field name="inherit_id" ref="stock.view_warehouse"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[last()]" position="after">
+                <group string="Recomendador de compra"
+                       groups="prometeo_purchase_advisor.group_purchase_advisor_manager">
+                    <field name="auto_suggestion"/>
+                    <field name="suggestion_user_id" invisible="not auto_suggestion"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_form_advisor" model="ir.ui.view">
+        <field name="name">res.partner.form.purchase.advisor</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='sales_purchases']//group" position="inside">
+                <group string="Medido por el recomendador"
+                       groups="prometeo_purchase_advisor.group_purchase_advisor_user"
+                       invisible="not metrics_date">
+                    <field name="measured_lead_time"/>
+                    <field name="lead_time_sample_size"/>
+                    <field name="fill_rate"/>
+                    <field name="metrics_date"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

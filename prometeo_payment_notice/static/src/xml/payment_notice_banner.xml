@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="prometeo_payment_notice.Banner">
+        <div t-if="notice.mostrar" class="o_prometeo_payment_notice">
+            <i class="fa fa-info-circle me-2"/>
+            <span t-esc="notice.mensaje"/>
+        </div>
+    </t>
+
+    <t t-name="prometeo_payment_notice.WebClientBanner" t-inherit="web.WebClient" t-inherit-mode="extension">
+        <xpath expr="//ActionContainer" position="before">
+            <PaymentNoticeBanner/>
+        </xpath>
+    </t>
+
+</templates>

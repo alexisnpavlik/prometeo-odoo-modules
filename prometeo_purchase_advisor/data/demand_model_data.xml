@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="demand_model_default" model="prometeo.demand.model">
+        <field name="name">Promedio ponderado 14/30/90</field>
+        <field name="method">weighted_ma</field>
+        <field name="sequence">1</field>
+        <field name="company_id" eval="False"/>
+        <field name="lookback_days">90</field>
+        <field name="service_level">0.95</field>
+        <field name="ignore_stockout_days" eval="True"/>
+        <field name="outlier_percentile">0.95</field>
+        <field name="min_history_days">21</field>
+        <field name="weight_config">14:0.5,30:0.3,90:0.2</field>
+    </record>
+</odoo>

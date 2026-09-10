@@ -28,7 +28,7 @@ class CawStatementWizard(models.TransientModel):
             [
                 ("account_id", "=", account.id),
                 ("date", "<=", self.date_to),
-                ("state", "not in", ("draft", "cancel")),
+                ("state", "not in", ("draft", "delivered", "cancel")),
             ],
             order="date asc, name asc",
         )

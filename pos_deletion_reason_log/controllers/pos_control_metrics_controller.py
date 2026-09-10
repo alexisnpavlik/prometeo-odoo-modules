@@ -2,9 +2,31 @@
 from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessError
+import datetime
+import io
 import logging
 
+import xlsxwriter
+
 _logger = logging.getLogger(__name__)
+
+# Tope de filas del detalle en el dashboard. La exportación a Excel usa un
+# tope mucho más alto: ahí el archivo es el respaldo de la auditoría y
+# truncar en 500 escondería operaciones sin avisar.
+DETAIL_LIMIT = 500
+EXPORT_DETAIL_LIMIT = 20000
+
+# Espejo de TYPE_LABELS del dashboard (static/src/js/control_dashboard.js):
+# el Excel tiene que decir lo mismo que la pantalla.
+TYPE_LABELS = {
+    "order": "Orden eliminada",
+    "line": "Línea eliminada",
+    "qty_reduction": "Reducción cantidad",
+    "high_discount": "Descuento alto",
+    "price_reduction": "Reducción precio",
+    "price_increase": "Aumento precio",
+    "refund": "Reembolso",
+}
 
 
 class PosControlMetricsController(http.Controller):
@@ -24,17 +46,21 @@ class PosControlMetricsController(http.Controller):
 
     def _build_where(
         self, start_date=None, end_date=None, pos="all", cashier="all",
-        company="all", dtype="all",
+        company="all", dtype="all", exclude_refund=True,
     ):
         """WHERE compartido sobre pos_control_log (alias dl).
 
         Excluye los eventos 'refund': los reembolsos se miden desde la data
         nativa (pos_order_line), y el evento 'refund' del log solo guarda el
         motivo. Contarlos acá los duplicaría en KPIs, ranking, tendencia y
-        detalle.
+        detalle. La distribución por motivo es la excepción (exclude_refund=False):
+        ahí el log es la única fuente del motivo y hay un solo evento por
+        reembolso, así que no duplica nada.
         """
         allowed = tuple(request.env.companies.ids) or (0,)
-        where = "dl.company_id IN %s AND dl.event_type != 'refund'"
+        where = "dl.company_id IN %s"
+        if exclude_refund:
+            where += " AND dl.event_type != 'refund'"
         params = [allowed]
         tz = self._get_timezone()
 
@@ -156,9 +182,13 @@ class PosControlMetricsController(http.Controller):
     @http.route("/pos_control_metrics/metrics", type="json", auth="user")
     def get_metrics(
         self, start_date=None, end_date=None, pos="all", cashier="all",
-        company="all", dtype="all", **kwargs
+        company="all", dtype="all", detail_limit=DETAIL_LIMIT, **kwargs
     ):
         self._check_access()
+        try:
+            detail_limit = max(1, min(int(detail_limit), EXPORT_DETAIL_LIMIT))
+        except (TypeError, ValueError):
+            detail_limit = DETAIL_LIMIT
         cr = request.env.cr
         lang = self._get_lang()
         tz = self._get_timezone()
@@ -241,13 +271,32 @@ class PosControlMetricsController(http.Controller):
         if pos and pos != "all":
             ord_where += " AND pc.name = %s"
             ord_params.append(pos)
+        if cashier and cashier != "all":
+            ord_where += " AND rp.name = %s"
+            ord_params.append(cashier)
+        if company and company != "all":
+            ord_where += " AND rc.name = %s"
+            ord_params.append(company)
         cr.execute(
-            f"SELECT COUNT(*) FROM pos_order po LEFT JOIN pos_config pc ON pc.id = po.config_id WHERE {ord_where}",
+            f"""
+            SELECT COUNT(*)
+            FROM pos_order po
+            LEFT JOIN pos_config pc ON pc.id = po.config_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN res_partner rp ON rp.id = ru.partner_id
+            LEFT JOIN res_company rc ON rc.id = po.company_id
+            WHERE {ord_where}
+            """,
             ord_params,
         )
         orders_period = int(cr.fetchone()[0] or 0)
-        denom = orders_period + kpis["n_order"]
-        kpis["deletion_rate"] = round(100.0 * kpis["n_order"] / denom, 2) if denom else 0.0
+        # Con un filtro de tipo distinto de 'order' el numerador es 0 por definición:
+        # la tasa no aplica y mostrar 0,00% haría creer que no hubo eliminaciones.
+        if dtype and dtype not in ("all", "order"):
+            kpis["deletion_rate"] = None
+        else:
+            denom = orders_period + kpis["n_order"]
+            kpis["deletion_rate"] = round(100.0 * kpis["n_order"] / denom, 2) if denom else 0.0
 
         # --- Ranking de cajeros (conteo por tipo + importe) ---
         # Se arma como dict por nombre para poder fusionar los reembolsos
@@ -318,16 +367,21 @@ class PosControlMetricsController(http.Controller):
         )[:15]
 
         # --- Distribución por motivo ---
+        # Único bloque que incluye los eventos 'refund' del log: el motivo del
+        # reembolso solo existe ahí y se graba una vez por orden reembolsada.
+        reasons_where, reasons_params = self._build_where(
+            start_date, end_date, pos, cashier, company, dtype, exclude_refund=False
+        )
         cr.execute(
             f"""
             SELECT COALESCE(pdr.name->>%s, pdr.name->>'en_US', 'Sin motivo') AS motivo,
                    COUNT(*) AS total
             {self._JOINS}
-            WHERE {where}
+            WHERE {reasons_where}
             GROUP BY 1
             ORDER BY total DESC
             """,
-            [lang] + params,
+            [lang] + reasons_params,
         )
         reasons = [{"motivo": r["motivo"], "total": int(r["total"])} for r in cr.dictfetchall()]
 
@@ -391,9 +445,9 @@ class PosControlMetricsController(http.Controller):
             {self._JOINS}
             WHERE {where}
             ORDER BY dl.event_datetime DESC
-            LIMIT 500
+            LIMIT %s
             """,
-            [tz, lang, lang] + params,
+            [tz, lang, lang] + params + [detail_limit],
         )
         detail = [
             {
@@ -429,8 +483,8 @@ class PosControlMetricsController(http.Controller):
                 SELECT to_char((po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s), 'YYYY-MM-DD HH24:MI') AS fecha,
                        rp.name AS cajero,
                        COUNT(*) AS n_lineas,
-                       COALESCE(SUM(pol.qty), 0) AS qty,
-                       COALESCE(SUM(pol.price_subtotal_incl), 0) AS amount,
+                       COALESCE(ABS(SUM(pol.qty)), 0) AS qty,
+                       COALESCE(ABS(SUM(pol.price_subtotal_incl)), 0) AS amount,
                        COALESCE(po.pos_reference, po.name, '') AS nota,
                        pc.name AS caja,
                        MAX(COALESCE(rdr.name->>%s, rdr.name->>'en_US', '')) AS motivo,
@@ -446,9 +500,9 @@ class PosControlMetricsController(http.Controller):
                 WHERE {rf_where}
                 GROUP BY po.id, po.date_order, rp.name, po.pos_reference, po.name, pc.name
                 ORDER BY po.date_order DESC
-                LIMIT 500
+                LIMIT %s
                 """,
-                [tz, lang] + rf_params,
+                [tz, lang] + rf_params + [detail_limit],
             )
             for r in cr.dictfetchall():
                 n = int(r["n_lineas"] or 0)
@@ -473,7 +527,7 @@ class PosControlMetricsController(http.Controller):
                 })
             # El formato 'YYYY-MM-DD HH24:MI' ordena cronológicamente como texto.
             detail.sort(key=lambda d: d["fecha"] or "", reverse=True)
-            detail = detail[:500]
+            detail = detail[:detail_limit]
 
         return {
             "kpis": kpis,
@@ -482,3 +536,126 @@ class PosControlMetricsController(http.Controller):
             "trend": trend,
             "detail": detail,
         }
+
+    @http.route("/pos_control_metrics/export_detail", type="http", auth="user")
+    def export_detail_xlsx(
+        self, start_date=None, end_date=None, pos="all", cashier="all",
+        company="all", dtype="all", **kwargs
+    ):
+        """Exporta a Excel el detalle de operaciones con los filtros activos."""
+        try:
+            self._check_access()
+
+            # Saneo de los filtros: llegan planos por GET, donde un select vacío
+            # se serializa como "" o "null" y no como None.
+            start_date = start_date if start_date and start_date not in ("null", "") else None
+            end_date = end_date if end_date and end_date not in ("null", "") else None
+            pos = pos or "all"
+            cashier = cashier or "all"
+            company = company or "all"
+            dtype = dtype or "all"
+
+            data = self.get_metrics(
+                start_date=start_date, end_date=end_date, pos=pos,
+                cashier=cashier, company=company, dtype=dtype,
+                detail_limit=EXPORT_DETAIL_LIMIT,
+            )
+            rows = data.get("detail") or []
+
+            output = io.BytesIO()
+            workbook = xlsxwriter.Workbook(output, {"in_memory": True})
+            fmt_title = workbook.add_format({"bold": True, "font_size": 12})
+            fmt_header = workbook.add_format({
+                "bold": True, "bg_color": "#1e293b", "font_color": "#ffffff",
+                "border": 1, "align": "center", "valign": "vcenter",
+            })
+            fmt_text = workbook.add_format({"border": 1, "valign": "top"})
+            fmt_wrap = workbook.add_format({"border": 1, "valign": "top", "text_wrap": True})
+            fmt_money = workbook.add_format({"border": 1, "num_format": "#,##0.00"})
+            fmt_qty = workbook.add_format({"border": 1, "num_format": "#,##0.###"})
+            fmt_pct = workbook.add_format({"border": 1, "num_format": "#,##0.00"})
+
+            sheet = workbook.add_worksheet("Detalle de operaciones")
+            sheet.set_column(0, 0, 18)   # fecha
+            sheet.set_column(1, 1, 26)   # cajero
+            sheet.set_column(2, 2, 20)   # tipo
+            sheet.set_column(3, 3, 50)   # producto
+            sheet.set_column(4, 8, 14)   # cant / desc / precios / importe
+            sheet.set_column(9, 9, 28)   # motivo
+            sheet.set_column(10, 10, 45)  # nota
+            sheet.set_column(11, 11, 22)  # caja
+
+            filtros = " · ".join([
+                f"Período: {start_date or 'inicio'} a {end_date or 'hoy'}",
+                f"Caja: {pos if pos != 'all' else 'Todas'}",
+                f"Cajero: {cashier if cashier != 'all' else 'Todos'}",
+                f"Empresa: {company if company != 'all' else 'Todas'}",
+                f"Tipo: {TYPE_LABELS.get(dtype, 'Todos') if dtype != 'all' else 'Todos'}",
+            ])
+            sheet.write(0, 0, "Detalle de operaciones POS", fmt_title)
+            sheet.write(1, 0, filtros)
+            sheet.write(2, 0, f"{len(rows)} operaciones")
+
+            headers = [
+                "Fecha/hora", "Cajero", "Tipo", "Producto", "Cantidad",
+                "Descuento %", "Precio anterior", "Precio nuevo", "Importe",
+                "Motivo", "Nota", "Caja",
+            ]
+            for col, header in enumerate(headers):
+                sheet.write(4, col, header, fmt_header)
+
+            for idx, row in enumerate(rows):
+                line = 5 + idx
+                tipo = row.get("tipo") or ""
+                # El dashboard muestra un botón "Ver" cuando la orden tenía
+                # varias líneas; en el Excel se vuelcan todas en la celda.
+                productos = row.get("productos") or []
+                producto = " | ".join(productos) if productos else (row.get("producto") or "")
+
+                sheet.write_string(line, 0, row.get("fecha") or "", fmt_text)
+                sheet.write_string(line, 1, row.get("cajero") or "", fmt_text)
+                sheet.write_string(line, 2, TYPE_LABELS.get(tipo, tipo), fmt_text)
+                sheet.write_string(line, 3, producto, fmt_wrap)
+                sheet.write_number(line, 4, float(row.get("qty") or 0.0), fmt_qty)
+                # Descuento y precios solo aplican a su tipo de evento: en el
+                # resto se deja la celda vacía en vez de un 0 engañoso.
+                if tipo == "high_discount":
+                    sheet.write_number(line, 5, float(row.get("discount") or 0.0), fmt_pct)
+                else:
+                    sheet.write_blank(line, 5, None, fmt_text)
+                if tipo in ("price_reduction", "price_increase"):
+                    sheet.write_number(line, 6, float(row.get("old_price") or 0.0), fmt_money)
+                    sheet.write_number(line, 7, float(row.get("new_price") or 0.0), fmt_money)
+                else:
+                    sheet.write_blank(line, 6, None, fmt_text)
+                    sheet.write_blank(line, 7, None, fmt_text)
+                sheet.write_number(line, 8, float(row.get("amount") or 0.0), fmt_money)
+                sheet.write_string(line, 9, row.get("motivo") or "", fmt_text)
+                sheet.write_string(line, 10, row.get("nota") or "", fmt_wrap)
+                sheet.write_string(line, 11, row.get("caja") or "", fmt_text)
+
+            if not rows:
+                sheet.write(5, 0, "Sin operaciones en el período.", fmt_text)
+
+            sheet.freeze_panes(5, 0)
+            sheet.autofilter(4, 0, 4 + len(rows), len(headers) - 1)
+
+            workbook.close()
+            xlsx_data = output.getvalue()
+            output.close()
+
+            filename = (
+                "detalle_operaciones_pos_"
+                f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            )
+            return request.make_response(
+                xlsx_data,
+                headers=[
+                    ("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    ("Content-Disposition", f'attachment; filename="{filename}"'),
+                    ("Content-Length", str(len(xlsx_data))),
+                ],
+            )
+        except Exception as e:
+            _logger.exception("Error exportando el detalle de operaciones POS")
+            return request.make_response(str(e), status=500)

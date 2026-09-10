@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_demand_model_list" model="ir.ui.view">
+        <field name="name">prometeo.demand.model.list</field>
+        <field name="model">prometeo.demand.model</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="method"/>
+                <field name="lookback_days"/>
+                <field name="service_level"/>
+                <field name="ignore_stockout_days"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_demand_model_form" model="ir.ui.view">
+        <field name="name">prometeo.demand.model.form</field>
+        <field name="model">prometeo.demand.model</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archivado" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Promedio ponderado 14/30/90"/></h1>
+                    </div>
+                    <group>
+                        <group string="Método">
+                            <field name="method"/>
+                            <field name="weight_config" invisible="method != 'weighted_ma'"/>
+                            <!-- Lo muestra el módulo que provea un método que lo use. -->
+                            <field name="alpha" invisible="1"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group string="Ventana de datos">
+                            <field name="lookback_days"/>
+                            <field name="min_history_days"/>
+                            <field name="ignore_stockout_days"/>
+                            <field name="outlier_percentile"/>
+                        </group>
+                        <group string="Nivel de servicio">
+                            <field name="service_level"/>
+                        </group>
+                        <group string="Alcance">
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_demand_model" model="ir.actions.act_window">
+        <field name="name">Modelos de demanda</field>
+        <field name="res_model">prometeo.demand.model</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configurá un modelo de demanda</p>
+            <p>Define cómo se estima la venta diaria de cada producto y qué nivel de servicio se busca cubrir.</p>
+        </field>
+    </record>
+</odoo>

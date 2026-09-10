@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="purchase.menu_purchase_root" model="ir.ui.menu">
+        <field name="groups_id" eval="[(4, ref('prometeo_purchase_advisor.group_purchase_advisor_user'))]"/>
+    </record>
+
+    <menuitem id="menu_purchase_advisor_root"
+              name="Recomendador de compra"
+              parent="purchase.menu_purchase_root"
+              sequence="46"
+              groups="prometeo_purchase_advisor.group_purchase_advisor_user"/>
+
+    <record id="menu_purchase_advisor_root" model="ir.ui.menu">
+        <field name="web_icon" eval="False"/>
+    </record>
+
+    <menuitem id="menu_purchase_suggestion"
+              name="Sugerencias de compra"
+              parent="menu_purchase_advisor_root"
+              action="action_purchase_suggestion"
+              sequence="10"/>
+
+    <menuitem id="menu_purchase_advisor_config"
+              name="Configuración"
+              parent="menu_purchase_advisor_root"
+              sequence="90"
+              groups="prometeo_purchase_advisor.group_purchase_advisor_manager"/>
+
+    <menuitem id="menu_purchase_suggestion_centralized"
+              name="Compra para varias sucursales"
+              parent="menu_purchase_advisor_root"
+              action="action_purchase_suggestion_centralized"
+              sequence="20"/>
+
+    <menuitem id="menu_demand_model"
+              name="Modelos de demanda"
+              parent="menu_purchase_advisor_config"
+              action="action_demand_model"
+              sequence="10"/>
+
+    <menuitem id="menu_demand_model_rule"
+              name="Reglas de asignación"
+              parent="menu_purchase_advisor_config"
+              action="action_demand_model_rule"
+              sequence="20"/>
+</odoo>

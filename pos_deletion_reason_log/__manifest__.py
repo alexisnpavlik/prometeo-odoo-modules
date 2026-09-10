@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Deletion Reason Log",
-    "version": "18.0.1.6.9",
+    "version": "18.0.1.7.2",
     "category": "Point of Sale",
     "summary": "Traza en el POS eliminaciones, descuentos altos y reducciones de precio, pidiendo motivo",
     "description": """
@@ -12,7 +12,8 @@ En cada caso se pide un motivo (lista configurable + texto opcional) y queda
 un registro con cajero, producto, cantidad/importe/porcentaje afectado, motivo
 y momento — aunque la orden nunca se sincronice al servidor.
 
-Incluye informe de sesión con el detalle y un dashboard de métricas de cajeros.
+Incluye informe de sesión con el detalle, un dashboard de métricas de cajeros
+y exportación a Excel del detalle de operaciones con los filtros activos.
 
 Standalone: si está instalado pos_special_approval_omax convive con su flujo de
 aprobación de manager (los popups se apilan), pero no depende de él.

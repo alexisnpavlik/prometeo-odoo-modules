@@ -8,6 +8,8 @@ from markupsafe import Markup
 from odoo import _, models
 from odoo.exceptions import UserError
 
+from odoo.addons.l10n_ar_afipws.afip_errors import afip_connection_message, is_afip_unreachable
+
 _logger = logging.getLogger(__name__)
 
 # TODO: unir AccountJournalWs con AccountJournal ya que ambos heredan account.journal
@@ -61,14 +63,17 @@ class AccountJournalWs(models.Model):
                 return _("AFIP WS %s not implemented") % afip_ws
             return last
 
-        except ValueError as error:
-            _logger.warning("exception in get_pyafipws_last_invoice: %s" % (str(error)))
-            if "The read operation timed out" in str(error):
-                raise UserError(_("Servicio AFIP Ocupado reintente en unos minutos"))
-            else:
-                raise UserError(
-                    _("Hubo un error al conectarse a AFIP, contacte a su" " proveedor de Odoo para mas información")
-                )
+        except UserError:
+            raise
+        except Exception as error:
+            # Antes solo se atrapaba ValueError, así que un SoapFault o un corte
+            # de conexión se le escapaba al usuario como traceback crudo.
+            _logger.warning("exception in get_pyafipws_last_invoice: %s", error)
+            if is_afip_unreachable(error):
+                raise UserError(afip_connection_message())
+            raise UserError(
+                _("Hubo un error al conectarse a AFIP, contacte a su proveedor de Odoo para mas información")
+            )
 
     def test_pyafipws_point_of_sales(self):
         self.ensure_one()

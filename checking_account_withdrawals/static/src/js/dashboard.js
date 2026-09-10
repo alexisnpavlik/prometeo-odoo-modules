@@ -22,7 +22,8 @@ class CawDashboard extends Component {
             activeTab: "general",
             loading: false,
             syncTime: "Cargando...",
-            theme: "dark"
+            theme: "dark",
+            showFilters: false
         });
 
         this.filtersData = useState({
@@ -112,8 +113,14 @@ class CawDashboard extends Component {
         setTimeout(() => this.renderAllCharts(), 50);
     }
 
+    toggleFilters() {
+        // Panel de filtros plegable: solo visible en pantallas chicas
+        this.state.showFilters = !this.state.showFilters;
+    }
+
     async applyFilters() {
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -124,6 +131,7 @@ class CawDashboard extends Component {
         this.state.partner = "all";
         this.state.search = "";
         this.state.page = 1;
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
@@ -318,7 +326,7 @@ class CawDashboard extends Component {
             labels: trendData.labels,
             datasets: datasets.length ? datasets : [{ label: "Saldo", data: [], borderColor: "#3b82f6" }]
         }, {
-            plugins: { legend: { display: true, position: "top", labels: { color: "#94a3b8", usePointStyle: true, pointStyle: "circle", padding: 15 } } },
+            plugins: { legend: { display: true, position: "top", labels: { usePointStyle: true, pointStyle: "circle", padding: 15 } } },
             scales: {
                 x: { grid: gridConfig },
                 y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
@@ -334,7 +342,7 @@ class CawDashboard extends Component {
                 { label: "Vencido", data: vs.overdue, borderColor: "#ef4444", backgroundColor: "rgba(239, 68, 68, 0.08)", fill: true, tension: 0.4, borderWidth: 3, pointBackgroundColor: "#ef4444", pointHoverRadius: 6 }
             ]
         }, {
-            plugins: { legend: { display: true, position: "top", labels: { color: "#94a3b8", usePointStyle: true, pointStyle: "circle", padding: 15 } } },
+            plugins: { legend: { display: true, position: "top", labels: { usePointStyle: true, pointStyle: "circle", padding: 15 } } },
             scales: {
                 x: { grid: gridConfig },
                 y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
@@ -351,7 +359,7 @@ class CawDashboard extends Component {
                 borderWidth: 1.5
             }]
         }, {
-            plugins: { legend: { display: true, position: "bottom", labels: { color: "#94a3b8", usePointStyle: true, pointStyle: "circle", padding: 15 } } }
+            plugins: { legend: { display: true, position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", padding: 15 } } }
         });
 
         // 4. Top deudores (bar horizontal)
@@ -407,7 +415,7 @@ class CawDashboard extends Component {
         }
 
         // Estilos base globales para Chart.js
-        Chart.defaults.color = "#94a3b8";
+        Chart.defaults.color = this.state.theme === "light" ? "#475569" : "#94a3b8";
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.font.size = 10;
 

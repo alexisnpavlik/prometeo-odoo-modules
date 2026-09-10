@@ -30,11 +30,14 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_open_confirm_wizard" type="object" string="Confirmar"
+                    <button name="action_deliver" type="object" string="Entregar"
                             class="oe_highlight" invisible="state != 'draft'"
+                            confirm="¿Confirmás la entrega de la mercadería? Esto descuenta el stock."/>
+                    <button name="action_open_confirm_wizard" type="object" string="Confirmar"
+                            class="oe_highlight" invisible="state not in ('draft', 'delivered')"
                             groups="checking_account_withdrawals.group_cc_manager"/>
                     <div class="alert alert-info mb-0" role="alert"
-                         invisible="state != 'draft'"
+                         invisible="state not in ('draft', 'delivered')"
                          groups="!checking_account_withdrawals.group_cc_manager">
                         Pendiente de confirmación por un Manager de Cuenta Corriente.
                     </div>
@@ -50,7 +53,7 @@
                             invisible="state != 'cancel'"
                             groups="checking_account_withdrawals.group_cc_manager"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,pending,partial,paid"/>
+                           statusbar_visible="draft,delivered,pending,partial,paid"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -70,7 +73,9 @@
                                    options="{'no_create': True}"/>
                             <field name="account_id" readonly="1" groups="base.group_no_one"/>
                             <field name="date" readonly="state != 'draft'"/>
-                            <field name="user_id"/>
+                            <field name="pricelist_id" readonly="1"
+                                   groups="checking_account_withdrawals.group_cc_manager"/>
+                            <field name="user_id" readonly="1"/>
                         </group>
                         <group>
                             <field name="company_id" groups="base.group_multi_company"/>
@@ -82,12 +87,17 @@
                     </group>
                     <notebook>
                         <page string="Líneas" name="lines">
-                            <field name="line_ids" readonly="state != 'draft'">
+                            <field name="caw_lines_editable" invisible="1"/>
+                            <!-- Fuera de borrador la lista sigue abierta solo para que el
+                                 Manager corrija precios: producto, descripción y cantidad
+                                 quedan bloqueados porque la mercadería ya salió. -->
+                            <field name="line_ids" readonly="not caw_lines_editable">
                                 <list editable="bottom">
-                                    <field name="sequence" widget="handle"/>
+                                    <field name="sequence" widget="handle"
+                                           column_invisible="parent.state != 'draft'"/>
                                     <field name="product_id" readonly="id"/>
-                                    <field name="name"/>
-                                    <field name="quantity"/>
+                                    <field name="name" readonly="parent.state != 'draft'"/>
+                                    <field name="quantity" readonly="parent.state != 'draft'"/>
                                     <field name="caw_price_editable" column_invisible="True"/>
                                     <field name="price_unit" readonly="not caw_price_editable" force_save="1"/>
                                     <field name="price_subtotal" sum="Total"/>
@@ -145,6 +155,8 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="user_id"/>
+                <filter name="filter_delivered" string="Entregados sin confirmar"
+                        domain="[('state', '=', 'delivered')]"/>
                 <filter name="filter_pending" string="Pendientes"
                         domain="[('state', '=', 'pending')]"/>
                 <filter name="filter_partial" string="Pago parcial"

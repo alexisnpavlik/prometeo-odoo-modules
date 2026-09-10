@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 
 STATE_SELECTION = [
     ("draft", "Borrador"),
+    ("delivered", "Entregado"),
     ("pending", "Pendiente"),
     ("partial", "Pago parcial"),
     ("paid", "Pagado"),
@@ -57,7 +58,9 @@ class CawWithdrawal(models.Model):
         comodel_name="res.users",
         string="Responsable",
         default=lambda self: self.env.user,
+        readonly=True,
         tracking=True,
+        help="Usuario que cargó el retiro. Se asigna solo y no se edita.",
     )
     company_id = fields.Many2one(
         comodel_name="res.company",
@@ -70,6 +73,15 @@ class CawWithdrawal(models.Model):
         related="company_id.currency_id",
         string="Moneda",
         readonly=True,
+    )
+    pricelist_id = fields.Many2one(
+        comodel_name="product.pricelist",
+        string="Lista de precios",
+        default=lambda self: self.env.company.caw_pricelist_id,
+        readonly=True,
+        help="Lista con la que se cotizaron las líneas. Se toma de los ajustes de la "
+             "compañía y no se elige por retiro; queda guardada acá para que cambiar "
+             "la configuración no altere los retiros ya cargados.",
     )
     note = fields.Text(string="Notas")
     line_ids = fields.One2many(
@@ -137,6 +149,12 @@ class CawWithdrawal(models.Model):
         string="Estado del albarán",
         store=True,
     )
+    caw_lines_editable = fields.Boolean(
+        string="Líneas editables por el usuario actual",
+        compute="_compute_caw_lines_editable",
+        help="Campo técnico para el readonly de line_ids: en borrador edita cualquiera, y "
+             "fuera de borrador solo un Manager, y solo para corregir precios.",
+    )
     is_inconsistent = fields.Boolean(
         string="Inconsistente",
         compute="_compute_is_inconsistent",
@@ -164,6 +182,97 @@ class CawWithdrawal(models.Model):
                 installment.state == "overdue" for installment in withdrawal.installment_ids
             )
 
+    def _caw_posted_allocations(self):
+        """Imputaciones del retiro que provienen de pagos publicados."""
+        self.ensure_one()
+        return self.installment_ids.mapped("allocation_ids").filtered(
+            lambda a: a.payment_id.state == "posted"
+        )
+
+    def _caw_price_correctable(self):
+        """El retiro admite que un Manager corrija los precios de sus líneas.
+
+        Borrador y entregado siempre: en el primero el retiro todavía se está armando y
+        en el segundo salió la mercadería pero aún no hay deuda emitida. Confirmado,
+        solo mientras no haya ningún pago imputado: corregir un precio reescribe los
+        montos de las cuotas, y hacerlo con pagos encima dejaría imputaciones sin
+        correspondencia.
+        """
+        self.ensure_one()
+        if self.is_cancelled:
+            return False
+        if not self.is_confirmed:
+            return True
+        return not self._caw_posted_allocations()
+
+    def _caw_in_draft(self):
+        """El retiro sigue en borrador: sin confirmar y sin mercadería entregada."""
+        self.ensure_one()
+        return not self.is_confirmed and not (
+            self.picking_id and self.picking_id.state == "done"
+        )
+
+    def _caw_check_price_correction(self):
+        """Valida que se pueda corregir el precio de un retiro fuera de borrador."""
+        for withdrawal in self:
+            if withdrawal._caw_in_draft():
+                continue
+            if not self.env.user.has_group("checking_account_withdrawals.group_cc_manager"):
+                raise AccessError(_(
+                    "Solo un Manager de Cuenta Corriente puede corregir el precio de un "
+                    "retiro que ya salió de borrador."
+                ))
+            if not withdrawal._caw_price_correctable():
+                raise UserError(_(
+                    "No se puede corregir el precio del retiro %s: está cancelado o tiene "
+                    "pagos imputados. Anulá primero esos pagos.",
+                    withdrawal.name,
+                ))
+
+    def _caw_resync_installments(self):
+        """Reajusta los montos de las cuotas al total corregido, sin tocar vencimientos.
+
+        No las borra ni las recrea: se escriben los montos sobre las mismas cuotas para
+        no perder sus ids ni sus fechas. El reparto usa el mismo criterio que la
+        generación original — el resto del redondeo va a la última cuota.
+        """
+        for withdrawal in self:
+            installments = withdrawal.installment_ids.sorted("sequence")
+            if not installments:
+                continue
+            currency = withdrawal.currency_id
+            total = withdrawal.amount_total
+            count = len(installments)
+            base = currency.round(total / count)
+            accumulated = 0.0
+            for index, installment in enumerate(installments):
+                is_last = index == count - 1
+                amount = currency.round(total - accumulated) if is_last else base
+                accumulated += amount
+                installment.with_context(caw_skip_total_check=True).amount = amount
+            # Ya con todos los montos escritos, se verifica el invariante una sola vez.
+            withdrawal.installment_ids._check_total_matches_withdrawal()
+            _logger.info(
+                "Retiro %s: cuotas reajustadas al total %s", withdrawal.name, total
+            )
+        return True
+
+    @api.depends_context("uid")
+    @api.depends(
+        "is_confirmed",
+        "is_cancelled",
+        "picking_state",
+        "installment_ids.allocation_ids.payment_id.state",
+    )
+    def _compute_caw_lines_editable(self):
+        """En borrador edita cualquiera; fuera de borrador, solo un Manager."""
+        is_manager = self.env.user.has_group("checking_account_withdrawals.group_cc_manager")
+        for withdrawal in self:
+            withdrawal.caw_lines_editable = bool(
+                (withdrawal._caw_in_draft() and not withdrawal.is_cancelled)
+                or (is_manager and withdrawal._caw_price_correctable())
+            )
+
     @api.depends("picking_state", "is_cancelled")
     def _compute_is_inconsistent(self):
         """Señala los retiros vivos cuyo albarán fue cancelado."""
@@ -175,6 +284,7 @@ class CawWithdrawal(models.Model):
     @api.depends(
         "is_cancelled",
         "is_confirmed",
+        "picking_state",
         "amount_total",
         "installment_ids.state",
         "installment_ids.amount_allocated",
@@ -183,6 +293,7 @@ class CawWithdrawal(models.Model):
     def _compute_state(self):
         """Deriva el estado del retiro del estado de sus cuotas. Nunca se escribe a mano.
 
+        delivered: mercadería entregada (albarán validado) pero todavía sin confirmar.
         pending: ninguna cuota con imputación.
         partial: al menos una cuota con imputación y residual total > 0.
         paid:    TODAS las cuotas pagadas y residual del retiro en cero.
@@ -192,7 +303,9 @@ class CawWithdrawal(models.Model):
                 withdrawal.state = "cancel"
                 continue
             if not withdrawal.is_confirmed:
-                withdrawal.state = "draft"
+                withdrawal.state = (
+                    "delivered" if withdrawal.picking_state == "done" else "draft"
+                )
                 continue
             installments = withdrawal.installment_ids
             currency = withdrawal.currency_id
@@ -228,6 +341,11 @@ class CawWithdrawal(models.Model):
         for vals in vals_list:
             if not vals.get("account_id"):
                 vals["account_id"] = self._caw_resolve_account(vals).id
+            if not vals.get("pricelist_id"):
+                company = self.env["res.company"].browse(vals["company_id"]) if vals.get(
+                    "company_id"
+                ) else self.env.company
+                vals["pricelist_id"] = company.caw_pricelist_id.id
             if vals.get("name", "/") == "/":
                 vals["name"] = self.env["ir.sequence"].next_by_code("caw.withdrawal") or "/"
         return super().create(vals_list)
@@ -273,10 +391,39 @@ class CawWithdrawal(models.Model):
             raise UserError(_("Solo se pueden eliminar retiros en borrador o cancelados."))
         return super().unlink()
 
+    @api.model
+    def _caw_is_price_only(self, commands):
+        """True si los comandos de line_ids solo actualizan el precio de líneas existentes.
+
+        La corrección de precios del Manager es la única edición admitida fuera de
+        borrador: alta, baja, cambio de producto o de cantidad siguen prohibidos porque
+        la mercadería ya salió y el albarán quedaría en desacuerdo con el retiro.
+        """
+        if not commands:
+            return False
+        for command in commands:
+            if not (isinstance(command, (list, tuple)) and len(command) == 3):
+                return False
+            if command[0] != 1:
+                return False
+            if set(command[2] or {}) - {"price_unit"}:
+                return False
+        return True
+
     def write(self, vals):
-        """Impide editar las líneas de un retiro que ya salió de borrador."""
-        if "line_ids" in vals and any(w.is_confirmed or w.is_cancelled for w in self):
-            raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
+        """Impide editar las líneas de un retiro que ya salió de borrador.
+
+        También bloquea las de un retiro entregado aunque siga sin confirmar: el stock
+        ya salió y cambiar las líneas dejaría el albarán y el retiro en desacuerdo. La
+        excepción es la corrección de precios del Manager, que se valida y reajusta las
+        cuotas en el write de la línea.
+        """
+        price_only = "line_ids" in vals and self._caw_is_price_only(vals["line_ids"])
+        if "line_ids" in vals and not price_only:
+            if any(w.is_confirmed or w.is_cancelled for w in self):
+                raise UserError(_("No se pueden modificar las líneas de un retiro confirmado."))
+            if any(w.picking_id and w.picking_id.state == "done" for w in self):
+                raise UserError(_("No se pueden modificar las líneas de un retiro ya entregado."))
         return super().write(vals)
 
     def _caw_due_date(self, index, first_days, period, cutoff_day):
@@ -334,7 +481,7 @@ class CawWithdrawal(models.Model):
     def _caw_check_confirmable(self):
         """Valida las precondiciones para confirmar un retiro."""
         for withdrawal in self:
-            if withdrawal.state != "draft":
+            if withdrawal.state not in ("draft", "delivered"):
                 raise UserError(_("El retiro %s ya fue confirmado.", withdrawal.name))
             if not withdrawal.partner_id.sudo().caw_enabled:
                 raise UserError(_(
@@ -430,29 +577,84 @@ class CawWithdrawal(models.Model):
         """Valida el albarán de salida del retiro (descuenta el stock).
 
         Usa sudo porque el Operador (group_cc_user) no tiene stock.group_stock_user.
-        Este módulo no maneja entregas parciales: si Odoo devuelve el wizard intermedio
-        de backorder (picking con cantidad hecha menor a la demandada), se resuelve
-        automáticamente eligiendo "sin entrega parcial" para no dejar el flujo a mitad
-        de camino esperando una acción manual que este módulo no expone.
+        `skip_sms` saltea el aviso de confirmación de `stock_sms`: un retiro a cuenta
+        corriente no notifica al contacto por SMS y, sin ese contexto, button_validate
+        devuelve el wizard `confirm.stock.sms` en vez de validar.
+        Este módulo tampoco maneja entregas parciales: si Odoo devuelve el wizard de
+        backorder (cantidad hecha menor a la demandada), se resuelve automáticamente
+        eligiendo "sin entrega parcial".
         """
         self.ensure_one()
         if not self.picking_id:
             raise UserError(_("El retiro %s no tiene albarán asociado.", self.name))
         if self.picking_id.state == "done":
             raise UserError(_("El albarán del retiro %s ya está validado.", self.name))
-        picking = self.picking_id.sudo()
+        picking = self.picking_id.sudo().with_context(skip_sms=True)
         result = picking.button_validate()
         if isinstance(result, dict) and result.get("res_model"):
-            wizard = (
-                self.env[result["res_model"]]
-                .sudo()
-                .with_context(**(result.get("context") or {}))
-                .create({})
-            )
-            if hasattr(wizard, "process_cancel_backorder"):
-                wizard.process_cancel_backorder()
-            elif hasattr(wizard, "process"):
-                wizard.process()
+            self._caw_resolve_validation_wizard(result)
+        if self.picking_id.state != "done":
+            raise UserError(_(
+                "No se pudo validar el albarán %(picking)s del retiro %(name)s: quedó "
+                "en estado '%(state)s'. Validalo desde Inventario.",
+                picking=self.picking_id.name,
+                name=self.name,
+                state=self.picking_id.state,
+            ))
+        return True
+
+    def _caw_resolve_validation_wizard(self, action):
+        """Resuelve el diálogo intermedio que devuelve button_validate.
+
+        Reutiliza el wizard que Odoo ya creó (`res_id`) en lugar de instanciar uno
+        vacío: varios wizards guardan ahí los albaranes a procesar y uno nuevo no
+        tendría a qué aplicarse. Si el diálogo no es de los conocidos se levanta el
+        error en vez de seguir de largo — pasar por alto un diálogo desconocido es
+        justamente lo que dejaba el albarán sin validar y sin ningún aviso.
+        """
+        self.ensure_one()
+        model = self.env[action["res_model"]].sudo().with_context(
+            **(action.get("context") or {})
+        )
+        wizard = model.browse(action["res_id"]) if action.get("res_id") else model.create({})
+        for method in ("process_cancel_backorder", "process"):
+            if hasattr(wizard, method):
+                getattr(wizard, method)()
+                return True
+        raise UserError(_(
+            "La validación del albarán %(picking)s abrió un diálogo que este módulo no "
+            "sabe resolver (%(model)s). Validá el albarán desde Inventario.",
+            picking=self.picking_id.name,
+            model=action["res_model"],
+        ))
+
+    def action_deliver(self):
+        """Entrega la mercadería del retiro: genera el albarán y lo valida en un paso.
+
+        Es la acción del Operador, disponible en borrador: el stock sale primero y el
+        Manager define después el plan de cuotas. Va en un solo paso porque el Operador
+        no es usuario de stock y no tendría cómo intervenir el albarán entre la creación
+        y la validación.
+        """
+        self.ensure_one()
+        if self.is_cancelled:
+            raise UserError(_("El retiro %s está cancelado.", self.name))
+        if self.picking_id and self.picking_id.state == "done":
+            raise UserError(_("El retiro %s ya fue entregado.", self.name))
+        if not self.line_ids:
+            raise UserError(_("El retiro %s no tiene líneas.", self.name))
+        if not self.line_ids.filtered(lambda l: l.product_id.is_storable):
+            raise UserError(_(
+                "El retiro %s no tiene productos almacenables: no hay mercadería que entregar.",
+                self.name,
+            ))
+        self._caw_create_picking()
+        self.action_validate_picking()
+        # _message_log en vez de message_post: el Operador puede no tener email
+        # configurado y message_post exige remitente (rompería la entrega entera).
+        self._message_log(body=_(
+            "Mercadería entregada por %s.", self.env.user.display_name
+        ))
         return True
 
     def action_confirm(self):
@@ -527,14 +729,18 @@ class CawWithdrawal(models.Model):
             raise AccessError(_("Solo un Manager de Cuenta Corriente puede realizar esta acción."))
 
     def action_cancel(self):
-        """Cancela el retiro. Se bloquea si tiene pagos imputados o el albarán ya se validó."""
+        """Cancela el retiro. Se bloquea si tiene pagos imputados o el albarán ya se validó.
+
+        Excepción: un retiro entregado pero todavía sin confirmar (sin cuotas ni pagos)
+        sí se puede cancelar, porque de otro modo quedaría sin salida — tampoco se puede
+        borrar, ya que unlink solo admite borrador y cancelado. La devolución de la
+        mercadería queda a cargo de Inventario y se avisa en el chatter.
+        """
         self._caw_check_manager()
         for withdrawal in self:
             if withdrawal.is_cancelled:
                 raise UserError(_("El retiro %s ya está cancelado.", withdrawal.name))
-            allocations = withdrawal.installment_ids.mapped("allocation_ids").filtered(
-                lambda a: a.payment_id.state == "posted"
-            )
+            allocations = withdrawal._caw_posted_allocations()
             if allocations:
                 raise UserError(_(
                     "El retiro %(name)s tiene pagos imputados por %(amount)s. "
@@ -542,13 +748,22 @@ class CawWithdrawal(models.Model):
                     name=withdrawal.name,
                     amount=sum(allocations.mapped("amount")),
                 ))
+            delivered_not_confirmed = False
             if withdrawal.picking_id and withdrawal.picking_id.state == "done":
-                raise UserError(_(
-                    "El retiro %s tiene el albarán validado (el stock ya se entregó). "
-                    "Gestioná una devolución antes de cancelarlo.",
-                    withdrawal.name,
+                if withdrawal.is_confirmed:
+                    raise UserError(_(
+                        "El retiro %s tiene el albarán validado (el stock ya se entregó). "
+                        "Gestioná una devolución antes de cancelarlo.",
+                        withdrawal.name,
+                    ))
+                delivered_not_confirmed = True
+            if delivered_not_confirmed:
+                withdrawal.message_post(body=_(
+                    "Retiro cancelado con la mercadería ya entregada (albarán %s validado). "
+                    "Gestioná la devolución por Inventario.",
+                    withdrawal.picking_id.name,
                 ))
-            if withdrawal.picking_id:
+            elif withdrawal.picking_id:
                 withdrawal.picking_id.sudo().action_cancel()
             withdrawal.installment_ids.unlink()
             withdrawal.is_cancelled = True

@@ -2,7 +2,42 @@
 <odoo>
     <record id="group_edit_product_defaults" model="res.groups">
         <field name="name">Editar valores por defecto de producto</field>
-        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="category_id" ref="base.module_category_inventory"/>
         <field name="comment">Permite editar los campos que Product Default Settings deja bloqueados: Tipo de producto, Rastrear inventario, Política de facturación, Ventas, Compras y Punto de venta. Desactivado por defecto.</field>
+    </record>
+
+    <!-- Un grupo por pestaña del formulario de producto. Sin el grupo, la pestaña
+         no se ve. Se manejan como casillas desde Ajustes > Inventario y también
+         se pueden asignar a un usuario puntual desde su ficha. -->
+
+    <record id="group_show_page_variants" model="res.groups">
+        <field name="name">Ver pestaña Atributos y variantes en producto</field>
+        <field name="category_id" ref="base.module_category_inventory"/>
+        <field name="comment">Muestra la pestaña "Atributos y variantes" en la ficha del producto. Implica el grupo nativo "Variantes de producto", para no dejar la funcionalidad de variantes a medias. Desactivado por defecto.</field>
+        <field name="implied_ids" eval="[(4, ref('product.group_product_variant'))]"/>
+    </record>
+
+    <record id="group_show_page_sales" model="res.groups">
+        <field name="name">Ver pestaña Ventas en producto</field>
+        <field name="category_id" ref="base.module_category_inventory"/>
+        <field name="comment">Muestra la pestaña "Ventas" en la ficha del producto (etiquetas de producto y descripción para cotizaciones). Desactivado por defecto.</field>
+    </record>
+
+    <record id="group_show_page_purchase" model="res.groups">
+        <field name="name">Ver pestaña Compras en producto</field>
+        <field name="category_id" ref="base.module_category_inventory"/>
+        <field name="comment">Muestra la pestaña "Compras" en la ficha del producto (proveedores, UdM de compra, descripción de compra). Desactivado por defecto.</field>
+    </record>
+
+    <record id="group_show_page_inventory" model="res.groups">
+        <field name="name">Ver pestaña Inventario en producto</field>
+        <field name="category_id" ref="base.module_category_inventory"/>
+        <field name="comment">Muestra la pestaña "Inventario" en la ficha del producto (peso, volumen, rutas, embalajes, descripciones para albaranes). Desactivado por defecto.</field>
+    </record>
+
+    <record id="group_show_page_pos" model="res.groups">
+        <field name="name">Ver pestaña Punto de venta en producto</field>
+        <field name="category_id" ref="base.module_category_inventory"/>
+        <field name="comment">Muestra la pestaña "Punto de venta" en la ficha del producto (categorías de POS, pesable). Activado por defecto.</field>
     </record>
 </odoo>

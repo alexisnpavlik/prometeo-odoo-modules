@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_demand_model_form_ewma" model="ir.ui.view">
+        <field name="name">prometeo.demand.model.form.ewma</field>
+        <field name="model">prometeo.demand.model</field>
+        <field name="inherit_id" ref="prometeo_purchase_advisor.view_demand_model_form"/>
+        <field name="arch" type="xml">
+            <field name="alpha" position="attributes">
+                <attribute name="invisible">method != 'ewma'</attribute>
+            </field>
+        </field>
+    </record>
+</odoo>

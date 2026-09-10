@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
+from odoo.tools.safe_eval import safe_eval
 
 from .common import CviCommon
 
@@ -51,6 +52,32 @@ class TestCviTransfer(CviCommon):
         cards = self._active_cards(1)
         self._wizard(cards).action_confirm_transfer()
         self.assertEqual(cards.collector_id, self.collector_dest)
+
+    def test_menu_opens_without_selected_cards(self):
+        """El menú no tiene active_ids: abre el asistente vacío."""
+        action = self.env.ref(
+            "collections_from_vendors_installments.action_cvi_transfer_wizard"
+        )
+        context = safe_eval(action.context or "{}", {"context": {}})
+        defaults = self.env["cvi.transfer.wizard"].with_context(
+            context
+        ).default_get(["card_ids"])
+        self.assertFalse(defaults.get("card_ids"))
+
+    def test_bound_action_keeps_the_selected_cards(self):
+        """La acción de lista conserva exactamente las tarjetas seleccionadas."""
+        cards = self._active_cards(2)
+        wizard = self.env["cvi.transfer.wizard"].with_context(
+            active_model="cvi.card", active_ids=cards.ids,
+        ).create({"collector_dest_id": self.collector_dest.id, "reason": "Cambio de zona"})
+        self.assertEqual(wizard.card_ids, cards)
+
+    def test_other_models_do_not_prefill_cards(self):
+        """Los IDs de otra pantalla no se interpretan como tarjetas."""
+        defaults = self.env["cvi.transfer.wizard"].with_context(
+            active_model="res.users", active_ids=self.collector_user.ids,
+        ).default_get(["card_ids"])
+        self.assertFalse(defaults.get("card_ids"))
 
     def test_transferred_card_stays_active(self):
         """La tarjeta transferida sigue en cobranza: no vuelve a pendiente de aceptar."""

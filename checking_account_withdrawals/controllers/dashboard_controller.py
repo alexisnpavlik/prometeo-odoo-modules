@@ -18,6 +18,7 @@ INSTALLMENT_STATES = {
 
 WITHDRAWAL_STATES = {
     "draft": "Borrador",
+    "delivered": "Entregado",
     "pending": "Pendiente",
     "partial": "Pago parcial",
     "paid": "Pagado",
@@ -35,7 +36,7 @@ class CawDashboardController(http.Controller):
 
     def _caw_where(self, env, start_date, end_date, company, partner, alias="w"):
         """WHERE parametrizado sobre caw_withdrawal (alias `w`), scopeado a las compañías."""
-        where = f"{alias}.state NOT IN ('draft', 'cancel') AND {alias}.company_id IN %s"
+        where = f"{alias}.state NOT IN ('draft', 'delivered', 'cancel') AND {alias}.company_id IN %s"
         params = [tuple(env.companies.ids)]
         if start_date:
             where += f" AND {alias}.date >= %s"
@@ -269,7 +270,7 @@ class CawDashboardController(http.Controller):
         else:
             record_model = env["caw.withdrawal"]
             date_field = "date"
-            domain.append(("state", "not in", ("draft", "cancel")))
+            domain.append(("state", "not in", ("draft", "delivered", "cancel")))
         if start_date:
             domain.append((date_field, ">=", start_date))
         if end_date:
@@ -313,6 +314,7 @@ class CawDashboardController(http.Controller):
                 "allocated": record.amount_allocated,
                 "residual": record.amount_residual,
                 "state": INSTALLMENT_STATES.get(record.state, record.state),
+                "state_key": record.state,
             }
         return {
             "id": record.id,
@@ -324,6 +326,7 @@ class CawDashboardController(http.Controller):
             "residual": record.amount_residual,
             "overdue": record.is_overdue,
             "state": WITHDRAWAL_STATES.get(record.state, record.state),
+            "state_key": record.state,
         }
 
     @http.route("/checking_account_withdrawals/export", type="http", auth="user")
@@ -341,7 +344,8 @@ class CawDashboardController(http.Controller):
         rows = [self._caw_serialize(record, model) for record in records]
         output = io.StringIO()
         if rows:
-            writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()), delimiter=";")
+            fieldnames = [k for k in rows[0].keys() if not k.endswith("_key")]
+            writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";", extrasaction="ignore")
             writer.writeheader()
             writer.writerows(rows)
         filename = f"cuenta_corriente_{model}.csv"
