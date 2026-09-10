@@ -59,6 +59,51 @@
         </field>
     </record>
 
+    <record id="view_cvi_recovered_stock_list" model="ir.ui.view">
+        <field name="name">cvi.recovered.stock.list</field>
+        <field name="model">stock.quant</field>
+        <field name="arch" type="xml">
+            <list string="Muebles retirados" create="false" edit="false">
+                <field name="product_id" string="Modelo"/>
+                <field name="quantity" string="Retirados" sum="Total"/>
+                <field name="location_id" string="Ubicación" optional="hide"/>
+                <field name="company_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cvi_recovered_stock_search" model="ir.ui.view">
+        <field name="name">cvi.recovered.stock.search</field>
+        <field name="model">stock.quant</field>
+        <field name="arch" type="xml">
+            <search string="Muebles retirados">
+                <field name="product_id" string="Modelo"/>
+                <filter name="filter_with_stock" string="Con unidades"
+                        domain="[('quantity', '&gt;', 0)]"/>
+                <group expand="1" string="Agrupar por">
+                    <filter name="group_by_product" string="Modelo"
+                            context="{'group_by': 'product_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cvi_recovered_stock" model="ir.actions.act_window">
+        <field name="name">Muebles retirados</field>
+        <field name="res_model">stock.quant</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_cvi_recovered_stock_search"/>
+        <field name="domain">[('location_id.cvi_is_recovered_location', '=', True)]</field>
+        <field name="context">{'search_default_filter_with_stock': 1, 'search_default_group_by_product': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No hay muebles retirados</p>
+            <p>Acá entran los muebles que se retiraron a clientes que dejaron de pagar.
+               No vuelven al stock vendible: uno usado no es el mismo producto que uno
+               nuevo. Para ver de qué venta salió cada uno, usá el filtro "Retiradas"
+               en Todas las tarjetas.</p>
+        </field>
+    </record>
+
     <!-- Server action y no act_window porque el dominio depende del usuario que la abre. -->
     <record id="action_cvi_my_stock" model="ir.actions.server">
         <field name="name">Mi mercadería</field>

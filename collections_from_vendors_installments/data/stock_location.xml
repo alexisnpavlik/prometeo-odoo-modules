@@ -16,6 +16,7 @@
             <field name="usage">internal</field>
             <field name="location_id" ref="stock.stock_location_locations"/>
             <field name="comment">Mercadería retirada a clientes que dejaron de pagar.</field>
+            <field name="cvi_is_recovered_location" eval="True"/>
         </record>
     </data>
 </odoo>

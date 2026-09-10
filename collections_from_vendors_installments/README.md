@@ -112,7 +112,12 @@ Esta versión también incluye:
   revisadas y observaciones trazables.
 - **Mora y recuperaciones**: el cron diario actualiza cuotas vencidas y la
   antigüedad de la deuda; se pueden marcar tarjetas para retiro y registrar el
-  reingreso del mueble recuperado.
+  reingreso del mueble recuperado. Al registrar el retiro, las cuotas que
+  quedaban sin cobrar pasan a **Cancelada** y la tarjeta queda con saldo cero: la
+  deuda se da por perdida junto con el mueble y no se devuelve dinero. Lo que el
+  cliente alcanzó a pagar queda en *Cobrado al retirar*, así que la pérdida es el
+  total menos ese importe. El mueble entra a la ubicación `Recuperados`, que no es
+  stock vendible, y se ve en Depósito > *Muebles retirados*.
 - **Clientes y antecedentes**: historial, sugerencia y marca manual de cliente
   problemático con motivo pedido al marcar; la marca puede levantarse si
   corresponde. La ficha guarda frente y dorso del DNI, con filtro para encontrar

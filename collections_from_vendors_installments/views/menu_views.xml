@@ -45,6 +45,8 @@
               parent="menu_cvi_stock" action="action_cvi_vendor_delivery" sequence="10"/>
     <menuitem id="menu_cvi_vendor_stock" name="Mercadería en la calle"
               parent="menu_cvi_stock" action="action_cvi_vendor_stock" sequence="20"/>
+    <menuitem id="menu_cvi_recovered_stock" name="Muebles retirados"
+              parent="menu_cvi_stock" action="action_cvi_recovered_stock" sequence="30"/>
 
     <menuitem id="menu_cvi_supervision" name="Supervisión" parent="menu_cvi_root"
               sequence="35"
