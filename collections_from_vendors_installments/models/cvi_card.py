@@ -845,8 +845,11 @@ class CviCard(models.Model):
             else:
                 card.days_overdue = 0
 
-    def action_mark_to_recover(self):
+    def action_mark_to_recover(self, reason=None):
         """Marca la tarjeta para recuperar la mercadería (HU-25).
+
+        El motivo llega del recuadro. Sigue aceptando el que ya esté guardado en la
+        tarjeta para no romper lo que llame a este método sin pasarlo.
 
         Es una marca y no un estado: la tarjeta sigue en cobranza. Si el cliente
         aparece y paga antes del retiro, se salva sin tener que deshacer nada.
@@ -860,20 +863,62 @@ class CviCard(models.Model):
             ))
         if self.to_recover:
             raise UserError(_("La tarjeta %s ya está marcada para retiro.", self.name))
-        if not self.to_recover_reason:
+        motive = (reason or self.to_recover_reason or "").strip()
+        if not motive:
             raise UserError(_(
                 "Cargá el motivo antes de marcar %s para retiro.", self.name
             ))
         self.write({
             "to_recover": True,
+            "to_recover_reason": motive,
             "to_recover_date": fields.Datetime.now(),
             "to_recover_user_id": self.env.user.id,
         })
         self._cvi_log(_(
             "Tarjeta marcada PARA RETIRO por %(user)s. Motivo: %(reason)s.",
-            user=self.env.user.name, reason=self.to_recover_reason,
+            user=self.env.user.name, reason=motive,
+        ))
+        self._cvi_log_customer(_(
+            "Tarjeta %(card)s marcada PARA RETIRO por %(user)s. Motivo: %(reason)s.",
+            card=self.name, user=self.env.user.name, reason=motive,
         ))
         return True
+
+    def _cvi_log_customer(self, body):
+        """Deja el evento también en el historial del cliente, no solo en la tarjeta.
+
+        Quien atiende al cliente abre su ficha, no la de cada compra: los hechos que
+        lo describen (marcas de retiro, retiros efectivos) tienen que estar ahí.
+
+        _message_log y no message_post: registra la nota sin notificar a nadie, así no
+        depende de que el usuario tenga email cargado (los vendedores y cobradores son
+        personal de calle y muchos no lo tienen). El sudo() es por el mismo criterio
+        que el resto del módulo: el registro es consecuencia de una acción que el
+        usuario ya está autorizado a hacer, y author_id preserva la atribución real.
+        """
+        self.ensure_one()
+        if not self.customer_id:
+            return False
+        return self.customer_id.sudo()._message_log(
+            body=body, author_id=self.env.user.partner_id.id,
+        )
+
+    def action_open_recover_wizard(self):
+        """Abre el recuadro donde se escribe el motivo del retiro (HU-25).
+
+        El botón no marca por sí solo: el motivo dejó de ser un campo suelto del
+        formulario, así que pedirlo en el momento es lo que evita marcas sin
+        explicación. Mismo criterio que la marca de mala paga del cliente.
+        """
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Marcar para retiro"),
+            "res_model": "cvi.recover.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_card_id": self.id},
+        }
 
     def action_unmark_to_recover(self):
         """Levanta la marca de retiro, por ejemplo si el cliente se puso al día."""
@@ -883,6 +928,10 @@ class CviCard(models.Model):
         self.write({"to_recover": False, "to_recover_date": False,
                     "to_recover_user_id": False})
         self._cvi_log(_("Marca de retiro levantada por %s.", self.env.user.name))
+        self._cvi_log_customer(_(
+            "Se levantó la marca de retiro de la tarjeta %(card)s (%(user)s).",
+            card=self.name, user=self.env.user.name,
+        ))
         return True
 
     def action_register_recovery(self):
@@ -911,6 +960,13 @@ class CviCard(models.Model):
             paid=self.amount_paid,
             total=self.amount_total,
             picking=picking.name,
+        ))
+        self._cvi_log_customer(_(
+            "Mueble RETIRADO de la tarjeta %(card)s. Había pagado %(paid)s de "
+            "%(total)s y las cuotas pendientes quedaron canceladas.",
+            card=self.name,
+            paid=self.amount_paid_at_recovery,
+            total=self.amount_total,
         ))
         _logger.info(
             "Tarjeta %s retirada: cobrado %s de %s",
@@ -980,17 +1036,27 @@ class CviCard(models.Model):
 
     @api.depends(
         "amount_total",
+        "state",
         "installment_ids.amount_paid",
         "installment_ids.amount_residual",
         "installment_ids.state",
         "installment_ids.date_due",
     )
     def _compute_balance(self):
-        """Resume el estado de cobranza de la tarjeta a partir de sus cuotas (HU-16)."""
+        """Resume el estado de cobranza de la tarjeta a partir de sus cuotas (HU-16).
+
+        Una tarjeta retirada no tiene saldo: la deuda se dio por perdida junto con el
+        mueble y no se reclama más (HU-26). La pérdida es amount_total menos
+        amount_paid_at_recovery, y cuota por cuota queda en el residual de las
+        canceladas.
+        """
         for card in self:
             installments = card.installment_ids
             card.amount_paid = sum(installments.mapped("amount_paid"))
-            card.amount_residual = sum(installments.mapped("amount_residual"))
+            if card.state == "recovered":
+                card.amount_residual = 0.0
+            else:
+                card.amount_residual = sum(installments.mapped("amount_residual"))
             card.paid_installment_count = len(
                 installments.filtered(lambda i: i.state == "paid")
             )
@@ -1001,7 +1067,9 @@ class CviCard(models.Model):
                 installments.filtered(lambda i: i.state == "overdue")
             )
             upcoming = installments.filtered(
-                lambda i: not i.is_commission and i.amount_residual > 0
+                lambda i: not i.is_commission
+                and i.amount_residual > 0
+                and i.state != "cancelled"
             ).sorted("date_due")
             card.next_due_date = upcoming[0].date_due if upcoming else False
 

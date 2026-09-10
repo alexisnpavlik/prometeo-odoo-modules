@@ -109,19 +109,18 @@ class CviInstallment(models.Model):
         ),
     ]
 
-    @api.depends(
-        "amount",
-        "allocation_ids.amount",
-        "allocation_ids.payment_id.state",
-        "card_id.state",
-    )
+    @api.depends("amount", "allocation_ids.amount", "allocation_ids.payment_id.state")
     def _compute_amounts(self):
         """Cobrado = imputaciones de cobros publicados. Residual nunca es negativo.
 
-        Si el mueble se retiró, lo que faltaba pagar deja de ser saldo: la deuda se
-        dio por perdida junto con la mercadería y no se reclama más (HU-26). Lo
-        cobrado hasta ahí no se toca, y la pérdida sigue siendo calculable como
-        amount_total menos amount_paid_at_recovery en la tarjeta.
+        A propósito NO depende del estado de la tarjeta. Con el mueble retirado la
+        cuota queda en Cancelada y la tarjeta deja de mostrar saldo, pero el residual
+        de la cuota sigue siendo lo que quedó sin cobrar: es el monto de la pérdida.
+
+        Poner acá `card_id.state` además rompía el borrado: al eliminar una tarjeta,
+        la dependencia marcaba como sucio el residual de cuotas ya borradas y el flush
+        moría con MissingError buscando la moneda de un registro inexistente (este
+        campo es Monetary y necesita currency_id para escribirse).
         """
         for installment in self:
             paid = sum(
@@ -130,10 +129,7 @@ class CviInstallment(models.Model):
                 .mapped("amount")
             )
             installment.amount_paid = paid
-            if installment.card_id.state == "recovered":
-                installment.amount_residual = 0.0
-            else:
-                installment.amount_residual = max(installment.amount - paid, 0.0)
+            installment.amount_residual = max(installment.amount - paid, 0.0)
 
     @api.depends("allocation_ids.payment_id.state", "allocation_ids.payment_id.user_id")
     def _compute_collected_by(self):
@@ -160,7 +156,7 @@ class CviInstallment(models.Model):
             rounding = installment.currency_id.rounding or 0.01
             tolerance = installment.company_id.cvi_overdue_days or 0
             if installment.card_id.state == "recovered" and (
-                installment.amount_paid < installment.amount
+                installment.amount_residual > 0
             ):
                 installment.state = "cancelled"
             elif float_is_zero(installment.amount_residual, precision_rounding=rounding):

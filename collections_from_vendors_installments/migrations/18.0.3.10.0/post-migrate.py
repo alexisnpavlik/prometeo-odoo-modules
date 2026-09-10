@@ -6,9 +6,10 @@ Dos cosas que un `-u` no hace solo:
 - El registro de la ubicación `Recuperados` vive en un bloque `noupdate="1"`, así
   que agregar `cvi_is_recovered_location` al XML no lo actualiza en una base que ya
   lo tenía creado. Sin esto el reporte de muebles retirados sale vacío.
-- `state` y `amount_residual` de las cuotas son computados almacenados: las
+- El estado de la cuota y el saldo de la tarjeta son computados almacenados: las
   tarjetas retiradas antes de esta versión siguen con sus cuotas en Pendiente o
-  Vencida y con saldo, hasta que algo las toque.
+  Vencida y con saldo vivo, hasta que algo las toque. El residual de cada cuota
+  NO se toca: es el monto de la pérdida.
 """
 import logging
 

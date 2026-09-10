@@ -29,7 +29,7 @@
                             groups="collections_from_vendors_installments.group_cvi_collector"/>
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="state not in ('draft', 'sold')"/>
-                    <button name="action_mark_to_recover" type="object"
+                    <button name="action_open_recover_wizard" type="object"
                             string="Marcar para retiro"
                             invisible="to_recover or state not in ('active', 'routed')"
                             groups="collections_from_vendors_installments.group_cvi_manager"/>
@@ -99,12 +99,6 @@
                         <field name="partner_alert" readonly="1" nolabel="1"/>
                     </div>
                     <field name="has_partner_alert" invisible="1"/>
-                    <group string="Retiro del mueble"
-                           invisible="to_recover or state not in ('active', 'routed')"
-                           groups="collections_from_vendors_installments.group_cvi_manager">
-                        <field name="to_recover_reason"
-                               placeholder="Indicá el motivo antes de marcar para retiro"/>
-                    </group>
                     <div class="alert alert-danger" role="alert" invisible="not to_recover">
                         Tarjeta marcada para retiro del mueble:
                         <field name="to_recover_reason" readonly="state == 'recovered'"/>
