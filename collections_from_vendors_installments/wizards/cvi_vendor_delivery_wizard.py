@@ -46,8 +46,22 @@ class CviVendorDeliveryWizard(models.TransientModel):
         return vendor, factory
 
     def _cvi_check_availability(self, source):
-        """Verifica que haya suficiente stock en el origen antes de mover nada (HU-02, HU-04)."""
+        """Verifica que haya suficiente stock en el origen antes de mover nada (HU-02, HU-04).
+
+        Con cvi_allow_negative_stock la SALIDA no se traba: la fábrica termina el
+        mueble después de que el vendedor se lo lleva, y exigir disponibilidad
+        obligaba a inventar un ajuste de inventario antes de cada entrega. El
+        faltante queda como negativo en fábrica, que es el dato real y lo que deja
+        ver cuánto se entregó sin respaldo de producción.
+
+        La DEVOLUCIÓN se chequea siempre, incluso con el ajuste activo: aceptar más
+        unidades de las que el vendedor tiene a cargo inventaría en fábrica stock que
+        nunca estuvo en la calle.
+        """
         self.ensure_one()
+        company = self.warehouse_id.company_id or self.env.company
+        if self.direction == "out" and company.cvi_allow_negative_stock:
+            return
         quant_model = self.env["stock.quant"]
         for line in self.line_ids:
             available = quant_model._get_available_quantity(line.product_id, source)

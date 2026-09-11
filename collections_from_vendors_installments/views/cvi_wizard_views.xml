@@ -38,6 +38,45 @@
         <field name="context">{'default_card_ids': active_ids}</field>
     </record>
 
+    <!-- Motivo del retiro del mueble (HU-25): se pide en el momento de marcar. -->
+    <record id="view_cvi_recover_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.recover.wizard.form</field>
+        <field name="model">cvi.recover.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Marcar para retiro">
+                <group>
+                    <field name="card_id"/>
+                    <field name="reason"
+                           placeholder="Por qué se retira el mueble"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_recover" type="object"
+                            string="Marcar para retiro" class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Motivo de la marca de mala paga (HU-27): se pide en el momento de marcar. -->
+    <record id="view_cvi_problematic_wizard_form" model="ir.ui.view">
+        <field name="name">cvi.problematic.wizard.form</field>
+        <field name="model">cvi.problematic.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Marcar como mala paga">
+                <group>
+                    <field name="customer_id"/>
+                    <field name="reason" placeholder="Por qué es mala paga"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_problematic" type="object"
+                            string="Marcar" class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
     <record id="view_cvi_reject_wizard_form" model="ir.ui.view">
         <field name="name">cvi.reject.wizard.form</field>
         <field name="model">cvi.reject.wizard</field>

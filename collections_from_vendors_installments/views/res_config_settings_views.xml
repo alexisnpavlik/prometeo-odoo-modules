@@ -29,6 +29,31 @@
                             <field name="cvi_settlement_frequency"/>
                         </setting>
                     </block>
+                    <block title="Datos obligatorios del cliente"
+                           name="cvi_customer_required_data_block">
+                        <setting string="Exigir celular">
+                            <field name="cvi_customer_mobile_required"/>
+                        </setting>
+                        <setting string="Exigir dirección">
+                            <field name="cvi_customer_street_required"/>
+                        </setting>
+                        <setting string="Exigir ciudad">
+                            <field name="cvi_customer_city_required"/>
+                        </setting>
+                        <setting string="Exigir código postal">
+                            <field name="cvi_customer_zip_required"/>
+                        </setting>
+                        <setting string="Exigir fotos del DNI"
+                                 help="Obliga a cargar el frente y el dorso del documento">
+                            <field name="cvi_customer_dni_photos_required"/>
+                        </setting>
+                    </block>
+                    <block title="Mercadería en la calle" name="cvi_stock_block">
+                        <setting string="Permitir entregar sin stock"
+                                 help="La entrega al vendedor no se traba por falta de stock: el faltante queda como negativo en fábrica. Las devoluciones del vendedor se siguen chequeando.">
+                            <field name="cvi_allow_negative_stock"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

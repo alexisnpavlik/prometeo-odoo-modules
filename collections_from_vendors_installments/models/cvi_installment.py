@@ -13,6 +13,7 @@ STATE_SELECTION = [
     ("partial", "Parcial"),
     ("paid", "Pagada"),
     ("overdue", "Vencida"),
+    ("cancelled", "Cancelada"),
 ]
 
 
@@ -37,8 +38,8 @@ class CviInstallment(models.Model):
     street = fields.Char(
         related="customer_id.street", store=True, string="Dirección"
     )
-    city = fields.Char(related="customer_id.city", store=True, string="Ciudad")
-    phone = fields.Char(related="customer_id.phone", string="Teléfono")
+    city = fields.Char(related="customer_id.city_id.name", store=True, string="Ciudad")
+    mobile = fields.Char(related="customer_id.mobile", string="Celular")
     card_residual = fields.Monetary(
         related="card_id.amount_residual",
         string="Saldo de la tarjeta",
@@ -110,7 +111,17 @@ class CviInstallment(models.Model):
 
     @api.depends("amount", "allocation_ids.amount", "allocation_ids.payment_id.state")
     def _compute_amounts(self):
-        """Cobrado = imputaciones de cobros publicados. Residual nunca es negativo."""
+        """Cobrado = imputaciones de cobros publicados. Residual nunca es negativo.
+
+        A propósito NO depende del estado de la tarjeta. Con el mueble retirado la
+        cuota queda en Cancelada y la tarjeta deja de mostrar saldo, pero el residual
+        de la cuota sigue siendo lo que quedó sin cobrar: es el monto de la pérdida.
+
+        Poner acá `card_id.state` además rompía el borrado: al eliminar una tarjeta,
+        la dependencia marcaba como sucio el residual de cuotas ya borradas y el flush
+        moría con MissingError buscando la moneda de un registro inexistente (este
+        campo es Monetary y necesita currency_id para escribirse).
+        """
         for installment in self:
             paid = sum(
                 installment.allocation_ids
@@ -130,14 +141,25 @@ class CviInstallment(models.Model):
                 .mapped("payment_id.user_id")
             )
 
-    @api.depends("amount", "amount_paid", "amount_residual", "date_due", "company_id.cvi_overdue_days")
+    @api.depends(
+        "amount", "amount_paid", "amount_residual", "date_due",
+        "company_id.cvi_overdue_days", "card_id.state",
+    )
     def _compute_state(self):
-        """Estado de la cuota. Solo es pagada cuando el residual llega a cero."""
+        """Estado de la cuota. Solo es pagada cuando el residual llega a cero.
+
+        La rama de cancelada va primero: con el mueble retirado el residual queda en
+        cero, y sin este orden una cuota que nunca se cobró figuraría como Pagada.
+        """
         today = fields.Date.context_today(self)
         for installment in self:
             rounding = installment.currency_id.rounding or 0.01
             tolerance = installment.company_id.cvi_overdue_days or 0
-            if float_is_zero(installment.amount_residual, precision_rounding=rounding):
+            if installment.card_id.state == "recovered" and (
+                installment.amount_residual > 0
+            ):
+                installment.state = "cancelled"
+            elif float_is_zero(installment.amount_residual, precision_rounding=rounding):
                 installment.state = "paid"
             elif installment.date_due and (today - installment.date_due).days > tolerance:
                 installment.state = "overdue"
@@ -233,7 +255,7 @@ class CviInstallment(models.Model):
         "card_id.has_geolocation",
         "card_id.map_url",
         "customer_id.street",
-        "customer_id.city",
+        "customer_id.city_id",
         "customer_id.zip",
     )
     def _compute_map_url(self):
@@ -253,7 +275,12 @@ class CviInstallment(models.Model):
                 continue
             installment.map_is_gps = False
             customer = installment.customer_id
-            parts = [customer.street, customer.city, customer.zip]
+            parts = [
+                customer.street,
+                customer.city_id.name,
+                customer.state_id.name,
+                customer.zip,
+            ]
             address = ", ".join(part for part in parts if part)
             if address:
                 query = url_encode({"api": "1", "query": address})

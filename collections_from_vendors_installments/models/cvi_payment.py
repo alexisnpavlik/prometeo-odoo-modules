@@ -120,6 +120,14 @@ class CviPayment(models.Model):
                     "El cobro %s ya fue registrado: no se puede volver a registrar.",
                     payment.name,
                 ))
+            # Con el mueble retirado las cuotas quedaron canceladas (HU-26): imputar
+            # acá reviviría una deuda que se dio por perdida.
+            if payment.card_id.state == "recovered":
+                raise UserError(_(
+                    "La tarjeta %s está retirada: sus cuotas se cancelaron y no se "
+                    "cobran más.",
+                    payment.card_id.name,
+                ))
             payment.state = "posted"
             leftover = payment._cvi_allocate()
             rounding = payment.currency_id.rounding or 0.01

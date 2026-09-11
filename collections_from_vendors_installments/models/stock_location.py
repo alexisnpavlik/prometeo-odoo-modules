@@ -13,3 +13,12 @@ class StockLocation(models.Model):
         help="Marca las ubicaciones que representan la mercadería que un vendedor "
              "tiene en la calle. Es lo que filtra el reporte de mercadería en la calle.",
     )
+
+    cvi_is_recovered_location = fields.Boolean(
+        string="Es la ubicación de muebles retirados",
+        default=False,
+        index=True,
+        copy=False,
+        help="Marca la ubicación donde entran los muebles retirados a clientes que "
+             "dejaron de pagar. Es lo que filtra el reporte de muebles retirados.",
+    )

@@ -28,6 +28,17 @@ class TestCviVendorStock(CviCommon):
         product = product or self.product
         return self.env["stock.quant"]._get_available_quantity(product, location)
 
+    def _on_hand(self, location, product=None):
+        """Cantidad física en la ubicación, negativos incluidos.
+
+        _get_available_quantity() recorta los negativos a cero salvo que se le pase
+        allow_negative=True: para ver el faltante hay que pedirlo explícitamente.
+        """
+        product = product or self.product
+        return self.env["stock.quant"]._get_available_quantity(
+            product, location, allow_negative=True
+        )
+
     def _deliver(self, quantity, direction="out", vendor=None):
         """Corre el wizard de entrega/devolución y devuelve el albarán generado."""
         wizard = self.env["cvi.vendor.delivery.wizard"].create({
@@ -126,8 +137,38 @@ class TestCviVendorStock(CviCommon):
         self.assertEqual(picking.state, "done")
         self.assertEqual(picking.location_dest_id, self.vendor_user._cvi_get_location())
 
-    def test_delivering_more_than_available_is_rejected(self):
-        """No se puede entregar más unidades de las disponibles en fábrica (HU-02)."""
+    # --- entrega sin stock: se permite que fábrica quede en negativo ---
+
+    def test_delivering_without_stock_is_allowed_by_default(self):
+        """El depósito entrega igual aunque no tenga las unidades (HU-02).
+
+        La fábrica termina el mueble después de que el vendedor se lo lleva: trabar
+        la salida por disponibilidad obligaba a inventar un ajuste de inventario
+        antes de cada entrega.
+        """
+        self._receive(2)
+        vendor_location = self.vendor_user._cvi_get_location()
+        before_vendor = self._available(vendor_location)
+        before_factory = self._on_hand(self.stock_location)
+        picking = self._deliver(5)
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(self._available(vendor_location), before_vendor + 5)
+        self.assertEqual(self._on_hand(self.stock_location), before_factory - 5)
+
+    def test_the_shortfall_stays_as_negative_stock(self):
+        """El faltante queda como negativo en fábrica, no truncado en cero.
+
+        Es lo que después deja ver cuánto se entregó sin respaldo de producción.
+        """
+        self._receive(2)
+        self._deliver(5)
+        self.assertEqual(self._on_hand(self.stock_location), -3)
+        # Y confirmado: la disponibilidad que ve el resto de Odoo es cero, no -3.
+        self.assertEqual(self._available(self.stock_location), 0)
+
+    def test_delivering_more_than_available_is_rejected_when_negative_is_off(self):
+        """Con el ajuste apagado vuelve a exigir stock disponible (HU-02)."""
+        self.company.cvi_allow_negative_stock = False
         self._receive(2)
         with self.assertRaises(UserError):
             self._deliver(5)
