@@ -33,9 +33,10 @@ def export(env, output):
             env.cr.execute("""
                 SELECT sm.product_id,
                        (sm.date AT TIME ZONE 'UTC' AT TIME ZONE %s)::date,
-                       SUM(CASE WHEN dest.usage='customer' THEN sm.product_qty ELSE -sm.product_qty END),
-                       COUNT(*) FILTER (WHERE dest.usage='customer')
+                       SUM(CASE WHEN dest.usage='customer' THEN sml.quantity_product_uom ELSE -sml.quantity_product_uom END),
+                       COUNT(DISTINCT sm.id) FILTER (WHERE dest.usage='customer')
                   FROM stock_move sm
+                  JOIN stock_move_line sml ON sml.move_id=sm.id
                   JOIN stock_location src ON src.id=sm.location_id
                   JOIN stock_location dest ON dest.id=sm.location_dest_id
                   LEFT JOIN stock_picking picking ON picking.id=sm.picking_id
@@ -58,9 +59,10 @@ def export(env, output):
             # Unclamped balances characterize whether the historical stock is credible.
             env.cr.execute("""
                 SELECT sm.product_id,(sm.date AT TIME ZONE 'UTC' AT TIME ZONE %s)::date,
-                       SUM((CASE WHEN dest.usage='internal' AND dest.parent_path LIKE %s THEN sm.product_qty ELSE 0 END)
-                         - (CASE WHEN src.usage='internal' AND src.parent_path LIKE %s THEN sm.product_qty ELSE 0 END))
-                  FROM stock_move sm JOIN stock_location src ON src.id=sm.location_id
+                       SUM((CASE WHEN dest.usage='internal' AND dest.parent_path LIKE %s THEN sml.quantity_product_uom ELSE 0 END)
+                         - (CASE WHEN src.usage='internal' AND src.parent_path LIKE %s THEN sml.quantity_product_uom ELSE 0 END))
+                  FROM stock_move sm JOIN stock_move_line sml ON sml.move_id=sm.id
+                  JOIN stock_location src ON src.id=sm.location_id
                   JOIN stock_location dest ON dest.id=sm.location_dest_id
                  WHERE sm.state='done' AND sm.company_id=%s AND sm.product_id=ANY(%s)
                    AND sm.date >= %s
