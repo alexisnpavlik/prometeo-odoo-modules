@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="purchase_transfer_company_rule" model="ir.rule">
+        <field name="name">Traslados recomendados: compañías seleccionadas</field>
+        <field name="model_id" ref="model_prometeo_purchase_transfer"/>
+        <field name="domain_force">[('company_id', 'in', company_ids), ('source_warehouse_id.company_id', 'in', company_ids), ('destination_warehouse_id.company_id', 'in', company_ids), ('suggestion_id.has_forbidden_warehouses', '=', False)]</field>
+        <field name="global" eval="True"/>
+    </record>
     <record id="module_category_purchase_advisor" model="ir.module.category">
         <field name="name">Recomendador de compra</field>
         <field name="description">Sugerencias de compra basadas en la demanda real</field>

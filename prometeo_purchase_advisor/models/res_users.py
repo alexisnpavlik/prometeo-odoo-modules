@@ -19,6 +19,8 @@ class ResUsers(models.Model):
                     SELECT suggestion_id, warehouse_id FROM %s
                     UNION
                     SELECT suggestion_id, warehouse_id FROM %s
+                    UNION
+                    SELECT suggestion_id, warehouse_id FROM %s
                    ) scope
               JOIN %s warehouse ON warehouse.id = scope.warehouse_id
              WHERE NOT warehouse.company_id = ANY(%s)
@@ -26,5 +28,7 @@ class ResUsers(models.Model):
                   to_flush=suggestion_fields["demand_warehouse_ids"]),
              SQL("purchase_suggestion_metric_warehouse_rel",
                  to_flush=suggestion_fields["metric_warehouse_ids"]),
+             SQL("purchase_suggestion_source_warehouse_rel",
+                 to_flush=suggestion_fields["source_warehouse_ids"]),
              SQL("stock_warehouse", to_flush=self.env["stock.warehouse"]._fields["company_id"]),
              company_ids)

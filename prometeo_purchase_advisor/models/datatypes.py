@@ -143,3 +143,4 @@ class Estimate:
     method_used: str = ""
     explanation: str = ""
     warnings: list = field(default_factory=list)
+    observed_sales: dict = field(default_factory=dict)

@@ -30,6 +30,8 @@ class TestSupplyNetwork(PurchaseAdvisorCommon):
         suggestion.action_compute()
         line = suggestion.line_ids.filtered(lambda line: line.product_id == self.product_a)
         self.assertEqual(line.adu, 6)
+        self.assertTrue(line.sales_data_available)
+        self.assertEqual(line.qty_sold, 180)
         self.assertEqual(line.qty_suggested, 223)  # (2+4)*40 + 3 de seguridad - 20
         suggestion.action_confirm()
         suggestion.action_create_purchase_orders()

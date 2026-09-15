@@ -37,14 +37,14 @@ class PurchaseSuggestionNetwork(models.Model):
         string="Incluye almacenes de compañías no seleccionadas",
     )
 
-    @api.depends("demand_warehouse_ids.company_id", "metric_warehouse_ids.company_id")
+    @api.depends("demand_warehouse_ids.company_id", "metric_warehouse_ids.company_id", "source_warehouse_ids.company_id")
     @api.depends_context("allowed_company_ids", "uid")
     def _compute_has_forbidden_warehouses(self):
         """Evalúa permisos en memoria sin ocultar los almacenes que deben bloquearlos."""
         company_ids = set(self.env.companies.ids)
         for suggestion in self:
             scoped = suggestion.sudo()
-            warehouses = scoped.demand_warehouse_ids | scoped.metric_warehouse_ids
+            warehouses = scoped.demand_warehouse_ids | scoped.metric_warehouse_ids | scoped.source_warehouse_ids
             suggestion.has_forbidden_warehouses = any(
                 warehouse.company_id.id not in company_ids for warehouse in warehouses
             )
@@ -57,7 +57,8 @@ class PurchaseSuggestionNetwork(models.Model):
         query = self.env.user._purchase_advisor_forbidden_suggestions(self.env.companies.ids)
         return [("id", "in" if forbidden else "not in", query)]
 
-    @api.depends("line_ids.params_snapshot")
+    @api.depends("line_ids.params_snapshot", "transfer_plan_ids.source_warehouse_id",
+                 "transfer_plan_ids.destination_warehouse_id")
     def _compute_metric_warehouses(self):
         """Mantiene el alcance de seguridad aunque cambie la selección editable."""
         for suggestion in self:
@@ -67,6 +68,8 @@ class PurchaseSuggestionNetwork(models.Model):
                 for row in (line.params_snapshot or {}).get("warehouses", [])
                 if row.get("warehouse_id")
             }
+            warehouse_ids.update(suggestion.transfer_plan_ids.source_warehouse_id.ids)
+            warehouse_ids.update(suggestion.transfer_plan_ids.destination_warehouse_id.ids)
             suggestion.metric_warehouse_ids = [fields.Command.set(sorted(warehouse_ids))]
 
     @api.constrains("coverage_days", "transfer_days", "warehouse_id", "demand_warehouse_ids")
@@ -243,8 +246,8 @@ class PurchaseSuggestionNetwork(models.Model):
             transfer_days=self.transfer_days)
         values["explanation"] = _(
             "Compra para recibir en %(warehouse)s. Se suman los faltantes de las sucursales "
-            "y se descuenta el stock libre del depósito. El excedente de una sucursal "
-            "no se asigna a otra. Los mínimos y bultos se aplican una sola vez.\n",
+            "y se considera la disponibilidad de cada almacén. "
+            "Los mínimos y bultos se aplican una sola vez a la compra restante.\n",
             warehouse=self.warehouse_id.name) + "\n".join(details)
         values["warnings"] = "\n".join(warnings) or False
         return values

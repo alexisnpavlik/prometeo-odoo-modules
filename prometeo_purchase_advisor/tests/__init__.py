@@ -8,3 +8,4 @@ from . import test_purchase_generation
 from . import test_supply_network
 
 from . import test_budget
+from . import test_transfers

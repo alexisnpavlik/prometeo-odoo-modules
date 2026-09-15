@@ -1,7 +1,7 @@
 # Prometeo - Recomendador de compra
 
 Guía de uso para comprar directamente en una sucursal o recibir mercadería en
-el depósito central y distribuirla después. Versión del módulo: `18.0.1.3.0`.
+el depósito central y distribuirla después. Versión del módulo: `18.0.1.4.0`.
 
 **Inicio rápido:** **Compras → Recomendador de compra → Sugerencias de compra → Nuevo**.
 Elegí el almacén receptor y seguí **Calcular → revisar → Confirmar → Crear órdenes de compra**.
@@ -95,6 +95,13 @@ que quedó fuera, debés quitar esa línea o ponerla en cero antes de generar ó
 
 ## Revisar y generar la compra
 
+La columna **Vendidos (netos)** muestra unidades entregadas a clientes menos
+devoluciones en la ventana del cálculo, sin ajustes estadísticos. En compras
+conjuntas suma los almacenes incluidos. **Período de ventas** está disponible como
+columna opcional y en el detalle de la línea. Se conservan los datos de esa corrida;
+las sugerencias calculadas antes de incorporar esta columna deben recalcularse
+para completarla. Es informativa y no modifica las cantidades sugeridas.
+
 1. Leé los avisos generales y abrí las líneas con advertencias mediante el botón
    de abrir formulario de la fila. Ahí están **Por qué esta cantidad** y el detalle
    de stock, demanda y plazo.
@@ -112,7 +119,39 @@ que quedó fuera, debés quitar esa línea o ponerla en cero antes de generar ó
 
 **Confirmar la sugerencia no confirma las órdenes ni registra recepciones.**
 En modalidad centralizada, la distribución se realiza después mediante el flujo
-habitual de transferencias. El módulo no crea ni valida esos traslados.
+habitual de transferencias. El módulo puede preparar traslados de existencias
+actuales; nunca valida entregas ni recepciones automáticamente.
+
+### Transferir antes de comprar
+
+**Transferir antes de comprar** viene activado. En **Orígenes disponibles** podés
+limitar dónde buscar excedentes; vacío usa los almacenes de las compañías activas.
+Los orígenes solo aportan stock: sus faltantes no se agregan a esta compra.
+El depósito receptor y las sucursales a abastecer también pueden aportar excedentes.
+
+El origen conserva el objetivo de cobertura, plazo y seguridad calculado con su
+demanda y los parámetros de esta sugerencia. Solo se propone stock físico libre
+de su ubicación de existencias, descontando salidas comprometidas. Las entradas
+futuras no se ofrecen como stock transferible. Se prioriza el depósito receptor y
+luego los mayores excedentes, atendiendo primero destinos con menor cobertura.
+
+1. Pulsá **Calcular**. Revisá **A transferir**, **A comprar** y la pestaña
+   **Traslados propuestos**, con producto, origen, destino y cantidad.
+2. Con permisos de Inventario, pulsá **Preparar traslados**. Se crean documentos
+   agrupados por origen/destino y se reserva la salida; no se valida mercadería.
+   También podés registrar los traslados por el flujo habitual de Inventario.
+3. Pulsá **Calcular** otra vez. Los movimientos confirmados se incorporan como
+   entradas y salidas pendientes. No se descuenta dos veces la propuesta.
+4. Comprá solo el faltante. Si no queda compra, usá **Finalizar sin compra** y
+   gestioná la entrega y recepción desde **Traslados**.
+
+Una propuesta todavía no reserva stock y bloquea generar la compra hasta preparar
+los movimientos y recalcular. Si no se realizarán los traslados, volvé a borrador,
+desactivá la prioridad de transferencias y recalculá. Si se cancela o modifica un
+movimiento preparado, el cálculo debe actualizarse antes de continuar.
+Entre compañías se prepara una salida y una recepción encadenadas por tránsito
+compartido, con el almacén destino explícito. Los parciales se consultan junto
+con sus documentos originales. Revisá siempre existencias y tiempos de transporte.
 
 Antes de generar órdenes podés usar **Volver a borrador** para cambiar el alcance.
 Una sugerencia que ya generó órdenes no se reutiliza desde este flujo: gestioná
@@ -209,7 +248,7 @@ aciertos contra ventas futuras ni demuestra por sí sola mala calibración.
 1. En una sugerencia nueva o calculada, activá **Limitar por presupuesto**.
 2. Ingresá **Presupuesto sin impuestos**, en la moneda de la compañía compradora.
    Cero significa que no hay dinero asignado; desactivá la opción para trabajar sin límite.
-3. Pulsá **Calcular**. Se mantiene **Sugerido** como necesidad sin presupuesto;
+3. Pulsá **Calcular**. Se mantiene **A comprar** como necesidad de compra sin presupuesto;
    **Cantidad** muestra lo asignado. Revisá **Mercadería asignada** y **Disponible**.
 4. Para favorecer productos específicos, cambiá **Prioridad** a **Alta** o **Baja**.
    Pulsá **Ajustar al presupuesto** para redistribuir; este botón puede reducir
