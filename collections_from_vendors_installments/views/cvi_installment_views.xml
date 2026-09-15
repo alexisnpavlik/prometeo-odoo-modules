@@ -8,7 +8,7 @@
                   decoration-danger="state == 'overdue'" decoration-success="state == 'paid'">
                 <field name="customer_id"/>
                 <field name="street" optional="show"/>
-                <field name="phone" optional="show"/>
+                <field name="mobile" optional="show"/>
                 <field name="sequence" string="Cuota"/>
                 <field name="date_due"/>
                 <field name="amount_residual" sum="A cobrar"/>
@@ -75,7 +75,7 @@
                         <div class="row mt-2 align-items-center">
                             <div class="col-7">
                                 <!-- widget phone: en el celular es un link que llama. -->
-                                <field name="phone" widget="phone"/>
+                                <field name="mobile" widget="phone"/>
                             </div>
                             <div class="col-5 text-end">
                                 <button name="action_open_map" type="object"
@@ -121,7 +121,7 @@
                     <group>
                         <group string="Cliente">
                             <field name="customer_id" readonly="1"/>
-                            <field name="phone" widget="phone" readonly="1"/>
+                            <field name="mobile" widget="phone" readonly="1"/>
                             <field name="street" readonly="1"/>
                             <field name="city" readonly="1"/>
                             <field name="map_is_gps" readonly="1"/>

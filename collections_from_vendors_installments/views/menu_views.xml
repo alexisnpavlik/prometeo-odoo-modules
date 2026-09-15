@@ -83,4 +83,6 @@
               groups="collections_from_vendors_installments.group_cvi_manager"/>
     <menuitem id="menu_cvi_settings" name="Ajustes" parent="menu_cvi_config"
               action="base_setup.action_general_configuration" sequence="10"/>
+    <menuitem id="menu_cvi_cities" name="Ciudades" parent="menu_cvi_config"
+              action="action_cvi_cities" sequence="20"/>
 </odoo>

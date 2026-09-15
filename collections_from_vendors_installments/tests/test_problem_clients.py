@@ -71,6 +71,80 @@ class TestCviProblemClients(CviCommon):
         self.assertEqual(self.customer.problematic_user_id, self.env.user)
         self.assertTrue(self.customer.problematic_date)
 
+    def test_the_button_opens_a_dialog_for_the_reason(self):
+        """El botón no marca: abre el recuadro donde se escribe el motivo.
+
+        El motivo dejó de ser un campo suelto del formulario, así que marcar sin
+        pasar por el asistente dejaría al cliente señalado sin explicación.
+        """
+        action = self.customer.action_open_problematic_wizard()
+        self.assertEqual(action["res_model"], "cvi.problematic.wizard")
+        self.assertEqual(action["target"], "new")
+        self.assertEqual(action["context"]["default_customer_id"], self.customer.id)
+        self.assertFalse(self.customer.problematic)
+
+    def test_the_dialog_marks_the_customer_with_its_reason(self):
+        """Lo escrito en el recuadro queda como motivo, con autor y fecha."""
+        wizard = self.env["cvi.problematic.wizard"].create({
+            "customer_id": self.customer.id,
+            "reason": "Tres cuotas sin pagar y no atiende.",
+        })
+        wizard.action_confirm_problematic()
+        self.assertTrue(self.customer.problematic)
+        self.assertEqual(
+            self.customer.problematic_reason, "Tres cuotas sin pagar y no atiende."
+        )
+        self.assertEqual(self.customer.problematic_user_id, self.env.user)
+        self.assertTrue(self.customer.problematic_date)
+
+    def test_the_dialog_rejects_a_blank_reason(self):
+        """Un motivo en blanco no alcanza: el required de la vista no corre en el servidor."""
+        wizard = self.env["cvi.problematic.wizard"].create({
+            "customer_id": self.customer.id,
+            "reason": "   ",
+        })
+        with self.assertRaises(UserError):
+            wizard.action_confirm_problematic()
+        self.assertFalse(self.customer.problematic)
+
+    def _last_message_body(self):
+        """Cuerpo del último mensaje del chatter del cliente, ya materializado.
+
+        Los mensajes de tracking se arman en el precommit del cursor, no al vaciar
+        la transacción: sin correrlo a mano, en un test todavía no existen.
+        """
+        self.env.flush_all()
+        self.env.cr.precommit.run()
+        message = self.env["mail.message"].search(
+            [("model", "=", "cvi.customer"), ("res_id", "=", self.customer.id)],
+            order="id desc", limit=1,
+        )
+        return message.body
+
+    def test_marking_leaves_the_reason_in_the_history(self):
+        """El historial tiene que decir POR QUÉ, no solo que la marca cambió.
+
+        Sin esto el chatter mostraba únicamente "No -> Sí (Cliente problemático)",
+        que no le sirve a nadie para saber qué pasó con el cliente.
+        """
+        wizard = self.env["cvi.problematic.wizard"].create({
+            "customer_id": self.customer.id,
+            "reason": "Tres cuotas sin pagar y no atiende.",
+        })
+        wizard.action_confirm_problematic()
+        body = self._last_message_body()
+        self.assertIn("Tres cuotas sin pagar y no atiende.", body)
+
+    def test_lifting_the_mark_is_recorded_in_the_history(self):
+        """Levantar la marca también queda escrito, con el motivo que tenía antes."""
+        self.customer.action_mark_problematic("Nunca pagó.")
+        # Cada clic es su propia transacción: sin cerrar la primera, marcar y levantar
+        # se anulan entre sí y el tracking no ve ningún cambio que registrar.
+        self._last_message_body()
+        self.customer.action_unmark_problematic()
+        body = self._last_message_body()
+        self.assertIn("levantada", body)
+
     def test_mark_can_be_lifted(self):
         self.customer.problematic_reason = "Nunca pagó."
         self.customer.action_mark_problematic()

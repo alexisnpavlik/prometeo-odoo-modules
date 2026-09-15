@@ -29,12 +29,64 @@ class CviCustomer(models.Model):
         default=lambda self: self.env.company,
     )
     active = fields.Boolean(string="Activo", default=True)
-    phone = fields.Char(string="Teléfono")
     mobile = fields.Char(string="Celular")
     street = fields.Char(string="Dirección")
-    city = fields.Char(string="Ciudad")
+    city_id = fields.Many2one(
+        "cvi.city", string="Ciudad", index=True,
+        help="Se elige de las ciudades cargadas por administración: escribirla "
+             "a mano es lo que hacía entrar la misma ciudad de cinco formas.",
+    )
+    state_id = fields.Many2one(
+        related="city_id.state_id", string="Provincia", store=True, readonly=True,
+    )
     zip = fields.Char(string="Código postal")
-    note = fields.Text(string="Observaciones")
+    cvi_customer_mobile_required = fields.Boolean(
+        related="company_id.cvi_customer_mobile_required",
+        readonly=True,
+    )
+    cvi_customer_street_required = fields.Boolean(
+        related="company_id.cvi_customer_street_required",
+        readonly=True,
+    )
+    cvi_customer_city_required = fields.Boolean(
+        related="company_id.cvi_customer_city_required",
+        readonly=True,
+    )
+    cvi_customer_zip_required = fields.Boolean(
+        related="company_id.cvi_customer_zip_required",
+        readonly=True,
+    )
+    cvi_customer_dni_photos_required = fields.Boolean(
+        related="company_id.cvi_customer_dni_photos_required",
+        readonly=True,
+    )
+
+    # Frente y dorso del documento, en la ficha del cliente y no en la venta: el DNI es
+    # de la persona, así que el mismo documento no se vuelve a fotografiar cuando el
+    # cliente compra por segunda vez.
+    #
+    # max_width/max_height hacen que Odoo redimensione al guardar. Sin eso, cada foto de
+    # un celular moderno entra al filestore con varios megas. 1600 px alcanza de sobra
+    # para leer un documento.
+    photo_dni_front = fields.Image(
+        string="Foto del DNI - frente",
+        max_width=1600,
+        max_height=1600,
+        help="Frente del documento del cliente. Opcional.",
+    )
+    photo_dni_back = fields.Image(
+        string="Foto del DNI - dorso",
+        max_width=1600,
+        max_height=1600,
+        help="Dorso del documento del cliente. Opcional.",
+    )
+    has_dni_photos = fields.Boolean(
+        string="DNI completo",
+        compute="_compute_has_dni_photos",
+        store=True,
+        help="Se enciende con las dos caras cargadas: un frente solo no alcanza para "
+             "tener el documento del cliente.",
+    )
 
     # E8: control de clientes problemáticos.
     problematic = fields.Boolean(
@@ -98,6 +150,14 @@ class CviCustomer(models.Model):
                     "El cliente %s necesita un DNI: es lo que lo identifica.",
                     customer.name,
                 ))
+
+    @api.depends("photo_dni_front", "photo_dni_back")
+    def _compute_has_dni_photos(self):
+        """El documento está completo recién con las dos caras cargadas."""
+        for customer in self:
+            customer.has_dni_photos = bool(
+                customer.photo_dni_front and customer.photo_dni_back
+            )
 
     @api.depends(
         "card_ids.state",
@@ -172,15 +232,43 @@ class CviCustomer(models.Model):
             ))
         return avisos
 
-    def action_mark_problematic(self):
-        """Marca al cliente como mala paga, con motivo (HU-27)."""
+    def action_open_problematic_wizard(self):
+        """Abre el recuadro donde se escribe el motivo (HU-27).
+
+        El botón no marca por sí solo: el motivo dejó de ser un campo suelto del
+        formulario, así que pedirlo antes es lo que evita clientes señalados sin
+        explicación.
+        """
         self.ensure_one()
-        if not self.problematic_reason:
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Marcar como mala paga"),
+            "res_model": "cvi.problematic.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_customer_id": self.id},
+        }
+
+    def action_mark_problematic(self, reason=None):
+        """Marca al cliente como mala paga, con motivo (HU-27).
+
+        El motivo llega del recuadro. Sigue aceptando el que ya esté guardado en la
+        ficha para no romper lo que llame a este método sin pasarlo.
+        """
+        self.ensure_one()
+        motive = (reason or self.problematic_reason or "").strip()
+        if not motive:
             raise UserError(_(
                 "Cargá el motivo antes de marcar a %s como problemático.", self.name
             ))
+        # _track_set_log_message le pone texto al mensaje que genera el tracking del
+        # campo. Sin esto el historial mostraba solo "No -> Sí (Cliente problemático)",
+        # que no dice por qué. Y va en el mismo mensaje, no en uno aparte, para no
+        # dejar dos entradas por cada marca.
+        self._track_set_log_message(_("Marcado como mala paga: %s", motive))
         self.write({
             "problematic": True,
+            "problematic_reason": motive,
             "problematic_date": fields.Date.context_today(self),
             "problematic_user_id": self.env.user.id,
         })
@@ -189,6 +277,10 @@ class CviCustomer(models.Model):
     def action_unmark_problematic(self):
         """Levanta la marca, por ejemplo si el cliente regularizó."""
         self.ensure_one()
+        self._track_set_log_message(_(
+            "Marca de mala paga levantada. Motivo anterior: %s",
+            self.problematic_reason or _("sin motivo"),
+        ))
         self.write({
             "problematic": False,
             "problematic_date": False,

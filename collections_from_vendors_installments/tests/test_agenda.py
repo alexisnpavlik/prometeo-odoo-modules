@@ -12,7 +12,7 @@ class TestCviAgenda(CviCommon):
         super().setUp()
         self.customer.write({
             "street": "Av. Siempreviva 742",
-            "city": "Rosario",
+            "city_id": self.city.id,
         })
         self.card = self.env["cvi.card"].create({
             "customer_id": self.customer.id,
@@ -90,7 +90,7 @@ class TestCviAgenda(CviCommon):
 
     def test_map_url_is_empty_without_address(self):
         """Sin dirección cargada no se ofrece un link roto."""
-        self.customer.write({"street": False, "city": False, "zip": False})
+        self.customer.write({"street": False, "city_id": False, "zip": False})
         installment = self._agenda()[0]
         self.assertFalse(installment.map_url)
 

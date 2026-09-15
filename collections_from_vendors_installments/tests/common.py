@@ -23,6 +23,20 @@ class CviCommon(TransactionCase):
             "dni": "20111111",
             "company_id": cls.company.id,
         })
+        # La ciudad es un registro desde 18.0.3.6.0: las fichas ya no la escriben a mano.
+        cls.state = cls.env["res.country.state"].search(
+            [("country_id.code", "=", "AR"), ("name", "=", "Chaco")], limit=1
+        )
+        if not cls.state:
+            cls.state = cls.env["res.country.state"].create({
+                "name": "Chaco",
+                "code": "H",
+                "country_id": cls.env.ref("base.ar").id,
+            })
+        cls.city = cls.env["cvi.city"].create({
+            "name": "Resistencia",
+            "state_id": cls.state.id,
+        })
         cls.product = cls.env["product.product"].create({
             "name": "Ropero 3 puertas",
             "type": "consu",

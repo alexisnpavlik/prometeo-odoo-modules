@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <form string="Cliente">
                 <header>
-                    <button name="action_mark_problematic" type="object"
+                    <button name="action_open_problematic_wizard" type="object"
                             string="Marcar problemático" class="btn-secondary"
                             invisible="problematic"
                             groups="collections_from_vendors_installments.group_cvi_manager"/>
@@ -29,15 +29,18 @@
                     </div>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Nombre y apellido"/></h1>
-                        <h3><field name="dni" placeholder="DNI"/></h3>
+                        <h3><field name="dni" placeholder="DNI" required="1"/></h3>
                     </div>
                     <group>
                         <group string="Contacto">
-                            <field name="phone" widget="phone"/>
-                            <field name="mobile" widget="phone"/>
-                            <field name="street"/>
-                            <field name="city"/>
-                            <field name="zip"/>
+                            <field name="mobile" widget="phone"
+                                   required="cvi_customer_mobile_required"/>
+                            <field name="street"
+                                   required="cvi_customer_street_required"/>
+                            <field name="city_id" options="{'no_create': True}"
+                                   required="cvi_customer_city_required"/>
+                            <field name="state_id" readonly="1"/>
+                            <field name="zip" required="cvi_customer_zip_required"/>
                         </group>
                         <group string="Antecedentes">
                             <field name="card_count"/>
@@ -48,13 +51,35 @@
                             <field name="problematic" invisible="1"/>
                             <field name="currency_id" invisible="1"/>
                             <field name="company_id" invisible="1"/>
+                            <field name="cvi_customer_mobile_required" invisible="1"/>
+                            <field name="cvi_customer_street_required" invisible="1"/>
+                            <field name="cvi_customer_city_required" invisible="1"/>
+                            <field name="cvi_customer_zip_required" invisible="1"/>
+                            <field name="cvi_customer_dni_photos_required" invisible="1"/>
                         </group>
                     </group>
-                    <group string="Marca"
-                           groups="collections_from_vendors_installments.group_cvi_manager">
-                        <field name="problematic_reason" nolabel="1"
-                               placeholder="Por qué es mala paga"/>
-                    </group>
+                    <!--
+                        Fuera del grid de dos columnas, igual que en la venta: adentro
+                        cada imagen cae en una celda angosta y las dos apiladas comen
+                        media pantalla. widget="image": en el celular ofrece la cámara,
+                        que es como el vendedor las saca en el domicilio.
+                    -->
+                    <separator string="Documento (opcional)"/>
+                    <div class="d-flex flex-wrap gap-4 mb-3">
+                        <div>
+                            <div class="text-muted small mb-1">DNI - frente</div>
+                            <field name="photo_dni_front" widget="image" nolabel="1"
+                                   required="cvi_customer_dni_photos_required"
+                                   options="{'size': [140, 140]}"/>
+                        </div>
+                        <div>
+                            <div class="text-muted small mb-1">DNI - dorso</div>
+                            <field name="photo_dni_back" widget="image" nolabel="1"
+                                   required="cvi_customer_dni_photos_required"
+                                   options="{'size': [140, 140]}"/>
+                        </div>
+                        <field name="has_dni_photos" invisible="1"/>
+                    </div>
                     <notebook>
                         <page string="Compras" name="cards">
                             <field name="card_ids" readonly="1">
@@ -71,9 +96,6 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Observaciones" name="note">
-                            <field name="note" nolabel="1"/>
-                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
@@ -88,9 +110,10 @@
             <list string="Clientes" decoration-danger="problematic">
                 <field name="dni"/>
                 <field name="name"/>
-                <field name="phone" optional="show"/>
+                <field name="mobile" optional="show"/>
                 <field name="street" optional="show"/>
-                <field name="city" optional="show"/>
+                <field name="city_id" optional="show"/>
+                <field name="state_id" optional="hide"/>
                 <field name="card_count"/>
                 <field name="amount_residual" sum="Saldo"/>
                 <field name="problematic"/>
@@ -115,7 +138,7 @@
                                 </div>
                             </div>
                             <div class="col-4 text-end">
-                                <field name="phone" widget="phone"/>
+                                <field name="mobile" widget="phone"/>
                             </div>
                         </div>
                         <div class="row mt-2">
@@ -140,9 +163,12 @@
             <search string="Clientes">
                 <field name="dni"/>
                 <field name="name"/>
-                <field name="phone"/>
+                <field name="mobile"/>
+                <field name="city_id"/>
                 <filter name="filter_problematic" string="Problemáticos"
                         domain="[('problematic', '=', True)]"/>
+                <filter name="filter_without_dni_photos" string="Sin foto de DNI"
+                        domain="[('has_dni_photos', '=', False)]"/>
                 <filter name="filter_with_overdue" string="Con mora"
                         domain="[('card_ids.overdue_installment_count', '&gt;', 0)]"/>
             </search>
@@ -183,6 +209,12 @@
                     <field name="found" invisible="1"/>
                     <field name="has_alert" invisible="1"/>
                     <field name="customer_id" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <field name="cvi_customer_mobile_required" invisible="1"/>
+                    <field name="cvi_customer_street_required" invisible="1"/>
+                    <field name="cvi_customer_city_required" invisible="1"/>
+                    <field name="cvi_customer_zip_required" invisible="1"/>
+                    <field name="cvi_customer_dni_photos_required" invisible="1"/>
                 </group>
 
                 <div class="alert alert-info" role="alert"
@@ -200,11 +232,26 @@
                 </div>
 
                 <group invisible="not searched or found" string="Cliente nuevo">
-                    <field name="name" placeholder="Nombre y apellido"/>
-                    <field name="phone"/>
-                    <field name="mobile"/>
-                    <field name="street"/>
-                    <field name="city"/>
+                    <field name="name" placeholder="Nombre y apellido"
+                           required="searched and not found"/>
+                    <field name="mobile"
+                           required="searched and not found and cvi_customer_mobile_required"/>
+                    <field name="street"
+                           required="searched and not found and cvi_customer_street_required"/>
+                    <field name="city_id" options="{'no_create': True}"
+                           required="searched and not found and cvi_customer_city_required"/>
+                    <field name="zip"
+                           required="searched and not found and cvi_customer_zip_required"/>
+                </group>
+
+                <group invisible="not searched or found" string="Fotos del DNI (opcionales)"
+                       col="2">
+                    <field name="photo_dni_front" widget="image"
+                           required="searched and not found and cvi_customer_dni_photos_required"
+                           options="{'size': [180, 120]}"/>
+                    <field name="photo_dni_back" widget="image"
+                           required="searched and not found and cvi_customer_dni_photos_required"
+                           options="{'size': [180, 120]}"/>
                 </group>
 
                 <footer>

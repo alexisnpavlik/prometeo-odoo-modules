@@ -169,19 +169,14 @@
                         </group>
                     </group>
                     <!--
-                        Fuera del grid de dos columnas: adentro, cada imagen queda en una
-                        celda angosta con la etiqueta al costado y las dos apiladas, que
-                        come media pantalla. Acá van lado a lado, con el rótulo arriba.
-                        widget="image": en el celular el selector ofrece la cámara.
+                        Fuera del grid de dos columnas: adentro la imagen queda en una
+                        celda angosta con la etiqueta al costado. Acá va con el rótulo
+                        arriba. widget="image": en el celular el selector ofrece la
+                        cámara. Las fotos del DNI no están en la venta: son del cliente
+                        y se cargan en su ficha.
                     -->
-                    <separator string="Fotos (opcional)"/>
+                    <separator string="Foto de la vivienda (opcional)"/>
                     <div class="d-flex flex-wrap gap-4 mb-3">
-                        <div>
-                            <div class="text-muted small mb-1">Foto del DNI</div>
-                            <field name="photo_dni" widget="image" nolabel="1"
-                                   options="{'size': [140, 140]}"
-                                   readonly="state not in ('draft', 'sold')"/>
-                        </div>
                         <div>
                             <div class="text-muted small mb-1">Foto de la vivienda</div>
                             <field name="photo_house" widget="image" nolabel="1"
