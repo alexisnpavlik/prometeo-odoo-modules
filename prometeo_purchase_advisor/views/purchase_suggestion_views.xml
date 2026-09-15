@@ -32,6 +32,9 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_apply_budget" type="object" string="Ajustar al presupuesto"
+                            invisible="not budget_enabled or state not in ('draft', 'computed')"
+                            help="Redistribuye las cantidades, incluidas las editadas a mano, según prioridad y presupuesto."/>
                     <button name="action_compute" type="object" string="Calcular"
                             class="oe_highlight" invisible="state not in ('draft', 'computed')"/>
                     <button name="action_confirm" type="object" string="Confirmar"
@@ -103,6 +106,22 @@
                     <div class="alert alert-warning" role="alert" invisible="not calculation_notes">
                         <field name="calculation_notes" nolabel="1"/>
                     </div>
+                    <group string="Presupuesto de compra">
+                        <field name="budget_enabled" readonly="state not in ('draft', 'computed')"/>
+                        <field name="budget_amount" invisible="not budget_enabled"
+                               readonly="state not in ('draft', 'computed')"/>
+                        <field name="budget_used" invisible="not budget_enabled"/>
+                        <field name="budget_remaining" invisible="not budget_enabled"/>
+                        <field name="budget_exceeded" invisible="1"/>
+                    </group>
+                    <div class="alert alert-danger" role="alert" invisible="not budget_enabled or not budget_exceeded">
+                        El total supera el presupuesto. Ajustá las cantidades antes de confirmar o generar órdenes.
+                    </div>
+                    <div class="alert alert-info" role="status" invisible="not budget_enabled">
+                        Límite de mercadería sin impuestos, en la moneda de la compañía.
+                        Primero se atiende la prioridad elegida; luego riesgo de quiebre, cobertura y rotación.
+                        Calcular conserva cantidades manuales. Ajustar al presupuesto también puede reducirlas.
+                    </div>
                     <notebook>
                         <page string="Líneas" name="lines">
                             <field name="line_ids" readonly="state in ('done', 'cancel')">
@@ -118,7 +137,9 @@
                                     <field name="qty_incoming" string="Tránsito" readonly="1"/>
                                     <field name="adu" string="Venta/día" readonly="1"/>
                                     <field name="qty_suggested" string="Sugerido" readonly="1"/>
+                                    <field name="budget_priority" column_invisible="not parent.budget_enabled"/>
                                     <field name="qty_final" string="Cantidad"/>
+                                    <field name="budget_note" optional="show" column_invisible="not parent.budget_enabled"/>
                                     <field name="supplier_id"/>
                                     <field name="price_unit"/>
                                     <field name="subtotal" sum="Total" readonly="1"/>
@@ -189,6 +210,8 @@
                     </group>
                     <group>
                         <group string="Qué se compra">
+                            <field name="budget_priority"/>
+                            <field name="budget_note"/>
                             <field name="qty_suggested"/>
                             <field name="qty_final"/>
                             <field name="supplier_id"/>

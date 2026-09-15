@@ -11,3 +11,5 @@ from . import stock_warehouse
 from . import purchase_order
 from . import res_config_settings
 from . import res_users
+
+from . import purchase_suggestion_budget

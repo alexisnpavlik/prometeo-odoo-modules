@@ -1,7 +1,7 @@
 # Prometeo - Recomendador de compra
 
 Guía de uso para comprar directamente en una sucursal o recibir mercadería en
-el depósito central y distribuirla después. Versión del módulo: `18.0.1.1.1`.
+el depósito central y distribuirla después. Versión del módulo: `18.0.1.3.0`.
 
 **Inicio rápido:** **Compras → Recomendador de compra → Sugerencias de compra → Nuevo**.
 Elegí el almacén receptor y seguí **Calcular → revisar → Confirmar → Crear órdenes de compra**.
@@ -203,6 +203,55 @@ La pestaña **Calidad del cálculo** muestra cuántas líneas se editaron y cuá
 apartaron del sugerido. Una tasa de edición alta es una señal para revisar datos,
 cobertura y modelo; también puede responder a decisiones comerciales. No mide
 aciertos contra ventas futuras ni demuestra por sí sola mala calibración.
+
+## Comprar con un presupuesto máximo
+
+1. En una sugerencia nueva o calculada, activá **Limitar por presupuesto**.
+2. Ingresá **Presupuesto sin impuestos**, en la moneda de la compañía compradora.
+   Cero significa que no hay dinero asignado; desactivá la opción para trabajar sin límite.
+3. Pulsá **Calcular**. Se mantiene **Sugerido** como necesidad sin presupuesto;
+   **Cantidad** muestra lo asignado. Revisá **Mercadería asignada** y **Disponible**.
+4. Para favorecer productos específicos, cambiá **Prioridad** a **Alta** o **Baja**.
+   Pulsá **Ajustar al presupuesto** para redistribuir; este botón puede reducir
+   también cantidades editadas a mano. Las líneas sin asignación quedan visibles con cantidad cero.
+5. Revisá las explicaciones de **Asignación de presupuesto** y confirmá la sugerencia.
+   Si una edición supera el límite, el sistema bloquea la confirmación y la generación de órdenes.
+
+El orden es **prioridad elegida → riesgo de quiebre antes de la reposición → menor
+cobertura → mayor venta diaria**. Se asigna primero la cantidad posible del producto
+mejor ubicado y luego se continúa con el siguiente. Es una regla transparente de
+priorización; no una optimización de rentabilidad ni un reparto igual entre sucursales.
+
+Se respetan mínimos del proveedor, bultos y precisión de las unidades de stock y
+compra. Si el lote mínimo no entra en el dinero restante, esa línea queda en cero
+y se intenta la siguiente. Por eso puede quedar presupuesto sin utilizar.
+
+**Ejemplo:** hay $1.000 para dos productos. A necesita 10 unidades de $100 netos
+y B necesita 10 de $250. Si A tiene mayor urgencia, se asignan 10 de A y cero de B.
+Si marcás B con prioridad Alta y ajustás, se asignan 4 de B y cero de A, suponiendo
+venta por unidad y sin otro mínimo. La necesidad original de ambos sigue visible.
+
+El límite excluye impuestos, también cuando el precio del proveedor contiene IVA:
+10 unidades a $121 con IVA incluido del 21% consumen $1.000 de presupuesto neto.
+El cálculo usa los impuestos y la posición fiscal del proveedor; la orden puede
+tener un total final con impuestos mayor que el presupuesto indicado.
+
+Al recalcular se conservan cantidades realmente editadas a mano y se reserva su
+costo antes de asignar el resto. Si esas decisiones ya exceden el presupuesto,
+queda un aviso y no se puede continuar hasta corregirlas o usar el ajuste explícito.
+Un recorte automático por presupuesto no se cuenta como edición manual.
+
+El presupuesto es **por sugerencia**, compartido entre sus proveedores y, en modo
+centralizado, todas las sucursales seleccionadas. Se comprueba el importe neto real
+de las órdenes vinculadas, convertido a la moneda de la sugerencia. También se
+controlan la confirmación, la segunda aprobación y cambios de cantidades/precios
+en órdenes ya confirmadas. Las órdenes canceladas dejan de consumir ese límite.
+Sugerencias distintas tienen presupuestos independientes.
+
+Los productos sin proveedor o precio positivo quedan sin asignación automática.
+Completá esos datos antes de volver a ajustar; un costo desconocido no se trata
+como una compra gratuita. Los campos de presupuesto quedan bloqueados en el
+formulario después de confirmar la sugerencia.
 
 ## Configurar el modelo de demanda
 

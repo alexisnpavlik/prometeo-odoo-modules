@@ -595,6 +595,9 @@ class PrometeoPurchaseSuggestion(models.Model):
                     line_vals.pop("price_unit", None)
                     line_vals.pop("price_in_stock_uom", None)
                     preserved += 1
+                else:
+                    # La cantidad recién calculada no es una edición manual del comprador.
+                    line_vals.update(budget_adjusted=False, budget_note=False)
                 line.write(line_vals)
             else:
                 to_create.append(dict(vals, suggestion_id=self.id, product_id=product_id))
