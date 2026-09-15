@@ -186,7 +186,7 @@
                                     <field name="method_used" optional="hide" readonly="1"/>
                                     <field name="explanation" widget="text" optional="hide" readonly="1"/>
                                     <field name="warnings" widget="text" optional="hide" readonly="1"/>
-                                    <field name="is_manual" column_invisible="True"/>
+                                    <field name="is_manual" column_invisible="True" force_save="1"/>
                                     <field name="was_edited" optional="hide" readonly="1"/>
                                     <field name="currency_id" column_invisible="True"/>
                                 </list>
@@ -289,7 +289,7 @@
                             <field name="method_used"/>
                             <field name="abc_class"/>
                             <field name="xyz_class"/>
-                            <field name="is_manual"/>
+                            <field name="is_manual" force_save="1"/>
                             <field name="was_edited"/>
                         </group>
                     </group>
