@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import Command
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests import tagged, new_test_user
+from odoo.tests import Form, tagged, new_test_user
 from .common import PurchaseAdvisorCommon
 
 
@@ -219,3 +219,16 @@ class TestBudget(PurchaseAdvisorCommon):
         self.assertEqual(b.qty_final, 2)
         self.assertTrue(b.was_edited)
         self.assertEqual((s.line_ids - b).qty_final, 5)
+
+    def test_form_manual_line_survives_repeated_budget_adjustments(self):
+        self.product_a.supplier_taxes_id = False
+        s = self._make_suggestion(budget_enabled=True, budget_amount=1000)
+        with Form(s) as form:
+            with form.line_ids.new() as line:
+                line.product_id = self.product_a
+                line.qty_final = 20
+        self.assertTrue(s.line_ids.is_manual)
+        s.action_apply_budget()
+        self.assertEqual(s.line_ids.qty_final, 10)
+        s.action_apply_budget()
+        self.assertEqual(s.line_ids.qty_final, 10)
