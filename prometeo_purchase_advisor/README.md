@@ -1,7 +1,7 @@
 # Prometeo - Recomendador de compra
 
 Guía de uso para comprar directamente en una sucursal o recibir mercadería en
-el depósito central y distribuirla después. Versión del módulo: `18.0.1.4.0`.
+el depósito central y distribuirla después. Versión del módulo: `18.0.1.4.1`.
 
 **Inicio rápido:** **Compras → Recomendador de compra → Sugerencias de compra → Nuevo**.
 Elegí el almacén receptor y seguí **Calcular → revisar → Confirmar → Crear órdenes de compra**.
@@ -381,3 +381,7 @@ documenta el error observado, la comparación de algoritmos y sus límites.
 Cuando la reconstrucción de inventario produce saldos negativos, el estimador
 usa días calendario, avisa al operador y limita la confianza a 0,2. Ese indicador
 describe calidad de datos; no expresa una probabilidad de acertar.
+
+## Auditoría de movimientos
+
+La [auditoría del 15/09/2026](auditoria-movimientos-2026-09-15.md) detalla la conciliación de ventas, entradas, salidas y las limitaciones de la predicción sobre la copia histórica.

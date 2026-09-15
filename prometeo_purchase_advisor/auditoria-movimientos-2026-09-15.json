@@ -1,0 +1,1100 @@
+{
+  "flows": [
+    {
+      "name": "My Company",
+      "sales_moves": 2,
+      "sales": 201.0,
+      "returns": null,
+      "external_receipts": null,
+      "transfer_in": null,
+      "transfer_out": null,
+      "adjustment_in": null,
+      "adjustment_out": null,
+      "last_sale": "2026-02-06T12:22:05"
+    },
+    {
+      "name": "Impacto modas",
+      "sales_moves": 16197,
+      "sales": 30994.0,
+      "returns": 516.0,
+      "external_receipts": 30407.01,
+      "transfer_in": 2909.0,
+      "transfer_out": 44.0,
+      "adjustment_in": 217033.03,
+      "adjustment_out": 146513.02,
+      "last_sale": "2026-08-19T23:06:41"
+    },
+    {
+      "name": "Deposito central",
+      "sales_moves": 1474,
+      "sales": 28526.0,
+      "returns": 3.0,
+      "external_receipts": 16269.0,
+      "transfer_in": 9520.0,
+      "transfer_out": 248842.0,
+      "adjustment_in": 455.0,
+      "adjustment_out": 191.0,
+      "last_sale": "2026-08-18T11:19:27"
+    },
+    {
+      "name": "Sucursal Barranqueras",
+      "sales_moves": 4964,
+      "sales": 6858.0,
+      "returns": 20.0,
+      "external_receipts": null,
+      "transfer_in": 90.0,
+      "transfer_out": null,
+      "adjustment_in": 2038.0,
+      "adjustment_out": 160.0,
+      "last_sale": "2026-06-26T15:00:52"
+    },
+    {
+      "name": "Corrientes 1",
+      "sales_moves": 16045,
+      "sales": 22862.0,
+      "returns": 16.0,
+      "external_receipts": null,
+      "transfer_in": 36955.0,
+      "transfer_out": 255.0,
+      "adjustment_in": 244863.17,
+      "adjustment_out": 18335.01,
+      "last_sale": "2026-08-19T23:38:38"
+    },
+    {
+      "name": "Corrientes 2",
+      "sales_moves": 22739,
+      "sales": 33470.0,
+      "returns": 558.0,
+      "external_receipts": null,
+      "transfer_in": 51298.0,
+      "transfer_out": 230.0,
+      "adjustment_in": null,
+      "adjustment_out": null,
+      "last_sale": "2026-08-19T23:30:33"
+    },
+    {
+      "name": "Sucursal Fontana",
+      "sales_moves": 6960,
+      "sales": 8955.0,
+      "returns": 537.0,
+      "external_receipts": null,
+      "transfer_in": 12352.0,
+      "transfer_out": 664.0,
+      "adjustment_in": 74266.0,
+      "adjustment_out": 918.0,
+      "last_sale": "2026-08-19T14:47:39"
+    },
+    {
+      "name": "Sucursal Goya",
+      "sales_moves": 15502,
+      "sales": 22227.0,
+      "returns": 502.0,
+      "external_receipts": null,
+      "transfer_in": 20107.0,
+      "transfer_out": 135.0,
+      "adjustment_in": 150218.0,
+      "adjustment_out": 6689.5,
+      "last_sale": "2026-08-19T23:22:00"
+    },
+    {
+      "name": "Sucursal Reconquista",
+      "sales_moves": 13678,
+      "sales": 19692.0,
+      "returns": 39.0,
+      "external_receipts": null,
+      "transfer_in": null,
+      "transfer_out": 706.0,
+      "adjustment_in": 245749.0,
+      "adjustment_out": 11262.0,
+      "last_sale": "2026-08-19T23:28:52"
+    },
+    {
+      "name": "Sucursal Resistencia",
+      "sales_moves": 6929,
+      "sales": 9210.0,
+      "returns": 10.0,
+      "external_receipts": null,
+      "transfer_in": 13817.0,
+      "transfer_out": 276.0,
+      "adjustment_in": 62507.8,
+      "adjustment_out": 1261.0,
+      "last_sale": "2026-08-19T23:32:47"
+    },
+    {
+      "name": "Sucursal Corrientes Mayorista",
+      "sales_moves": 21808,
+      "sales": 51256.0,
+      "returns": 886.0,
+      "external_receipts": null,
+      "transfer_in": 67294.0,
+      "transfer_out": 8061.0,
+      "adjustment_in": 261553.8,
+      "adjustment_out": 27781857.23,
+      "last_sale": "2026-09-05T19:58:36"
+    },
+    {
+      "name": "Sucursal Villa Angela",
+      "sales_moves": 5309,
+      "sales": 7505.0,
+      "returns": 36.0,
+      "external_receipts": 16.0,
+      "transfer_in": 2055.0,
+      "transfer_out": 143.0,
+      "adjustment_in": null,
+      "adjustment_out": null,
+      "last_sale": "2026-08-19T23:17:19"
+    },
+    {
+      "name": "Sucursal Santo Tome",
+      "sales_moves": 14393,
+      "sales": 19847.0,
+      "returns": 325.0,
+      "external_receipts": null,
+      "transfer_in": 7614.0,
+      "transfer_out": 417.0,
+      "adjustment_in": 150324.0,
+      "adjustment_out": 3594.0,
+      "last_sale": "2026-08-19T23:33:26"
+    },
+    {
+      "name": "Sucursal Mega futbol",
+      "sales_moves": 1691,
+      "sales": 1921.0,
+      "returns": 3.0,
+      "external_receipts": 154.0,
+      "transfer_in": 1280.0,
+      "transfer_out": 8.0,
+      "adjustment_in": 4886.0,
+      "adjustment_out": 16798.0,
+      "last_sale": "2026-08-19T20:27:50"
+    }
+  ],
+  "planned_actual_differences": [
+    {
+      "id": 28253,
+      "date": "2026-04-17T22:12:38",
+      "company_id": 2,
+      "product_id": 13909,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 19.0,
+      "actual": 18.0,
+      "intercompany": false
+    },
+    {
+      "id": 28258,
+      "date": "2026-04-17T22:12:38",
+      "company_id": 2,
+      "product_id": 11082,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 17.0,
+      "actual": 14.0,
+      "intercompany": false
+    },
+    {
+      "id": 28261,
+      "date": "2026-04-17T22:12:38",
+      "company_id": 2,
+      "product_id": 23260,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 28.0,
+      "actual": 27.0,
+      "intercompany": false
+    },
+    {
+      "id": 28264,
+      "date": "2026-04-17T22:12:38",
+      "company_id": 2,
+      "product_id": 11771,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 17.0,
+      "actual": 13.0,
+      "intercompany": false
+    },
+    {
+      "id": 28293,
+      "date": "2026-04-17T22:12:38",
+      "company_id": 2,
+      "product_id": 10126,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 10.0,
+      "actual": 9.0,
+      "intercompany": false
+    },
+    {
+      "id": 28544,
+      "date": "2026-04-17T22:16:40",
+      "company_id": 2,
+      "product_id": 31537,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 2.0,
+      "actual": 1.0,
+      "intercompany": false
+    },
+    {
+      "id": 28604,
+      "date": "2026-04-17T22:16:40",
+      "company_id": 2,
+      "product_id": 13201,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 2.0,
+      "actual": 1.0,
+      "intercompany": false
+    },
+    {
+      "id": 28618,
+      "date": "2026-04-17T22:16:40",
+      "company_id": 2,
+      "product_id": 19405,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 11.0,
+      "actual": 10.0,
+      "intercompany": false
+    },
+    {
+      "id": 28620,
+      "date": "2026-04-17T22:16:40",
+      "company_id": 2,
+      "product_id": 19327,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 2.0,
+      "actual": 1.0,
+      "intercompany": false
+    },
+    {
+      "id": 29727,
+      "date": "2026-04-17T22:17:35",
+      "company_id": 2,
+      "product_id": 10123,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 28.0,
+      "actual": 26.0,
+      "intercompany": false
+    },
+    {
+      "id": 29741,
+      "date": "2026-04-17T22:17:35",
+      "company_id": 2,
+      "product_id": 30441,
+      "src_usage": "internal",
+      "dst_usage": "customer",
+      "planned": 80.0,
+      "actual": 75.0,
+      "intercompany": false
+    },
+    {
+      "id": 73926,
+      "date": "2026-06-23T22:36:50",
+      "company_id": 8,
+      "product_id": 34086,
+      "src_usage": "supplier",
+      "dst_usage": "internal",
+      "planned": 10.0,
+      "actual": 9.0,
+      "intercompany": true
+    },
+    {
+      "id": 207161,
+      "date": "2026-07-27T22:46:59",
+      "company_id": 9,
+      "product_id": 33668,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 3.0,
+      "actual": 1.0,
+      "intercompany": true
+    },
+    {
+      "id": 207595,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 30425,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 5.0,
+      "actual": 2.0,
+      "intercompany": true
+    },
+    {
+      "id": 207597,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 30427,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 8.0,
+      "actual": 5.0,
+      "intercompany": true
+    },
+    {
+      "id": 207601,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 29422,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 5.0,
+      "actual": 4.0,
+      "intercompany": true
+    },
+    {
+      "id": 207602,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 29436,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 6.0,
+      "actual": 2.0,
+      "intercompany": true
+    },
+    {
+      "id": 207610,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 29434,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 5.0,
+      "actual": 4.0,
+      "intercompany": true
+    },
+    {
+      "id": 207613,
+      "date": "2026-07-28T11:18:44",
+      "company_id": 9,
+      "product_id": 29435,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 7.0,
+      "actual": 2.0,
+      "intercompany": true
+    },
+    {
+      "id": 207693,
+      "date": "2026-07-28T12:16:23",
+      "company_id": 9,
+      "product_id": 21475,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 2.0,
+      "actual": 1.0,
+      "intercompany": true
+    },
+    {
+      "id": 207709,
+      "date": "2026-07-28T12:16:23",
+      "company_id": 9,
+      "product_id": 28476,
+      "src_usage": "transit",
+      "dst_usage": "internal",
+      "planned": 4.0,
+      "actual": 1.0,
+      "intercompany": true
+    }
+  ],
+  "stock_ledger": [
+    {
+      "name": "My Company",
+      "positions": 2,
+      "negative_positions": 0,
+      "mismatches": 2,
+      "on_hand": 0,
+      "ledger_net": -201.0
+    },
+    {
+      "name": "Impacto modas",
+      "positions": 4871,
+      "negative_positions": 236,
+      "mismatches": 91,
+      "on_hand": 74156.02,
+      "ledger_net": 73314.02
+    },
+    {
+      "name": "Deposito central",
+      "positions": 8179,
+      "negative_positions": 2039,
+      "mismatches": 7899,
+      "on_hand": 2543039.3,
+      "ledger_net": -251312.0
+    },
+    {
+      "name": "Sucursal Barranqueras",
+      "positions": 2004,
+      "negative_positions": 1871,
+      "mismatches": 80,
+      "on_hand": -4608.0,
+      "ledger_net": -4870.0
+    },
+    {
+      "name": "Corrientes 1",
+      "positions": 10990,
+      "negative_positions": 2207,
+      "mismatches": 115,
+      "on_hand": 239400.16,
+      "ledger_net": 240382.16
+    },
+    {
+      "name": "Corrientes 2",
+      "positions": 3355,
+      "negative_positions": 2043,
+      "mismatches": 119,
+      "on_hand": 17437.0,
+      "ledger_net": 18156.0
+    },
+    {
+      "name": "Sucursal Fontana",
+      "positions": 5900,
+      "negative_positions": 369,
+      "mismatches": 93,
+      "on_hand": 76220.0,
+      "ledger_net": 76618.0
+    },
+    {
+      "name": "Sucursal Goya",
+      "positions": 7637,
+      "negative_positions": 1309,
+      "mismatches": 110,
+      "on_hand": 142631.5,
+      "ledger_net": 141775.5
+    },
+    {
+      "name": "Sucursal Reconquista",
+      "positions": 10540,
+      "negative_positions": 1902,
+      "mismatches": 109,
+      "on_hand": 215748.0,
+      "ledger_net": 214128.0
+    },
+    {
+      "name": "Sucursal Resistencia",
+      "positions": 5241,
+      "negative_positions": 427,
+      "mismatches": 103,
+      "on_hand": 65282.8,
+      "ledger_net": 65587.8
+    },
+    {
+      "name": "Sucursal Corrientes Mayorista",
+      "positions": 7865,
+      "negative_positions": 1959,
+      "mismatches": 105,
+      "on_hand": -27509409.43,
+      "ledger_net": -27511440.43
+    },
+    {
+      "name": "Sucursal Villa Angela",
+      "positions": 2303,
+      "negative_positions": 2068,
+      "mismatches": 74,
+      "on_hand": -5373.0,
+      "ledger_net": -5541.0
+    },
+    {
+      "name": "Sucursal Santo Tome",
+      "positions": 8038,
+      "negative_positions": 993,
+      "mismatches": 115,
+      "on_hand": 135278.0,
+      "ledger_net": 134405.0
+    },
+    {
+      "name": "Sucursal Mega futbol",
+      "positions": 104,
+      "negative_positions": 20,
+      "mismatches": 0,
+      "on_hand": -12404.0,
+      "ledger_net": -12404.0
+    }
+  ],
+  "pending": [
+    {
+      "name": "Impacto modas",
+      "moves": 177,
+      "expected": 3047.0,
+      "older_30_days_at_snapshot": 3045.0,
+      "earliest": "2026-06-29T22:20:12",
+      "latest": "2026-08-15T11:48:41"
+    },
+    {
+      "name": "Deposito central",
+      "moves": 115,
+      "expected": 1088.0,
+      "older_30_days_at_snapshot": 937.0,
+      "earliest": "2026-06-12T20:14:19",
+      "latest": "2026-08-06T11:45:45"
+    },
+    {
+      "name": "Sucursal Barranqueras",
+      "moves": 12,
+      "expected": 277.0,
+      "older_30_days_at_snapshot": 277.0,
+      "earliest": "2026-05-23T12:54:01",
+      "latest": "2026-06-02T21:38:38"
+    },
+    {
+      "name": "Corrientes 1",
+      "moves": 46,
+      "expected": 802.0,
+      "older_30_days_at_snapshot": 153.0,
+      "earliest": "2026-06-16T10:58:57",
+      "latest": "2026-08-11T12:56:55"
+    },
+    {
+      "name": "Corrientes 2",
+      "moves": 38,
+      "expected": 953.0,
+      "older_30_days_at_snapshot": 87.0,
+      "earliest": "2026-06-04T22:46:41",
+      "latest": "2026-08-18T15:24:13"
+    },
+    {
+      "name": "Sucursal Fontana",
+      "moves": 11,
+      "expected": 98.0,
+      "older_30_days_at_snapshot": 98.0,
+      "earliest": "2026-06-02T21:33:43",
+      "latest": "2026-07-30T19:01:52"
+    },
+    {
+      "name": "Sucursal Goya",
+      "moves": 675,
+      "expected": 9440.0,
+      "older_30_days_at_snapshot": 7683.0,
+      "earliest": "2026-06-02T21:25:58",
+      "latest": "2026-08-19T11:23:14"
+    },
+    {
+      "name": "Sucursal Reconquista",
+      "moves": 11,
+      "expected": 178.0,
+      "older_30_days_at_snapshot": 178.0,
+      "earliest": "2026-06-11T21:43:17",
+      "latest": "2026-08-04T11:21:11"
+    },
+    {
+      "name": "Sucursal Resistencia",
+      "moves": 9,
+      "expected": 65.0,
+      "older_30_days_at_snapshot": 63.0,
+      "earliest": "2026-07-11T11:06:24",
+      "latest": "2026-08-08T13:03:23"
+    },
+    {
+      "name": "Sucursal Corrientes Mayorista",
+      "moves": 31,
+      "expected": 1534.0,
+      "older_30_days_at_snapshot": 158.0,
+      "earliest": "2026-06-02T21:23:44",
+      "latest": "2026-08-19T13:27:07"
+    },
+    {
+      "name": "Sucursal Villa Angela",
+      "moves": 102,
+      "expected": 2610.0,
+      "older_30_days_at_snapshot": 2610.0,
+      "earliest": "2026-06-10T19:04:25",
+      "latest": "2026-07-08T14:45:06"
+    },
+    {
+      "name": "Sucursal Santo Tome",
+      "moves": 666,
+      "expected": 15343.0,
+      "older_30_days_at_snapshot": 15341.0,
+      "earliest": "2026-06-08T21:32:38",
+      "latest": "2026-08-08T12:57:28"
+    }
+  ],
+  "pos_totals": [
+    {
+      "company_id": 1,
+      "orders": 1,
+      "net_qty": 201.0,
+      "first_sale": "2026-02-06T12:22:06",
+      "last_sale": "2026-02-06T12:22:06"
+    },
+    {
+      "company_id": 2,
+      "orders": 4438,
+      "net_qty": 19678.0,
+      "first_sale": "2026-02-05T05:48:28",
+      "last_sale": "2026-08-19T23:06:39"
+    },
+    {
+      "company_id": 3,
+      "orders": 3,
+      "net_qty": 25.0,
+      "first_sale": "2026-06-10T14:56:40",
+      "last_sale": "2026-07-10T19:30:17"
+    },
+    {
+      "company_id": 4,
+      "orders": 1648,
+      "net_qty": 6878.0,
+      "first_sale": "2026-05-26T14:18:08",
+      "last_sale": "2026-06-26T15:00:51"
+    },
+    {
+      "company_id": 5,
+      "orders": 5954,
+      "net_qty": 22812.0,
+      "first_sale": "2026-06-03T12:55:15",
+      "last_sale": "2026-08-20T02:38:02"
+    },
+    {
+      "company_id": 6,
+      "orders": 7853,
+      "net_qty": 32897.0,
+      "first_sale": "2026-06-05T13:51:49",
+      "last_sale": "2026-08-19T23:30:33"
+    },
+    {
+      "company_id": 8,
+      "orders": 2468,
+      "net_qty": 8377.0,
+      "first_sale": "2026-06-06T12:08:04",
+      "last_sale": "2026-08-19T14:47:41"
+    },
+    {
+      "company_id": 9,
+      "orders": 4929,
+      "net_qty": 21719.0,
+      "first_sale": "2026-06-16T13:17:36",
+      "last_sale": "2026-08-19T23:22:00"
+    },
+    {
+      "company_id": 10,
+      "orders": 4210,
+      "net_qty": 19667.0,
+      "first_sale": "2026-06-12T19:12:07",
+      "last_sale": "2026-08-19T23:28:52"
+    },
+    {
+      "company_id": 11,
+      "orders": 2393,
+      "net_qty": 9165.0,
+      "first_sale": "2026-06-06T15:00:05",
+      "last_sale": "2026-08-19T23:32:47"
+    },
+    {
+      "company_id": 12,
+      "orders": 3317,
+      "net_qty": 50443.0,
+      "first_sale": "2026-06-24T19:43:45",
+      "last_sale": "2026-09-05T19:58:36"
+    },
+    {
+      "company_id": 13,
+      "orders": 2136,
+      "net_qty": 7469.0,
+      "first_sale": "2026-06-12T11:18:13",
+      "last_sale": "2026-08-19T23:17:18"
+    },
+    {
+      "company_id": 14,
+      "orders": 4685,
+      "net_qty": 19527.0,
+      "first_sale": "2026-06-09T22:41:32",
+      "last_sale": "2026-08-19T23:33:25"
+    },
+    {
+      "company_id": 15,
+      "orders": 1429,
+      "net_qty": 1917.0,
+      "first_sale": "2026-06-06T23:29:43",
+      "last_sale": "2026-08-19T20:27:50"
+    }
+  ],
+  "reconcile": [
+    {
+      "warehouse": "My Company",
+      "products": 2,
+      "product_days": 2,
+      "net_units": 201.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Impacto modas",
+      "products": 3230,
+      "product_days": 13431,
+      "net_units": 30478.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Deposito central",
+      "products": 1273,
+      "product_days": 1416,
+      "net_units": 28523.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Barranqueras",
+      "products": 1988,
+      "product_days": 4410,
+      "net_units": 6838.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Corrientes 1",
+      "products": 3253,
+      "product_days": 13599,
+      "net_units": 22846.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Corrientes 2",
+      "products": 3201,
+      "product_days": 18210,
+      "net_units": 32912.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Fontana",
+      "products": 2400,
+      "product_days": 6071,
+      "net_units": 8418.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Goya",
+      "products": 3087,
+      "product_days": 12806,
+      "net_units": 21725.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Reconquista",
+      "products": 3296,
+      "product_days": 11972,
+      "net_units": 19653.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Resistencia",
+      "products": 2197,
+      "product_days": 6258,
+      "net_units": 9200.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Corrientes Mayorista",
+      "products": 2601,
+      "product_days": 15962,
+      "net_units": 50370.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Villa Angela",
+      "products": 2236,
+      "product_days": 4871,
+      "net_units": 7469.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Santo Tome",
+      "products": 2963,
+      "product_days": 12168,
+      "net_units": 19522.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    },
+    {
+      "warehouse": "Sucursal Mega futbol",
+      "products": 77,
+      "product_days": 743,
+      "net_units": 1918.0,
+      "mismatches": [],
+      "mismatch_count": 0
+    }
+  ],
+  "backtest": [
+    {
+      "warehouse": "Impacto modas",
+      "products": 100,
+      "train_from": "2026-05-08",
+      "cut": "2026-08-06",
+      "end_exclusive": "2026-08-20",
+      "unreliable_stock": 14,
+      "models": {
+        "weighted": {
+          "actual": 179.0,
+          "predicted": 268.4027483053345,
+          "wape": 148.4998880376457,
+          "bias": 49.945669444320956
+        },
+        "mean14": {
+          "actual": 179.0,
+          "predicted": 256.0,
+          "wape": 144.6927374301676,
+          "bias": 43.01675977653631
+        },
+        "mean30": {
+          "actual": 179.0,
+          "predicted": 324.8,
+          "wape": 160.85661080074487,
+          "bias": 81.45251396648045
+        }
+      }
+    },
+    {
+      "warehouse": "Corrientes 1",
+      "products": 100,
+      "train_from": "2026-05-08",
+      "cut": "2026-08-06",
+      "end_exclusive": "2026-08-20",
+      "unreliable_stock": 98,
+      "models": {
+        "weighted": {
+          "actual": 754.0,
+          "predicted": 665.8870689655172,
+          "wape": 78.56272294887039,
+          "bias": -11.686065123936713
+        },
+        "mean14": {
+          "actual": 754.0,
+          "predicted": 1020.0,
+          "wape": 102.65251989389921,
+          "bias": 35.278514588859416
+        },
+        "mean30": {
+          "actual": 754.0,
+          "predicted": 964.6,
+          "wape": 96.45446507515474,
+          "bias": 27.931034482758626
+        }
+      }
+    },
+    {
+      "warehouse": "Corrientes 2",
+      "products": 100,
+      "train_from": "2026-05-08",
+      "cut": "2026-08-06",
+      "end_exclusive": "2026-08-20",
+      "unreliable_stock": 96,
+      "models": {
+        "weighted": {
+          "actual": 1341.0,
+          "predicted": 1172.6,
+          "wape": 52.3303504847129,
+          "bias": -12.557792692020886
+        },
+        "mean14": {
+          "actual": 1341.0,
+          "predicted": 1418.0,
+          "wape": 63.012677106636836,
+          "bias": 5.741983594332588
+        },
+        "mean30": {
+          "actual": 1341.0,
+          "predicted": 1411.2,
+          "wape": 62.187422321650516,
+          "bias": 5.234899328859064
+        }
+      }
+    },
+    {
+      "warehouse": "Sucursal Reconquista",
+      "products": 100,
+      "train_from": "2026-05-08",
+      "cut": "2026-08-06",
+      "end_exclusive": "2026-08-20",
+      "unreliable_stock": 99,
+      "models": {
+        "weighted": {
+          "actual": 467.0,
+          "predicted": 575.6916666666666,
+          "wape": 95.97251962883654,
+          "bias": 23.274446823697346
+        },
+        "mean14": {
+          "actual": 467.0,
+          "predicted": 628.0,
+          "wape": 115.8458244111349,
+          "bias": 34.475374732334046
+        },
+        "mean30": {
+          "actual": 467.0,
+          "predicted": 941.2666666666667,
+          "wape": 134.78943611705927,
+          "bias": 101.55603140613847
+        }
+      }
+    },
+    {
+      "warehouse": "Sucursal Villa Angela",
+      "products": 100,
+      "train_from": "2026-05-08",
+      "cut": "2026-08-06",
+      "end_exclusive": "2026-08-20",
+      "unreliable_stock": 99,
+      "models": {
+        "weighted": {
+          "actual": 372.0,
+          "predicted": 662.9166666666666,
+          "wape": 172.35663082437276,
+          "bias": 78.20340501792114
+        },
+        "mean14": {
+          "actual": 372.0,
+          "predicted": 431.0,
+          "wape": 113.17204301075269,
+          "bias": 15.86021505376344
+        },
+        "mean30": {
+          "actual": 372.0,
+          "predicted": 489.06666666666666,
+          "wape": 104.15770609318996,
+          "bias": 31.46953405017921
+        }
+      }
+    }
+  ],
+  "pos_reconciliation": [
+    {
+      "company_id": 2,
+      "order_products": 14428,
+      "sold": 17889.0,
+      "delivered": 17889.0,
+      "differences": 0,
+      "difference": 0.0
+    },
+    {
+      "company_id": 3,
+      "order_products": 10,
+      "sold": 25.0,
+      "delivered": 25.0,
+      "differences": 0,
+      "difference": 0.0
+    },
+    {
+      "company_id": 4,
+      "order_products": 4803,
+      "sold": 6616.0,
+      "delivered": 6576.0,
+      "differences": 40,
+      "difference": 40.0
+    },
+    {
+      "company_id": 5,
+      "order_products": 14366,
+      "sold": 20816.0,
+      "delivered": 20798.0,
+      "differences": 15,
+      "difference": 18.0
+    },
+    {
+      "company_id": 6,
+      "order_products": 20666,
+      "sold": 29958.0,
+      "delivered": 29943.0,
+      "differences": 16,
+      "difference": 15.0
+    },
+    {
+      "company_id": 8,
+      "order_products": 6708,
+      "sold": 7725.0,
+      "delivered": 7725.0,
+      "differences": 0,
+      "difference": 0.0
+    },
+    {
+      "company_id": 9,
+      "order_products": 14340,
+      "sold": 19949.0,
+      "delivered": 19934.0,
+      "differences": 25,
+      "difference": 15.0
+    },
+    {
+      "company_id": 10,
+      "order_products": 12442,
+      "sold": 18047.0,
+      "delivered": 18033.0,
+      "differences": 12,
+      "difference": 14.0
+    },
+    {
+      "company_id": 11,
+      "order_products": 6400,
+      "sold": 8418.0,
+      "delivered": 8418.0,
+      "differences": 0,
+      "difference": 0.0
+    },
+    {
+      "company_id": 12,
+      "order_products": 18058,
+      "sold": 44137.0,
+      "delivered": 44107.0,
+      "differences": 19,
+      "difference": 30.0
+    },
+    {
+      "company_id": 13,
+      "order_products": 5119,
+      "sold": 7201.0,
+      "delivered": 7201.0,
+      "differences": 0,
+      "difference": 0.0
+    },
+    {
+      "company_id": 14,
+      "order_products": 13395,
+      "sold": 18085.0,
+      "delivered": 18073.0,
+      "differences": 9,
+      "difference": 12.0
+    },
+    {
+      "company_id": 15,
+      "order_products": 1693,
+      "sold": 1917.0,
+      "delivered": 1917.0,
+      "differences": 0,
+      "difference": 0.0
+    }
+  ],
+  "pos_difference_explanation": [
+    {
+      "pack_ok": true,
+      "pairs": 136,
+      "difference": 144.0
+    }
+  ],
+  "scope": {
+    "database": "prod (copia histórica)",
+    "read_only": true,
+    "done_move_count": 245718,
+    "date_from": "2026-02-05",
+    "last_done_move": "2026-09-05 19:58:36",
+    "quantity_source": "stock_move_line.quantity_product_uom",
+    "company_contact_aliases_not_remapped": [
+      57,
+      58,
+      60,
+      61
+    ]
+  }
+}

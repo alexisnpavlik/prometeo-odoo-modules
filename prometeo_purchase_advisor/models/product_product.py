@@ -83,14 +83,19 @@ class ProductProduct(models.Model):
             WITH daily AS (
                 SELECT sm.product_id,
                        (sm.date AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s)::date AS d,
-                       SUM(sm.product_qty) AS qty
+                       SUM(CASE WHEN dest.usage = 'customer' THEN sml.quantity_product_uom
+                                ELSE -sml.quantity_product_uom END) AS qty
                   FROM stock_move sm
+                  JOIN stock_move_line sml ON sml.move_id = sm.id
+                  LEFT JOIN stock_picking picking ON picking.id = sm.picking_id
                   JOIN stock_location src  ON src.id  = sm.location_id
                   JOIN stock_location dest ON dest.id = sm.location_dest_id
                  WHERE sm.state = 'done'
                    AND sm.company_id = %(company_id)s
-                   AND dest.usage = 'customer'
-                   AND src.usage = 'internal'
+                   AND ((dest.usage = 'customer' AND src.usage = 'internal')
+                     OR (src.usage = 'customer' AND dest.usage = 'internal'))
+                   AND NOT EXISTS (SELECT 1 FROM res_company company
+                       WHERE company.partner_id = COALESCE(picking.partner_id, sm.partner_id))
                    AND sm.date >= %(since)s
                  GROUP BY 1, 2
             )
@@ -133,14 +138,14 @@ class ProductProduct(models.Model):
         valued = []
         for product in products:
             total, _sumsq, _days = stats.get(product.id, (0.0, 0.0, 0))
-            valued.append((product, total * (product.standard_price or 0.0)))
+            valued.append((product, max(total, 0.0) * max(product.standard_price or 0.0, 0.0)))
         total_value = sum(value for _product, value in valued)
         valued.sort(key=lambda item: -item[1])
 
         now = fields.Datetime.now()
         cumulative = 0.0
         for product, value in valued:
-            if total_value > 0:
+            if total_value > 0 and value > 0:
                 # La clase se decide con lo acumulado ANTES de sumar este
                 # producto: el que cruza el corte todavía pertenece a la clase
                 # alta. Mirándolo después, un producto que solo por sí mismo

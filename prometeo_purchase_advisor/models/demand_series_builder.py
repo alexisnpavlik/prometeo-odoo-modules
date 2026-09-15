@@ -92,7 +92,7 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
     # Demanda: salidas a cliente, netas de devoluciones
     # ------------------------------------------------------------------
     def _fill_demand(self, series, params):
-        """Demanda diaria neta por producto.
+        """Demanda diaria neta por producto, usando cantidades efectivamente movidas.
 
         Una devolución del cliente resta: sin eso, un producto que se vende y se
         devuelve todo el tiempo parece un éxito de ventas.
@@ -101,9 +101,10 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
             SELECT sm.product_id,
                    (sm.date AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s)::date AS move_date,
                    SUM(CASE WHEN dest.usage = 'customer'
-                            THEN sm.product_qty ELSE -sm.product_qty END) AS qty,
-                   COUNT(*) FILTER (WHERE dest.usage = 'customer') AS moves
+                            THEN sml.quantity_product_uom ELSE -sml.quantity_product_uom END) AS qty,
+                   COUNT(DISTINCT sm.id) FILTER (WHERE dest.usage = 'customer') AS moves
               FROM stock_move sm
+              JOIN stock_move_line sml ON sml.move_id = sm.id
               JOIN stock_location src  ON src.id  = sm.location_id
               JOIN stock_location dest ON dest.id = sm.location_dest_id
               LEFT JOIN stock_picking picking ON picking.id = sm.picking_id
@@ -141,6 +142,7 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
             SELECT sm.product_id,
                    MIN((sm.date AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s)::date) AS first_date
               FROM stock_move sm
+              JOIN stock_move_line sml ON sml.move_id = sm.id
               JOIN stock_location src  ON src.id  = sm.location_id
               JOIN stock_location dest ON dest.id = sm.location_dest_id
              WHERE sm.state = 'done'
@@ -177,17 +179,18 @@ class PrometeoDemandSeriesBuilder(models.AbstractModel):
                    SUM(CASE
                          WHEN dest.usage = 'internal' AND dest.parent_path LIKE %(wh_path)s
                               AND NOT (src.usage = 'internal' AND src.parent_path LIKE %(wh_path)s)
-                              THEN sm.product_qty
+                              THEN sml.quantity_product_uom
                          WHEN src.usage = 'internal' AND src.parent_path LIKE %(wh_path)s
                               AND NOT (dest.usage = 'internal' AND dest.parent_path LIKE %(wh_path)s)
-                              THEN -sm.product_qty
+                              THEN -sml.quantity_product_uom
                          ELSE 0 END) AS net,
                    SUM(CASE
                          WHEN src.usage = 'internal' AND src.parent_path LIKE %(wh_path)s
                               AND NOT (dest.usage = 'internal' AND dest.parent_path LIKE %(wh_path)s)
-                              THEN sm.product_qty
+                              THEN sml.quantity_product_uom
                          ELSE 0 END) AS outbound
               FROM stock_move sm
+              JOIN stock_move_line sml ON sml.move_id = sm.id
               JOIN stock_location src  ON src.id  = sm.location_id
               JOIN stock_location dest ON dest.id = sm.location_dest_id
              WHERE sm.state = 'done'

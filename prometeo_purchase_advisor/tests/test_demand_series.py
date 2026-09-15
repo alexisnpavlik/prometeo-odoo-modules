@@ -25,6 +25,21 @@ class TestDemandSeries(PurchaseAdvisorCommon):
         series = self._build_series(None, self.product_a, lookback=30)
         self.assertEqual(series.total_qty(self.product_a.id), 3)
 
+    def test_done_demand_uses_delivered_quantity_not_requested(self):
+        day = self._today() - timedelta(days=2)
+        move = self._make_move(self.product_a, 17, day)
+        move.quantity = 14
+        series = self._build_series(None, self.product_a, lookback=30)
+        self.assertEqual(series.total_qty(self.product_a.id), 14)
+
+    def test_done_receipt_uses_actual_quantity_for_stock_reconstruction(self):
+        today = self._today()
+        move = self._make_move(self.product_a, 4, today - timedelta(days=10), outgoing=False)
+        move.product_uom_qty = 10
+        self._set_stock(self.product_a, 4)
+        series = self._build_series(None, self.product_a, lookback=30)
+        self.assertNotIn(self.product_a.id, series.unreliable_stock_ids)
+
     def test_daily_demand_is_aggregated_per_day(self):
         today = self._today()
         self._make_move(self.product_a, 3, today - timedelta(days=1))

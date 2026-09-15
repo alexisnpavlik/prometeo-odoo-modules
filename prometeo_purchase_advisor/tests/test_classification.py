@@ -12,6 +12,31 @@ class TestClassification(PurchaseAdvisorCommon):
     # ------------------------------------------------------------------
     # ABC
     # ------------------------------------------------------------------
+    def test_classification_uses_actual_sales_net_of_returns_and_transfers(self):
+        from datetime import timedelta
+        day = self._today() - timedelta(days=2)
+        move = self._make_move(self.product_a, 14, day)
+        move.product_uom_qty = 17
+        self._make_return(self.product_a, 4, day)
+        other, _warehouse = self._isolated_company('Clasificación traslado')
+        transfer = self._make_move(self.product_a, 100, day)
+        transfer.partner_id = other.partner_id
+        stats = self.env['product.product']._classification_stats(
+            self.company, self._local_dt(day - timedelta(days=1)))
+        self.assertEqual(stats[self.product_a.id][0], 10)
+
+    def test_net_returns_do_not_degrade_other_products_abc(self):
+        from datetime import timedelta
+        day = self._today() - timedelta(days=2)
+        self._make_move(self.product_a, 100, day)
+        self._make_move(self.product_b, 80, day)
+        self._make_return(self.product_c, 200, day)
+        (self.product_a | self.product_b | self.product_c).standard_price = 1
+        self.env['product.product']._classify_for_company(self.company)
+        self.assertEqual(self.product_a.abc_class, 'a')
+        self.assertEqual(self.product_b.abc_class, 'a')
+        self.assertEqual(self.product_c.abc_class, 'c')
+
     def test_abc_ranks_by_consumption_value_not_units(self):
         """Vender 500 medias no es lo mismo que vender 20 camperas."""
         company, warehouse = self._isolated_company("ABC")
