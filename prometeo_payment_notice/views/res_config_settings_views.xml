@@ -21,6 +21,23 @@
                             <button name="action_test_payment_notice" type="object" string="Probar conexión" class="btn-secondary"/>
                         </setting>
                     </block>
+                    <block title="Estado recibido" name="prometeo_notice_info" groups="base.group_no_one">
+                        <setting string="Estado del pago" help="Lo que devolvió la API en la última consulta exitosa.">
+                            <field name="prometeo_notice_info_estado"/>
+                        </setting>
+                        <setting string="Bloqueo de caja" help="Lo decide el servidor de cobranzas; no se configura acá.">
+                            <field name="prometeo_notice_info_bloqueo"/>
+                        </setting>
+                        <setting string="Última consulta exitosa" help="El cron consulta una vez por día. Probar conexión la fuerza.">
+                            <field name="prometeo_notice_info_consulta"/>
+                        </setting>
+                        <setting string="Mensaje que ve el cliente">
+                            <field name="prometeo_notice_info_mensaje"/>
+                        </setting>
+                        <setting string="Respuesta cruda" help="Tal cual quedó cacheada en el parámetro del sistema.">
+                            <field name="prometeo_notice_info_crudo"/>
+                        </setting>
+                    </block>
                     <block title="Punto de Venta" name="prometeo_notice_pos">
                         <setting string="Aviso en el POS" help="Dónde mostrar el aviso dentro del Punto de Venta.">
                             <field name="prometeo_notice_pos_mode"/>

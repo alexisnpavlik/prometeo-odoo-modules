@@ -15,7 +15,17 @@ PARAM_POS_MODE = "prometeo_payment_notice.pos_mode"
 PARAM_STATE = "prometeo_payment_notice.state"
 
 TIMEOUT = 10
-SIN_AVISO = {"mostrar": False, "mensaje": ""}
+# Días que se considera utilizable el último estado consultado con éxito. El
+# aviso puede seguir mostrándose con datos viejos sin consecuencias, pero la
+# caja trabada no: si la API queda caída una semana, el bloqueo se apaga solo
+# en vez de dejar al cliente sin poder abrir el POS.
+DIAS_CACHE_VALIDA = 7
+SIN_AVISO = {
+    "mostrar": False,
+    "mensaje": "",
+    "bloqueo_caja": False,
+    "bloqueo_caja_segundos": 0,
+}
 
 
 class PrometeoPaymentNotice(models.AbstractModel):
@@ -79,10 +89,31 @@ class PrometeoPaymentNotice(models.AbstractModel):
         if not isinstance(data, dict):
             _logger.warning("Aviso de pago: estado cacheado no es un objeto, se ignora")
             return dict(SIN_AVISO)
+        bloqueo = bool(data.get("bloqueo_caja")) and self._cache_vigente(data.get("consultado_el"))
         return {
             "mostrar": bool(data.get("mostrar_aviso")),
             "mensaje": data.get("mensaje") or "",
+            "bloqueo_caja": bloqueo,
+            "bloqueo_caja_segundos": int(data.get("bloqueo_caja_segundos") or 0) if bloqueo else 0,
         }
+
+    @api.model
+    def _cache_vigente(self, consultado_el):
+        """True si la última consulta exitosa es de hace menos de DIAS_CACHE_VALIDA.
+
+        Sin caché legible devuelve False: el bloqueo de caja solo se aplica con
+        una confirmación reciente del servidor.
+        """
+        if not consultado_el:
+            return False
+        try:
+            consultado = fields.Datetime.to_datetime(consultado_el)
+        except (TypeError, ValueError):
+            _logger.warning("Aviso de pago: fecha de consulta ilegible (%s)", consultado_el)
+            return False
+        if not consultado:
+            return False
+        return (fields.Datetime.now() - consultado).days < DIAS_CACHE_VALIDA
 
     @api.model
     def get_pos_mode(self):

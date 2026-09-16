@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Prometeo - Aviso de pago del servicio",
-    "version": "18.0.1.0.1",
+    "version": "18.0.1.2.0",
     "category": "Tools",
     "summary": "Muestra un aviso amistoso cuando el pago mensual del servicio no figura registrado",
     "description": """
@@ -9,9 +9,14 @@ Consulta una vez por día la API de cobranzas de Prometeo y, si el pago del mes
 en curso no figura registrado pasada la fecha límite, muestra una franja
 amistosa en la parte superior del cliente web y, opcionalmente, en el POS.
 
+Para los clientes que el servidor marca, además hace esperar al cajero con una
+cuenta regresiva antes de abrir y de cerrar la caja del POS. Nunca frena una
+venta ni un cobro.
+
 La respuesta se cachea en un parámetro del sistema: ninguna pantalla hace
 llamadas de red. Si el servidor no responde se conserva el último estado
-conocido y nunca se genera un aviso nuevo.
+conocido y nunca se genera un aviso nuevo; el bloqueo de caja, además, se
+apaga solo si hace 7 días que no hay una consulta exitosa.
     """,
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
@@ -29,7 +34,9 @@ conocido y nunca se genera un aviso nuevo.
         ],
         "point_of_sale._assets_pos": [
             "prometeo_payment_notice/static/src/css/payment_notice_banner.css",
+            "prometeo_payment_notice/static/src/js/payment_notice_lock_dialog.js",
             "prometeo_payment_notice/static/src/js/pos_payment_notice.js",
+            "prometeo_payment_notice/static/src/xml/payment_notice_lock_dialog.xml",
             "prometeo_payment_notice/static/src/xml/pos_payment_notice.xml",
         ],
     },
