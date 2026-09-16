@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Prometeo - Aviso de pago del servicio",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "category": "Tools",
     "summary": "Muestra un aviso amistoso cuando el pago mensual del servicio no figura registrado",
     "description": """

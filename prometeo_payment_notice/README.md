@@ -23,6 +23,21 @@ El botón **Probar conexión** guarda la configuración, consulta la API en el
 momento y devuelve el resultado en una notificación (éxito, aviso activo o
 error de conexión).
 
+## Estado recibido (solo en modo desarrollador)
+
+Debajo hay un bloque **Estado recibido**, de solo lectura, con `groups=
+"base.group_no_one"`: aparece únicamente con el modo desarrollador activo, así
+que el cliente no lo ve en su pantalla de Ajustes.
+
+Muestra lo que el módulo está usando **en este momento** para decidir: estado
+del pago con días de atraso y meses pendientes, si el bloqueo de caja está
+activo y por qué no lo está cuando corresponde, la fecha de la última consulta
+exitosa en hora local con su antigüedad, el mensaje que ve el cliente y la
+respuesta cruda cacheada.
+
+No consulta la API: lee el parámetro del sistema. Para refrescarlo está
+**Probar conexión**.
+
 ## Cómo funciona
 
 Un cron diario (**Prometeo: verificar estado de pago del servicio**) consulta
