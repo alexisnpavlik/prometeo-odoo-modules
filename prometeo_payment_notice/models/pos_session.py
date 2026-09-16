@@ -31,6 +31,11 @@ class PosSession(models.Model):
             result["data"][0]["_prometeo_notice_show"] = bool(notice["mostrar"]) and mode != "oculto"
             result["data"][0]["_prometeo_notice_message"] = notice["mensaje"]
             result["data"][0]["_prometeo_notice_mode"] = mode
+            # El bloqueo de caja no depende del modo de aviso: lo decide el
+            # servidor de cobranzas y no se apaga desde los Ajustes de esta
+            # instalación.
+            result["data"][0]["_prometeo_notice_lock"] = bool(notice["bloqueo_caja"])
+            result["data"][0]["_prometeo_notice_lock_seconds"] = notice["bloqueo_caja_segundos"]
         except Exception as e:
             _logger.warning("Aviso de pago: no se pudo agregar a los datos del POS (%s)", e)
         return result

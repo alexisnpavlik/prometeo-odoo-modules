@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="prometeo_payment_notice.LockDialog">
+        <Dialog size="'md'" header="false" contentClass="'o_prometeo_lock_dialog'">
+            <h4 class="mb-3">Pago del servicio pendiente</h4>
+            <p t-if="props.message" t-esc="props.message"/>
+            <p class="o_prometeo_lock_reloj" t-esc="reloj"/>
+            <p class="text-muted mb-0" t-if="!listo">
+                Podés continuar cuando termine la cuenta regresiva.
+            </p>
+            <t t-set-slot="footer">
+                <button t-if="listo" class="btn btn-primary btn-lg" t-on-click="() => this.props.close()">
+                    Continuar
+                </button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

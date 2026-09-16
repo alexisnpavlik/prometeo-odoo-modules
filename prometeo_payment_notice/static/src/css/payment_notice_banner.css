@@ -7,3 +7,15 @@
     text-align: center;
     flex: 0 0 auto;
 }
+
+.o_prometeo_lock_dialog {
+    text-align: center;
+}
+
+.o_prometeo_lock_dialog .o_prometeo_lock_reloj {
+    font-size: 40px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin: 12px 0 4px;
+    color: #664d03;
+}
