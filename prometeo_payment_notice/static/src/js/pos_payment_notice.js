@@ -9,30 +9,6 @@ import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 import { esperarBloqueoPago } from "@prometeo_payment_notice/js/payment_notice_lock_dialog";
 
-// La apertura se traba una sola vez por sesión de POS: openOpeningControl
-// corre en cada montaje de la pantalla de productos, y sin esta marca el
-// cajero se comería la espera cada vez que vuelve del cobro. Guardar el id de
-// la sesión en vez de un booleano hace que la marca se limpie sola al abrir la
-// caja del día siguiente.
-const CLAVE_APERTURA = "prometeo_payment_notice_lock_session";
-
-function aperturaYaBloqueada(sessionId) {
-    try {
-        return window.localStorage.getItem(CLAVE_APERTURA) === String(sessionId);
-    } catch {
-        return false;
-    }
-}
-
-function marcarAperturaBloqueada(sessionId) {
-    try {
-        window.localStorage.setItem(CLAVE_APERTURA, String(sessionId));
-    } catch {
-        // Sin localStorage la espera vuelve a salir en cada recarga: molesta
-        // más de lo previsto, pero nunca impide operar.
-    }
-}
-
 export class PosPaymentNoticeBanner extends Component {
     static template = "prometeo_payment_notice.PosBanner";
     static props = {};
@@ -77,9 +53,17 @@ patch(PosStore.prototype, {
 
     /**
      * Traba la apertura de caja antes de dejar ver el control de apertura.
+     *
+     * Se apoya en shouldShowOpeningControl, que mira si la sesión sigue en
+     * opening_control: así la espera sale cada vez que el cajero intenta
+     * abrir la caja —incluso si descarta el control y vuelve a entrar— y no
+     * vuelve a salir una vez abierta, aunque openOpeningControl corra de
+     * nuevo en cada montaje de la pantalla de productos.
      */
     async openOpeningControl() {
-        await this._prometeoBloquearCaja("apertura");
+        if (this.shouldShowOpeningControl()) {
+            await this._prometeoBloquearCaja();
+        }
         return super.openOpeningControl(...arguments);
     },
 
@@ -87,7 +71,7 @@ patch(PosStore.prototype, {
      * Traba el cierre de caja antes de abrir el popup de cierre.
      */
     async closeSession() {
-        await this._prometeoBloquearCaja("cierre");
+        await this._prometeoBloquearCaja();
         return super.closeSession(...arguments);
     },
 
@@ -98,16 +82,10 @@ patch(PosStore.prototype, {
      * se apaga desde los Ajustes de esta instalación. Cualquier error se
      * traga: el cobro nunca puede quedar trabado por este módulo.
      */
-    async _prometeoBloquearCaja(momento) {
+    async _prometeoBloquearCaja() {
         const session = this.session || {};
         if (!session._prometeo_notice_lock) {
             return;
-        }
-        if (momento === "apertura") {
-            if (aperturaYaBloqueada(session.id)) {
-                return;
-            }
-            marcarAperturaBloqueada(session.id);
         }
         try {
             await esperarBloqueoPago(

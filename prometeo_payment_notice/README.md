@@ -39,9 +39,10 @@ Cuando el servidor devuelve `bloqueo_caja`, el POS muestra un diálogo sin
 salida —sin Escape y sin X— con una cuenta regresiva, y el botón para
 continuar aparece recién al terminarla:
 
-- **Al abrir la caja**, una sola vez por sesión de POS. La marca se guarda en
-  `localStorage` con el id de la sesión, así volver a la pantalla de productos
-  o recargar la pestaña no repite la espera, y la caja del día siguiente sí.
+- **Al abrir la caja**, cada vez que se intenta. Si el cajero descarta el
+  control de apertura y vuelve a entrar, espera de nuevo. Una vez abierta la
+  caja no vuelve a salir: el disparador es `shouldShowOpeningControl`, o sea
+  que la sesión siga en `opening_control`.
 - **Al cerrar la caja**, cada vez que se pide el cierre.
 
 Se configura por cliente en el panel de cobranzas, no acá: *trabar la caja*
