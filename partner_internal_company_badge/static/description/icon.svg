@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Radial Gradient (Warm Dark Slate / Amber Tinted Navy) -->
+    <radialGradient id="bg_grad" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#2a180e"/>
+      <stop offset="55%" stop-color="#140d18"/>
+      <stop offset="100%" stop-color="#050308"/>
+    </radialGradient>
+
+    <!-- Glass Fill -->
+    <linearGradient id="glass_fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="48%" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <!-- Glass Glowing Edge Gradient (Amber Gold to Neon Coral Red) -->
+    <linearGradient id="glass_edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffb703"/>
+      <stop offset="50%" stop-color="#fb8500"/>
+      <stop offset="100%" stop-color="#ff006e"/>
+    </linearGradient>
+
+    <!-- Company Building Gradient -->
+    <linearGradient id="building_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffb703" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#fb8500" stop-opacity="0.10"/>
+    </linearGradient>
+
+    <!-- Orange Badge Ribbon Gradient -->
+    <linearGradient id="badge_ribbon_grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff9f43"/>
+      <stop offset="50%" stop-color="#ff5252"/>
+      <stop offset="100%" stop-color="#ff793f"/>
+    </linearGradient>
+
+    <linearGradient id="badge_crest_grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#ffeaa7"/>
+    </linearGradient>
+
+    <!-- Radial Glow Halo -->
+    <radialGradient id="halo_glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fb8500" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#ff006e" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ff006e" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Sheen Highlight -->
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="25%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Container Base -->
+  <rect width="512" height="512" rx="108" fill="url(#bg_grad)"/>
+
+  <!-- Background Tech Grid Lines -->
+  <g stroke="#ffb703" stroke-opacity="0.07" stroke-width="1.5">
+    <path d="M64 0V112 M160 0V78 M352 0V78 M448 0V112"/>
+    <path d="M64 400V512 M160 434V512 M352 434V512 M448 400V512"/>
+    <path d="M0 64H112 M0 160H78 M434 160H512 M400 64H512"/>
+    <path d="M0 352H78 M0 448H112 M434 352H512 M400 448H512"/>
+  </g>
+
+  <!-- Background Ambient Glow & Base Shadow -->
+  <circle cx="256" cy="248" r="180" fill="url(#halo_glow)"/>
+  <ellipse cx="256" cy="416" rx="150" ry="28" fill="#000000" fill-opacity="0.5"/>
+
+  <!-- Rotated Backdrop Glass Card -->
+  <g transform="translate(256 250) rotate(-6) translate(-256 -250)">
+    <rect x="124" y="118" width="264" height="264" rx="58"
+          fill="url(#glass_fill)" stroke="#ffb703" stroke-opacity="0.25" stroke-width="3"/>
+  </g>
+
+  <!-- Main Front Glass Card -->
+  <rect x="112" y="106" width="288" height="288" rx="64"
+        fill="url(#glass_fill)" stroke="url(#glass_edge)" stroke-width="5"/>
+  <rect x="122" y="116" width="268" height="268" rx="55"
+        fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M145 120H343C367 120 386 139 386 163V184C318 147 230 142 145 166Z"
+        fill="url(#sheen)" opacity="0.65"/>
+
+  <!-- Corporate Headquarters Silhouette in background of glass card -->
+  <g opacity="0.85">
+    <!-- Main Tower -->
+    <rect x="220" y="152" width="72" height="130" rx="6"
+          fill="url(#building_grad)" stroke="#ffb703" stroke-opacity="0.7" stroke-width="2"/>
+    <!-- Windows Grid -->
+    <g fill="#ffb703" opacity="0.8">
+      <rect x="232" y="166" width="10" height="12" rx="2"/>
+      <rect x="250" y="166" width="10" height="12" rx="2"/>
+      <rect x="268" y="166" width="10" height="12" rx="2"/>
+      <rect x="232" y="188" width="10" height="12" rx="2"/>
+      <rect x="250" y="188" width="10" height="12" rx="2"/>
+      <rect x="268" y="188" width="10" height="12" rx="2"/>
+      <rect x="232" y="210" width="10" height="12" rx="2"/>
+      <rect x="250" y="210" width="10" height="12" rx="2"/>
+      <rect x="268" y="210" width="10" height="12" rx="2"/>
+    </g>
+
+    <!-- Side Tower -->
+    <rect x="168" y="186" width="48" height="96" rx="6"
+          fill="url(#building_grad)" stroke="#ffb703" stroke-opacity="0.5" stroke-width="2"/>
+    <g fill="#ffb703" opacity="0.6">
+      <rect x="178" y="200" width="8" height="10" rx="2"/>
+      <rect x="194" y="200" width="8" height="10" rx="2"/>
+      <rect x="178" y="218" width="8" height="10" rx="2"/>
+      <rect x="194" y="218" width="8" height="10" rx="2"/>
+    </g>
+
+    <rect x="296" y="200" width="44" height="82" rx="6"
+          fill="url(#building_grad)" stroke="#ffb703" stroke-opacity="0.5" stroke-width="2"/>
+    <g fill="#ffb703" opacity="0.6">
+      <rect x="306" y="214" width="8" height="10" rx="2"/>
+      <rect x="320" y="214" width="8" height="10" rx="2"/>
+    </g>
+  </g>
+
+  <!-- Foreground Orange "Empresa Interna" Badge Ribbon Tag -->
+  <g transform="translate(0, 10)">
+    <!-- Badge Ribbon Glow -->
+    <rect x="140" y="268" width="232" height="64" rx="18"
+          fill="#ff6b00" opacity="0.3" filter="blur(10px)"/>
+
+    <!-- Badge Ribbon Container -->
+    <rect x="140" y="268" width="232" height="64" rx="18"
+          fill="url(#badge_ribbon_grad)" stroke="#ffffff" stroke-opacity="0.7" stroke-width="2.5"/>
+
+    <!-- Badge Star / Crest Shield Icon on Left -->
+    <circle cx="178" cy="300" r="18" fill="url(#badge_crest_grad)"/>
+    <path d="M178 288 L181 296 L189 296 L182 301 L185 309 L178 304 L171 309 L174 301 L167 296 L175 296 Z"
+          fill="#d9480f"/>
+
+    <!-- Badge Text Lines / Internal Emblem (Empresa Interna indicator) -->
+    <rect x="210" y="288" width="138" height="8" rx="4" fill="#ffffff" opacity="0.95"/>
+    <rect x="210" y="304" width="96" height="6" rx="3" fill="#ffffff" opacity="0.75"/>
+  </g>
+
+  <!-- Sparkles & Micro Highlights -->
+  <circle cx="138" cy="132" r="6" fill="#ffffff" fill-opacity="0.8"/>
+  <circle cx="368" cy="374" r="5" fill="#ffb703" fill-opacity="0.85"/>
+  <circle cx="372" cy="148" r="4" fill="#ff5252" fill-opacity="0.75"/>
+</svg>
