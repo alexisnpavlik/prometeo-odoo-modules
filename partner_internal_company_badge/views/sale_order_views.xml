@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_internal_company_badge" model="ir.ui.view">
+        <field name="name">sale.order.form.internal.company.badge</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <field name="partner_is_internal_company" invisible="1"/>
+                <div class="alert mb-0 rounded-0 text-center fw-bold fs-5 o_internal_company_badge"
+                     role="alert"
+                     style="background-color: #fd7e14; color: #fff;"
+                     invisible="not partner_is_internal_company">
+                    🏢 Empresa interna: <field name="partner_internal_company_name" class="d-inline" readonly="1"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
