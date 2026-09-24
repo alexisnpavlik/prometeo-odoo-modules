@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Radial Gradient -->
+    <radialGradient id="bg_grad" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#0e2a4a"/>
+      <stop offset="55%" stop-color="#061527"/>
+      <stop offset="100%" stop-color="#020812"/>
+    </radialGradient>
+
+    <!-- Glass Fill -->
+    <linearGradient id="glass_fill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="48%" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <!-- Glass Glowing Edge Gradient -->
+    <linearGradient id="glass_edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#4facfe"/>
+      <stop offset="100%" stop-color="#6b11ff"/>
+    </linearGradient>
+
+    <!-- Shield Glow Gradient -->
+    <linearGradient id="shield_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0066ff" stop-opacity="0.12"/>
+    </linearGradient>
+
+    <linearGradient id="shield_stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38ef7d"/>
+      <stop offset="50%" stop-color="#11998e"/>
+      <stop offset="100%" stop-color="#00f2fe"/>
+    </linearGradient>
+
+    <!-- Lock Gold/Cyan Neon Gradient -->
+    <linearGradient id="lock_body_grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#00a8ff"/>
+      <stop offset="100%" stop-color="#0052d4"/>
+    </linearGradient>
+
+    <linearGradient id="lock_shackle_grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#70e1ff"/>
+    </linearGradient>
+
+    <!-- Radial Glow Halo -->
+    <radialGradient id="halo_glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#0052d4" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0052d4" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Sheen Highlight -->
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="25%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Container Base -->
+  <rect width="512" height="512" rx="108" fill="url(#bg_grad)"/>
+
+  <!-- Background Tech Grid Lines -->
+  <g stroke="#00f2fe" stroke-opacity="0.07" stroke-width="1.5">
+    <path d="M64 0V112 M160 0V78 M352 0V78 M448 0V112"/>
+    <path d="M64 400V512 M160 434V512 M352 434V512 M448 400V512"/>
+    <path d="M0 64H112 M0 160H78 M434 160H512 M400 64H512"/>
+    <path d="M0 352H78 M0 448H112 M434 352H512 M400 448H512"/>
+  </g>
+
+  <!-- Background Ambient Glow & Base Shadow -->
+  <circle cx="256" cy="248" r="180" fill="url(#halo_glow)"/>
+  <ellipse cx="256" cy="416" rx="150" ry="28" fill="#000000" fill-opacity="0.5"/>
+
+  <!-- Rotated Backdrop Glass Card -->
+  <g transform="translate(256 250) rotate(-6) translate(-256 -250)">
+    <rect x="124" y="118" width="264" height="264" rx="58"
+          fill="url(#glass_fill)" stroke="#00f2fe" stroke-opacity="0.25" stroke-width="3"/>
+  </g>
+
+  <!-- Main Front Glass Card -->
+  <rect x="112" y="106" width="288" height="288" rx="64"
+        fill="url(#glass_fill)" stroke="url(#glass_edge)" stroke-width="5"/>
+  <rect x="122" y="116" width="268" height="268" rx="55"
+        fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M145 120H343C367 120 386 139 386 163V184C318 147 230 142 145 166Z"
+        fill="url(#sheen)" opacity="0.65"/>
+
+  <!-- Protective Outer Aura Ring -->
+  <circle cx="256" cy="246" r="115" fill="none" stroke="#00f2fe" stroke-opacity="0.2" stroke-width="2" stroke-dasharray="8 6"/>
+
+  <!-- Center Shield Icon -->
+  <path d="M256 150 C298 150 336 164 346 178 C346 252 310 316 256 344 C202 316 166 252 166 178 C176 164 214 150 256 150 Z"
+        fill="url(#shield_grad)" stroke="url(#shield_stroke)" stroke-width="4"/>
+
+  <!-- Partner User Silhouette inside Shield -->
+  <g opacity="0.85">
+    <circle cx="256" cy="206" r="24" fill="none" stroke="#e0f7fa" stroke-width="4"/>
+    <path d="M218 256 C218 234 235 224 256 224 C277 224 294 234 294 256"
+          fill="none" stroke="#e0f7fa" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Glowing Lock Foreground Badge -->
+  <!-- Lock Shackle -->
+  <path d="M232 262 V242 C232 228 242 218 256 218 C270 218 280 228 280 242 V262"
+        fill="none" stroke="url(#lock_shackle_grad)" stroke-width="9" stroke-linecap="round"/>
+  <!-- Lock Body -->
+  <rect x="216" y="258" width="80" height="66" rx="16"
+        fill="url(#lock_body_grad)" stroke="#ffffff" stroke-opacity="0.6" stroke-width="2.5"/>
+  <!-- Keyhole -->
+  <circle cx="256" cy="285" r="7" fill="#061527"/>
+  <path d="M253 289 L259 289 L261 303 L251 303 Z" fill="#061527"/>
+
+  <!-- Sparkles & Micro Highlights -->
+  <circle cx="138" cy="132" r="6" fill="#ffffff" fill-opacity="0.8"/>
+  <circle cx="368" cy="374" r="5" fill="#00f2fe" fill-opacity="0.85"/>
+  <circle cx="372" cy="148" r="4" fill="#38ef7d" fill-opacity="0.75"/>
+</svg>
