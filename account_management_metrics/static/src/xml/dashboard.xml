@@ -77,6 +77,12 @@
                         </div>
                     </div>
 
+                    <div class="input-group">
+                        <label>CUIT del Cliente</label>
+                        <input type="text" inputmode="numeric" placeholder="Ej: 20-12345678-9"
+                               t-model="state.vat" t-on-keydown="onVatKeydown"/>
+                    </div>
+
                 </div>
 
                 <div class="sidebar-footer" style="display: flex; gap: 8px;">
@@ -388,7 +394,7 @@
                                 </div>
                                 <div class="header-actions">
                                     <div class="search-box">
-                                        <input type="text" placeholder="Buscar número, cliente, vendedor..." t-on-input="onSearchInput"/>
+                                        <input type="text" placeholder="Buscar número, cliente, CUIT, vendedor..." t-on-input="onSearchInput"/>
                                     </div>
                                     <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -409,6 +415,7 @@
                                             <th>Fecha</th>
                                             <th>Tipo de Comprobante</th>
                                             <th>Cliente</th>
+                                            <th>CUIT</th>
                                             <th>Empresa</th>
                                             <th>Sucursal (Diario)</th>
                                             <th>Vendedor</th>
@@ -420,7 +427,7 @@
                                     <tbody>
                                         <t t-if="invoicesData.invoices.length === 0">
                                             <tr>
-                                                <td colspan="10" class="text-center text-muted">No se encontraron comprobantes registrados.</td>
+                                                <td colspan="11" class="text-center text-muted">No se encontraron comprobantes registrados.</td>
                                             </tr>
                                         </t>
                                         <t t-foreach="invoicesData.invoices" t-as="inv" t-key="inv.move_id">
@@ -429,6 +436,7 @@
                                                 <td><t t-esc="inv.fecha"/></td>
                                                 <td><t t-esc="inv.tipo_doc"/></td>
                                                 <td><t t-esc="inv.cliente"/></td>
+                                                <td><t t-esc="inv.cuit"/></td>
                                                 <td><t t-esc="inv.empresa"/></td>
                                                 <td><t t-esc="inv.diario"/></td>
                                                 <td><t t-esc="inv.vendedor"/></td>
@@ -481,6 +489,7 @@
                                             <th>Fecha</th>
                                             <th>Tipo de Comprobante</th>
                                             <th>Cliente</th>
+                                            <th>CUIT</th>
                                             <th>Empresa</th>
                                             <th>Sucursal (Diario)</th>
                                             <th>Vendedor</th>
@@ -490,7 +499,7 @@
                                     <tbody>
                                         <t t-if="draftsData.invoices.length === 0">
                                             <tr>
-                                                <td colspan="8" class="text-center text-muted">No hay facturas en borrador para los filtros seleccionados.</td>
+                                                <td colspan="9" class="text-center text-muted">No hay facturas en borrador para los filtros seleccionados.</td>
                                             </tr>
                                         </t>
                                         <t t-foreach="draftsData.invoices" t-as="inv" t-key="inv.move_id">
@@ -501,6 +510,7 @@
                                                 <td><t t-esc="inv.fecha"/></td>
                                                 <td><t t-esc="inv.tipo_doc"/></td>
                                                 <td><t t-esc="inv.cliente"/></td>
+                                                <td><t t-esc="inv.cuit"/></td>
                                                 <td><t t-esc="inv.empresa"/></td>
                                                 <td><t t-esc="inv.diario"/></td>
                                                 <td><t t-esc="inv.vendedor"/></td>

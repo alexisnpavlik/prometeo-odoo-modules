@@ -16,6 +16,20 @@ INVOICE_STATES = {
 }
 
 
+# Partners cuya empresa comercial tiene un CUIT que contiene los dígitos buscados.
+# Se compara sin guiones ni espacios: "20-12345678-9" y "20123456789" matchean igual.
+VAT_PARTNER_SUBQUERY = """
+    SELECT p.id FROM res_partner p
+    JOIN res_partner cp ON cp.id = p.commercial_partner_id
+    WHERE regexp_replace(COALESCE(cp.vat, ''), '[^0-9]', '', 'g') LIKE %s
+"""
+
+
+def _vat_digits(value):
+    """Devuelve solo los dígitos de un CUIT ingresado por el usuario."""
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
 class AccountMetricsController(http.Controller):
 
     def _check_access(self):
@@ -39,7 +53,7 @@ class AccountMetricsController(http.Controller):
         return {rec.id: rec.display_name for rec in records}
 
     def _build_where_clause(self, start_date=None, end_date=None, company="all", journal="all",
-                            doc_type="all", salesperson="all", search=None, state="all"):
+                            doc_type="all", salesperson="all", search=None, state="all", vat=None):
         """Construye el WHERE parametrizado sobre account_move (alias am).
 
         El filtro search solo debe usarse en queries que joinean res_partner (rp)
@@ -72,14 +86,24 @@ class AccountMetricsController(http.Controller):
             where_clause += " AND am.state = %s"
             params.append(state)
 
+        vat_digits = _vat_digits(vat)
+        if vat_digits:
+            where_clause += f" AND am.partner_id IN ({VAT_PARTNER_SUBQUERY})"
+            params.append(f"%{vat_digits}%")
+
         if search:
             search_pattern = f"%{search.lower()}%"
             where_clause += """ AND (
                 LOWER(am.name) LIKE %s OR
                 LOWER(COALESCE(rp.name, '')) LIKE %s OR
-                LOWER(COALESCE(rup.name, '')) LIKE %s
-            )"""
-            params.extend([search_pattern, search_pattern, search_pattern])
+                LOWER(COALESCE(rup.name, '')) LIKE %s OR
+                LOWER(COALESCE(rp.vat, '')) LIKE %s"""
+            params.extend([search_pattern] * 4)
+            search_digits = _vat_digits(search)
+            if search_digits:
+                where_clause += " OR regexp_replace(COALESCE(rp.vat, ''), '[^0-9]', '', 'g') LIKE %s"
+                params.append(f"%{search_digits}%")
+            where_clause += "\n            )"
 
         return where_clause, params
 
@@ -208,13 +232,13 @@ class AccountMetricsController(http.Controller):
 
     @http.route("/account_management_metrics/metrics", type="json", auth="user")
     def get_metrics(self, start_date=None, end_date=None, company="all", journal="all",
-                    doc_type="all", salesperson="all", **kwargs):
+                    doc_type="all", salesperson="all", vat=None, **kwargs):
         """KPIs y gráficos de facturación para el período y filtros indicados."""
         self._check_access()
         cr = request.env.cr
 
         where_clause, params = self._build_where_clause(
-            start_date, end_date, company, journal, doc_type, salesperson)
+            start_date, end_date, company, journal, doc_type, salesperson, vat=vat)
 
         # 1. KPIs en una sola pasada con FILTER
         cr.execute(f"""
@@ -300,6 +324,10 @@ class AccountMetricsController(http.Controller):
             if end_date:
                 pos_where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
                 pos_params.extend([f"{end_date} 23:59:59", tz])
+            vat_digits = _vat_digits(vat)
+            if vat_digits:
+                pos_where += f" AND po.partner_id IN ({VAT_PARTNER_SUBQUERY})"
+                pos_params.append(f"%{vat_digits}%")
             cr.execute(f"""
                 SELECT (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS fecha,
                        SUM(po.amount_total) AS total
@@ -400,6 +428,7 @@ class AccountMetricsController(http.Controller):
                 am.company_id                        AS company_id,
                 am.invoice_user_id                   AS user_id,
                 rp.name                              AS cliente,
+                rp.vat                               AS cuit,
                 am.state                             AS estado,
                 am.move_type                         AS move_type,
                 am.amount_total                      AS total,
@@ -431,6 +460,7 @@ class AccountMetricsController(http.Controller):
             r["empresa"] = company_names.get(r["company_id"], "")
             r["vendedor"] = user_names.get(r["user_id"], "")
             r["cliente"] = r["cliente"] or "Consumidor Final"
+            r["cuit"] = r["cuit"] or ""
             r["estado_label"] = INVOICE_STATES.get(r["estado"], r["estado"])
             r["total"] = round(sign * float(r["total"] or 0.0), 2)
             r["saldo"] = round(sign * float(r["saldo"] or 0.0), 2)
@@ -441,13 +471,13 @@ class AccountMetricsController(http.Controller):
     @http.route("/account_management_metrics/raw_invoices", type="json", auth="user")
     def get_raw_invoices(self, start_date=None, end_date=None, company="all", journal="all",
                          doc_type="all", salesperson="all", search=None, state="all",
-                         page=1, per_page=15, **kwargs):
+                         vat=None, page=1, per_page=15, **kwargs):
         """Detalle paginado de comprobantes con búsqueda difusa y filtro opcional de estado."""
         self._check_access()
         cr = request.env.cr
 
         where_clause, params = self._build_where_clause(
-            start_date, end_date, company, journal, doc_type, salesperson, search, state)
+            start_date, end_date, company, journal, doc_type, salesperson, search, state, vat)
 
         cr.execute(f"""
             SELECT COUNT(*)
@@ -472,7 +502,7 @@ class AccountMetricsController(http.Controller):
 
     @http.route("/account_management_metrics/export", type="http", auth="user")
     def export_csv(self, start_date=None, end_date=None, company="all", journal="all",
-                   doc_type="all", salesperson="all", search=None, **kwargs):
+                   doc_type="all", salesperson="all", search=None, vat=None, **kwargs):
         """Exporta el detalle de comprobantes filtrado a CSV (con BOM para Excel)."""
         try:
             self._check_access()
@@ -485,21 +515,22 @@ class AccountMetricsController(http.Controller):
             doc_type = doc_type or "all"
             salesperson = salesperson or "all"
             search = search if search and search != "null" else None
+            vat = vat if vat and vat != "null" else None
 
             where_clause, params = self._build_where_clause(
-                start_date, end_date, company, journal, doc_type, salesperson, search)
+                start_date, end_date, company, journal, doc_type, salesperson, search, vat=vat)
             rows = self._query_raw_invoices(where_clause, params)
 
             output = io.StringIO()
             output.write("\ufeff")  # BOM para soporte Excel nativo con acentos
             writer = csv.writer(output, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
             writer.writerow([
-                "Número", "Fecha", "Tipo de Comprobante", "Cliente", "Empresa",
+                "Número", "Fecha", "Tipo de Comprobante", "Cliente", "CUIT", "Empresa",
                 "Diario (Sucursal)", "Vendedor", "Estado", "Total", "Saldo Pendiente",
             ])
             for r in rows:
                 writer.writerow([
-                    r["numero"], r["fecha"], r["tipo_doc"], r["cliente"], r["empresa"],
+                    r["numero"], r["fecha"], r["tipo_doc"], r["cliente"], r["cuit"], r["empresa"],
                     r["diario"], r["vendedor"], r["estado_label"], r["total"], r["saldo"],
                 ])
 

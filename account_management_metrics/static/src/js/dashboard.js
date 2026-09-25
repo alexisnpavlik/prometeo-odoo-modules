@@ -16,6 +16,7 @@ class AccountDashboardMetrics extends Component {
             endDate: "",
             company: "all",
             docType: "all",
+            vat: "",
             search: "",
             page: 1,
             draftPage: 1,
@@ -140,6 +141,7 @@ class AccountDashboardMetrics extends Component {
         this.setPresetDates("30days");
         this.state.company = "all";
         this.state.docType = "all";
+        this.state.vat = "";
         this.state.search = "";
         this.state.page = 1;
         await this.refreshData();
@@ -203,7 +205,8 @@ class AccountDashboardMetrics extends Component {
             start_date: this.state.startDate || null,
             end_date: this.state.endDate || null,
             company: this.state.company,
-            doc_type: this.state.docType
+            doc_type: this.state.docType,
+            vat: this.state.vat
         };
     }
 
@@ -283,6 +286,12 @@ class AccountDashboardMetrics extends Component {
         }
     }
 
+    onVatKeydown(ev) {
+        if (ev.key === "Enter") {
+            this.applyFilters();
+        }
+    }
+
     onSearchInput(ev) {
         this.state.search = ev.target.value;
         this.state.page = 1;
@@ -315,6 +324,7 @@ class AccountDashboardMetrics extends Component {
             end_date: this.state.endDate || '',
             company: this.state.company,
             doc_type: this.state.docType,
+            vat: this.state.vat || '',
             search: this.state.search || ''
         });
         window.open(`/account_management_metrics/export?${params.toString()}`, '_blank');
