@@ -56,8 +56,15 @@ class PosDashboardMetrics extends Component {
                 total_revenue_net: 0,
                 total_tax: 0,
                 total_orders: 0,
+                refund_orders: 0,
                 ticket_average: 0,
-                cash_difference: 0
+                cash_difference: 0,
+                discount_total: 0,
+                discount_global: 0,
+                discount_line: 0,
+                discount_percent: 0,
+                surcharge_total: 0,
+                surcharge_percent: 0
             },
             charts: {
                 sales_trend: { labels: [], companies: {}, timeframe: "Diario" },
@@ -78,6 +85,10 @@ class PosDashboardMetrics extends Component {
                 total_cost: 0.0,
                 gross_profit: 0.0,
                 margin_percent: 0.0,
+                cost_coverage_percent: 0.0,
+                products_sold: 0,
+                products_with_cost: 0,
+                products_with_cost_percent: 0.0,
                 top_profitable: [],
                 bottom_profitable: []
             }
@@ -470,6 +481,13 @@ class PosDashboardMetrics extends Component {
         }
     }
 
+    get cashDifferenceTotal() {
+        // Mismo universo que la tabla de auditoría: sólo las sesiones cerradas tienen arqueo
+        return this.sessionsData
+            .filter((s) => s.estado_sesion === "closed")
+            .reduce((acc, s) => acc + (s.diferencia_caja || 0), 0);
+    }
+
     get sortedTopArticles() {
         return this.state.topSort === "units"
             ? (this.topArticlesData.by_units || [])
@@ -741,7 +759,7 @@ class PosDashboardMetrics extends Component {
         this.createOrUpdateChart("chart-sales-by-weekday", "bar", {
             labels: this.metricsData.charts.sales_by_weekday.labels,
             datasets: [{
-                label: "Ingresos",
+                label: "Promedio por día",
                 data: this.metricsData.charts.sales_by_weekday.values,
                 backgroundColor: "rgba(139, 92, 246, 0.65)",
                 borderColor: "#8b5cf6",

@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import logging
+import pytz
 import xlsxwriter
 
 _logger = logging.getLogger(__name__)
@@ -68,6 +69,8 @@ class PosMetricsController(http.Controller):
         if pos_configs:
             where_clause += " AND pc.name IN %s"
             params.append(pos_configs)
+        # `emp` es un LATERAL que elige UN empleado por usuario (el de la compañía de la venta):
+        # un usuario con empleado en varias sucursales duplicaba cada línea con un JOIN simple.
         if cashier and cashier != 'all':
             where_clause += " AND COALESCE(emp.name, ru.login) = %s"
             params.append(cashier)
@@ -117,6 +120,31 @@ class PosMetricsController(http.Controller):
 
         return where_clause, params
 
+    def _surcharge_products_sql(self):
+        """Subconsulta con los productos de recargo de las cajas (pos_global_surcharge_button).
+
+        El módulo de recargo no es dependencia de éste: si la columna no existe en la base,
+        devuelve una subconsulta vacía para que las consultas sigan funcionando.
+        """
+        cr = request.env.cr
+        cr.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'pos_config' AND column_name = 'surcharge_product_id'
+        """)
+        if cr.fetchone():
+            return "(SELECT surcharge_product_id FROM pos_config WHERE surcharge_product_id IS NOT NULL)"
+        return "(SELECT NULL::integer WHERE FALSE)"
+
+    def _non_merchandise_sql(self):
+        """Subconsulta con los productos que no son mercadería: descuento global y recargo.
+
+        Entran en la facturación (son plata cobrada o descontada) pero no en rankings ni márgenes.
+        """
+        return (
+            "(SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL"
+            f" UNION SELECT * FROM {self._surcharge_products_sql()} s)"
+        )
+
     def _build_line_filters(self, category='all', product='all', lang='es_AR'):
         clauses = []
         params = []
@@ -134,6 +162,7 @@ class PosMetricsController(http.Controller):
     def get_filters(self, **kwargs):
         self._check_access()
         cr = request.env.cr
+        non_merch = self._non_merchandise_sql()
         allowed_companies = tuple(request.env.companies.ids)
         lang = self._get_lang()
 
@@ -153,7 +182,7 @@ class PosMetricsController(http.Controller):
             SELECT DISTINCT COALESCE(emp.name, ru.login) 
             FROM pos_order po 
             JOIN res_users ru ON ru.id = po.user_id 
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id 
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             WHERE po.state IN ('done', 'invoiced') 
               AND po.company_id IN %s
             ORDER BY 1
@@ -190,13 +219,13 @@ class PosMetricsController(http.Controller):
         products = [r[0] for r in cr.fetchall() if r[0]]
 
         # 6. Mapa categoría -> productos
-        cr.execute("""
+        cr.execute(f"""
             SELECT DISTINCT ic.name, COALESCE(pt.name->>%s, pt.name->>'en_US') 
             FROM product_product pp 
             JOIN product_template pt ON pt.id = pp.product_tmpl_id 
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
             ORDER BY ic.name, 2
         """, (lang,))
         products_by_category = {}
@@ -237,13 +266,31 @@ class PosMetricsController(http.Controller):
         
         params_list = list(params)
         
+        # La línea de descuento global (pos_discount) entra en la facturación, que debe
+        # coincidir con lo cobrado; el costo y las unidades salen sólo de productos reales.
+        is_discount = "pp.id IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)"
+        is_surcharge = f"pp.id IN {self._surcharge_products_sql()}"
+        is_merchandise = f"NOT {is_discount} AND NOT {is_surcharge}"
+        unit_cost = "COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)"
+        # price_subtotal_incl ya viene neto del descuento de línea: se reconstruye el monto descontado.
+        # Al 100% el subtotal es 0 y no hay de dónde despejarlo; se usa qty * price_unit.
+        line_discount = """CASE
+                    WHEN pol.discount >= 100 THEN pol.qty * pol.price_unit
+                    WHEN pol.discount > 0 THEN pol.price_subtotal_incl * pol.discount / (100 - pol.discount)
+                    ELSE 0 END"""
+
         query = f"""
             SELECT
                 SUM(pol.price_subtotal_incl) AS total_revenue,
                 SUM(pol.price_subtotal) AS total_revenue_net,
-                SUM(pol.qty) AS total_qty,
-                SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS total_cost,
-                COUNT(DISTINCT pol.order_id) AS total_orders
+                SUM(pol.qty) FILTER (WHERE {is_merchandise} AND po.amount_total >= 0) AS total_qty,
+                SUM(pol.price_subtotal_incl) FILTER (WHERE {is_merchandise}) AS products_revenue,
+                SUM(pol.price_subtotal_incl) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS costed_revenue,
+                SUM(pol.qty * {unit_cost}) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS total_cost,
+                SUM(pol.price_subtotal_incl) FILTER (WHERE {is_discount}) AS global_discount,
+                SUM(pol.price_subtotal_incl) FILTER (WHERE {is_surcharge}) AS surcharge_total,
+                SUM({line_discount}) FILTER (WHERE {is_merchandise}) AS line_discount,
+                COUNT(DISTINCT pol.order_id) FILTER (WHERE po.amount_total >= 0) AS total_orders
             FROM pos_order_line pol
             JOIN pos_order po ON po.id = pol.order_id
             JOIN pos_config pc ON pc.id = po.config_id
@@ -251,25 +298,30 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
-              AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
-        
+
         lang = self._get_lang()
         line_clauses, line_params = self._build_line_filters(category, product, lang)
         query += "".join(f" AND {c}" for c in line_clauses)
         params_list.extend(line_params)
-            
+
         cr.execute(query, params_list)
         res = cr.dictfetchone() or {}
-        
+
         return {
             "total_revenue": float(res.get("total_revenue") or 0.0),
             "total_revenue_net": float(res.get("total_revenue_net") or 0.0),
             "total_qty": float(res.get("total_qty") or 0.0),
+            "products_revenue": float(res.get("products_revenue") or 0.0),
+            "costed_revenue": float(res.get("costed_revenue") or 0.0),
             "total_cost": float(res.get("total_cost") or 0.0),
+            # Negativo: es la suma de las líneas de descuento global
+            "global_discount": float(res.get("global_discount") or 0.0),
+            "line_discount": float(res.get("line_discount") or 0.0),
+            "surcharge_total": float(res.get("surcharge_total") or 0.0),
             "total_orders": int(res.get("total_orders") or 0)
         }
 
@@ -290,7 +342,7 @@ class PosMetricsController(http.Controller):
             FROM pos_order po
             JOIN pos_config pc ON pc.id = po.config_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause}
         """
@@ -303,8 +355,15 @@ class PosMetricsController(http.Controller):
                 "total_revenue_net": 0,
                 "total_tax": 0,
                 "total_orders": 0,
+                "refund_orders": 0,
                 "ticket_average": 0,
-                "cash_difference": 0
+                "cash_difference": 0,
+                "discount_total": 0,
+                "discount_global": 0,
+                "discount_line": 0,
+                "discount_percent": 0,
+                "surcharge_total": 0,
+                "surcharge_percent": 0
             },
             "charts": {
                 "sales_trend": {"labels": [], "values": [], "timeframe": "Diario"},
@@ -325,6 +384,10 @@ class PosMetricsController(http.Controller):
                 "total_cost": 0.0,
                 "gross_profit": 0.0,
                 "margin_percent": 0.0,
+                "cost_coverage_percent": 0.0,
+                "products_sold": 0,
+                "products_with_cost": 0,
+                "products_with_cost_percent": 0.0,
                 "top_profitable": [],
                 "bottom_profitable": []
             }
@@ -337,18 +400,22 @@ class PosMetricsController(http.Controller):
 
         # Generar cláusulas de filtrado a nivel de línea
         line_clauses, line_params = self._build_line_filters(category, product, lang)
+        non_merch = self._non_merchandise_sql()
 
         # 1. KPIs principales de líneas
         kpi_query = """
             SELECT
                 SUM(pol.price_subtotal_incl) AS total_revenue,
                 SUM(pol.price_subtotal) AS total_revenue_net,
-                COUNT(DISTINCT pol.order_id) AS total_orders
+                SUM(pol.price_subtotal_incl) FILTER (WHERE po.amount_total >= 0) AS sales_revenue,
+                COUNT(DISTINCT pol.order_id) FILTER (WHERE po.amount_total >= 0) AS total_orders,
+                COUNT(DISTINCT pol.order_id) FILTER (WHERE po.amount_total < 0) AS refund_orders
             FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
         """
         kpi_params = [order_ids_tuple]
         kpi_query += "".join(f" AND {c}" for c in line_clauses)
@@ -358,9 +425,13 @@ class PosMetricsController(http.Controller):
         kpi_row = cr.dictfetchone()
         total_rev = float(kpi_row['total_revenue'] or 0.0)
         total_rev_net = float(kpi_row['total_revenue_net'] or 0.0)
+        # Las devoluciones (orden con total negativo) restan facturación pero no son tickets:
+        # contarlas como transacciones bajaba el ticket promedio.
         total_orders = int(kpi_row['total_orders'] or 0)
+        refund_orders = int(kpi_row['refund_orders'] or 0)
+        sales_revenue = float(kpi_row['sales_revenue'] or 0.0)
         total_tax = total_rev - total_rev_net
-        ticket_avg = total_rev / total_orders if total_orders > 0 else 0.0
+        ticket_avg = sales_revenue / total_orders if total_orders > 0 else 0.0
 
         # 2. Diferencia de arqueo de caja (Sesiones) respetando las compañías permitidas
         sessions_sql = """
@@ -382,7 +453,7 @@ class PosMetricsController(http.Controller):
             ) cash ON cash.session_id = ps.id
             LEFT JOIN res_company rc ON rc.id = pc.company_id
             LEFT JOIN res_users ru ON ru.id = ps.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = pc.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             WHERE ps.state = 'closed'
               AND pc.company_id IN %s
         """
@@ -414,6 +485,7 @@ class PosMetricsController(http.Controller):
             "total_revenue_net": round(total_rev_net, 2),
             "total_tax": round(total_tax, 2),
             "total_orders": total_orders,
+            "refund_orders": refund_orders,
             "ticket_average": round(ticket_avg, 2),
             "cash_difference": round(cash_diff, 2)
         }
@@ -442,7 +514,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -472,7 +544,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -537,7 +609,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
         """
         pos_params = [order_ids_tuple]
         pos_query += "".join(f" AND {c}" for c in line_clauses)
@@ -572,7 +644,7 @@ class PosMetricsController(http.Controller):
         }
 
         # 6. Top 10 Productos
-        prod_query = """
+        prod_query = f"""
             SELECT
                 COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
                 SUM(pol.price_subtotal_incl) AS subtotal
@@ -581,7 +653,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
         """
         prod_params = [lang, order_ids_tuple]
         prod_query += "".join(f" AND {c}" for c in line_clauses)
@@ -600,7 +672,7 @@ class PosMetricsController(http.Controller):
         }
 
         # 7. Top 10 Categorías
-        cat_query = """
+        cat_query = f"""
             SELECT
                 ic.name AS categoria,
                 SUM(pol.price_subtotal_incl) AS subtotal
@@ -611,7 +683,7 @@ class PosMetricsController(http.Controller):
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE pol.order_id IN %s
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
         """
         cat_params = [order_ids_tuple]
         cat_query += "".join(f" AND {c}" for c in line_clauses)
@@ -640,7 +712,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
         """
         dow_params = [tz, order_ids_tuple]
         dow_query += "".join(f" AND {c}" for c in line_clauses)
@@ -649,9 +721,37 @@ class PosMetricsController(http.Controller):
         dow_query += " GROUP BY dow"
         cr.execute(dow_query, dow_params)
         dow_data = {r[0]: float(r[1]) for r in cr.fetchall()}
+
+        # Promedio por día calendario: un mes con 5 viernes y 4 sábados no debe
+        # inflar el viernes. Un día sin ventas (local cerrado) cuenta como 0.
+        if start_date and end_date:
+            first_day = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+            last_day = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+        else:
+            cr.execute("""
+                SELECT MIN((date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date),
+                       MAX((date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date)
+                FROM pos_order WHERE id IN %s
+            """, (tz, tz, order_ids_tuple))
+            first_day, last_day = cr.fetchone()
+            if start_date:
+                first_day = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+            if end_date:
+                last_day = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+        # Los días futuros del rango todavía no existen: no deben bajar el promedio
+        last_day = min(last_day, datetime.datetime.now(pytz.timezone(tz)).date())
+        weekday_counts = {k: 0 for k in range(7)}
+        day = first_day
+        while day <= last_day:
+            weekday_counts[day.isoweekday() % 7] += 1  # mismo índice que EXTRACT(dow): domingo = 0
+            day += datetime.timedelta(days=1)
+
         sales_by_weekday = {
             "labels": order_days,
-            "values": [round(dow_data.get(k, 0.0), 2) for k in [1, 2, 3, 4, 5, 6, 0]]
+            "values": [
+                round(dow_data.get(k, 0.0) / weekday_counts[k], 2) if weekday_counts[k] else 0.0
+                for k in [1, 2, 3, 4, 5, 6, 0]
+            ]
         }
 
         # 9. Distribución Horaria
@@ -664,7 +764,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
         """
         hour_params = [tz, order_ids_tuple]
         hour_query += "".join(f" AND {c}" for c in line_clauses)
@@ -692,9 +792,30 @@ class PosMetricsController(http.Controller):
         # Obtener métricas del período actual completo para KPI base
         current_perf = self._get_period_metrics(start_date, end_date, pos, cashier, company, category, product)
         total_cost = round(current_perf["total_cost"], 2)
-        gross_profit = round(current_perf["total_revenue"] - current_perf["total_cost"], 2)
-        if current_perf["total_revenue"] > 0:
-            margin_percent = round((gross_profit / current_perf["total_revenue"]) * 100.0, 2)
+        # El descuento global no se puede atribuir a un producto: se prorratea sobre la parte
+        # de la venta que tiene costo cargado, la única que entra en el margen.
+        costed_revenue = current_perf["costed_revenue"]
+        discount_share = 0.0
+        if current_perf["products_revenue"]:
+            discount_share = current_perf["global_discount"] * costed_revenue / current_perf["products_revenue"]
+        margin_base = costed_revenue + discount_share
+        gross_profit = round(margin_base - current_perf["total_cost"], 2)
+        if margin_base > 0:
+            margin_percent = round((gross_profit / margin_base) * 100.0, 2)
+        # Qué parte de la venta de productos tiene costo cargado: el margen sólo habla de esa parte
+        cost_coverage_percent = 0.0
+        if current_perf["products_revenue"] > 0:
+            cost_coverage_percent = round(costed_revenue / current_perf["products_revenue"] * 100.0, 1)
+
+        discount_total = current_perf["line_discount"] - current_perf["global_discount"]
+        gross_sales = current_perf["total_revenue"] + discount_total
+        kpis["discount_total"] = round(discount_total, 2)
+        kpis["discount_global"] = round(-current_perf["global_discount"], 2)
+        kpis["discount_line"] = round(current_perf["line_discount"], 2)
+        kpis["discount_percent"] = round(discount_total / gross_sales * 100.0, 2) if gross_sales > 0 else 0.0
+        surcharge_total = current_perf["surcharge_total"]
+        kpis["surcharge_total"] = round(surcharge_total, 2)
+        kpis["surcharge_percent"] = round(surcharge_total / current_perf["total_revenue"] * 100.0, 2) if current_perf["total_revenue"] > 0 else 0.0
         if current_perf["total_orders"] > 0:
             units_per_ticket = round(current_perf["total_qty"] / current_perf["total_orders"], 2)
 
@@ -755,9 +876,9 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         prod_margin_params = [lang] + list(params)
@@ -778,6 +899,7 @@ class PosMetricsController(http.Controller):
             p['gross_profit'] = round(float(p['gross_profit'] or 0.0), 2)
             p['margin_percent'] = round((p['gross_profit'] / p['net_revenue'] * 100.0), 2) if p['net_revenue'] > 0 else 0.0
             p['unit_cost'] = round(p['total_cost'] / p['total_qty'], 2) if p['total_qty'] else 0.0
+            p['unit_price'] = round(p['net_revenue'] / p['total_qty'], 2) if p['total_qty'] else 0.0
         # Descartar productos con costo no cargado o erróneo (margen >= 95% se considera dato basura)
         product_margins = [p for p in product_margins if p['margin_percent'] < 95.0]
 
@@ -796,10 +918,11 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
+              AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         cat_margin_params = list(params)
         cat_margin_query += "".join(f" AND {c}" for c in line_clauses)
@@ -819,6 +942,50 @@ class PosMetricsController(http.Controller):
             c['margin_percent'] = round((c['gross_profit'] / c['net_revenue'] * 100.0), 2) if c['net_revenue'] > 0 else 0.0
             c['unit_cost'] = round(c['total_cost'] / c['total_qty'], 2) if c['total_qty'] else 0.0
         category_margins = [c for c in category_margins if c['margin_percent'] < 95.0]
+
+        # 11b. Cobertura de costo: cuántos productos vendidos y qué parte de la venta tienen costo
+        # cargado, total y por categoría. El margen sólo habla de esa parte; esto dice cuánto vale.
+        # El costo es por compañía: un producto cuenta "con costo" si alguna de sus líneas lo tuvo.
+        coverage_query = f"""
+            SELECT
+                COALESCE(ic.name, 'Sin categoría') AS categoria,
+                COUNT(DISTINCT pp.id) AS productos,
+                COUNT(DISTINCT pp.id) FILTER (WHERE COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0) AS productos_con_costo,
+                SUM(pol.price_subtotal_incl) AS venta,
+                SUM(pol.price_subtotal_incl) FILTER (WHERE COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0) AS venta_con_costo
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN pos_config pc ON pc.id = po.config_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category ic ON ic.id = pt.categ_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            LEFT JOIN res_company rc ON rc.id = po.company_id
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+        """
+        coverage_params = list(params)
+        coverage_query += "".join(f" AND {c}" for c in line_clauses)
+        coverage_params.extend(line_params)
+        coverage_query += " GROUP BY 1 ORDER BY venta DESC NULLS LAST"
+        cr.execute(coverage_query, coverage_params)
+        category_coverage = []
+        for row in cr.dictfetchall():
+            productos = int(row['productos'] or 0)
+            con_costo = int(row['productos_con_costo'] or 0)
+            venta = float(row['venta'] or 0.0)
+            venta_con_costo = float(row['venta_con_costo'] or 0.0)
+            category_coverage.append({
+                "categoria": row['categoria'],
+                "productos": productos,
+                "productos_con_costo": con_costo,
+                "productos_percent": round(con_costo / productos * 100.0, 1) if productos else 0.0,
+                "venta": round(venta, 2),
+                "venta_percent": round(venta_con_costo / venta * 100.0, 1) if venta > 0 else 0.0,
+            })
+        total_products = sum(c['productos'] for c in category_coverage)
+        total_products_with_cost = sum(c['productos_con_costo'] for c in category_coverage)
+        products_with_cost_percent = round(total_products_with_cost / total_products * 100.0, 1) if total_products else 0.0
 
         # 12. Productos con mayor rentabilidad absoluta y fugas de rentabilidad (solo margen negativo)
         top_profitable = sorted([p for p in product_margins if p['gross_profit'] > 0], key=lambda x: x['gross_profit'], reverse=True)[:5]
@@ -848,6 +1015,10 @@ class PosMetricsController(http.Controller):
                 "total_cost": total_cost,
                 "gross_profit": gross_profit,
                 "margin_percent": margin_percent,
+                "cost_coverage_percent": cost_coverage_percent,
+                "products_sold": total_products,
+                "products_with_cost": total_products_with_cost,
+                "products_with_cost_percent": products_with_cost_percent,
                 "top_profitable": top_profitable,
                 "bottom_profitable": bottom_profitable
             }
@@ -907,7 +1078,7 @@ class PosMetricsController(http.Controller):
             FROM pos_session              ps
             JOIN pos_config               pc       ON pc.id = ps.config_id
             LEFT JOIN res_users           ru_o     ON ru_o.id = ps.user_id
-            LEFT JOIN hr_employee         emp_open ON emp_open.user_id = ru_o.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru_o.id ORDER BY (e.company_id = pc.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp_open ON TRUE
             LEFT JOIN pos_order           po       ON po.session_id = ps.id
                                                      AND po.state IN ('done', 'invoiced')
             LEFT JOIN res_company         rc       ON rc.id = pc.company_id
@@ -961,6 +1132,7 @@ class PosMetricsController(http.Controller):
         lang = self._get_lang()
 
         where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
+        non_merch = self._non_merchandise_sql()
 
         query = f"""
             SELECT
@@ -975,12 +1147,11 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
-              AND COALESCE(pt.name->>%s, pt.name->>'en_US') NOT ILIKE %s AND COALESCE(pt.name->>%s, pt.name->>'en_US') NOT ILIKE %s
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
         """
-        params_list = [lang] + list(params) + [lang, '%recargo%', lang, '%cancha%']
+        params_list = [lang] + list(params)
 
         line_clauses, line_params = self._build_line_filters(category, product, lang)
         query += "".join(f" AND {c}" for c in line_clauses)
@@ -1026,9 +1197,9 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
         count_params = list(params)
         count_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1062,9 +1233,9 @@ class PosMetricsController(http.Controller):
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_partner rp ON rp.id = po.partner_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
         sales_params = [tz, lang] + list(params)
         sales_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1214,9 +1385,9 @@ class PosMetricsController(http.Controller):
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
                 LEFT JOIN res_partner rp ON rp.id = po.partner_id
                 LEFT JOIN res_users ru ON ru.id = po.user_id
-                LEFT JOIN hr_employee emp ON emp.user_id = ru.id
+                LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
                 LEFT JOIN res_company rc ON rc.id = po.company_id
-                WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)
+                WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
             """
             sales_params = [tz, lang] + list(params)
             sales_query += "".join(f" AND {c}" for c in line_clauses)

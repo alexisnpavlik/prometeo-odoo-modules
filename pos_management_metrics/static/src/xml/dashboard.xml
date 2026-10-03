@@ -305,7 +305,7 @@
                                     </div>
                                     <div class="kpi-value"><t t-esc="metricsData.kpis.total_orders.toLocaleString()"/></div>
                                     <div class="kpi-footer">
-                                        <span class="kpi-subtext">Estado: Listo</span>
+                                        <span class="kpi-subtext">Ventas, sin contar <t t-esc="metricsData.kpis.refund_orders.toLocaleString()"/> devoluciones</span>
                                     </div>
                                 </div>
                             </div>
@@ -324,30 +324,44 @@
                                     </div>
                                     <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.ticket_average)"/></div>
                                     <div class="kpi-footer">
-                                        <span class="kpi-subtext">Por orden de venta</span>
+                                        <span class="kpi-subtext">Por venta, sin devoluciones</span>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.cash_difference &lt; 0 ? 'red' : (metricsData.kpis.cash_difference &gt; 0 ? 'green' : 'purple'))">
+                            <div class="kpi-card shadow-glow green">
                                 <div class="kpi-card-inner">
                                     <div class="kpi-meta">
-                                        <span class="kpi-title">Arqueo Acumulado</span>
+                                        <span class="kpi-title">Recargos Cobrados</span>
                                         <div class="kpi-icon">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                                                <line x1="12" y1="10" x2="12" y2="10"></line>
-                                                <circle cx="12" cy="14" r="2"></circle>
+                                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                                <polyline points="5 12 12 5 19 12"></polyline>
                                             </svg>
                                         </div>
                                     </div>
-                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.cash_difference)"/></div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.surcharge_total)"/></div>
                                     <div class="kpi-footer">
-                                        <span class="kpi-subtext">
-                                            <t t-if="metricsData.kpis.cash_difference &lt; 0">Faltante neto en cajas</t>
-                                            <t t-elif="metricsData.kpis.cash_difference &gt; 0">Sobrante neto en cajas</t>
-                                            <t t-else="">Cajas cuadradas perfectas</t>
-                                        </span>
+                                        <span class="kpi-subtext"><t t-esc="metricsData.kpis.surcharge_percent"/>% de la facturación</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kpi-card shadow-glow amber">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Descuentos Otorgados</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="19" y1="5" x2="5" y2="19"></line>
+                                                <circle cx="6.5" cy="6.5" r="2.5"></circle>
+                                                <circle cx="17.5" cy="17.5" r="2.5"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(metricsData.kpis.discount_total)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext"><t t-esc="metricsData.kpis.discount_percent"/>% de la venta · Global: <t t-esc="formatCurrency(metricsData.kpis.discount_global)"/> · Por ítem: <t t-esc="formatCurrency(metricsData.kpis.discount_line)"/></span>
                                     </div>
                                 </div>
                             </div>
@@ -422,7 +436,7 @@
                             <!-- Weekday activity -->
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
-                                    <h3>Ventas por Día de la Semana</h3>
+                                    <h3>Venta Promedio por Día de la Semana</h3>
                                     <div class="info-tooltip-wrapper tooltip-right">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                                             <circle cx="12" cy="12" r="10"></circle>
@@ -430,7 +444,7 @@
                                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                                         </svg>
                                         <div class="info-tooltip-text">
-                                            Muestra el volumen acumulado de ventas para cada día de la semana. Ideal para identificar qué días registran mayor afluencia comercial para optimizar personal y recursos.
+                                            Muestra cuánto se vende en promedio un lunes, un martes, etc. dentro del período (total del día dividido por cuántas veces aparece en el calendario). Ideal para identificar qué días registran mayor afluencia comercial para optimizar personal y recursos.
                                         </div>
                                     </div>
                                 </div>
@@ -560,6 +574,30 @@
 
                     <!-- TAB: SESSIONS (ARQUEOS) -->
                     <section t-att-class="'tab-pane ' + (state.activeTab === 'sessions' ? 'active' : '')">
+                        <div class="kpi-grid">
+                            <div t-att-class="'kpi-card shadow-glow ' + (cashDifferenceTotal &lt; 0 ? 'red' : (cashDifferenceTotal &gt; 0 ? 'green' : 'purple'))">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Arqueo Acumulado</span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                                                <line x1="12" y1="10" x2="12" y2="10"></line>
+                                                <circle cx="12" cy="14" r="2"></circle>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(cashDifferenceTotal)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">
+                                            <t t-if="cashDifferenceTotal &lt; 0">Faltante neto en cajas</t>
+                                            <t t-elif="cashDifferenceTotal &gt; 0">Sobrante neto en cajas</t>
+                                            <t t-else="">Cajas cuadradas perfectas</t>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="glass-panel" style="margin-bottom: 20px;">
                             <div class="chart-header" style="position: relative;">
                                 <h3>Evolución Temporal de Ventas por Caja</h3>
@@ -751,6 +789,15 @@
 
                     <!-- TAB: VENTAS Y RENTABILIDAD -->
                     <section t-att-class="'tab-pane ' + (state.activeTab === 'profitability' ? 'active' : '')">
+                        <div t-if="metricsData.kpis.total_orders &gt; 0"
+                             t-att-class="'cost-coverage-alert' + (metricsData.profitability.cost_coverage_percent &lt; 90 ? '' : ' ok')">
+                            <strong t-if="metricsData.profitability.cost_coverage_percent &lt; 90">Margen poco confiable: </strong>
+                            <t t-esc="metricsData.profitability.products_with_cost.toLocaleString()"/> de
+                            <t t-esc="metricsData.profitability.products_sold.toLocaleString()"/> productos vendidos
+                            (<t t-esc="metricsData.profitability.products_with_cost_percent"/>%) tienen costo cargado y suman el
+                            <t t-esc="metricsData.profitability.cost_coverage_percent"/>% de la venta.
+                            Esta pestaña sólo considera esos productos.
+                        </div>
                         <!-- KPI Grid -->
                         <div class="kpi-grid">
                             <!-- Card 1: Utilidad Bruta -->
@@ -786,7 +833,7 @@
                                     </div>
                                     <div class="kpi-value"><t t-esc="metricsData.profitability.margin_percent"/>%</div>
                                     <div class="kpi-footer">
-                                        <span class="kpi-subtext">Ganancia por peso neto vendido</span>
+                                        <span class="kpi-subtext">Ganancia por peso vendido, descuentos incluidos</span>
                                     </div>
                                 </div>
                             </div>
@@ -817,7 +864,7 @@
                             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Producto</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo por unidad, ventas con IVA y porcentaje de margen por producto</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo y precio de venta por unidad, ventas con IVA, utilidad y porcentaje de margen por producto</p>
                                 </div>
                                 <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
                                     <div class="nav-tabs" style="display: flex; gap: 4px;">
@@ -842,16 +889,17 @@
                                         <tr>
                                             <th>Producto</th>
                                             <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
-                                            <th class="text-right" style="text-align: right;">Costo Unidad</th>
-                                            <th class="text-right" style="text-align: right;">Ventas</th>
-                                            <th class="text-right" style="text-align: right;">Costo Total</th>
+                                            <th class="text-right" style="text-align: right;">Costo</th>
+                                            <th class="text-right" style="text-align: right;">Precio de Venta</th>
+                                            <th class="text-right" style="text-align: right;">Ventas Total</th>
+                                            <th class="text-right" style="text-align: right;">Utilidad</th>
                                             <th>% Margen</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <t t-if="filteredProductMargins.length === 0">
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted">
+                                                <td colspan="7" class="text-center text-muted">
                                                     <t t-if="state.marginSign === 'negative'">Sin productos con margen negativo en este período.</t>
                                                     <t t-else="">No se encontraron productos registrados.</t>
                                                 </td>
@@ -862,8 +910,9 @@
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="p.producto"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="p.total_qty"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.unit_cost)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.unit_price)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.net_revenue)"/></td>
-                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.total_cost)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(p.gross_profit)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
                                                         <div class="margin-progress-container">
@@ -887,7 +936,7 @@
                             <div class="section-header" style="margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Categoría</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo por unidad, ventas con IVA y porcentaje de margen por categoría</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo total, ventas con IVA, utilidad y porcentaje de margen por categoría</p>
                                 </div>
                             </div>
                             
@@ -897,9 +946,9 @@
                                         <tr>
                                             <th>Categoría</th>
                                             <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
-                                            <th class="text-right" style="text-align: right;">Costo Unidad</th>
-                                            <th class="text-right" style="text-align: right;">Ventas</th>
                                             <th class="text-right" style="text-align: right;">Costo Total</th>
+                                            <th class="text-right" style="text-align: right;">Ventas Total</th>
+                                            <th class="text-right" style="text-align: right;">Utilidad</th>
                                             <th>% Margen</th>
                                         </tr>
                                     </thead>
@@ -913,9 +962,9 @@
                                             <tr>
                                                 <td style="font-weight: 700; color: #fff;"><t t-esc="c.categoria"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="c.total_qty"/></td>
-                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.unit_cost)"/></td>
-                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.net_revenue)"/></td>
                                                 <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.total_cost)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.net_revenue)"/></td>
+                                                <td class="text-right" style="text-align: right;"><t t-esc="formatCurrency(c.gross_profit)"/></td>
                                                 <td>
                                                     <div class="margin-progress-wrapper" style="display: flex; align-items: center; gap: 10px;">
                                                         <div class="margin-progress-container">
