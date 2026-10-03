@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (56 Módulos)](#-catálogo-completo-de-módulos-56-módulos)
+- [📂 Catálogo Completo de Módulos (63 Módulos)](#-catálogo-completo-de-módulos-63-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -40,7 +40,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (56 Módulos)
+## 📂 Catálogo Completo de Módulos (63 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -74,6 +74,7 @@ Extensiones para mejorar la velocidad de atención, la seguridad y el control de
 | **POS Global Discount** | [`pos_global_discount_button`](./pos_global_discount_button) | Agrega un botón configurable para aplicar descuentos a todo el pedido de forma ágil. |
 | **POS Global Surcharge** | [`pos_global_surcharge_button`](./pos_global_surcharge_button) | Agrega un botón 'Recargo' tipo toggle en el POS para aplicar/quitar un porcentaje de recargo global. |
 | **POS Invoice Default Off** | [`pos_invoice_default_off`](./pos_invoice_default_off) | Desmarca por defecto la opción de solicitar factura al cobrar, acelerando el flujo de tickets. |
+| **POS Mercado Pago Validator** | [`pos_mercadopago_validator`](./pos_mercadopago_validator) | Concilia los pagos del QR estático de Mercado Pago con las líneas de cobro del POS, desambiguando por monto, hora e id de pago. |
 | **POS Pricelist Enforce** | [`pos_pricelist_enforce`](./pos_pricelist_enforce) | Corrige el comportamiento del POS que deja líneas a precio público en lugar de forzar la lista fija asignada. |
 | **POS Print Last Session** | [`pos_print_last_session`](./pos_print_last_session) | Permite imprimir el reporte de cierre de caja correspondiente a la sesión anterior. |
 | **POS Product Pack** | [`pos_product_pack`](./pos_product_pack) | Habilita la venta de productos compuestos (combos/packs) de forma integrada en el catálogo del POS. |
@@ -88,7 +89,8 @@ Flujos contables simplificados, cuentas corrientes informales y administración 
 
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
-| **Cuentas Corrientes - Retiros** | [`cuenta_corriente_retiros`](./cuenta_corriente_retiros) | Gestión informal de cuentas corrientes: retiros de mercadería con abonos parciales (sin asiento contable pesado), límite de crédito y estado de cuenta imprimible. |
+| **Cuentas Corrientes - Retiros** | [`checking_account_withdrawals`](./checking_account_withdrawals) | Retiros de mercadería a cuenta corriente con cuotas, pagos con imputación FIFO, límite de crédito, estado de cuenta imprimible y dashboard. |
+| **Cobranza a Vendedores y Cuotas** | [`collections_from_vendors_installments`](./collections_from_vendors_installments) | Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza. |
 | **Transferencias Internas** | [`account_internal_transfer`](./account_internal_transfer) | Facilita el traspaso y conciliación automática de fondos entre bancos y cajas de la misma empresa. |
 | **Talonarios de Recibos** | [`account_payment_pro_receiptbook`](./account_payment_pro_receiptbook) | Control y numeración de cobros/pagos mediante el uso de talonarios de recibos físicos. |
 | **Pagos Avanzados** | [`account_payment_pro`](./account_payment_pro) | Interfaz unificada y extendida para el procesamiento de cobros y pagos contables complejos. |
@@ -102,6 +104,8 @@ Operaciones automatizadas, remitos e integración logística inter-compañía.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Actualización de Costos** | [`purchase_auto_update_cost`](./purchase_auto_update_cost) | Actualiza el costo de adquisición del producto de forma automática al recibir la compra. |
+| **Recomendador de Compra** | [`prometeo_purchase_advisor`](./prometeo_purchase_advisor) | Sugerencias de compra a partir de la demanda real observada, revisables y convertibles en órdenes de compra. |
+| **Recomendador de Compra - EWMA** | [`prometeo_purchase_advisor_ewma`](./prometeo_purchase_advisor_ewma) | Agrega el método de estimación por suavizado exponencial (EWMA) al recomendador de compra. |
 | **Hide Create Receipt** | [`stock_hide_create_receipt`](./stock_hide_create_receipt) | Oculta los botones de creación manual de nuevas recepciones en el flujo de almacén. |
 | **Purchase/Sale Intercompany** | [`purchase_sale_inter_company`](./purchase_sale_inter_company) | Genera automáticamente una Sale Order (SO) en la empresa proveedora al confirmar una Purchase Order (PO). |
 | **Purchase/Sale Stock Intercompany** | [`purchase_sale_stock_inter_company`](./purchase_sale_stock_inter_company) | Extiende la integración PO/SO propagando la entrega/recepción de stock sincronizada entre compañías. |
@@ -130,7 +134,7 @@ Tableros OWL con Chart.js sobre datos en vivo, más monitoreo de errores en prod
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Métricas de Inventario** | [`inventory_dashboard_metrics`](./inventory_dashboard_metrics) | KPIs de rotación, stock crítico, valorización por sucursal y dead stock. |
-| **Métricas de POS** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard e indicadores clave sobre ventas y arqueos de caja con exportación a Excel. |
+| **Métricas de POS** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard gerencial de ventas: facturación neta de descuentos, descuentos otorgados, recargos cobrados, márgenes con aviso de cobertura de costo, top artículos y auditoría de arqueos con exportación a Excel. |
 | **Métricas de Facturación** | [`account_management_metrics`](./account_management_metrics) | Comprobantes por tipo (A/B/C, NC), facturación por sucursal/diario y cobros por medio de pago. |
 | **Métricas de Listas de Precios** | [`pricelist_management_metrics`](./pricelist_management_metrics) | Comparativa de precio base vs. precio vigente por lista/sucursal, filtrable por categoría. |
 | **Cambios de Precio (Góndola)** | [`product_price_change_metrics`](./product_price_change_metrics) | Lista de trabajo por sucursal con los productos que cambiaron de precio para reetiquetar en góndola. |
@@ -145,6 +149,9 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la barra superior de Odoo dinámicamente según la compañía activa. |
 | **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a modelos personalizados. |
+| **Bloqueo de Contactos y Productos de Sistema** | [`partner_protected_lock`](./partner_protected_lock) | Impide editar, archivar o borrar los contactos de las empresas propias, Consumidor Final Anónimo y los productos de Descuento y Recargo del POS. Solo administradores. |
+| **Aviso de Empresa Interna** | [`partner_internal_company_badge`](./partner_internal_company_badge) | Banner naranja en ventas, transferencias y facturas cuando el contacto es una empresa propia del grupo. |
+| **Ocultar Conversaciones** | [`mail_hide_discuss`](./mail_hide_discuss) | Oculta y bloquea el acceso a la aplicación Conversaciones (Discuss). |
 
 ---
 
