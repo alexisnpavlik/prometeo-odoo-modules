@@ -412,7 +412,81 @@
                                     <canvas id="chart-payment-methods"></canvas>
                                 </div>
                             </div>
-                            
+
+                            <!-- Branch trend vs chain -->
+                            <div class="chart-container glass-panel company-trend-card">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Tendencia por Sucursal</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <t t-set="trend" t-value="metricsData.charts.company_trend"/>
+                                        <span t-if="trend.chain_growth !== null" class="badge"
+                                              t-att-title="'Período anterior: ' + formatShortDate(trend.prev_start) + ' al ' + formatShortDate(trend.prev_end)">
+                                            Todas <t t-esc="formatSignedPercent(trend.chain_growth)"/>
+                                        </span>
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text company-trend-help">
+                                                <b>Cómo leer esta tabla</b><br/>
+                                                Compara lo que vendió cada sucursal en las fechas elegidas contra el mismo lapso justo antes. Si elegís los últimos 30 días, los compara con los 30 días anteriores (con "Todo", usa las últimas 4 semanas).
+                                                <br/><br/>
+                                                <b>Todas:</b> cuánto subió o bajó la venta de todas las sucursales juntas.
+                                                <br/><br/>
+                                                <b>Var.:</b> cuánto subió o bajó esta sucursal.
+                                                <br/><br/>
+                                                <b>vs. el resto:</b> si a esta sucursal le fue mejor o peor que a las demás. Es la columna para mirar primero.<br/>
+                                                Ejemplo: si todas bajaron 8% y esta bajó 18%, muestra −11%: cayó más que el resto, por algo propio. Si todas bajaron 8% y esta vendió igual, muestra +9%: aguantó mejor que las demás.<br/>
+                                                En rojo, −10% o peor. En verde, +10% o mejor.
+                                                <br/><br/>
+                                                <b>Tendencia:</b> qué parte de la venta total hace esta sucursal, semana a semana. Si la línea baja de golpe y se queda, algo cambió esa semana. Si baja de a poco, viene perdiendo terreno.
+                                                <br/><br/>
+                                                Una fecha especial (Día del Niño, primavera) hace subir o bajar a todas las sucursales a la vez. Por eso "vs. el resto" es más confiable que "Var.".
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body company-trend-body">
+                                    <table class="data-table company-trend-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Sucursal</th>
+                                                <th class="num">Facturación</th>
+                                                <th class="num" title="Variación contra el período anterior">Var.</th>
+                                                <th class="num">vs. el resto</th>
+                                                <th>Tendencia</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr t-if="!metricsData.charts.company_trend.rows.length">
+                                                <td colspan="5" class="text-center text-muted">Sin ventas para los filtros seleccionados.</td>
+                                            </tr>
+                                            <t t-foreach="metricsData.charts.company_trend.rows" t-as="row" t-key="row_index + '-' + row.name">
+                                                <tr t-att-class="row.small ? 'company-trend-small' : ''">
+                                                    <td class="company-trend-name" t-att-title="row.name" t-esc="row.name"/>
+                                                    <td class="num" t-att-title="formatCurrency(row.revenue).split(',')[0]" t-esc="formatCurrencyCompact(row.revenue)"/>
+                                                    <td class="num" t-att-title="'Anterior: ' + formatCurrency(row.prev_revenue).split(',')[0]">
+                                                        <span class="diff-neutral" t-esc="row.growth !== null ? formatSignedPercent(row.growth) : 'Nueva'"/>
+                                                    </td>
+                                                    <td class="num">
+                                                        <span t-att-class="trendClass(row.vs_chain, row.small)" t-esc="formatSignedPercent(row.vs_chain)"/>
+                                                    </td>
+                                                    <td>
+                                                        <svg t-if="row.share.length" class="company-trend-spark" viewBox="0 0 72 20" preserveAspectRatio="none">
+                                                            <title t-esc="sparklineTitle(row.share)"/>
+                                                            <polyline t-att-points="sparklinePoints(row.share)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                                                        </svg>
+                                                        <span t-else="" class="text-muted">—</span>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             <!-- Top Categories -->
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">
@@ -453,6 +527,87 @@
                                 </div>
                             </div>
                             
+                            <!-- Category trend vs total -->
+                            <div class="chart-container span-two-cols glass-panel category-trend-card">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Tendencia por Categoría</h3>
+                                    <div class="chart-options" style="display: flex; align-items: center; gap: 8px;">
+                                        <t t-set="cat_trend" t-value="metricsData.charts.category_trend"/>
+                                        <span t-if="cat_trend.chain_growth !== null" class="badge"
+                                              t-att-title="'Período anterior: ' + formatShortDate(cat_trend.prev_start) + ' al ' + formatShortDate(cat_trend.prev_end)">
+                                            Todas <t t-esc="formatSignedPercent(cat_trend.chain_growth)"/>
+                                        </span>
+                                        <div class="info-tooltip-wrapper tooltip-right">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                            </svg>
+                                            <div class="info-tooltip-text company-trend-help">
+                                                <b>Cómo leer esta tabla</b><br/>
+                                                Compara lo que vendió cada categoría en las fechas elegidas contra el mismo lapso justo antes. Si elegís los últimos 30 días, los compara con los 30 días anteriores (con "Todo", usa las últimas 4 semanas).
+                                                <br/><br/>
+                                                <b>Todas:</b> cuánto subió o bajó la venta de todas las categorías juntas. Respeta los filtros: si elegís una sucursal, es la venta de esa sucursal.
+                                                <br/><br/>
+                                                <b>Var.:</b> cuánto subió o bajó lo que facturó la categoría.
+                                                <br/><br/>
+                                                <b>Unidades:</b> cuántos artículos más o menos se vendieron.
+                                                <br/><br/>
+                                                <b>Precio prom.:</b> cuánto más caro o más barato salió, en promedio, cada artículo vendido. Sube por aumentos de precio o porque se vendieron artículos más caros de esa categoría.<br/>
+                                                Las dos juntas explican la Var. Ejemplo: 10% menos unidades y 18% menos de precio promedio da 26% menos de facturación: se vendieron menos cosas y además más baratas.
+                                                <br/><br/>
+                                                <b>vs. el resto:</b> si a esta categoría le fue mejor o peor que a las demás. Es la columna para mirar primero. En rojo, −10% o peor. En verde, +10% o mejor.
+                                                <br/><br/>
+                                                <b>Tendencia:</b> qué parte de la venta total hace esta categoría, semana a semana. Si la línea sube y baja con las fechas especiales, es una categoría de temporada.
+                                                <br/><br/>
+                                                Las categorías que pesan menos del 1% de la venta van al final y en gris: con tan poca venta los porcentajes saltan mucho y no dicen nada.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body category-trend-body">
+                                    <table class="data-table company-trend-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Categoría</th>
+                                                <th class="num">Facturación</th>
+                                                <th class="num" title="Variación contra el período anterior">Var.</th>
+                                                <th class="num">Unidades</th>
+                                                <th class="num">Precio prom.</th>
+                                                <th class="num">vs. el resto</th>
+                                                <th>Tendencia</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr t-if="!cat_trend.rows.length">
+                                                <td colspan="7" class="text-center text-muted">Sin ventas para los filtros seleccionados.</td>
+                                            </tr>
+                                            <t t-foreach="cat_trend.rows" t-as="row" t-key="row_index + '-' + row.name">
+                                                <tr t-att-class="row.small ? 'company-trend-small' : ''">
+                                                    <td class="company-trend-name category-trend-name" t-att-title="row.name" t-esc="row.name"/>
+                                                    <td class="num" t-att-title="formatCurrency(row.revenue).split(',')[0]" t-esc="formatCurrencyCompact(row.revenue)"/>
+                                                    <td class="num" t-att-title="'Anterior: ' + formatCurrency(row.prev_revenue).split(',')[0]">
+                                                        <span class="diff-neutral" t-esc="row.growth !== null ? formatSignedPercent(row.growth) : 'Nueva'"/>
+                                                    </td>
+                                                    <td class="num"><span class="diff-neutral" t-esc="formatSignedPercent(row.units_growth)"/></td>
+                                                    <td class="num"><span class="diff-neutral" t-esc="formatSignedPercent(row.price_growth)"/></td>
+                                                    <td class="num">
+                                                        <span t-att-class="trendClass(row.vs_chain, row.small)" t-esc="formatSignedPercent(row.vs_chain)"/>
+                                                    </td>
+                                                    <td>
+                                                        <svg t-if="row.share.length" class="company-trend-spark category-trend-spark" viewBox="0 0 160 20" preserveAspectRatio="none">
+                                                            <title t-esc="sparklineTitle(row.share)"/>
+                                                            <polyline t-att-points="sparklinePoints(row.share, 160)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                                                        </svg>
+                                                        <span t-else="" class="text-muted">—</span>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             <!-- Hourly distribution -->
                             <div class="chart-container span-two-cols glass-panel">
                                 <div class="chart-header" style="position: relative;">

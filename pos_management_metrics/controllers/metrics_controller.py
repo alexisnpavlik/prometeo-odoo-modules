@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import pytz
+import re
 import xlsxwriter
 
 _logger = logging.getLogger(__name__)
@@ -325,6 +326,144 @@ class PosMetricsController(http.Controller):
             "total_orders": int(res.get("total_orders") or 0)
         }
 
+    def _get_group_trend(self, group_by, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all'):
+        """Facturación de cada sucursal (group_by='company') o categoría (group_by='category') en el
+        período contra el período anterior de igual largo.
+
+        La columna clave es la variación relativa al total: (1 + var. del grupo) / (1 + var. del total) - 1.
+        Una fecha especial (Día del Niño, primavera) mueve a todos los grupos a la vez; medida contra
+        el total no aparece como un cambio de uno solo. El total usa todos los filtros salvo el del
+        propio agrupamiento (empresa o categoría), que sólo decide qué filas se muestran.
+        """
+        cr = request.env.cr
+        tz = self._get_timezone()
+        lang = self._get_lang()
+        non_merch = self._non_merchandise_sql()
+        empty = {"rows": [], "chain_growth": None, "prev_start": None, "prev_end": None}
+
+        # Los días futuros del rango todavía no existen: contarlos alargaría el período anterior
+        today = datetime.datetime.now(pytz.timezone(tz)).date()
+        end_dt = min(datetime.datetime.strptime(end_date, '%Y-%m-%d').date(), today) if end_date else today
+        # Sin fecha de inicio ("Todo") no hay período anterior: se comparan 4 semanas completas
+        if start_date:
+            start_dt = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+        else:
+            start_dt = end_dt - datetime.timedelta(days=27)
+        if start_dt > end_dt:
+            return empty
+        days = (end_dt - start_dt).days + 1
+        prev_start = start_dt - datetime.timedelta(days=days)
+        prev_end = start_dt - datetime.timedelta(days=1)
+
+        if group_by == 'company':
+            group_sql = "rc.name"
+            visible = self._normalize_multi(company)
+            company, extra = 'all', ""
+        else:
+            # Igual que "Ventas por Categoría": sin descuento/recargo ni las categorías raíz genéricas
+            group_sql = "ic.name"
+            visible = self._normalize_multi(category)
+            category = 'all'
+            extra = f" AND pp.id NOT IN {non_merch} AND ic.name IS NOT NULL AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')"
+
+        where_clause, params = self._build_where_clause(
+            prev_start.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d'),
+            pos, cashier, company, category, product
+        )
+        local_ts = "(po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)"
+        query = f"""
+            SELECT
+                {group_sql} AS grupo,
+                {local_ts}::date >= %s AS actual,
+                (%s::date - {local_ts}::date) / 7 AS bloque,
+                SUM(pol.price_subtotal_incl) AS subtotal,
+                SUM(pol.qty) FILTER (WHERE pp.id NOT IN {non_merch}) AS unidades
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN pos_config pc ON pc.id = po.config_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category ic ON ic.id = pt.categ_id
+            LEFT JOIN res_users ru ON ru.id = po.user_id
+            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            LEFT JOIN res_company rc ON rc.id = po.company_id
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE{extra}
+        """
+        query_params = [tz, start_dt, end_dt, tz] + list(params)
+        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        query += "".join(f" AND {c}" for c in line_clauses)
+        query_params.extend(line_params)
+        query += " GROUP BY 1, 2, 3"
+        cr.execute(query, query_params)
+
+        current, previous, units_cur, units_prev, group_weeks, chain_weeks = {}, {}, {}, {}, {}, {}
+        for grupo, actual, bloque, subtotal, unidades in cr.fetchall():
+            subtotal = float(subtotal or 0.0)
+            unidades = float(unidades or 0.0)
+            period, units = (current, units_cur) if actual else (previous, units_prev)
+            period[grupo] = period.get(grupo, 0.0) + subtotal
+            units[grupo] = units.get(grupo, 0.0) + unidades
+            weeks = group_weeks.setdefault(grupo, {})
+            weeks[bloque] = weeks.get(bloque, 0.0) + subtotal
+            chain_weeks[bloque] = chain_weeks.get(bloque, 0.0) + subtotal
+
+        chain_current = sum(current.values())
+        chain_previous = sum(previous.values())
+        chain_ratio = chain_current / chain_previous if chain_previous > 0 else 0.0
+
+        # La participación semanal distingue un escalón (cae una vez y se queda) de una tendencia.
+        # Bloques de 7 días contados hacia atrás desde el fin del período (0 = el último): todos
+        # tienen los mismos días de semana. El más viejo queda incompleto si el total no es múltiplo
+        # de 7 y se descarta: un bloque de un domingo daba 100% a la única sucursal abierta.
+        full_blocks = (2 * days) // 7
+        weeks = list(range(full_blocks - 1, -1, -1)) if full_blocks >= 3 else []
+        rows = []
+        for grupo in set(current) | set(previous):
+            if visible and grupo not in visible:
+                continue
+            cur = current.get(grupo, 0.0)
+            prev = previous.get(grupo, 0.0)
+            u_cur = units_cur.get(grupo, 0.0)
+            u_prev = units_prev.get(grupo, 0.0)
+            growth = vs_chain = units_growth = price_growth = None
+            if prev > 0:
+                growth = round((cur / prev - 1) * 100.0, 1)
+                if chain_ratio > 0:
+                    vs_chain = round((cur / prev / chain_ratio - 1) * 100.0, 1)
+            # Precio promedio = facturación / unidades: separa "se vendió más" de "se vendió más caro"
+            if u_prev > 0:
+                units_growth = round((u_cur / u_prev - 1) * 100.0, 1)
+                if u_cur > 0 and prev > 0:
+                    price_growth = round(((cur / u_cur) / (prev / u_prev) - 1) * 100.0, 1)
+            # Menos del 1% del total en los dos períodos: sus porcentajes son ruido (+700% sobre casi nada)
+            small = (chain_current <= 0 or cur / chain_current < 0.01) and (chain_previous <= 0 or prev / chain_previous < 0.01)
+            name = grupo or ''
+            if group_by == 'company':
+                name = re.sub(r'^Sucursal\s+', '', name, flags=re.IGNORECASE)
+            rows.append({
+                "name": name,
+                "revenue": round(cur, 2),
+                "prev_revenue": round(prev, 2),
+                "growth": growth,
+                "vs_chain": vs_chain,
+                "units_growth": units_growth,
+                "price_growth": price_growth,
+                "small": small,
+                "share": [
+                    round(group_weeks[grupo].get(w, 0.0) / chain_weeks[w] * 100.0, 2) if chain_weeks.get(w, 0.0) > 0 else 0.0
+                    for w in weeks
+                ],
+            })
+        # Peor primero; los grupos chicos y los sin período anterior (nuevos) van al final
+        rows.sort(key=lambda r: (r["small"], r["vs_chain"] is None, r["vs_chain"] or 0.0, -r["revenue"]))
+
+        return {
+            "rows": rows,
+            "chain_growth": round((chain_ratio - 1) * 100.0, 1) if chain_previous > 0 else None,
+            "prev_start": prev_start.strftime('%Y-%m-%d'),
+            "prev_end": prev_end.strftime('%Y-%m-%d'),
+        }
+
     @http.route('/pos_management_metrics/metrics', type='json', auth='user')
     def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):
         self._check_access()
@@ -370,6 +509,8 @@ class PosMetricsController(http.Controller):
                 "pos_trend": {"labels": [], "configs": {}, "timeframe": "Diario"},
                 "sales_by_pos": {"labels": [], "values": []},
                 "payment_methods": {"labels": [], "values": []},
+                "company_trend": {"rows": [], "chain_growth": None, "prev_start": None, "prev_end": None},
+                "category_trend": {"rows": [], "chain_growth": None, "prev_start": None, "prev_end": None},
                 "top_products": {"labels": [], "values": []},
                 "top_categories": {"labels": [], "values": []},
                 "sales_by_weekday": {"labels": [], "values": []},
@@ -642,6 +783,10 @@ class PosMetricsController(http.Controller):
             "labels": [r[0] for r in pay_rows],
             "values": [round(float(r[1]), 2) for r in pay_rows]
         }
+
+        # 5b. Tendencia por sucursal y por categoría contra el total
+        company_trend = self._get_group_trend('company', start_date, end_date, pos, cashier, company, category, product)
+        category_trend = self._get_group_trend('category', start_date, end_date, pos, cashier, company, category, product)
 
         # 6. Top 10 Productos
         prod_query = f"""
@@ -1001,6 +1146,8 @@ class PosMetricsController(http.Controller):
                 "pos_trend": pos_trend,
                 "sales_by_pos": sales_by_pos,
                 "payment_methods": payment_methods,
+                "company_trend": company_trend,
+                "category_trend": category_trend,
                 "top_products": top_products,
                 "top_categories": top_categories,
                 "sales_by_weekday": sales_by_weekday,

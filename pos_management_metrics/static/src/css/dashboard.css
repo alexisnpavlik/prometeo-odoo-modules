@@ -947,6 +947,112 @@
     height: 300px;
 }
 
+/* Tendencia por Sucursal: la tabla scrollea dentro de la tarjeta de 320px, como su vecina de fila */
+.pos-dashboard-wrap .chart-body.company-trend-body {
+    padding: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+.pos-dashboard-wrap .company-trend-table {
+    font-size: 12px;
+}
+
+.pos-dashboard-wrap .company-trend-table th,
+.pos-dashboard-wrap .company-trend-table td {
+    padding: 8px;
+    white-space: nowrap;
+}
+
+.pos-dashboard-wrap .company-trend-table .num {
+    text-align: right;
+}
+
+.pos-dashboard-wrap .company-trend-table .company-trend-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* La ayuda es más alta que la tarjeta: sin overflow:hidden se cortaba, y al pasar el mouse
+   la tarjeta sube de capa para que la ayuda quede por encima de la fila de abajo */
+.pos-dashboard-wrap .chart-container.company-trend-card {
+    overflow: visible;
+    position: relative;
+    /* Sin esto el ítem de la grilla toma el ancho de la tabla y se sale de la pantalla */
+    min-width: 0;
+}
+
+.pos-dashboard-wrap .chart-container.company-trend-card:hover {
+    z-index: 5;
+}
+
+/* La ayuda de esta tarjeta es más larga que las demás: más ancha, sin pasarse de la pantalla */
+.pos-dashboard-wrap .info-tooltip-text.company-trend-help {
+    width: 340px;
+    max-width: calc(100vw - 48px);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.pos-dashboard-wrap .company-trend-help b {
+    color: var(--text-primary);
+}
+
+.pos-dashboard-wrap .company-trend-spark {
+    display: block;
+    width: 72px;
+    height: 20px;
+    color: var(--color-blue);
+}
+
+/* Grupos de menos del 1% del total: al final y apagados, sus porcentajes son ruido */
+.pos-dashboard-wrap .company-trend-table tr.company-trend-small td {
+    opacity: 0.55;
+}
+
+/* Tendencia por Categoría: ocupa las dos columnas y no tiene vecina de fila, así que crece
+   con la tabla en vez de scrollear adentro */
+.pos-dashboard-wrap .chart-container.category-trend-card {
+    height: auto;
+    overflow: visible;
+    position: relative;
+    /* Sin esto el ítem de la grilla toma el ancho de la tabla y se sale de la pantalla */
+    min-width: 0;
+}
+
+.pos-dashboard-wrap .chart-container.category-trend-card:hover {
+    z-index: 5;
+}
+
+.pos-dashboard-wrap .chart-body.category-trend-body {
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.pos-dashboard-wrap .company-trend-table .category-trend-name {
+    max-width: 220px;
+}
+
+.pos-dashboard-wrap .category-trend-spark {
+    width: 160px;
+}
+
+@media (max-width: 768px) {
+    /* Sin scroll vertical anidado en el teléfono: la tarjeta crece con la tabla.
+       Doble clase porque las media queries de más abajo fijan el alto de .chart-container */
+    .pos-dashboard-wrap .chart-container.company-trend-card {
+        height: auto;
+    }
+
+    .pos-dashboard-wrap .chart-body.company-trend-body {
+        padding: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+}
+
 /* Responsive Desings */
 @media (max-width: 992px) {
     /* El scroll lo maneja .main-content, igual que en escritorio: con

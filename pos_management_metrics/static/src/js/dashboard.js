@@ -71,6 +71,8 @@ class PosDashboardMetrics extends Component {
                 pos_trend: { labels: [], configs: {}, timeframe: "Diario" },
                 sales_by_pos: { labels: [], values: [] },
                 payment_methods: { labels: [], values: [] },
+                company_trend: { rows: [], chain_growth: null, prev_start: null, prev_end: null },
+                category_trend: { rows: [], chain_growth: null, prev_start: null, prev_end: null },
                 top_products: { labels: [], values: [] },
                 top_categories: { labels: [], values: [] },
                 sales_by_weekday: { labels: [], values: [] },
@@ -359,6 +361,53 @@ class PosDashboardMetrics extends Component {
             currency: 'ARS',
             minimumFractionDigits: 2
         }).format(val || 0);
+    }
+
+    formatCurrencyCompact(val) {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            notation: 'compact',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1
+        }).format(val || 0);
+    }
+
+    formatSignedPercent(val) {
+        if (val === null || val === undefined) return "—";
+        const sign = val > 0 ? "+" : "";
+        return `${sign}${val.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    }
+
+    formatShortDate(d) {
+        if (!d) return "";
+        const [, month, day] = d.split("-");
+        return `${day}/${month}`;
+    }
+
+    // --- Tendencia por Sucursal / Categoría ---
+    trendClass(val, small = false) {
+        if (small || val === null || val === undefined) return "diff-neutral";
+        if (val <= -10) return "diff-negative";
+        if (val >= 10) return "diff-positive";
+        return "diff-neutral";
+    }
+
+    sparklinePoints(share, width = 72) {
+        if (!share || share.length < 2) return "";
+        const max = Math.max(...share);
+        const min = Math.min(...share);
+        // Rango mínimo de 2 puntos de participación: sin él, una variación de décimas se dibuja como un precipicio
+        const span = Math.max(max - min, 2);
+        const low = (max + min) / 2 - span / 2;
+        const step = width / (share.length - 1);
+        return share.map((v, i) => `${(i * step).toFixed(1)},${(18 - ((v - low) / span) * 16).toFixed(1)}`).join(" ");
+    }
+
+    sparklineTitle(share) {
+        if (!share || !share.length) return "";
+        const fmt = (v) => v.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        return `Parte de la venta total: ${fmt(share[0])}% → ${fmt(share[share.length - 1])}%`;
     }
 
     formatDatetime(dt) {
