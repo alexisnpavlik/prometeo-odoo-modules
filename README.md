@@ -122,6 +122,8 @@ Gestión del catálogo, control de cambios y restricciones multi-compañía sobr
 | :--- | :--- | :--- |
 | **Product Default Settings** | [`product_default_settings`](./product_default_settings) | Valores por defecto y configuraciones automáticas para nuevos productos en el catálogo. |
 | **Product Image Zoom** | [`product_image_zoom`](./product_image_zoom) | Amplía la imagen del producto al hacer clic en su ficha en el backend web. |
+| **Product Main Vendor** | [`product_main_vendor`](./product_main_vendor) | Campo Proveedor en la ficha de producto, sincronizado con la primera línea de proveedores de la pestaña Compras. |
+| **Product Pricelist Lines** | [`product_pricelist_lines`](./product_pricelist_lines) | Tabla editable en la ficha de producto con las listas de precios que aplican y su precio fijo (reglas de la propia lista). |
 | **Product Pack** | [`product_pack`](./product_pack) | Define productos compuestos (packs/combos) con sus componentes y reglas de precio en backend. |
 | **Product Change History** | [`product_change_history`](./product_change_history) | Postea en el chatter **todos** los campos editados del producto, garantizando auditabilidad. |
 | **Product Company Restriction** | [`product_company_restriction`](./product_company_restriction) | Grupo que limita la creación/edición/borrado de productos a los de la propia empresa del usuario. |
