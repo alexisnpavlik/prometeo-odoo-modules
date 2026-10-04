@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (63 Módulos)](#-catálogo-completo-de-módulos-63-módulos)
+- [📂 Catálogo Completo de Módulos (65 Módulos)](#-catálogo-completo-de-módulos-65-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -40,7 +40,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (63 Módulos)
+## 📂 Catálogo Completo de Módulos (65 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
