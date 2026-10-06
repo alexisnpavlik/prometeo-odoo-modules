@@ -1,6 +1,6 @@
 {
     "name": "Product Pricelist Lines",
-    "version": "18.0.1.0.3",
+    "version": "18.0.1.0.5",
     "category": "Sales/Sales",
     "summary": "Tabla de listas de precios y su precio en la ficha de producto.",
     "description": """
@@ -23,6 +23,11 @@ Ventas > Listas de precios y la que usa el POS.
     "license": "LGPL-3",
     "depends": ["product"],
     "data": ["views/product_template_views.xml"],
+    "assets": {
+        "web.assets_backend": [
+            "product_pricelist_lines/static/src/js/pricelist_many2one_field.js",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": False,
