@@ -11,7 +11,8 @@
                     <field name="pricelist_line_ids" nolabel="1" colspan="2"
                            context="{'allowed_company_ids': False}">
                         <list editable="bottom">
-                            <field name="pricelist_id" options="{'no_create': True}"
+                            <field name="pricelist_id" widget="pricelist_many2one_all"
+                                   options="{'no_create': True}"
                                    context="{'allowed_company_ids': False}"
                                    domain="[('name', '!=', 'Predeterminado')]"/>
                             <field name="fixed_price" string="Precio"/>
