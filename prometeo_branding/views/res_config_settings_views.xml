@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.prometeo.branding</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='web_app_name']" position="attributes">
+                <attribute name="placeholder">Prometeo ERP</attribute>
+            </xpath>
+            <!-- QR de descarga de la app móvil de Odoo en "Acerca de" -->
+            <xpath expr="//widget[@name='mobile_apps_funnel']" position="replace"/>
+            <xpath expr="//field[@name='web_app_name']/.." position="attributes">
+                <attribute name="help">Nombre de la aplicación cuando Prometeo ERP se instala desde el navegador.</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

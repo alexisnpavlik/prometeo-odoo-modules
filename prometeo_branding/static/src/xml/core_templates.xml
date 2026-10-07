@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.SessionExpiredDialog" t-inherit-mode="extension">
+        <xpath expr="//Dialog" position="attributes">
+            <attribute name="title.translate">Sesión de Prometeo ERP expirada</attribute>
+        </xpath>
+        <xpath expr="//p" position="replace">
+            <p class="text-prewrap">Tu sesión de Prometeo ERP expiró. La página se va a recargar.</p>
+        </xpath>
+    </t>
+
+    <!-- Página para instalar una app (PWA) -->
+    <t t-inherit="web.InstallScopedApp" t-inherit-mode="extension">
+        <xpath expr="//a[@href='https://odoo.com']" position="replace">
+            <a class="text-primary text-decoration-none" href="https://prometeo.com.ar/" target="_blank">Prometeo ERP</a>
+        </xpath>
+    </t>
+</templates>

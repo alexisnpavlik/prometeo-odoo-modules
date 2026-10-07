@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="pos_index" inherit_id="point_of_sale.index" name="Prometeo ERP: título y favicon del POS">
+        <xpath expr="//title" position="replace">
+            <title>Prometeo ERP - Punto de venta</title>
+        </xpath>
+        <xpath expr="//link[@rel='icon']" position="attributes">
+            <attribute name="href">/prometeo_branding/static/src/img/favicon.png</attribute>
+            <attribute name="type">image/png</attribute>
+        </xpath>
+    </template>
+
+    <template id="customer_display_index" inherit_id="point_of_sale.customer_display_index" name="Prometeo ERP: favicon de la pantalla del cliente">
+        <xpath expr="//link[@rel='icon']" position="attributes">
+            <attribute name="href">/prometeo_branding/static/src/img/favicon.png</attribute>
+            <attribute name="type">image/png</attribute>
+        </xpath>
+    </template>
+</odoo>
