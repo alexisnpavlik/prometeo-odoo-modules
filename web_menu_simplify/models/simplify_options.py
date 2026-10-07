@@ -54,17 +54,38 @@ MENU_OPTIONS = {
     ),
 }
 
-# opción -> botones (atributo name) que oculta en las vistas de producto.
-BUTTON_OPTIONS = {
-    "hide_pricelists": ("open_pricelist_rules",),
-    "hide_product_documents": ("action_open_documents",),
-    "hide_reordering_rules": ("action_view_orderpoints",),
+# opción -> {tipo de vista: xpaths} de los elementos que oculta en las vistas
+# de producto. Las xpaths de campos apuntan a su contenedor exacto para no
+# tocar campos homónimos de subvistas.
+VIEW_OPTIONS = {
+    "hide_pricelists": {"form": ("//button[@name='open_pricelist_rules']",)},
+    "hide_product_documents": {"form": ("//button[@name='action_open_documents']",)},
+    "hide_reordering_rules": {
+        "form": ("//button[@name='action_view_orderpoints']",),
+        "list": ("//button[@name='action_view_orderpoints']",),
+    },
+    "hide_product_type_fields": {
+        "form": (
+            "//group[@name='group_general']/field[@name='type']",
+            "//group[@name='group_general']/field[@name='invoice_policy']",
+            "//group[@name='group_general']/label[@for='is_storable']",
+            "//group[@name='group_general']/div[field[@name='is_storable']]",
+            "//group[@name='group_general']/field[@name='product_tooltip']",
+        ),
+    },
+    "hide_product_sale_flags": {
+        "form": (
+            "//div[@name='options']/span[field[@name='sale_ok']]",
+            "//div[@name='options']/span[field[@name='purchase_ok']]",
+            "//div[@name='options']/span[field[@name='available_in_pos']]",
+        ),
+    },
 }
 
-# Opciones sin menús ni botones: las resuelve el frontend.
+# Opciones sin menús ni vistas: las resuelve el frontend.
 OTHER_OPTIONS = ("hide_systray",)
 
-ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *BUTTON_OPTIONS, *OTHER_OPTIONS)))
+ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *VIEW_OPTIONS, *OTHER_OPTIONS)))
 
 
 def is_option_active(env, key):
@@ -72,15 +93,15 @@ def is_option_active(env, key):
     return env["ir.config_parameter"].sudo().get_param(PARAM_PREFIX + key, "1") != "0"
 
 
-def active_button_options(env):
-    """Devuelve las opciones de botones activadas (sirve como clave de caché de vistas)."""
-    return tuple(key for key in BUTTON_OPTIONS if is_option_active(env, key))
+def active_view_options(env):
+    """Devuelve las opciones de vistas activadas (sirve como clave de caché de vistas)."""
+    return tuple(key for key in VIEW_OPTIONS if is_option_active(env, key))
 
 
-def hide_option_buttons(env, arch, view_type):
-    """Oculta en la arquitectura de la vista los botones de las opciones activadas."""
+def hide_option_nodes(env, arch, view_type):
+    """Oculta en la arquitectura de la vista los elementos de las opciones activadas."""
     attribute = "column_invisible" if view_type == "list" else "invisible"
-    for key in active_button_options(env):
-        for button_name in BUTTON_OPTIONS[key]:
-            for node in arch.xpath("//button[@name='%s']" % button_name):
+    for key in active_view_options(env):
+        for xpath in VIEW_OPTIONS[key].get(view_type, ()):
+            for node in arch.xpath(xpath):
                 node.set(attribute, "1")
