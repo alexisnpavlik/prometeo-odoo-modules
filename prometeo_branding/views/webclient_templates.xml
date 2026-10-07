@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="layout" inherit_id="web.layout" name="Prometeo ERP: título y favicon">
+        <xpath expr="//title" position="replace">
+            <title t-esc="title or 'Prometeo ERP'"/>
+        </xpath>
+        <xpath expr="//link[@rel='shortcut icon']" position="attributes">
+            <attribute name="t-att-href">x_icon or '/prometeo_branding/static/src/img/favicon.png'</attribute>
+            <attribute name="type">image/png</attribute>
+        </xpath>
+    </template>
+
+    <template id="webclient_bootstrap" inherit_id="web.webclient_bootstrap" name="Prometeo ERP: ícono iOS y color">
+        <xpath expr="//meta[@name='theme-color']" position="attributes">
+            <attribute name="content">#F76707</attribute>
+        </xpath>
+        <xpath expr="//link[@rel='apple-touch-icon']" position="attributes">
+            <attribute name="href">/prometeo_branding/static/src/img/icon-ios.png</attribute>
+        </xpath>
+    </template>
+
+    <template id="login_layout" inherit_id="web.login_layout" name="Prometeo ERP: pie del login">
+        <xpath expr="//t[@t-if='not disable_database_manager']" position="replace"/>
+        <xpath expr="//a[contains(@href, 'www.odoo.com')]" position="replace">
+            <a href="https://prometeo.com.ar/" target="_blank">Powered by <span>Prometeo ERP</span></a>
+        </xpath>
+    </template>
+
+    <template id="brand_promotion_message" inherit_id="web.brand_promotion_message" name="Prometeo ERP: Powered by">
+        <xpath expr="//t[@t-set='odoo_logo']" position="replace">
+            <t t-set="odoo_logo">
+                <a target="_blank" href="https://prometeo.com.ar/" class="badge text-bg-light">Prometeo ERP</a>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="webclient_offline" inherit_id="web.webclient_offline" name="Prometeo ERP: página offline">
+        <xpath expr="//img" position="attributes">
+            <attribute name="alt">Prometeo ERP</attribute>
+        </xpath>
+        <xpath expr="//div[hasclass('card')]/p" position="replace">
+            <p>Revisá tu conexión a internet. Prometeo ERP va a cargar apenas vuelvas a estar en línea.</p>
+        </xpath>
+    </template>
+</odoo>

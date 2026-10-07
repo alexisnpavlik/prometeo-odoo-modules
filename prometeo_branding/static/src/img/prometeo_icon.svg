@@ -1,0 +1,10 @@
+<svg width="160" height="160" viewBox="8 8 144 144" xmlns="http://www.w3.org/2000/svg">
+  <title>Prometeo ERP</title>
+  <polygon points="144,80 112,135 48,135 16,80 48,25 112,25" fill="none" stroke="#F76707" stroke-width="6"/>
+  <g transform="translate(80,120) scale(0.72)">
+      <path d="M0 0 C-40 -10 -44 -55 -18 -85 C-6 -98 -10 -112 -4 -124 C4 -112 8 -96 14 -86 C38 -56 34 -12 0 0 Z" fill="#E8590C"/>
+      <path d="M0 -6 C-26 -14 -28 -50 -12 -74 C-4 -84 -7 -96 -2 -106 C3 -96 6 -84 11 -76 C26 -50 22 -14 0 -6 Z" fill="#F76707"/>
+      <path d="M0 -16 C-13 -22 -14 -44 -5 -60 C-1 -67 -3 -75 0 -82 C3 -74 5 -66 7 -60 C14 -44 11 -22 0 -16 Z" fill="#22B8CF"/>
+      <path d="M0 -26 C-7 -30 -8 -44 -3 -55 C0 -60 -1 -66 0 -71 C1 -65 3 -60 4 -55 C8 -44 6 -30 0 -26 Z" fill="#66D9E8"/>
+    </g>
+</svg>

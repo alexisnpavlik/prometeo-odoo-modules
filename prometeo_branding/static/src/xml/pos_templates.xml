@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.Navbar" t-inherit-mode="extension">
+        <xpath expr="//img[hasclass('pos-logo')]" position="attributes">
+            <attribute name="src">/prometeo_branding/static/src/img/prometeo_logo_horizontal.svg</attribute>
+            <attribute name="alt">Prometeo ERP</attribute>
+        </xpath>
+    </t>
+
+    <t t-inherit="point_of_sale.SaverScreen" t-inherit-mode="extension">
+        <xpath expr="//img[@src='/web/static/img/odoo_logo.svg']" position="attributes">
+            <attribute name="src">/prometeo_branding/static/src/img/prometeo_logo.svg</attribute>
+            <attribute name="alt">Prometeo ERP</attribute>
+        </xpath>
+    </t>
+
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('pos-receipt-order-data')]/p" position="replace">
+            <p>Powered by Prometeo ERP</p>
+        </xpath>
+    </t>
+</templates>

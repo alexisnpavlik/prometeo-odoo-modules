@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="digest_mail_main" inherit_id="digest.digest_mail_main" name="Prometeo ERP: resumen periódico">
+        <xpath expr="//div[hasclass('by_odoo')]/a" position="replace">
+            <a href="https://prometeo.com.ar/" target="_blank"><span class="odoo_link_text">Prometeo ERP</span></a>
+        </xpath>
+        <xpath expr="//p[@id='powered']/a" position="replace">
+            <a href="https://prometeo.com.ar/" target="_blank" class="odoo_link"><span class="odoo_link_text">Prometeo ERP</span></a>
+        </xpath>
+        <!-- Banner que promociona la app móvil de Odoo -->
+        <xpath expr="//tr[@t-call='digest.digest_section_mobile']" position="attributes">
+            <attribute name="t-if">False</attribute>
+        </xpath>
+    </template>
+</odoo>
