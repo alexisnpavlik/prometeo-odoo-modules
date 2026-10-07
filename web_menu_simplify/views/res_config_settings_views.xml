@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_web_menu_simplify" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.web.menu.simplify</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Interfaz simplificada" string="Interfaz simplificada" name="web_menu_simplify">
+                    <block title="General" name="simplify_general">
+                        <setting help="App de chat interno: oculta el menú y bloquea abrirla por URL.">
+                            <field name="simplify_hide_discuss"/>
+                        </setting>
+                        <setting help="Tableros de hojas de cálculo de Odoo.">
+                            <field name="simplify_hide_dashboards"/>
+                        </setting>
+                        <setting help="Seguimiento de enlaces de marketing.">
+                            <field name="simplify_hide_link_tracker"/>
+                        </setting>
+                        <setting help="Menú técnico de pruebas.">
+                            <field name="simplify_hide_tests"/>
+                        </setting>
+                        <setting help="Íconos de chat, actividades y llamadas arriba a la derecha, y las ventanas de chat flotantes.">
+                            <field name="simplify_hide_systray"/>
+                        </setting>
+                    </block>
+                    <block title="Punto de venta" name="simplify_pos">
+                        <setting>
+                            <field name="simplify_hide_pos_reports"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_pos_categories"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_pos_combos"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_pos_printers"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_pos_note_models"/>
+                        </setting>
+                    </block>
+                    <block title="Facturación" name="simplify_invoicing">
+                        <setting>
+                            <field name="simplify_hide_account_dashboard"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_account_bank_cash"/>
+                        </setting>
+                        <setting help="Asientos, apuntes y conciliaciones.">
+                            <field name="simplify_hide_account_entries"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_account_reports"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_account_ledgers"/>
+                        </setting>
+                    </block>
+                    <block title="Inventario" name="simplify_inventory">
+                        <setting help="Incluye Reabastecimiento y el planificador.">
+                            <field name="simplify_hide_stock_procurement"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_stock_lots"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_stock_packages"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_stock_move_analysis"/>
+                        </setting>
+                        <setting>
+                            <field name="simplify_hide_stock_valuation"/>
+                        </setting>
+                    </block>
+                    <block title="Productos" name="simplify_products">
+                        <setting help="Menús de variantes en Inventario, Punto de venta, Ventas y Compras.">
+                            <field name="simplify_hide_variants"/>
+                        </setting>
+                        <setting help="Menús de atributos en Inventario, Punto de venta, Ventas y Compras.">
+                            <field name="simplify_hide_attributes"/>
+                        </setting>
+                        <setting help="Menús de listas de precios y el botón de la ficha de producto.">
+                            <field name="simplify_hide_pricelists"/>
+                        </setting>
+                        <setting help="Botón Documentos de la ficha de producto.">
+                            <field name="simplify_hide_product_documents"/>
+                        </setting>
+                        <setting help="Botones de reglas en la ficha de producto y en Existencias.">
+                            <field name="simplify_hide_reordering_rules"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
