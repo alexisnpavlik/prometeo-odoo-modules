@@ -150,10 +150,10 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la barra superior de Odoo dinámicamente según la compañía activa. |
+| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Oculta Conversaciones, menús avanzados, botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Pensado para kiosco. |
 | **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a modelos personalizados. |
 | **Bloqueo de Contactos y Productos de Sistema** | [`partner_protected_lock`](./partner_protected_lock) | Impide editar, archivar o borrar los contactos de las empresas propias, Consumidor Final Anónimo y los productos de Descuento y Recargo del POS. Solo administradores. |
 | **Aviso de Empresa Interna** | [`partner_internal_company_badge`](./partner_internal_company_badge) | Banner naranja en ventas, transferencias y facturas cuando el contacto es una empresa propia del grupo. |
-| **Ocultar Conversaciones** | [`mail_hide_discuss`](./mail_hide_discuss) | Oculta y bloquea el acceso a la aplicación Conversaciones (Discuss). |
 
 ---
 
