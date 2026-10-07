@@ -8,6 +8,8 @@
             <xpath expr="//field[@name='web_app_name']" position="attributes">
                 <attribute name="placeholder">Prometeo ERP</attribute>
             </xpath>
+            <!-- QR de descarga de la app móvil de Odoo en "Acerca de" -->
+            <xpath expr="//widget[@name='mobile_apps_funnel']" position="replace"/>
             <xpath expr="//field[@name='web_app_name']/.." position="attributes">
                 <attribute name="help">Nombre de la aplicación cuando Prometeo ERP se instala desde el navegador.</attribute>
             </xpath>

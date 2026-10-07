@@ -8,7 +8,8 @@
         <xpath expr="//small" position="replace">
             <small>
                 <a target="_blank" href="https://prometeo.com.ar/" style="text-decoration: underline;">prometeo.com.ar</a>
-                <a id="license" target="_blank" href="http://www.gnu.org/licenses/lgpl.html" style="text-decoration: underline;">GNU LGPL Licensed</a>
+                <span class="mx-2">|</span>
+                <a id="license" target="_blank" href="http://www.gnu.org/licenses/lgpl.html" style="text-decoration: underline;">Licencia GNU LGPL</a>
             </small>
         </xpath>
     </t>
