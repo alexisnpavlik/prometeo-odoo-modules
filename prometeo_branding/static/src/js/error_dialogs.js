@@ -21,7 +21,9 @@ function debrand(title) {
     return title ? String(title).replace(/\bOdoo\b/g, BRAND_NAME) : title;
 }
 
-Dialog.defaultProps = { ...Dialog.defaultProps, title: BRAND_NAME };
+// Mutación en el lugar: los diálogos que copian estos defaults al cargar
+// (ActionDialog) se corrigen aparte en action_dialog.js.
+Dialog.defaultProps.title = BRAND_NAME;
 
 ErrorDialog.title = _t("Error de Prometeo ERP");
 ClientErrorDialog.title = _t("Error de cliente de Prometeo ERP");

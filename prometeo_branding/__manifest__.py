@@ -1,6 +1,6 @@
 {
     "name": "Prometeo ERP - Marca",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.1",
     "category": "Hidden/Tools",
     "summary": "Reemplaza la marca Odoo por Prometeo ERP: nombre, logos, favicon y enlaces",
     "description": """
@@ -40,6 +40,7 @@
             "prometeo_branding/static/src/xml/core_templates.xml",
         ],
         "web.assets_backend": [
+            "prometeo_branding/static/src/js/action_dialog.js",
             "prometeo_branding/static/src/js/user_menu_items.js",
             "prometeo_branding/static/src/xml/webclient_templates.xml",
         ],
