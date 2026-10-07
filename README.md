@@ -36,6 +36,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 * 💳 **Cuentas Corrientes & Finanzas**: Módulo exclusivo de gestión informal de cuentas corrientes (retiros de mercancía con abonos parciales, límites de crédito y estados de cuenta imprimibles), además de transferencias internas entre diarios y cheques LATAM.
 * 🏢 **Gestión Multi-Compañía Segura**: Herramientas de aislamiento visual y lógico (selectores de compañía seguros, colores dinámicos por empresa y generación automática de órdenes/facturas/remitos espejo inter-compañía).
 * 📊 **KPIs y Métricas OWL**: Tableros analíticos en tiempo real con Chart.js para Inventario, POS, Facturación, Asesores de Venta y Listas de Precios.
+* 🧭 **Interfaz Simplificada para Kiosco**: Oculta Conversaciones, menús avanzados (contabilidad, aprovisionamiento, variantes, atributos, listas de precios) y el chat de la barra superior, con un interruptor por opción en Ajustes. Punto de venta abre primero, directo al tablero de cajas.
 * 🔍 **Trazabilidad y Monitoreo**: Historial de cambios en productos en el chatter, registro de motivos de borrado en POS y captura automática de excepciones frontend en Sentry.
 
 ---
@@ -150,10 +151,10 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la barra superior de Odoo dinámicamente según la compañía activa. |
+| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Oculta Conversaciones, menús avanzados, botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Pensado para kiosco. |
 | **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a modelos personalizados. |
 | **Bloqueo de Contactos y Productos de Sistema** | [`partner_protected_lock`](./partner_protected_lock) | Impide editar, archivar o borrar los contactos de las empresas propias, Consumidor Final Anónimo y los productos de Descuento y Recargo del POS. Solo administradores. |
 | **Aviso de Empresa Interna** | [`partner_internal_company_badge`](./partner_internal_company_badge) | Banner naranja en ventas, transferencias y facturas cuando el contacto es una empresa propia del grupo. |
-| **Ocultar Conversaciones** | [`mail_hide_discuss`](./mail_hide_discuss) | Oculta y bloquea el acceso a la aplicación Conversaciones (Discuss). |
 
 ---
 
