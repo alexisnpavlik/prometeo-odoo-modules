@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.FormStatusIndicator" t-inherit-mode="extension">
+        <xpath expr="//button[hasclass('o_form_button_save')]" position="attributes">
+            <attribute name="class">o_form_button_save o_form_button_big btn btn-primary</attribute>
+            <attribute name="data-tooltip">Guardar los cambios</attribute>
+            <attribute name="aria-label">Guardar</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('o_form_button_save')]/i" position="replace">
+            <i class="fa fa-check fa-fw"/>
+            <span class="o_form_button_label">Guardar</span>
+        </xpath>
+        <xpath expr="//button[hasclass('o_form_button_cancel')]" position="attributes">
+            <attribute name="class">o_form_button_cancel o_form_button_big btn btn-outline-secondary</attribute>
+            <attribute name="data-tooltip">Descartar todos los cambios</attribute>
+            <attribute name="aria-label">Descartar</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('o_form_button_cancel')]/i" position="replace">
+            <i class="fa fa-times fa-fw"/>
+            <span class="o_form_button_label">Descartar</span>
+        </xpath>
+    </t>
+</templates>
