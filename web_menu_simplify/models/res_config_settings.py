@@ -17,7 +17,10 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_dashboards = fields.Boolean("Ocultar Tableros")
     simplify_hide_link_tracker = fields.Boolean("Ocultar Rastreador de enlaces")
     simplify_hide_tests = fields.Boolean("Ocultar Pruebas")
+    simplify_hide_sales = fields.Boolean("Ocultar Ventas")
+    simplify_hide_purchase = fields.Boolean("Ocultar Compras")
     simplify_hide_systray = fields.Boolean("Ocultar chat y actividades de la barra superior")
+    simplify_fullscreen_apps = fields.Boolean("Menú de apps a pantalla completa")
     # Punto de venta
     simplify_hide_pos_reports = fields.Boolean("Ocultar Reportes de Punto de venta")
     simplify_hide_pos_categories = fields.Boolean("Ocultar Categorías de PdV")
@@ -25,6 +28,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_pos_printers = fields.Boolean("Ocultar Impresoras de preparación")
     simplify_hide_pos_note_models = fields.Boolean("Ocultar Modelos de nota")
     # Facturación
+    simplify_hide_account = fields.Boolean("Ocultar app Facturación")
     simplify_hide_account_dashboard = fields.Boolean("Ocultar Tablero de Facturación")
     simplify_hide_account_bank_cash = fields.Boolean("Ocultar Banco y Caja")
     simplify_hide_account_entries = fields.Boolean("Ocultar Contabilidad")
@@ -36,6 +40,9 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_stock_packages = fields.Boolean("Ocultar Paquetes")
     simplify_hide_stock_move_analysis = fields.Boolean("Ocultar Análisis de movimientos")
     simplify_hide_stock_valuation = fields.Boolean("Ocultar Valoración")
+    simplify_inventory_open_products = fields.Boolean("Inventario abre en Productos")
+    simplify_hide_stock_overview = fields.Boolean("Ocultar Información general")
+    simplify_hide_stock_operations = fields.Boolean("Ocultar Operaciones")
     # Productos
     simplify_hide_variants = fields.Boolean("Ocultar Variantes")
     simplify_hide_attributes = fields.Boolean("Ocultar Atributos")

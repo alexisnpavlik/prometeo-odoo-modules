@@ -20,8 +20,17 @@
                         <setting help="Menú técnico de pruebas.">
                             <field name="simplify_hide_tests"/>
                         </setting>
+                        <setting help="App Ventas (cotizaciones y pedidos). Se vende por Punto de venta.">
+                            <field name="simplify_hide_sales"/>
+                        </setting>
+                        <setting help="App Compras (solicitudes de cotización y órdenes de compra).">
+                            <field name="simplify_hide_purchase"/>
+                        </setting>
                         <setting help="Íconos de chat, actividades y llamadas arriba a la derecha, y las ventanas de chat flotantes.">
                             <field name="simplify_hide_systray"/>
+                        </setting>
+                        <setting help="El botón de apps abre una pantalla completa con íconos grandes, en lugar de la lista desplegable.">
+                            <field name="simplify_fullscreen_apps"/>
                         </setting>
                     </block>
                     <block title="Punto de venta" name="simplify_pos">
@@ -42,6 +51,9 @@
                         </setting>
                     </block>
                     <block title="Facturación" name="simplify_invoicing">
+                        <setting help="Oculta la app entera. Las facturas de cliente siguen disponibles en Punto de venta > Órdenes > Facturas.">
+                            <field name="simplify_hide_account"/>
+                        </setting>
                         <setting>
                             <field name="simplify_hide_account_dashboard"/>
                         </setting>
@@ -59,6 +71,15 @@
                         </setting>
                     </block>
                     <block title="Inventario" name="simplify_inventory">
+                        <setting help="Al entrar a Inventario se abre la lista de productos en lugar de Información general.">
+                            <field name="simplify_inventory_open_products"/>
+                        </setting>
+                        <setting help="Tablero de tipos de operación de Inventario.">
+                            <field name="simplify_hide_stock_overview"/>
+                        </setting>
+                        <setting help="Incluye Traslados, Ajustes y Aprovisionamiento.">
+                            <field name="simplify_hide_stock_operations"/>
+                        </setting>
                         <setting help="Incluye Reabastecimiento y el planificador.">
                             <field name="simplify_hide_stock_procurement"/>
                         </setting>

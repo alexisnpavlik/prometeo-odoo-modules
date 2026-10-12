@@ -16,6 +16,8 @@ MENU_OPTIONS = {
     "hide_dashboards": ("spreadsheet_dashboard.spreadsheet_dashboard_menu_root",),
     "hide_link_tracker": ("utm.menu_link_tracker_root",),
     "hide_tests": ("base.menu_tests",),
+    "hide_sales": ("sale.sale_menu_root",),
+    "hide_purchase": ("purchase.menu_purchase_root",),
     # Punto de venta
     "hide_pos_reports": ("point_of_sale.menu_point_rep",),
     "hide_pos_categories": ("point_of_sale.menu_products_pos_category",),
@@ -23,12 +25,15 @@ MENU_OPTIONS = {
     "hide_pos_printers": ("point_of_sale.menu_pos_preparation_printer",),
     "hide_pos_note_models": ("point_of_sale.menu_pos_note_model",),
     # Facturación
+    "hide_account": ("account.menu_finance",),
     "hide_account_dashboard": ("account.menu_board_journal_1",),
     "hide_account_bank_cash": ("account_internal_transfer.menu_finance_bank_and_cash",),
     "hide_account_entries": ("account.menu_finance_entries",),
     "hide_account_reports": ("account.menu_finance_reports",),
     "hide_account_ledgers": ("account_ux.menu_customer_ledger", "account_ux.menu_vendor_ledger"),
     # Inventario
+    "hide_stock_overview": ("stock.stock_picking_type_menu",),
+    "hide_stock_operations": ("stock.menu_stock_warehouse_mgmt",),
     "hide_stock_procurement": ("stock.menu_stock_procurement", "stock.menu_procurement_compute"),
     "hide_stock_lots": ("stock.menu_action_production_lot_form",),
     "hide_stock_packages": ("stock.menu_package",),
@@ -82,10 +87,16 @@ VIEW_OPTIONS = {
     },
 }
 
-# Opciones sin menús ni vistas: las resuelve el frontend.
-OTHER_OPTIONS = ("hide_systray",)
+# opción -> {app: acción con la que abre} (la app abre ahí en vez de en su
+# primer submenú).
+APP_START_OPTIONS = {
+    "inventory_open_products": {"stock.menu_stock_root": "stock.product_template_action_product"},
+}
 
-ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *VIEW_OPTIONS, *OTHER_OPTIONS)))
+# Opciones sin menús ni vistas: las resuelve el frontend.
+OTHER_OPTIONS = ("hide_systray", "fullscreen_apps")
+
+ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *VIEW_OPTIONS, *APP_START_OPTIONS, *OTHER_OPTIONS)))
 
 
 def is_option_active(env, key):
