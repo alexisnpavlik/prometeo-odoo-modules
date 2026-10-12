@@ -91,6 +91,12 @@
                         <setting help="Botones de reglas en la ficha de producto y en Existencias.">
                             <field name="simplify_hide_reordering_rules"/>
                         </setting>
+                        <setting help="En la ficha: Tipo de producto, Política de facturación, Rastrear inventario y su texto de ayuda.">
+                            <field name="simplify_hide_product_type_fields"/>
+                        </setting>
+                        <setting help="En la ficha: las casillas Ventas, Compras y Punto de venta debajo del nombre.">
+                            <field name="simplify_hide_product_sale_flags"/>
+                        </setting>
                     </block>
                 </app>
             </xpath>
