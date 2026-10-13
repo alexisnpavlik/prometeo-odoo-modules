@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (68 Módulos)](#-catálogo-completo-de-módulos-68-módulos)
+- [📂 Catálogo Completo de Módulos (69 Módulos)](#-catálogo-completo-de-módulos-69-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -41,7 +41,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (68 Módulos)
+## 📂 Catálogo Completo de Módulos (69 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -114,6 +114,7 @@ Operaciones automatizadas, remitos e integración logística inter-compañía.
 | **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
 | **Stock Picking Auto Qty** | [`stock_picking_auto_qty`](./stock_picking_auto_qty) | Auto-completa la cantidad hecha con la cantidad demandada en albaranes de salida. |
 | **Conteo por Código de Barras** | [`stock_count_barcode`](./stock_count_barcode) | Sesiones de inventario rápido escaneando códigos de barra desde dispositivos móviles o lectores láser. |
+| **Escáner de productos** | [`stock_barcode_lookup`](./stock_barcode_lookup) | App "Escáner" en el panel principal: busca el producto escaneando el código de barras con la cámara (foto por HTTP, video en vivo con HTTPS) y ofrece Abrir ficha, Reabastecer o crear el producto con ese código. |
 
 ### 5. Productos & Catálogo
 

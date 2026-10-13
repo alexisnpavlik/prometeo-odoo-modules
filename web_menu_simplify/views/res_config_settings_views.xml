@@ -162,6 +162,9 @@
                         <setting help="Botón Documentos de la ficha de producto.">
                             <field name="simplify_hide_product_documents"/>
                         </setting>
+                        <setting help="Botón Pronosticado (stock previsto) de la ficha de producto.">
+                            <field name="simplify_hide_product_forecast"/>
+                        </setting>
                         <setting help="Botones de reglas en la ficha de producto y en Existencias.">
                             <field name="simplify_hide_reordering_rules"/>
                         </setting>
