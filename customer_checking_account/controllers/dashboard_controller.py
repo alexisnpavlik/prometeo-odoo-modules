@@ -2,8 +2,9 @@
 import csv
 import io
 import logging
+from datetime import timedelta
 
-from odoo import http
+from odoo import fields, http
 from odoo.exceptions import AccessError
 from odoo.http import request
 
@@ -14,6 +15,13 @@ INSTALLMENT_STATES = {
     "partial": "Parcial",
     "paid": "Pagada",
     "overdue": "Vencida",
+}
+
+PAYMENT_METHODS = {
+    "cash": "Efectivo",
+    "transfer": "Transferencia",
+    "card": "Tarjeta",
+    "other": "Otro",
 }
 
 WITHDRAWAL_STATES = {
@@ -179,7 +187,15 @@ class CcaDashboardController(http.Controller):
         top_rows = env.cr.dictfetchall()
         partner_names = self._resolve_names(env, "res.partner", [r["partner_id"] for r in top_rows])
 
+        today = fields.Date.context_today(env.user)
+        upcoming = self._cca_upcoming(env, company, partner, today)
+        aging = self._cca_aging(env, company, partner, today)
+        by_method = self._cca_by_method(env, start_date, end_date, company, partner)
+
         return {
+            "upcoming": upcoming,
+            "aging": aging,
+            "by_method": by_method,
             "balance_trend": {"labels": labels, "companies": companies_series},
             "collected_vs_overdue": {
                 "labels": [r["period"] for r in vs_rows],
@@ -196,6 +212,80 @@ class CcaDashboardController(http.Controller):
                 "values": [float(r["residual"]) for r in top_rows],
             },
         }
+
+    def _cca_upcoming(self, env, company, partner, today, weeks=8):
+        """Cobranza próxima: residual vencido y lo que vence en cada una de las próximas semanas.
+
+        No usa el rango de fechas del filtro: mira hacia adelante desde hoy.
+        """
+        where, params = self._cca_where(env, None, None, company, partner)
+        end = today + timedelta(days=7 * weeks)
+        env.cr.execute(f"""
+            SELECT i.date_due, i.amount_residual
+            FROM cca_installment i
+            JOIN cca_withdrawal w ON w.id = i.withdrawal_id
+            WHERE {where} AND i.amount_residual > 0 AND i.date_due < %s
+        """, params + [end])
+        values = [0.0] * (weeks + 1)
+        for date_due, residual in env.cr.fetchall():
+            index = 0 if date_due < today else 1 + (date_due - today).days // 7
+            values[index] += float(residual)
+        labels = ["Vencido"] + [
+            (today + timedelta(days=7 * week)).strftime("%d/%m") for week in range(weeks)
+        ]
+        return {"labels": labels, "values": [round(v, 2) for v in values]}
+
+    def _cca_aging(self, env, company, partner, today):
+        """Antigüedad de la deuda vencida por tramos de días."""
+        where, params = self._cca_where(env, None, None, company, partner)
+        env.cr.execute(f"""
+            SELECT i.date_due, i.amount_residual
+            FROM cca_installment i
+            JOIN cca_withdrawal w ON w.id = i.withdrawal_id
+            WHERE {where} AND i.amount_residual > 0 AND i.date_due < %s
+        """, params + [today])
+        values = [0.0, 0.0, 0.0, 0.0]
+        for date_due, residual in env.cr.fetchall():
+            days = (today - date_due).days
+            index = 0 if days <= 30 else 1 if days <= 60 else 2 if days <= 90 else 3
+            values[index] += float(residual)
+        return {
+            "labels": ["1-30 días", "31-60 días", "61-90 días", "Más de 90 días"],
+            "values": [round(v, 2) for v in values],
+        }
+
+    def _cca_by_method(self, env, start_date, end_date, company, partner):
+        """Cobrado por mes y medio de pago (pagos vigentes)."""
+        where = "p.state = 'posted' AND p.company_id IN %s"
+        params = [tuple(env.companies.ids)]
+        if start_date:
+            where += " AND p.date >= %s"
+            params.append(start_date)
+        if end_date:
+            where += " AND p.date <= %s"
+            params.append(end_date)
+        if company and company != "all":
+            where += " AND p.company_id = %s"
+            params.append(int(company))
+        if partner and partner != "all":
+            where += " AND p.partner_id = %s"
+            params.append(int(partner))
+        env.cr.execute(f"""
+            SELECT to_char(date_trunc('month', p.date), 'YYYY-MM') AS period,
+                   p.payment_method, COALESCE(SUM(p.amount), 0) AS total
+            FROM cca_payment p
+            WHERE {where}
+            GROUP BY period, p.payment_method
+            ORDER BY period
+        """, params)
+        rows = env.cr.dictfetchall()
+        labels = sorted({r["period"] for r in rows})
+        series = []
+        for key, label in PAYMENT_METHODS.items():
+            totals = {r["period"]: float(r["total"]) for r in rows if r["payment_method"] == key}
+            if totals:
+                series.append({"key": key, "label": label, "values": [totals.get(l, 0.0) for l in labels]})
+        return {"labels": labels, "series": series}
 
     def _resolve_names(self, env, model, ids):
         """Resuelve {id: display_name} vía ORM con sudo, evitando SQL sobre columnas jsonb."""

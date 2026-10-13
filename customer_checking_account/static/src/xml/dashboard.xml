@@ -381,6 +381,66 @@
                                 </ul>
                             </div>
 
+                            <!-- Cobranza de las Próximas Semanas -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Cobranza de las Próximas Semanas</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Lo que falta cobrar: primero todo lo ya vencido (en rojo) y después lo que vence en cada una de las próximas 8 semanas. No depende del filtro de fechas.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-upcoming"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Antigüedad de la Deuda Vencida -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Antigüedad de la Deuda Vencida</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Saldo vencido según cuántos días lleva vencido. Lo de más de 90 días es lo que tiene más riesgo de no cobrarse. No depende del filtro de fechas.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-aging"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Cobrado por Medio de Pago -->
+                            <div class="chart-container glass-panel">
+                                <div class="chart-header" style="position: relative;">
+                                    <h3>Cobrado por Medio de Pago</h3>
+                                    <div class="info-tooltip-wrapper tooltip-right">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                        </svg>
+                                        <div class="info-tooltip-text">
+                                            Pagos vigentes del período, por mes y por medio de pago. Sirve para cuadrar la caja.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-body">
+                                    <canvas id="chart-by-method"></canvas>
+                                </div>
+                            </div>
+
                             <!-- Top Deudores -->
                             <div class="chart-container glass-panel">
                                 <div class="chart-header" style="position: relative;">

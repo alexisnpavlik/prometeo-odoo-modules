@@ -48,6 +48,9 @@ class CcaDashboard extends Component {
                 balance_trend: { labels: [], companies: {} },
                 collected_vs_overdue: { labels: [], collected: [], overdue: [] },
                 installment_status: { keys: [], labels: [], values: [] },
+                upcoming: { labels: [], values: [] },
+                aging: { labels: [], values: [] },
+                by_method: { labels: [], series: [] },
                 top_partners: { labels: [], values: [] },
 
             }
@@ -363,6 +366,67 @@ class CcaDashboard extends Component {
             }]
         }, {
             plugins: { legend: { display: false } }
+        });
+
+        const moneyTooltip = { callbacks: { label: (ctx) => ` ${ctx.dataset.label ? ctx.dataset.label + ": " : ""}${this.formatCurrency(ctx.raw)}` } };
+        const moneyTicks = { callback: (v) => this.formatCurrency(v).split(",")[0] };
+
+        // Cobranza de las próximas semanas: la primera barra es lo vencido.
+        const upcoming = this.metricsData.charts.upcoming;
+        this.createOrUpdateChart("chart-upcoming", "bar", {
+            labels: upcoming.labels,
+            datasets: [{
+                label: "A cobrar",
+                data: upcoming.values,
+                backgroundColor: upcoming.labels.map((_l, i) => (i === 0 ? "rgba(239, 68, 68, 0.75)" : "rgba(59, 130, 246, 0.65)")),
+                borderColor: upcoming.labels.map((_l, i) => (i === 0 ? "#ef4444" : "#3b82f6")),
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        }, {
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: { grid: { display: false }, ticks: { maxRotation: 0 } }, y: { grid: gridConfig, ticks: moneyTicks } }
+        });
+
+        // Antigüedad de la deuda vencida: de amarillo a rojo según los días.
+        const agingColors = ["#f59e0b", "#f97316", "#ef4444", "#b91c1c"];
+        this.createOrUpdateChart("chart-aging", "bar", {
+            labels: this.metricsData.charts.aging.labels,
+            datasets: [{
+                label: "Vencido",
+                data: this.metricsData.charts.aging.values,
+                backgroundColor: agingColors.map((c) => c + "bf"),
+                borderColor: agingColors,
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        }, {
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: { grid: { display: false }, ticks: { maxRotation: 0 } }, y: { grid: gridConfig, ticks: moneyTicks } }
+        });
+
+        // Cobrado por medio de pago: barras apiladas por mes.
+        const methodColors = { cash: "#10b981", transfer: "#3b82f6", card: "#8b5cf6", other: "#94a3b8" };
+        const byMethod = this.metricsData.charts.by_method;
+        this.createOrUpdateChart("chart-by-method", "bar", {
+            labels: byMethod.labels,
+            datasets: byMethod.series.map((serie) => ({
+                label: serie.label,
+                data: serie.values,
+                backgroundColor: (methodColors[serie.key] || "#94a3b8") + "bf",
+                borderColor: methodColors[serie.key] || "#94a3b8",
+                borderWidth: 1.5,
+                borderRadius: 4
+            }))
+        }, {
+            plugins: {
+                legend: { display: true, position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", padding: 12 } },
+                tooltip: moneyTooltip
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 0 } },
+                y: { stacked: true, grid: gridConfig, ticks: moneyTicks }
+            }
         });
 
         // 4. Top deudores (bar horizontal)

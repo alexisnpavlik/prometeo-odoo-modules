@@ -19,14 +19,15 @@ class TestCcaDashboard(CcaCommon):
         self.account = self.env["cca.account"]._get_or_create(self.partner, self.company)
         self.withdrawal = self._confirmed(self.partner, qty=20, count=2)  # 20 x 50 = 1000
 
-    def _confirmed(self, partner, qty, count=1):
+    def _confirmed(self, partner, qty, count=1, first_due="2027-01-01", frequency="monthly"):
         """Retiro confirmado del servicio de prueba en la compañía aislada."""
         withdrawal = self.env["cca.withdrawal"].create({
             "partner_id": partner.id,
             "company_id": self.company.id,
             "date": "2026-01-01",
-            "first_due_date": "2027-01-01",
+            "first_due_date": first_due,
             "installment_count": count,
+            "frequency": frequency,
             "line_ids": [(0, 0, {"product_id": self.service.id, "quantity": qty})],
         })
         withdrawal.action_confirm()
@@ -87,3 +88,47 @@ class TestCcaDashboard(CcaCommon):
         })
         with self.assertRaises(AccessError):
             self._controller()._check_access(self.env(user=user))
+
+    def _charts(self):
+        """Gráficos del dashboard sin filtros."""
+        return self._controller()._cca_charts(
+            self.env, start_date=None, end_date=None, company="all", partner="all"
+        )
+
+    def test_upcoming_collection_by_week(self):
+        """Cobranza próxima: primero lo vencido y después 8 semanas desde hoy."""
+        from datetime import timedelta
+        from odoo import fields
+        today = fields.Date.context_today(self.env.user)
+        self._confirmed(self.partner, qty=2, first_due="2026-02-01")              # 100 vencido
+        self._confirmed(self.partner, qty=4, count=2, frequency="weekly",
+                        first_due=today + timedelta(days=1))                     # 100 + 100
+        upcoming = self._charts()["upcoming"]
+        self.assertEqual(len(upcoming["labels"]), 9)
+        self.assertEqual(upcoming["labels"][0], "Vencido")
+        self.assertEqual(upcoming["values"][0], 100.0)
+        self.assertEqual(sum(upcoming["values"][1:3]), 200.0)
+
+    def test_aging_buckets_overdue_debt(self):
+        """Antigüedad: la deuda vencida hace más de 90 días cae en el último tramo."""
+        self._confirmed(self.partner, qty=2, first_due="2026-02-01")
+        aging = self._charts()["aging"]
+        self.assertEqual(aging["labels"], ["1-30 días", "31-60 días", "61-90 días", "Más de 90 días"])
+        self.assertEqual(aging["values"][3], 100.0)
+        self.assertEqual(sum(aging["values"][:3]), 0.0)
+
+    def test_collected_by_payment_method(self):
+        """Cobrado por medio de pago, por mes."""
+        self.env["cca.payment"].create({
+            "partner_id": self.partner.id, "company_id": self.company.id,
+            "amount": 300, "payment_method": "transfer",
+        })
+        self.env["cca.payment"].create({
+            "partner_id": self.partner.id, "company_id": self.company.id,
+            "amount": 50, "payment_method": "cash",
+        })
+        by_method = self._charts()["by_method"]
+        totals = {serie["key"]: sum(serie["values"]) for serie in by_method["series"]}
+        self.assertEqual(totals["transfer"], 300.0)
+        self.assertEqual(totals["cash"], 50.0)
+        self.assertEqual(len(by_method["labels"]), 1)
