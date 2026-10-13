@@ -12,4 +12,39 @@
         <field name="comment">Acceso completo: retiros, pagos, límites, cancelaciones y dashboard.</field>
         <field name="users" eval="[(4, ref('base.user_admin'))]"/>
     </record>
+
+    <record id="cca_account_company_rule" model="ir.rule">
+        <field name="name">cca.account: multi-compañía</field>
+        <field name="model_id" ref="model_cca_account"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="cca_allocation_company_rule" model="ir.rule">
+        <field name="name">cca.allocation: multi-compañía</field>
+        <field name="model_id" ref="model_cca_allocation"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="cca_withdrawal_company_rule" model="ir.rule">
+        <field name="name">cca.withdrawal: multi-compañía</field>
+        <field name="model_id" ref="model_cca_withdrawal"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="cca_installment_company_rule" model="ir.rule">
+        <field name="name">cca.installment: multi-compañía</field>
+        <field name="model_id" ref="model_cca_installment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="cca_payment_company_rule" model="ir.rule">
+        <field name="name">cca.payment: multi-compañía</field>
+        <field name="model_id" ref="model_cca_payment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
 </odoo>
