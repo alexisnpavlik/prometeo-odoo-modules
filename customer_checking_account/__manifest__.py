@@ -37,6 +37,7 @@
         "views/menu_views.xml",
         "report/report_cca_statement.xml",
         "report/report_cca_statement_templates.xml",
+        "report/report_cca_payment_receipt.xml",
     ],
     "assets": {
         "web.assets_backend": [

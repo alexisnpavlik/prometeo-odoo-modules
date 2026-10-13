@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from dateutil.relativedelta import relativedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools import float_is_zero
@@ -175,3 +177,18 @@ class CcaInstallment(models.Model):
         candidates.mapped("account_id").invalidate_recordset(["overdue_balance"])
         _logger.info("Cron de vencidas: %s cuotas revisadas", len(candidates))
         return True
+
+    @api.model
+    def _cca_to_collect_domain(self, days=7):
+        """Cuotas para cobrar: impagas, de retiros vivos, vencidas o que vencen en `days` días."""
+        limit = fields.Date.context_today(self) + relativedelta(days=days)
+        return [
+            ("amount_residual", ">", 0),
+            ("withdrawal_id.state", "not in", ("draft", "cancel")),
+            ("date_due", "<=", limit),
+        ]
+
+    def action_register_payment(self):
+        """Botón Cobrar: abre el pago del cliente sugiriendo el saldo de esta cuota."""
+        self.ensure_one()
+        return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.amount_residual)

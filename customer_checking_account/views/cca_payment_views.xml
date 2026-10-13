@@ -23,6 +23,8 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_print_receipt" type="object" string="Imprimir comprobante"
+                            class="btn-primary" icon="fa-print" invisible="not id"/>
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="not id or state == 'cancel'"
                             confirm="¿Anular el pago? Se deshacen sus imputaciones."/>

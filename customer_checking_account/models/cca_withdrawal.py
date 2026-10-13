@@ -415,15 +415,7 @@ class CcaWithdrawal(models.Model):
     def _cca_after_confirm(self):
         """Imputa al retiro recién confirmado el saldo a favor de pagos anteriores."""
         self.ensure_one()
-        payments = self.env["cca.payment"].search(
-            [
-                ("account_id", "=", self.account_id.id),
-                ("state", "=", "posted"),
-                ("amount_unallocated", ">", 0),
-            ],
-            order="date asc, id asc",
-        )
-        payments._cca_allocate_fifo()
+        self.account_id._cca_apply_credit()
         return True
 
     def action_confirm(self):

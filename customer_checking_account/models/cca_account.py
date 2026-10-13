@@ -187,3 +187,16 @@ class CcaAccount(models.Model):
         """Abre un pago nuevo del cliente sugiriendo la deuda total."""
         self.ensure_one()
         return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.balance)
+
+    def _cca_apply_credit(self):
+        """Imputa por FIFO el saldo a favor de los pagos vigentes, del más viejo al más nuevo."""
+        payments = self.env["cca.payment"].search(
+            [
+                ("account_id", "in", self.ids),
+                ("state", "=", "posted"),
+                ("amount_unallocated", ">", 0),
+            ],
+            order="date asc, id asc",
+        )
+        payments._cca_allocate_fifo()
+        return True

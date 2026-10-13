@@ -4,17 +4,39 @@
         <field name="name">cca.installment.list</field>
         <field name="model">cca.installment</field>
         <field name="arch" type="xml">
-            <list create="0" edit="0" decoration-danger="state == 'overdue'">
-                <field name="date_due"/>
+            <list create="0" edit="0" decoration-danger="state == 'overdue'"
+                  default_order="date_due asc">
                 <field name="partner_id"/>
+                <field name="date_due"/>
                 <field name="withdrawal_id"/>
-                <field name="sequence" string="Nº"/>
-                <field name="amount" sum="Total"/>
-                <field name="amount_residual" sum="Saldo"/>
+                <field name="sequence" string="Cuota"/>
+                <field name="amount" optional="hide"/>
+                <field name="amount_residual" string="Debe" sum="Total"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="state" widget="badge" decoration-danger="state == 'overdue'"
                        decoration-warning="state == 'partial'" decoration-success="state == 'paid'"/>
+                <button name="action_register_payment" type="object" string="Cobrar"
+                        class="btn-primary btn-sm" icon="fa-money"
+                        invisible="amount_residual &lt;= 0"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_cca_installment_search" model="ir.ui.view">
+        <field name="name">cca.installment.search</field>
+        <field name="model">cca.installment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id" filter_domain="['|', ('partner_id', 'ilike', self), ('partner_id.vat', 'ilike', self)]"/>
+                <field name="withdrawal_id"/>
+                <filter name="to_collect" string="Vencidas y de esta semana"
+                        domain="[('date_due', '&lt;=', (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+                <filter name="overdue" string="Vencidas" domain="[('state', '=', 'overdue')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_partner" string="Cliente" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_due" string="Vencimiento" context="{'group_by': 'date_due:week'}"/>
+                </group>
+            </search>
         </field>
     </record>
 
@@ -41,9 +63,14 @@
     </record>
 
     <record id="action_cca_installment" model="ir.actions.act_window">
-        <field name="name">Cuotas por cobrar</field>
+        <field name="name">Para cobrar</field>
         <field name="res_model">cca.installment</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('amount_residual', '>', 0), ('withdrawal_id.state', 'not in', ('draft', 'cancel'))]</field>
+        <field name="context">{'search_default_to_collect': 1, 'search_default_group_partner': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nada para cobrar esta semana.</p>
+            <p>Sacá el filtro "Vencidas y de esta semana" para ver todas las cuotas pendientes.</p>
+        </field>
     </record>
 </odoo>

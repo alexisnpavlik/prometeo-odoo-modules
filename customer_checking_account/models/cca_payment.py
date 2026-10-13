@@ -238,4 +238,32 @@ class CcaPayment(models.Model):
             payment.allocation_ids.sudo().unlink()
             payment.state = "cancel"
             payment._message_log(body=_("Pago anulado por %s.", self.env.user.display_name))
+        # Las cuotas que liberó la anulación las cubre el saldo a favor de otros pagos.
+        self.mapped("account_id")._cca_apply_credit()
         return True
+
+    def action_print_receipt(self):
+        """Comprobante de pago en PDF para entregar al cliente.
+
+        config=False: el comprobante usa un layout propio, así que no hace falta que la
+        compañía tenga configurado el diseño de documentos (si no, Odoo abre ese asistente).
+        """
+        return self.env.ref(
+            "customer_checking_account.action_report_cca_payment_receipt"
+        ).report_action(self, config=False)
+
+    def _cca_receipt_lines(self):
+        """Filas del comprobante: retiro, cuota n/N, monto aplicado y saldo que le queda."""
+        self.ensure_one()
+        return [{
+            "withdrawal": allocation.withdrawal_id.name,
+            "installment": "%s/%s" % (
+                allocation.installment_id.sequence,
+                len(allocation.withdrawal_id.installment_ids),
+            ),
+            "date_due": allocation.installment_id.date_due,
+            "amount": allocation.amount,
+            "residual": allocation.installment_id.amount_residual,
+        } for allocation in self.allocation_ids.sorted(
+            lambda a: (a.installment_id.date_due, a.withdrawal_id.id, a.installment_id.sequence)
+        )]

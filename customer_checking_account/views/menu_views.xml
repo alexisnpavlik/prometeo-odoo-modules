@@ -17,8 +17,8 @@
               action="action_cca_payment" sequence="20"/>
     <menuitem id="menu_cca_account" name="Clientes" parent="menu_cca_root"
               action="action_cca_account" sequence="30"/>
-    <menuitem id="menu_cca_installment" name="Cuotas por cobrar" parent="menu_cca_root"
-              action="action_cca_installment" sequence="40"/>
+    <menuitem id="menu_cca_installment" name="Para cobrar" parent="menu_cca_root"
+              action="action_cca_installment" sequence="15"/>
     <menuitem id="menu_cca_settings" name="Ajustes" parent="menu_cca_root"
               action="action_cca_settings" sequence="90"/>
     <menuitem id="menu_cca_dashboard" name="Dashboard" parent="menu_cca_root"
