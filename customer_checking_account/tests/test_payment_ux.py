@@ -27,18 +27,14 @@ class TestPaymentUx(CcaCommon):
         self.assertEqual(payment.account_id, withdrawal.account_id)
         self.assertEqual(withdrawal.amount_residual, 60.0)
 
-    def test_form_shows_debt_and_quick_amounts(self):
-        """Elegido el cliente se ve la deuda, y los atajos completan el monto."""
+    def test_form_shows_debt(self):
+        """Elegido el cliente se ve su deuda total y lo vencido."""
         self._confirmed(qty=4, count=2)  # 2 cuotas de 100
         overdue = self._confirmed(qty=2, first_due=date(2026, 2, 1))  # 100 vencido
         form = Form(self.env["cca.payment"])
         form.partner_id = self.partner
         self.assertEqual(form.account_balance, 300.0)
         self.assertEqual(form.account_overdue_balance, 100.0)
-        form.quick_amount = "overdue"
-        self.assertEqual(form.amount, 100.0)
-        form.quick_amount = "all"
-        self.assertEqual(form.amount, 300.0)
         self.assertTrue(overdue)
 
     def test_preview_lists_installments_and_surplus(self):

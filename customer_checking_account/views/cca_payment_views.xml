@@ -55,10 +55,6 @@
                             <field name="amount_unallocated" string="Saldo a favor"/>
                         </group>
                     </group>
-                    <group invisible="id or not partner_id">
-                        <field name="quick_amount" widget="radio" options="{'horizontal': true}"
-                               string="Cuánto paga"/>
-                    </group>
                     <group>
                         <field name="amount" readonly="id" class="fs-3 fw-bold"
                                string="Monto"/>

@@ -75,13 +75,6 @@ class CcaPayment(models.Model):
     account_credit_balance = fields.Monetary(
         related="account_id.credit_balance", string="Saldo a favor previo", currency_field="currency_id"
     )
-    quick_amount = fields.Selection(
-        selection=[("custom", "Otro monto"), ("overdue", "Pagar vencido"), ("all", "Pagar todo")],
-        string="Monto rápido",
-        compute="_compute_quick_amount",
-        readonly=False,
-        help="Atajo: completa el monto con lo vencido o con toda la deuda.",
-    )
     allocation_preview = fields.Html(
         string="Qué cubre este pago",
         compute="_compute_allocation_preview",
@@ -103,19 +96,6 @@ class CcaPayment(models.Model):
             payment.amount_unallocated = (
                 max(payment.amount - allocated, 0.0) if payment.state == "posted" else 0.0
             )
-
-    def _compute_quick_amount(self):
-        """Arranca siempre en 'Otro monto'; el valor solo dispara el onchange."""
-        for payment in self:
-            payment.quick_amount = "custom"
-
-    @api.onchange("quick_amount")
-    def _onchange_quick_amount(self):
-        """Completa el monto con lo vencido o con la deuda total."""
-        if self.quick_amount == "overdue":
-            self.amount = self.account_overdue_balance
-        elif self.quick_amount == "all":
-            self.amount = self.account_balance
 
     @api.onchange("partner_id", "company_id")
     def _onchange_partner_id(self):
