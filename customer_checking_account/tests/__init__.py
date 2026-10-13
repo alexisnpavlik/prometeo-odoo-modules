@@ -6,3 +6,4 @@ from . import test_confirm
 from . import test_payment
 from . import test_partner
 from . import test_statement
+from . import test_dashboard_controller

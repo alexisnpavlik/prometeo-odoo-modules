@@ -23,4 +23,6 @@
               action="action_cca_settings" sequence="90"/>
     <menuitem id="menu_cca_statement" name="Estado de cuenta" parent="menu_cca_root"
               action="action_cca_statement_wizard" sequence="50"/>
+    <menuitem id="menu_cca_dashboard" name="Dashboard" parent="menu_cca_root"
+              action="action_cca_dashboard" sequence="5"/>
 </odoo>

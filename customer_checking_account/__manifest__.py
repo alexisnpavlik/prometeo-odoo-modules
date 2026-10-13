@@ -33,10 +33,18 @@
         "views/cca_installment_views.xml",
         "views/res_partner_views.xml",
         "views/res_config_settings_views.xml",
+        "views/dashboard_views.xml",
         "views/menu_views.xml",
         "report/report_cca_statement.xml",
         "report/report_cca_statement_templates.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "customer_checking_account/static/src/css/dashboard.css",
+            "customer_checking_account/static/src/js/dashboard.js",
+            "customer_checking_account/static/src/xml/dashboard.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,
