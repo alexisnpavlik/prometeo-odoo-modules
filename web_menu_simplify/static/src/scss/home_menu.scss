@@ -1,0 +1,99 @@
+// Botón de la barra superior que abre la pantalla de apps.
+.o_simplify_home_toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--o-navbar-height, 46px) + 0.75rem);
+    height: var(--o-navbar-height, 46px);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: $o-navbar-entry-color;
+    font-size: 1.6rem;
+    line-height: 1;
+    transition: background-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible,
+    &.o_simplify_home_toggle_open {
+        background-color: rgba(255, 255, 255, 0.18);
+        color: $o-navbar-entry-color--hover;
+        outline: none;
+    }
+}
+
+// Pantalla de apps a pantalla completa, debajo de la barra superior.
+.o_simplify_home {
+    position: fixed;
+    top: var(--o-navbar-height, 46px);
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 1050;
+    overflow-y: auto;
+    background-color: $o-view-background-color;
+    padding: 3rem 1.5rem;
+}
+
+.o_simplify_home_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 2rem 1.5rem;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.o_simplify_home_app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 0.5rem;
+    border-radius: 1rem;
+    color: $body-color;
+    text-decoration: none;
+    font-size: 1.25rem;
+    text-align: center;
+
+    img {
+        width: 96px;
+        height: 96px;
+        border-radius: 1.25rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    &:hover,
+    &:focus {
+        background-color: rgba($o-action, 0.08);
+        color: $body-color;
+    }
+}
+
+.o_simplify_home_app_current {
+    background-color: rgba($o-action, 0.12);
+}
+
+// Celular: dos o tres columnas y menos margen.
+@include media-breakpoint-down(md) {
+    .o_simplify_home {
+        padding: 1.5rem 1rem;
+    }
+
+    .o_simplify_home_grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 1.25rem 0.75rem;
+    }
+
+    .o_simplify_home_app {
+        font-size: 1.1rem;
+
+        img {
+            width: 72px;
+            height: 72px;
+        }
+    }
+
+    .o_simplify_home_toggle {
+        width: var(--o-navbar-height, 46px);
+    }
+}

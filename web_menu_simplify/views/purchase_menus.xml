@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Compras simplificado: enlaces directos en la barra. Se ocultan si la opción está apagada
+         (MENU_OPTIONS_WHEN_OFF), y con la opción activa se oculta el desplegable Órdenes. -->
+    <menuitem id="menu_purchase_orders_direct"
+              name="Órdenes de compra"
+              parent="purchase.menu_purchase_root"
+              action="purchase.purchase_form_action"
+              sequence="0"/>
+    <menuitem id="menu_purchase_vendors_direct"
+              name="Proveedores"
+              parent="purchase.menu_purchase_root"
+              action="account.res_partner_action_supplier"
+              sequence="2"/>
+</odoo>

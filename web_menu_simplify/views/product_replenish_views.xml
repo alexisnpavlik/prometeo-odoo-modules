@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_replenish_route_locked" model="ir.ui.view">
+        <field name="name">product.replenish.form.route.locked</field>
+        <field name="model">product.replenish</field>
+        <field name="inherit_id" ref="stock.view_product_replenish"/>
+        <field name="arch" type="xml">
+            <field name="route_id" position="before">
+                <field name="can_edit_route" invisible="1"/>
+            </field>
+            <field name="route_id" position="attributes">
+                <attribute name="readonly">not can_edit_route</attribute>
+                <attribute name="force_save">1</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- Proveedor como contacto con creación rápida. Con la opción apagada vuelve el
+         campo nativo (línea de precio); cada uno tiene su etiqueta y se muestra uno solo. -->
+    <record id="view_product_replenish_vendor_partner" model="ir.ui.view">
+        <field name="name">product.replenish.form.vendor.partner</field>
+        <field name="model">product.replenish</field>
+        <field name="inherit_id" ref="purchase_stock.view_product_replenish_form_inherit_stock"/>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='supplier_id']" position="attributes">
+                <attribute name="invisible">not show_vendor or simplify_vendor_partner</attribute>
+            </xpath>
+            <field name="supplier_id" position="attributes">
+                <attribute name="invisible">not show_vendor or simplify_vendor_partner</attribute>
+                <attribute name="required">show_vendor and not simplify_vendor_partner</attribute>
+            </field>
+            <xpath expr="//div[field[@name='supplier_id']]" position="after">
+                <label for="vendor_partner_id" invisible="not show_vendor or not simplify_vendor_partner"/>
+                <div class="o_row">
+                    <field name="simplify_vendor_partner" invisible="1"/>
+                    <field name="vendor_partner_id"
+                           invisible="not show_vendor or not simplify_vendor_partner"
+                           required="show_vendor and simplify_vendor_partner"
+                           options="{'no_open': True}"
+                           context="{'res_partner_search_mode': 'supplier', 'default_supplier_rank': 1}"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

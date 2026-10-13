@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Se ejecuta en cada instalación/actualización; solo toca nombres que siguen en inglés. -->
+    <function model="stock.location" name="_simplify_translate_location_names"/>
+</odoo>

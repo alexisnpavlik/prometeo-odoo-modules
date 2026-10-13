@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acceso directo a Categorías de producto en la barra de Inventario, junto a Productos (en Odoo solo está en Configuración). -->
+    <menuitem id="menu_stock_product_categories"
+              name="Categorías"
+              parent="stock.menu_stock_root"
+              action="product.product_category_action_form"
+              sequence="5"/>
+</odoo>

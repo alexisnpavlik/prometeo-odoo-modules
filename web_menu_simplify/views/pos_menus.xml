@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acceso a facturas de cliente desde Punto de venta, para poder ocultar la app Facturación. -->
+    <menuitem id="menu_pos_customer_invoices"
+              name="Facturas"
+              parent="point_of_sale.menu_point_of_sale"
+              action="account.action_move_out_invoice_type"
+              sequence="20"/>
+</odoo>

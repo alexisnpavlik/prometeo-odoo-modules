@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="purchase_order_form_confirm_receive" model="ir.ui.view">
+        <field name="name">purchase.order.form.confirm.receive</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <field name="simplify_confirm_receive" invisible="1"/>
+                <button name="action_simplify_confirm_receive"
+                        type="object"
+                        string="Confirmar e ingresar"
+                        class="btn-primary"
+                        data-hotkey="v"
+                        invisible="not simplify_confirm_receive or state not in ('draft', 'sent')"/>
+                <field name="simplify_print" invisible="1"/>
+                <button name="%(purchase.action_report_purchase_order)d"
+                        type="action"
+                        string="Imprimir"
+                        icon="fa-print"
+                        invisible="not simplify_print or state not in ('purchase', 'done')"/>
+                <field name="simplify_can_return" invisible="1"/>
+                <button name="action_simplify_return"
+                        type="object"
+                        string="Devolver"
+                        icon="fa-undo"
+                        invisible="not simplify_can_return"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

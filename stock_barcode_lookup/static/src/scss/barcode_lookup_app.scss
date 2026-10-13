@@ -1,0 +1,93 @@
+.o_barcode_lookup {
+    height: 100%;
+    overflow-y: auto;
+    background-color: $o-view-background-color;
+}
+
+.o_barcode_lookup_body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 2.5rem 1rem;
+}
+
+.o_barcode_lookup_scan {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 320px;
+    padding: 2rem 1rem;
+    border-radius: 1.25rem;
+    font-size: 1.6rem;
+
+    .fa {
+        font-size: 4rem;
+    }
+}
+
+.o_barcode_lookup_manual {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 420px;
+
+    .form-control {
+        font-size: 1.15rem;
+    }
+}
+
+.o_barcode_lookup_loading {
+    font-size: 1.2rem;
+}
+
+.o_barcode_lookup_card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1.5rem;
+    border: 1px solid $border-color;
+    border-radius: 1rem;
+    text-align: center;
+    font-size: 1.15rem;
+
+    img {
+        max-width: 200px;
+        max-height: 200px;
+        object-fit: contain;
+    }
+
+    h2 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+}
+
+.o_barcode_lookup_price {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.o_barcode_lookup_info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.o_barcode_lookup_actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+
+    .btn {
+        padding: 0.6rem 1.2rem;
+        font-size: 1.05rem;
+    }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.FileUploader" t-inherit-mode="extension">
+        <xpath expr="//input[@type='file']" position="attributes">
+            <attribute name="t-att-capture">props.capture</attribute>
+        </xpath>
+    </t>
+
+    <t t-inherit="web.ImageField" t-inherit-mode="extension">
+        <xpath expr="//FileUploader" position="after">
+            <FileUploader t-if="isMobile"
+                acceptedFileExtensions="'image/*'"
+                capture="'environment'"
+                t-key="'camera_' + props.record.resId"
+                onUploaded.bind="onFileUploaded"
+            >
+                <t t-set-slot="toggler">
+                    <button
+                        class="o_camera_file_button btn btn-light border-0 rounded-circle m-1 p-1"
+                        data-tooltip="Sacar foto"
+                        aria-label="Sacar foto">
+                        <i class="fa fa-camera fa-fw"/>
+                    </button>
+                </t>
+            </FileUploader>
+        </xpath>
+    </t>
+</templates>

@@ -9,7 +9,8 @@ class IrHttp(models.AbstractModel):
     _inherit = "ir.http"
 
     def session_info(self):
-        """Le indica al cliente web si debe quitar chat y actividades de la barra."""
+        """Le indica al cliente web las opciones que resuelve el frontend."""
         result = super().session_info()
         result["web_menu_simplify_hide_systray"] = is_option_active(self.env, "hide_systray")
+        result["web_menu_simplify_fullscreen_apps"] = is_option_active(self.env, "fullscreen_apps")
         return result

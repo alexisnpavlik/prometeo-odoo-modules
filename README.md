@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (65 Módulos)](#-catálogo-completo-de-módulos-65-módulos)
+- [📂 Catálogo Completo de Módulos (68 Módulos)](#-catálogo-completo-de-módulos-68-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -36,12 +36,12 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 * 💳 **Cuentas Corrientes & Finanzas**: Módulo exclusivo de gestión informal de cuentas corrientes (retiros de mercancía con abonos parciales, límites de crédito y estados de cuenta imprimibles), además de transferencias internas entre diarios y cheques LATAM.
 * 🏢 **Gestión Multi-Compañía Segura**: Herramientas de aislamiento visual y lógico (selectores de compañía seguros, colores dinámicos por empresa y generación automática de órdenes/facturas/remitos espejo inter-compañía).
 * 📊 **KPIs y Métricas OWL**: Tableros analíticos en tiempo real con Chart.js para Inventario, POS, Facturación, Asesores de Venta y Listas de Precios.
-* 🧭 **Interfaz Simplificada para Kiosco**: Oculta Conversaciones, menús avanzados (contabilidad, aprovisionamiento, variantes, atributos, listas de precios) y el chat de la barra superior, con un interruptor por opción en Ajustes. Punto de venta abre primero, directo al tablero de cajas.
+* 🧭 **Interfaz Simplificada para Kiosco**: Oculta apps y menús avanzados con un interruptor por opción en Ajustes, menú de apps a pantalla completa, botones Guardar/Descartar grandes con texto y foto de producto directo desde la cámara del teléfono. Punto de venta abre primero, directo al tablero de cajas.
 * 🔍 **Trazabilidad y Monitoreo**: Historial de cambios en productos en el chatter, registro de motivos de borrado en POS y captura automática de excepciones frontend en Sentry.
 
 ---
 
-## 📂 Catálogo Completo de Módulos (65 Módulos)
+## 📂 Catálogo Completo de Módulos (68 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -151,7 +151,10 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la barra superior de Odoo dinámicamente según la compañía activa. |
-| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Oculta Conversaciones, menús avanzados, botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Pensado para kiosco. |
+| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Modo kiosco: oculta apps (Ventas, Compras, Facturación, Conversaciones), menús avanzados, campos y botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Menú de apps a pantalla completa con íconos grandes, Inventario abre en Productos y acceso a Facturas desde Punto de venta. |
+| **Foto con cámara** | [`web_image_camera`](./web_image_camera) | En el teléfono, los campos de imagen suman un botón que abre directo la cámara trasera (funciona sin HTTPS). |
+| **Botones Guardar y Descartar grandes** | [`web_form_save_buttons`](./web_form_save_buttons) | Reemplaza los íconos de guardar/descartar del formulario por botones grandes con texto; compactos en el teléfono. |
+| **Marca Prometeo ERP** | [`prometeo_branding`](./prometeo_branding) | Reemplaza la marca Odoo por Prometeo ERP en títulos, diálogos, logos y Punto de venta. |
 | **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a modelos personalizados. |
 | **Bloqueo de Contactos y Productos de Sistema** | [`partner_protected_lock`](./partner_protected_lock) | Impide editar, archivar o borrar los contactos de las empresas propias, Consumidor Final Anónimo y los productos de Descuento y Recargo del POS. Solo administradores. |
 | **Aviso de Empresa Interna** | [`partner_internal_company_badge`](./partner_internal_company_badge) | Banner naranja en ventas, transferencias y facturas cuando el contacto es una empresa propia del grupo. |
