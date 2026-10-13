@@ -23,14 +23,49 @@
                         <setting help="App Ventas (cotizaciones y pedidos). Se vende por Punto de venta.">
                             <field name="simplify_hide_sales"/>
                         </setting>
-                        <setting help="App Compras (solicitudes de cotización y órdenes de compra).">
-                            <field name="simplify_hide_purchase"/>
-                        </setting>
                         <setting help="Íconos de chat, actividades y llamadas arriba a la derecha, y las ventanas de chat flotantes.">
                             <field name="simplify_hide_systray"/>
                         </setting>
+                        <setting help="Queda nombre, CUIT, dirección, teléfono, correo, Cuenta corriente y Datos Fiscales. Se ocultan Puesto, Sitio web, Título, Idioma, Etiquetas y las pestañas que no se usan.">
+                            <field name="simplify_partner_form_simple"/>
+                        </setting>
                         <setting help="El botón de apps abre una pantalla completa con íconos grandes, en lugar de la lista desplegable.">
                             <field name="simplify_fullscreen_apps"/>
+                        </setting>
+                        <setting help="Si un menú de la barra queda con una sola opción visible, se abre directo en lugar de desplegar una lista.">
+                            <field name="simplify_flatten_single_menus"/>
+                        </setting>
+                        <setting help="Punto de venta va primero en el menú de apps y es lo que se abre al iniciar sesión.">
+                            <field name="simplify_pos_first"/>
+                        </setting>
+                    </block>
+                    <block title="Compras" name="simplify_purchase">
+                        <setting help="La barra de Compras muestra solo Órdenes de compra y Proveedores, sin el desplegable Órdenes ni las Solicitudes de cotización.">
+                            <field name="simplify_purchase_simple"/>
+                        </setting>
+                        <setting help="Con mercadería recibida, la orden muestra Devolver: abre la devolución y la valida al confirmar.">
+                            <field name="simplify_purchase_return_button"/>
+                        </setting>
+                        <setting help="En la orden de compra, el botón Confirmar e ingresar confirma la compra y recibe la mercadería: el stock sube en el momento.">
+                            <field name="simplify_purchase_confirm_receive"/>
+                        </setting>
+                        <setting help="En la orden de compra: Referencia de proveedor, Moneda, Entrega esperada, Fecha límite, Solicitar confirmación, la pestaña Otra información y Agregar sección / nota / Catálogo en las líneas.">
+                            <field name="simplify_hide_purchase_order_fields"/>
+                        </setting>
+                        <setting help="Botones Enviar/Reenviar por correo electrónico e Imprimir solicitudes de cotización de la orden de compra. En su lugar queda un único botón Imprimir.">
+                            <field name="simplify_hide_purchase_order_send_print"/>
+                        </setting>
+                        <setting help="Solo oculta la columna: los impuestos se siguen calculando con los del producto.">
+                            <field name="simplify_hide_purchase_order_taxes"/>
+                        </setting>
+                        <setting help="La factura del proveedor no se carga desde la orden de compra.">
+                            <field name="simplify_hide_purchase_order_invoice"/>
+                        </setting>
+                        <setting help="El título dice siempre Orden de compra y no se muestra la barra Solicitud de cotización → enviada → Orden de compra.">
+                            <field name="simplify_purchase_order_no_rfq"/>
+                        </setting>
+                        <setting help="Sin Cancelar (en borrador ya está Descartar), Bloquear, Desbloquear, Confirmar la fecha de recepción ni el botón Recepción. Ya confirmada, la orden muestra solo Devolver e Imprimir.">
+                            <field name="simplify_purchase_confirmed_only_return"/>
                         </setting>
                     </block>
                     <block title="Punto de venta" name="simplify_pos">
@@ -48,6 +83,9 @@
                         </setting>
                         <setting>
                             <field name="simplify_hide_pos_note_models"/>
+                        </setting>
+                        <setting help="Punto de venta > Órdenes > Facturas, para ver las facturas de cliente aunque la app Facturación esté oculta.">
+                            <field name="simplify_pos_invoices_menu"/>
                         </setting>
                     </block>
                     <block title="Facturación" name="simplify_invoicing">
@@ -79,6 +117,21 @@
                         </setting>
                         <setting help="Incluye Traslados, Ajustes y Aprovisionamiento.">
                             <field name="simplify_hide_stock_operations"/>
+                        </setting>
+                        <setting help="Botón del encabezado de la ficha de producto que ajusta el stock a mano.">
+                            <field name="simplify_hide_update_quantity"/>
+                        </setting>
+                        <setting help="Al confirmar Reabastecer se crea la compra, se confirma y se recibe: el stock sube en el momento. Apagado, queda un pedido en borrador como en Odoo.">
+                            <field name="simplify_replenish_immediate"/>
+                        </setting>
+                        <setting help="Propone la ruta Comprar y no deja cambiarla (solo el administrador).">
+                            <field name="simplify_replenish_buy_locked"/>
+                        </setting>
+                        <setting help="El campo Proveedor del asistente busca contactos y permite crear uno nuevo; al confirmar se carga su precio en el producto.">
+                            <field name="simplify_replenish_vendor_partner"/>
+                        </setting>
+                        <setting help="Inventario > Categorías, junto a Productos.">
+                            <field name="simplify_stock_categories_menu"/>
                         </setting>
                         <setting help="Incluye Reabastecimiento y el planificador.">
                             <field name="simplify_hide_stock_procurement"/>
@@ -117,6 +170,12 @@
                         </setting>
                         <setting help="En la ficha: las casillas Ventas, Compras y Punto de venta debajo del nombre.">
                             <field name="simplify_hide_product_sale_flags"/>
+                        </setting>
+                        <setting help="Campo Impuestos de compra de la ficha de producto.">
+                            <field name="simplify_hide_purchase_taxes"/>
+                        </setting>
+                        <setting help="Letra más grande en la ficha y, con el tipo de producto oculto, los precios a la izquierda y el resto de los datos a la derecha.">
+                            <field name="simplify_product_form_comfort"/>
                         </setting>
                     </block>
                 </app>

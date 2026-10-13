@@ -1,0 +1,15 @@
+// Ficha de producto más legible (la clase la pone comfort_product_form).
+.o_simplify_product_form .o_form_sheet {
+    font-size: 1.1em;
+
+    .o_form_label,
+    .o_field_widget,
+    .o_input {
+        font-size: inherit;
+    }
+
+    .o_inner_group .o_wrap_label,
+    .o_inner_group .o_cell {
+        padding-block: 0.35rem;
+    }
+}

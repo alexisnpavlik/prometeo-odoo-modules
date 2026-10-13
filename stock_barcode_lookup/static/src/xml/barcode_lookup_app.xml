@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="stock_barcode_lookup.App">
+        <div class="o_barcode_lookup o_action">
+            <div class="o_barcode_lookup_body">
+                <button class="o_barcode_lookup_scan btn btn-primary" t-on-click="onScan" t-att-disabled="state.loading">
+                    <i class="fa fa-barcode"/>
+                    <span>Escanear</span>
+                </button>
+                <input type="file" accept="image/*" capture="environment" class="d-none"
+                       t-ref="photoInput" t-on-change="onPhoto"/>
+
+                <form class="o_barcode_lookup_manual" t-on-submit="onManualSubmit">
+                    <input type="text" class="form-control" inputmode="numeric"
+                           placeholder="O escribí el código"
+                           t-model="state.code"/>
+                    <button type="submit" class="btn btn-secondary">Buscar</button>
+                </form>
+
+                <div t-if="state.loading" class="o_barcode_lookup_loading">
+                    <i class="fa fa-spinner fa-spin"/> Buscando...
+                </div>
+
+                <t t-elif="state.result">
+                    <div t-if="state.result.found" class="o_barcode_lookup_card">
+                        <img t-att-src="state.result.image_url" alt=""/>
+                        <div class="o_barcode_lookup_info">
+                            <h2 t-esc="state.result.name"/>
+                            <div class="o_barcode_lookup_price" t-esc="state.result.price"/>
+                            <div>Stock: <strong t-esc="state.result.qty_available"/> <t t-esc="state.result.uom"/></div>
+                            <div t-if="state.result.vendor">Proveedor: <t t-esc="state.result.vendor"/></div>
+                            <div class="text-muted">Código: <t t-esc="state.result.code"/></div>
+                        </div>
+                        <div class="o_barcode_lookup_actions">
+                            <button class="btn btn-primary" t-on-click="openProduct">Abrir ficha</button>
+                            <button t-if="state.result.can_replenish" class="btn btn-secondary" t-on-click="replenish">Reabastecer</button>
+                            <button class="btn btn-outline-secondary" t-on-click="reset">Escanear otro</button>
+                        </div>
+                    </div>
+                    <div t-else="" class="o_barcode_lookup_card o_barcode_lookup_missing">
+                        <h2>No hay ningún producto con el código <t t-esc="state.result.code"/></h2>
+                        <div class="o_barcode_lookup_actions">
+                            <button class="btn btn-primary" t-on-click="createProduct">Crear producto con este código</button>
+                            <button class="btn btn-outline-secondary" t-on-click="reset">Escanear otro</button>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

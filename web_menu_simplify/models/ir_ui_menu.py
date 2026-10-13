@@ -2,7 +2,7 @@
 
 from odoo import api, models
 
-from .simplify_options import APP_START_OPTIONS, MENU_OPTIONS, is_option_active
+from .simplify_options import APP_START_OPTIONS, MENU_OPTIONS, MENU_OPTIONS_WHEN_OFF, is_option_active
 
 # Apps que van primero en el menú, en este orden; la primera es la que se abre
 # al iniciar sesión.
@@ -49,6 +49,12 @@ class IrUiMenu(models.Model):
             if is_option_active(self.env, key)
             for xmlid in xmlids
         ]
+        hidden_xmlids += [
+            xmlid
+            for key, xmlids in MENU_OPTIONS_WHEN_OFF.items()
+            if not is_option_active(self.env, key)
+            for xmlid in xmlids
+        ]
         if not is_admin:
             hidden_xmlids += ADMIN_ONLY_MENU_XMLIDS
         return visible - self._menu_ids_from_xmlids(hidden_xmlids)
@@ -57,6 +63,8 @@ class IrUiMenu(models.Model):
     def load_menus(self, debug):
         """Pone primero las apps de FIRST_MENU_XMLIDS (el webclient abre la primera) y aplica las acciones de inicio."""
         menus = super().load_menus(debug)
+        if not is_option_active(self.env, "pos_first"):
+            return self._flatten_single_child_menus(self._apply_app_start_actions(dict(menus)))
         root = menus["root"]
         first_ids = [
             self.env["ir.model.data"]._xmlid_to_res_id(xmlid, raise_if_not_found=False)
@@ -66,7 +74,8 @@ class IrUiMenu(models.Model):
         others = [menu_id for menu_id in root["children"] if menu_id not in first_ids]
         # Copia: el resultado de super() puede venir de la caché.
         menus = dict(menus, root=dict(root, children=first_ids + others))
-        return self._apply_app_start_actions(menus)
+        menus = self._apply_app_start_actions(menus)
+        return self._flatten_single_child_menus(menus)
 
     def _apply_app_start_actions(self, menus):
         """Hace que las apps de las opciones activadas abran en la acción configurada."""
@@ -79,4 +88,21 @@ class IrUiMenu(models.Model):
                 action = self.env.ref(action_xmlid, raise_if_not_found=False)
                 if app_id in menus and action:
                     menus[app_id] = dict(menus[app_id], action="%s,%s" % (action._name, action.id))
+        return menus
+
+    def _flatten_single_child_menus(self, menus):
+        """Convierte en enlace directo las carpetas de la barra que quedan con una sola opción."""
+        if not is_option_active(self.env, "flatten_single_menus"):
+            return menus
+        app_ids = set(menus["root"]["children"])
+        for menu_id, menu in list(menus.items()):
+            if menu_id == "root" or menu_id in app_ids or menu.get("action"):
+                continue
+            children = menu.get("children") or []
+            if len(children) != 1:
+                continue
+            child = menus.get(children[0])
+            if not child or not child.get("action") or child.get("children"):
+                continue
+            menus[menu_id] = dict(menu, action=child["action"], children=[])
         return menus
