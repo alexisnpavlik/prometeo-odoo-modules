@@ -26,6 +26,29 @@
                         icon="fa-undo"
                         invisible="not simplify_can_return"/>
             </xpath>
+            <!-- En el teléfono Odoo manda los botones del encabezado al menú del engranaje:
+                 esta barra los deja a la vista. En pantallas medianas y grandes no se muestra. -->
+            <xpath expr="//sheet/div[hasclass('oe_title')]" position="before">
+                <div class="o_simplify_mobile_actions d-md-none">
+                    <button name="action_simplify_confirm_receive"
+                            type="object"
+                            string="Confirmar e ingresar"
+                            class="btn btn-primary"
+                            invisible="not simplify_confirm_receive or state not in ('draft', 'sent')"/>
+                    <button name="%(purchase.action_report_purchase_order)d"
+                            type="action"
+                            string="Imprimir"
+                            icon="fa-print"
+                            class="btn btn-secondary"
+                            invisible="not simplify_print or state not in ('purchase', 'done')"/>
+                    <button name="action_simplify_return"
+                            type="object"
+                            string="Devolver"
+                            icon="fa-undo"
+                            class="btn btn-secondary"
+                            invisible="not simplify_can_return"/>
+                </div>
+            </xpath>
         </field>
     </record>
 </odoo>

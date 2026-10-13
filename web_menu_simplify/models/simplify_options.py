@@ -161,6 +161,12 @@ VIEW_OPTIONS = {
     },
     "hide_pricelists": {"form": ("//button[@name='open_pricelist_rules']",)},
     "hide_product_documents": {"form": ("//button[@name='action_open_documents']",)},
+    "hide_product_forecast": {
+        "form": (
+            "//div[@name='button_box']//button[@name='action_product_tmpl_forecast_report']",
+            "//div[@name='button_box']//button[@name='action_product_forecast_report']",
+        ),
+    },
     "hide_reordering_rules": {
         "form": ("//button[@name='action_view_orderpoints']",),
         "list": ("//button[@name='action_view_orderpoints']",),

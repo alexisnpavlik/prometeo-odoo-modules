@@ -66,6 +66,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_attributes = fields.Boolean("Ocultar Atributos")
     simplify_hide_pricelists = fields.Boolean("Ocultar Listas de precios")
     simplify_hide_product_documents = fields.Boolean("Ocultar Documentos")
+    simplify_hide_product_forecast = fields.Boolean("Ocultar Pronosticado")
     simplify_hide_reordering_rules = fields.Boolean("Ocultar Reglas de reordenamiento")
     simplify_hide_product_type_fields = fields.Boolean("Ocultar tipo de producto, facturación e inventario")
     simplify_hide_product_sale_flags = fields.Boolean("Ocultar casillas Ventas, Compras y Punto de venta")
