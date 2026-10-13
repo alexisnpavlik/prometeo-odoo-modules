@@ -14,7 +14,7 @@
     <menuitem id="menu_cca_withdrawal" name="Retiros" parent="menu_cca_root"
               action="action_cca_withdrawal" sequence="10"/>
     <menuitem id="menu_cca_payment" name="Pagos" parent="menu_cca_root"
-              action="action_cca_payment" sequence="20"/>
+              action="action_cca_payment" sequence="12"/>
     <menuitem id="menu_cca_account" name="Clientes" parent="menu_cca_root"
               action="action_cca_account" sequence="30"/>
     <menuitem id="menu_cca_installment" name="Para cobrar" parent="menu_cca_root"
