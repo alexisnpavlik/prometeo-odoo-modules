@@ -19,4 +19,18 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Alta de cliente desde un retiro: el documento (DNI/CUIT) es obligatorio.
+         Solo con el contexto cca_require_vat, para no exigirlo en el resto de Odoo. -->
+    <record id="view_partner_form_cca_require_vat" model="ir.ui.view">
+        <field name="name">res.partner.form.cca.require.vat</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='vat']" position="attributes">
+                <attribute name="required">context.get('cca_require_vat')</attribute>
+            </xpath>
+        </field>
+    </record>
 </odoo>
