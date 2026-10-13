@@ -31,6 +31,13 @@
                             class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_register_payment" type="object" string="Registrar pago"
                             class="btn-primary" invisible="state not in ('pending', 'partial')"/>
+                    <button name="action_edit" type="object" string="Editar" icon="fa-pencil"
+                            invisible="state != 'pending'"
+                            confirm="El retiro vuelve a borrador: se devuelve el stock y al confirmar se vuelve a descontar. ¿Seguir?"/>
+                    <button name="action_edit" type="object" string="Editar vencimientos" icon="fa-pencil"
+                            invisible="state not in ('partial', 'paid') or edit_due_dates"/>
+                    <button name="action_stop_edit" type="object" string="Terminar edición"
+                            invisible="not edit_due_dates"/>
                     <!-- Solo sin pagos imputados: 'pending' es confirmado sin ninguna imputación. -->
                     <button name="action_cancel" type="object" string="Devolver"
                             invisible="state != 'pending'"
@@ -94,13 +101,17 @@
                                 </group>
                             </group>
                             <separator string="Cuotas"/>
-                            <field name="installment_ids" readonly="1">
-                                <list>
-                                    <field name="sequence" string="Nº"/>
+                            <div class="alert alert-info" role="status" invisible="not edit_due_dates">
+                                Retiro con pagos: solo podés cambiar los vencimientos. Guardá para terminar.
+                            </div>
+                            <field name="edit_due_dates" invisible="1"/>
+                            <field name="installment_ids" readonly="not edit_due_dates">
+                                <list editable="bottom" create="0" delete="0">
+                                    <field name="sequence" string="Nº" readonly="1"/>
                                     <field name="date_due"/>
-                                    <field name="amount" sum="Total"/>
-                                    <field name="amount_residual" column_invisible="parent.state == 'draft'"/>
-                                    <field name="state" widget="badge" column_invisible="parent.state == 'draft'"
+                                    <field name="amount" sum="Total" readonly="1"/>
+                                    <field name="amount_residual" column_invisible="parent.state == 'draft'" readonly="1"/>
+                                    <field name="state" widget="badge" column_invisible="parent.state == 'draft'" readonly="1"
                                            decoration-danger="state == 'overdue'"
                                            decoration-success="state == 'paid'"
                                            decoration-warning="state == 'partial'"/>

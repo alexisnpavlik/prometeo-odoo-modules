@@ -4,7 +4,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
@@ -177,6 +177,16 @@ class CcaInstallment(models.Model):
         candidates.mapped("account_id").invalidate_recordset(["overdue_balance"])
         _logger.info("Cron de vencidas: %s cuotas revisadas", len(candidates))
         return True
+
+    def write(self, vals):
+        """En retiros confirmados, desde la pantalla solo se puede mover el vencimiento."""
+        if set(vals) - {"date_due"} and not self.env.context.get("cca_skip_total_check") and any(
+            installment.withdrawal_id.is_confirmed for installment in self
+        ):
+            raise UserError(_(
+                "En un retiro confirmado solo se pueden cambiar los vencimientos de las cuotas."
+            ))
+        return super().write(vals)
 
     @api.model
     def _cca_to_collect_domain(self, days=7):

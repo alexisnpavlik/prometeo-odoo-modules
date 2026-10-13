@@ -105,6 +105,12 @@ class CcaWithdrawal(models.Model):
         string="Vencido", compute="_compute_is_overdue", store=True, index=True
     )
     picking_id = fields.Many2one("stock.picking", string="Albarán", readonly=True, copy=False)
+    edit_due_dates = fields.Boolean(
+        string="Editando vencimientos",
+        copy=False,
+        help="Lo levanta el botón Editar en retiros con pagos: habilita solo los vencimientos. "
+             "Se baja solo al guardar.",
+    )
     return_picking_id = fields.Many2one(
         "stock.picking", string="Devolución", readonly=True, copy=False
     )
@@ -268,6 +274,9 @@ class CcaWithdrawal(models.Model):
             raise UserError(_("No se puede cambiar la financiación de un retiro confirmado."))
         if not any(w.is_confirmed for w in self):
             vals.pop("installment_ids", None)
+        elif "installment_ids" in vals and "edit_due_dates" not in vals:
+            # Guardar los vencimientos editados cierra el modo edición.
+            vals["edit_due_dates"] = False
         if {"partner_id", "company_id"} & set(vals):
             if any(w.is_confirmed for w in self):
                 raise UserError(_("No se puede cambiar el cliente ni la compañía de un retiro confirmado."))
@@ -463,6 +472,35 @@ class CcaWithdrawal(models.Model):
             withdrawal.installment_ids.sudo().unlink()
             withdrawal.is_cancelled = True
             withdrawal._message_log(body=_("Retiro cancelado por %s.", self.env.user.display_name))
+        return True
+
+    def action_edit(self):
+        """Editar un retiro confirmado.
+
+        Sin pagos imputados vuelve a borrador (devuelve el stock y regenera las cuotas
+        como vista previa) para poder cambiar todo. Con pagos solo habilita los
+        vencimientos: cambiar productos o montos dejaría imputaciones sin respaldo.
+        """
+        for withdrawal in self:
+            if withdrawal.state not in ("pending", "partial", "paid"):
+                raise UserError(_("Solo se puede editar un retiro confirmado."))
+            if withdrawal._cca_posted_allocations():
+                withdrawal.edit_due_dates = True
+                continue
+            if withdrawal.picking_id and withdrawal.picking_id.state == "done":
+                withdrawal._cca_return_picking()
+            withdrawal.installment_ids.sudo().unlink()
+            withdrawal.write({"is_confirmed": False, "picking_id": False, "edit_due_dates": False})
+            withdrawal._cca_regenerate_installments()
+            withdrawal._message_log(body=_(
+                "Retiro reabierto para editar por %s. El stock se devolvió y se vuelve a "
+                "descontar al confirmar.", self.env.user.display_name,
+            ))
+        return True
+
+    def action_stop_edit(self):
+        """Cierra el modo de edición de vencimientos sin cambios."""
+        self.write({"edit_due_dates": False})
         return True
 
     def action_draft(self):
