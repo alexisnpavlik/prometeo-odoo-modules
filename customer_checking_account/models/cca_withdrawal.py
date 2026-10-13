@@ -170,6 +170,17 @@ class CcaWithdrawal(models.Model):
             if withdrawal.installment_count < 1:
                 raise ValidationError(_("La cantidad de cuotas debe ser al menos 1."))
 
+    @api.constrains("account_id", "partner_id", "company_id")
+    def _check_account_matches(self):
+        """La cuenta tiene que ser la del cliente en la compañía del retiro."""
+        for withdrawal in self:
+            account = withdrawal.account_id
+            if account.partner_id != withdrawal.partner_id or account.company_id != withdrawal.company_id:
+                raise ValidationError(_(
+                    "La cuenta corriente del retiro %s no corresponde a su cliente o compañía.",
+                    withdrawal.name,
+                ))
+
     def _cca_due_date(self, index):
         """Vencimiento de la cuota `index` (base 0) según la frecuencia."""
         self.ensure_one()
@@ -257,6 +268,19 @@ class CcaWithdrawal(models.Model):
             raise UserError(_("No se puede cambiar la financiación de un retiro confirmado."))
         if not any(w.is_confirmed for w in self):
             vals.pop("installment_ids", None)
+        if {"partner_id", "company_id"} & set(vals):
+            if any(w.is_confirmed for w in self):
+                raise UserError(_("No se puede cambiar el cliente ni la compañía de un retiro confirmado."))
+            res = True
+            # La cuenta es readonly y el cliente web no la manda: se resuelve acá por retiro.
+            for withdrawal in self:
+                partner = self.env["res.partner"].browse(vals.get("partner_id", withdrawal.partner_id.id))
+                company = self.env["res.company"].browse(vals.get("company_id", withdrawal.company_id.id))
+                account = self.env["cca.account"].sudo()._get_or_create(partner, company)
+                res = super(CcaWithdrawal, withdrawal).write(dict(vals, account_id=account.id)) and res
+            if FINANCING_FIELDS & set(vals):
+                self._cca_regenerate_installments()
+            return res
         res = super().write(vals)
         if FINANCING_FIELDS & set(vals):
             self._cca_regenerate_installments()

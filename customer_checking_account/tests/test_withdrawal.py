@@ -115,3 +115,11 @@ class TestWithdrawal(CcaCommon):
         withdrawal = self._withdrawal()
         withdrawal.unlink()
         self.assertFalse(withdrawal.exists())
+
+    def test_change_partner_in_draft_moves_account(self):
+        """Cambiar el cliente de un borrador guardado mueve el retiro a la cuenta del nuevo cliente."""
+        withdrawal = self._withdrawal()
+        other = self.env["res.partner"].create({"name": "Otro Cliente", "vat": "27444555"})
+        withdrawal.partner_id = other
+        self.assertEqual(withdrawal.account_id.partner_id, other)
+        self.assertEqual(withdrawal.installment_ids.account_id.partner_id, other)
