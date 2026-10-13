@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_cca" model="ir.module.category">
+        <field name="name">Cuenta Corriente de Clientes</field>
+        <field name="description">Retiros de clientes a cuenta corriente</field>
+        <field name="sequence">21</field>
+    </record>
+
+    <record id="group_cca_user" model="res.groups">
+        <field name="name">Cuenta Corriente de Clientes</field>
+        <field name="category_id" ref="module_category_cca"/>
+        <field name="comment">Acceso completo: retiros, pagos, límites, cancelaciones y dashboard.</field>
+        <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+</odoo>
