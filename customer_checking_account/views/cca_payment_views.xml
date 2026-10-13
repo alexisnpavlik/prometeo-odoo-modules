@@ -38,8 +38,7 @@
                                    options="{'no_create': True}"
                                    placeholder="Nombre o DNI del cliente"/>
                             <field name="date" readonly="id"/>
-                            <field name="payment_method" readonly="id" widget="radio"
-                                   options="{'horizontal': true}"/>
+                            <field name="payment_method" readonly="id"/>
                             <field name="ref" placeholder="Opcional: Nº de transferencia, nota..."/>
                         </group>
                         <group invisible="id or not partner_id" string="Situación del cliente">
