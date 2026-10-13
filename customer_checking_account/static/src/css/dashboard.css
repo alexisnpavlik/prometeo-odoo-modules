@@ -699,11 +699,14 @@
 }
 
 .cca-dashboard-wrap .chart-body {
-    flex: 1;
+    /* flex + min-height 0 y no height:100%: así lo que va debajo del gráfico (leyendas
+       HTML) entra en la tarjeta en vez de quedar empujado afuera. */
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 16px;
     position: relative;
     width: 100%;
-    height: 100%;
+    box-sizing: border-box;
 }
 
 .cca-dashboard-wrap .flex-center {
@@ -1275,9 +1278,10 @@
 
 /* Leyenda HTML del gráfico de estados de cuota */
 .cca-dashboard-wrap .cca-status-legend {
+    flex: 0 0 auto;
     list-style: none;
-    margin: 8px 0 0;
-    padding: 0;
+    margin: 0;
+    padding: 0 16px 14px;
     display: flex;
     flex-wrap: wrap;
     gap: 6px 16px;
