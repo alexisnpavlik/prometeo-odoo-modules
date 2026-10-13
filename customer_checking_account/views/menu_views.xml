@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_cca_settings" model="ir.actions.act_window">
+        <field name="name">Ajustes</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'customer_checking_account', 'bin_size': False}</field>
+    </record>
+    <menuitem id="menu_cca_root" name="Cuenta Corriente de Clientes"
+              groups="customer_checking_account.group_cca_user"
+              web_icon="customer_checking_account,static/description/icon.png"
+              sequence="53"/>
+    <menuitem id="menu_cca_withdrawal" name="Retiros" parent="menu_cca_root"
+              action="action_cca_withdrawal" sequence="10"/>
+    <menuitem id="menu_cca_payment" name="Pagos" parent="menu_cca_root"
+              action="action_cca_payment" sequence="20"/>
+    <menuitem id="menu_cca_account" name="Clientes" parent="menu_cca_root"
+              action="action_cca_account" sequence="30"/>
+    <menuitem id="menu_cca_installment" name="Cuotas por cobrar" parent="menu_cca_root"
+              action="action_cca_installment" sequence="40"/>
+    <menuitem id="menu_cca_settings" name="Ajustes" parent="menu_cca_root"
+              action="action_cca_settings" sequence="90"/>
+</odoo>

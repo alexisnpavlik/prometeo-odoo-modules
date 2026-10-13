@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_installment_list" model="ir.ui.view">
+        <field name="name">cca.installment.list</field>
+        <field name="model">cca.installment</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" decoration-danger="state == 'overdue'">
+                <field name="date_due"/>
+                <field name="partner_id"/>
+                <field name="withdrawal_id"/>
+                <field name="sequence" string="Nº"/>
+                <field name="amount" sum="Total"/>
+                <field name="amount_residual" sum="Saldo"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge" decoration-danger="state == 'overdue'"
+                       decoration-warning="state == 'partial'" decoration-success="state == 'paid'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cca_installment_form" model="ir.ui.view">
+        <field name="name">cca.installment.form</field>
+        <field name="model">cca.installment</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <sheet>
+                    <group>
+                        <field name="withdrawal_id"/>
+                        <field name="partner_id"/>
+                        <field name="sequence"/>
+                        <field name="date_due"/>
+                        <field name="amount"/>
+                        <field name="amount_allocated"/>
+                        <field name="amount_residual"/>
+                        <field name="state"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cca_installment" model="ir.actions.act_window">
+        <field name="name">Cuotas por cobrar</field>
+        <field name="res_model">cca.installment</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('amount_residual', '>', 0), ('withdrawal_id.state', 'not in', ('draft', 'cancel'))]</field>
+    </record>
+</odoo>

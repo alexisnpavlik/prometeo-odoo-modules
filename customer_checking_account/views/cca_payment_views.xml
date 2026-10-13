@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_payment_list" model="ir.ui.view">
+        <field name="name">cca.payment.list</field>
+        <field name="model">cca.payment</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'cancel'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="payment_method"/>
+                <field name="amount" sum="Total"/>
+                <field name="amount_unallocated" sum="Saldo a favor"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge" decoration-success="state == 'posted'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cca_payment_form" model="ir.ui.view">
+        <field name="name">cca.payment.form</field>
+        <field name="model">cca.payment</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_cancel" type="object" string="Anular"
+                            invisible="not id or state == 'cancel'"
+                            confirm="¿Anular el pago? Se deshacen sus imputaciones."/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="account_id" readonly="id"
+                                   options="{'no_create': True}"/>
+                            <field name="date" readonly="id"/>
+                            <field name="ref"/>
+                        </group>
+                        <group>
+                            <field name="amount" readonly="id"/>
+                            <field name="payment_method" readonly="id"/>
+                            <field name="amount_allocated" invisible="not id"/>
+                            <field name="amount_unallocated" invisible="not id"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <field name="allocation_ids" readonly="1" invisible="not id">
+                        <list>
+                            <field name="withdrawal_id"/>
+                            <field name="installment_id"/>
+                            <field name="amount" sum="Total"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cca_payment" model="ir.actions.act_window">
+        <field name="name">Pagos</field>
+        <field name="res_model">cca.payment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

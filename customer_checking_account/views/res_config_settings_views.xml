@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_res_config_settings_form" model="ir.ui.view">
+        <field name="name">res.config.settings.form.cca</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Cuenta Corriente de Clientes" string="Cuenta Corriente de Clientes"
+                     name="customer_checking_account"
+                     groups="customer_checking_account.group_cca_user">
+                    <block title="Límite de crédito" name="cca_limit_container">
+                        <setting string="Límite por defecto"
+                                 help="Límite que toma cada cliente nuevo. 0 = sin límite.">
+                            <field name="cca_default_credit_limit"/>
+                        </setting>
+                        <setting string="Modo de límite por defecto"
+                                 help="Advertencia avisa y deja seguir; Bloqueo impide confirmar.">
+                            <field name="cca_default_limit_mode"/>
+                        </setting>
+                    </block>
+                    <block title="Stock" name="cca_stock_container">
+                        <setting string="Tipo de operación para retiros"
+                                 help="Vacío = salidas del almacén principal.">
+                            <field name="cca_picking_type_id" options="{'no_create': True}"
+                                   domain="[('code', '=', 'outgoing'), ('company_id', '=', company_id)]"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
