@@ -1,0 +1,202 @@
+# -*- coding: utf-8 -*-
+import logging
+
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
+
+
+class CcaAccount(models.Model):
+    _name = "cca.account"
+    _description = "Cuenta corriente de cliente"
+    _inherit = ["mail.thread"]
+    _rec_name = "partner_id"
+    _order = "partner_id, company_id"
+
+    partner_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Contacto",
+        required=True,
+        ondelete="restrict",
+        index=True,
+        tracking=True,
+    )
+    company_id = fields.Many2one(
+        comodel_name="res.company",
+        string="Compañía",
+        required=True,
+        default=lambda self: self.env.company,
+        index=True,
+    )
+    currency_id = fields.Many2one(
+        related="company_id.currency_id",
+        string="Moneda",
+        readonly=True,
+    )
+    credit_limit = fields.Monetary(
+        string="Límite de crédito",
+        currency_field="currency_id",
+        tracking=True,
+    )
+    limit_mode = fields.Selection(
+        selection=[
+            ("none", "Sin control"),
+            ("warn", "Advertencia"),
+            ("block", "Bloqueo"),
+        ],
+        string="Modo de límite",
+        default="none",
+        required=True,
+        tracking=True,
+        help="Advertencia: avisa y deja continuar. "
+             "Bloqueo: no deja confirmar; subí el límite y reintentá.",
+    )
+    active = fields.Boolean(default=True)
+    withdrawal_ids = fields.One2many(
+        comodel_name="cca.withdrawal",
+        inverse_name="account_id",
+        string="Retiros",
+    )
+    payment_ids = fields.One2many(
+        comodel_name="cca.payment",
+        inverse_name="account_id",
+        string="Pagos",
+    )
+    installment_ids = fields.One2many(
+        comodel_name="cca.installment",
+        inverse_name="account_id",
+        string="Cuotas",
+    )
+    balance = fields.Monetary(
+        string="Saldo",
+        compute="_compute_balances",
+        store=True,
+        currency_field="currency_id",
+    )
+    overdue_balance = fields.Monetary(
+        string="Saldo vencido",
+        compute="_compute_balances",
+        store=True,
+        currency_field="currency_id",
+    )
+    credit_balance = fields.Monetary(
+        string="Saldo a favor",
+        compute="_compute_credit_balance",
+        store=True,
+        currency_field="currency_id",
+    )
+
+    _sql_constraints = [
+        (
+            "partner_company_uniq",
+            "UNIQUE(partner_id, company_id)",
+            "Ya existe una cuenta corriente para este contacto en esta compañía.",
+        ),
+    ]
+
+    @api.constrains("credit_limit")
+    def _check_credit_limit(self):
+        """El límite de crédito no puede ser negativo."""
+        for account in self:
+            if account.credit_limit < 0:
+                raise ValidationError(_("El límite de crédito no puede ser negativo."))
+
+    @api.depends(
+        "installment_ids.amount_residual",
+        "installment_ids.state",
+        "installment_ids.date_due",
+        "installment_ids.withdrawal_id.state",
+    )
+    def _compute_balances(self):
+        """Saldo y vencido: residuales de cuotas de retiros vivos (confirmados y no cancelados)."""
+        today = fields.Date.context_today(self)
+        for account in self:
+            open_installments = account.installment_ids.filtered(
+                lambda i: i.withdrawal_id.state not in ("draft", "cancel")
+            )
+            account.balance = sum(open_installments.mapped("amount_residual"))
+            account.overdue_balance = sum(
+                open_installments
+                .filtered(lambda i: i.date_due and i.date_due < today and i.amount_residual > 0)
+                .mapped("amount_residual")
+            )
+
+    @api.depends("payment_ids.amount_unallocated", "payment_ids.state")
+    def _compute_credit_balance(self):
+        """Saldo a favor: remanente no imputado de los pagos publicados."""
+        for account in self:
+            account.credit_balance = sum(
+                account.payment_ids
+                .filtered(lambda p: p.state == "posted")
+                .mapped("amount_unallocated")
+            )
+
+    @api.model
+    def _get_or_create(self, partner, company):
+        """Devuelve la cuenta del partner en la compañía, creándola si no existe."""
+        account = self.with_context(active_test=False).search([
+            ("partner_id", "=", partner.id),
+            ("company_id", "=", company.id),
+        ], limit=1)
+        if account:
+            if not account.active:
+                account.active = True
+            return account
+        _logger.info("Creando cuenta corriente para %s en %s", partner.display_name, company.name)
+        return self.create({
+            "partner_id": partner.id,
+            "company_id": company.id,
+            "credit_limit": company.cca_default_credit_limit,
+            "limit_mode": company.cca_default_limit_mode or "none",
+        })
+
+    def _cca_open_installments(self):
+        """Cuotas abiertas de la cuenta en orden FIFO: vencimiento, retiro, número."""
+        self.ensure_one()
+        return self.env["cca.installment"].search(
+            [
+                ("account_id", "=", self.id),
+                ("amount_residual", ">", 0),
+                ("withdrawal_id.state", "not in", ("draft", "cancel")),
+            ],
+            order="date_due asc, withdrawal_id asc, sequence asc",
+        )
+
+    def _cca_fifo_plan(self, amount):
+        """Reparto FIFO de `amount` sobre las cuotas abiertas.
+
+        Devuelve ([(cuota, monto), ...], sobrante). Lo usan tanto la vista previa del
+        pago como la imputación real, así lo que se muestra es lo que se imputa.
+        """
+        self.ensure_one()
+        currency = self.currency_id
+        remaining = amount or 0.0
+        plan = []
+        for installment in self._cca_open_installments():
+            if currency.compare_amounts(remaining, 0.0) <= 0:
+                break
+            portion = currency.round(min(remaining, installment.amount_residual))
+            if currency.compare_amounts(portion, 0.0) <= 0:
+                continue
+            plan.append((installment, portion))
+            remaining -= portion
+        return plan, max(currency.round(remaining), 0.0)
+
+    def action_register_payment(self):
+        """Abre un pago nuevo del cliente sugiriendo la deuda total."""
+        self.ensure_one()
+        return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.balance)
+
+    def _cca_apply_credit(self):
+        """Imputa por FIFO el saldo a favor de los pagos vigentes, del más viejo al más nuevo."""
+        payments = self.env["cca.payment"].search(
+            [
+                ("account_id", "in", self.ids),
+                ("state", "=", "posted"),
+                ("amount_unallocated", ">", 0),
+            ],
+            order="date asc, id asc",
+        )
+        payments._cca_allocate_fifo()
+        return True

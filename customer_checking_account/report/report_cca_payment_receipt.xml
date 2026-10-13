@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- A5 y márgenes chicos: el comprobante es corto y se imprime o se manda por WhatsApp. -->
+    <record id="paperformat_cca_receipt" model="report.paperformat">
+        <field name="name">Comprobante de cuenta corriente (A5)</field>
+        <field name="format">A5</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">8</field>
+        <field name="margin_bottom">8</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_cca_payment_receipt" model="ir.actions.report">
+        <field name="name">Comprobante de pago</field>
+        <field name="model">cca.payment</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">customer_checking_account.report_cca_payment_receipt</field>
+        <field name="report_file">customer_checking_account.report_cca_payment_receipt</field>
+        <field name="print_report_name">'Comprobante %s - %s' % (object.name, object.partner_id.name)</field>
+        <field name="binding_model_id" ref="model_cca_payment"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_cca_receipt"/>
+    </record>
+
+    <template id="report_cca_payment_receipt_document">
+        <t t-set="currency" t-value="o.currency_id"/>
+        <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+        <div class="page" style="font-size: 13px;">
+            <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
+            <table style="width: 100%; border-bottom: 2px solid #333;">
+                <tr>
+                    <td style="vertical-align: top; padding-bottom: 6px;">
+                        <strong style="font-size: 16px;" t-esc="o.company_id.name"/>
+                        <div t-if="o.company_id.vat">CUIT <t t-esc="o.company_id.vat"/></div>
+                    </td>
+                    <td style="vertical-align: top; text-align: right; padding-bottom: 6px;">
+                        <strong style="font-size: 16px;">Comprobante de pago</strong>
+                        <div>Nº <t t-esc="o.name"/></div>
+                        <div>Fecha <span t-field="o.date"/></div>
+                    </td>
+                </tr>
+            </table>
+
+            <div t-if="o.state == 'cancel'"
+                 style="margin-top: 8px; padding: 4px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold;">
+                PAGO ANULADO
+            </div>
+
+            <p style="margin-top: 14px; font-size: 15px;">
+                Recibí de <strong t-esc="o.partner_id.name"/>
+                <t t-if="o.partner_id.vat">(DNI/CUIT <t t-esc="o.partner_id.vat"/>)</t>
+                la suma de <strong><span t-field="o.amount" t-options="money"/></strong>
+                en <t t-esc="dict(o._fields['payment_method'].selection).get(o.payment_method)"/>
+                <t t-if="o.ref">(ref. <t t-esc="o.ref"/>)</t>.
+            </p>
+
+            <table class="table table-sm" t-if="o.allocation_ids" style="width: 100%; margin-top: 6px;">
+                <thead>
+                    <tr>
+                        <th>Retiro</th>
+                        <th>Cuota</th>
+                        <th>Vencimiento</th>
+                        <th style="text-align: right;">Pagado</th>
+                        <th style="text-align: right;">Le queda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o._cca_receipt_lines()" t-as="line">
+                        <td t-esc="line['withdrawal']"/>
+                        <td t-esc="line['installment']"/>
+                        <td t-esc="line['date_due'].strftime('%d/%m/%Y')"/>
+                        <td style="text-align: right;"><span t-esc="line['amount']" t-options="money"/></td>
+                        <td style="text-align: right;">
+                            <t t-if="currency.is_zero(line['residual'])">Pagada</t>
+                            <span t-else="" t-esc="line['residual']" t-options="money"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table style="width: 100%; margin-top: 10px; font-size: 14px;">
+                <tr t-if="not currency.is_zero(o.amount_unallocated)">
+                    <td>Queda como saldo a favor</td>
+                    <td style="text-align: right;"><span t-field="o.amount_unallocated" t-options="money"/></td>
+                </tr>
+                <tr style="border-top: 1px solid #333;">
+                    <td><strong>Saldo pendiente de la cuenta</strong></td>
+                    <td style="text-align: right;"><strong><span t-field="o.account_id.balance" t-options="money"/></strong></td>
+                </tr>
+                <tr t-if="o.account_id.overdue_balance">
+                    <td>De ese saldo, vencido</td>
+                    <td style="text-align: right;"><span t-field="o.account_id.overdue_balance" t-options="money"/></td>
+                </tr>
+            </table>
+
+            <table style="width: 100%; margin-top: 40px;">
+                <tr>
+                    <td style="width: 55%;"/>
+                    <td style="border-top: 1px solid #333; text-align: center; padding-top: 4px;">Firma</td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_cca_payment_receipt">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <t t-call="customer_checking_account.report_cca_payment_receipt_document"/>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_withdrawal_list" model="ir.ui.view">
+        <field name="name">cca.withdrawal.list</field>
+        <field name="model">cca.withdrawal</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="is_overdue" decoration-muted="state == 'cancel'"
+                  decoration-success="state == 'paid'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="partner_vat"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="amount_residual" sum="Saldo"/>
+                <field name="is_overdue" column_invisible="1"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'pending'" decoration-warning="state == 'partial'"
+                       decoration-success="state == 'paid'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cca_withdrawal_form" model="ir.ui.view">
+        <field name="name">cca.withdrawal.form</field>
+        <field name="model">cca.withdrawal</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_confirm" type="object" string="Confirmar"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_register_payment" type="object" string="Registrar pago"
+                            class="btn-primary" invisible="state not in ('pending', 'partial')"/>
+                    <button name="action_edit" type="object" string="Editar" icon="fa-pencil"
+                            invisible="state in ('draft', 'cancel') or cca_has_payments"
+                            confirm="El retiro vuelve a borrador: se devuelve el stock y al confirmar se vuelve a descontar. ¿Seguir?"/>
+                    <button name="action_edit" type="object" string="Editar vencimientos" icon="fa-pencil"
+                            invisible="state in ('draft', 'cancel') or not cca_has_payments or edit_due_dates"/>
+                    <button name="action_stop_edit" type="object" string="Terminar edición"
+                            invisible="not edit_due_dates"/>
+                    <!-- Solo sin pagos imputados: 'pending' es confirmado sin ninguna imputación. -->
+                    <button name="action_cancel" type="object" string="Devolver"
+                            invisible="state in ('draft', 'cancel') or cca_has_payments"
+                            confirm="¿Devolver el retiro? La mercadería vuelve al stock y se anulan la deuda y la entrega inicial."/>
+                    <button name="action_draft" type="object" string="Volver a borrador"
+                            invisible="state != 'cancel'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pending,partial,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_picking" type="object" class="oe_stat_button"
+                                icon="fa-truck" invisible="not picking_id">
+                            <span>Albarán</span>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Vencido" bg_color="text-bg-danger" invisible="not is_overdue"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" context="{'show_vat': True, 'cca_require_vat': True}"
+                                   options="{'no_quick_create': True}"
+                                   readonly="state != 'draft'"/>
+                            <field name="partner_vat" readonly="1"/>
+                            <field name="account_balance"/>
+                            <field name="account_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="1" force_save="1"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="is_overdue" invisible="1"/>
+                            <field name="picking_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Productos" name="lines">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="name" optional="hide"/>
+                                    <field name="quantity"/>
+                                    <field name="price_unit"/>
+                                    <field name="price_subtotal"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                            <group>
+                                <group string="Financiación" name="financing">
+                                    <field name="down_payment" readonly="state != 'draft'"/>
+                                    <field name="down_payment_method" readonly="state != 'draft'"
+                                           invisible="not down_payment"/>
+                                    <field name="surcharge_percent" readonly="state != 'draft'"/>
+                                    <field name="installment_count" readonly="state != 'draft'"/>
+                                    <field name="first_due_date" readonly="state != 'draft'"/>
+                                    <field name="frequency" readonly="state != 'draft'"/>
+                                </group>
+                                <group class="oe_subtotal_footer" name="totals">
+                                    <field name="amount_untaxed"/>
+                                    <field name="down_payment" string="Entrega" invisible="not down_payment"/>
+                                    <field name="amount_surcharge"/>
+                                    <field name="amount_financed" invisible="not down_payment"/>
+                                    <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                                    <field name="amount_residual" invisible="state == 'draft'"/>
+                                </group>
+                            </group>
+                            <separator string="Cuotas"/>
+                            <div class="alert alert-info" role="status" invisible="not edit_due_dates">
+                                Retiro con pagos: solo podés cambiar los vencimientos. Guardá para terminar.
+                            </div>
+                            <field name="edit_due_dates" invisible="1"/>
+                            <field name="cca_has_payments" invisible="1"/>
+                            <field name="down_payment_id" invisible="1"/>
+                            <field name="installment_ids" readonly="not edit_due_dates">
+                                <list editable="bottom" create="0" delete="0">
+                                    <field name="sequence" column_invisible="1"/>
+                                    <field name="is_down_payment" column_invisible="1"/>
+                                    <field name="label" string="Cuota" readonly="1"/>
+                                    <field name="date_due" readonly="is_down_payment"/>
+                                    <field name="amount" sum="Total" readonly="1"/>
+                                    <field name="amount_residual" column_invisible="parent.state == 'draft'" readonly="1"/>
+                                    <field name="state" widget="badge" column_invisible="parent.state == 'draft'" readonly="1"
+                                           decoration-danger="state == 'overdue'"
+                                           decoration-success="state == 'paid'"
+                                           decoration-warning="state == 'partial'"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes">
+                            <field name="note"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cca_withdrawal_search" model="ir.ui.view">
+        <field name="name">cca.withdrawal.search</field>
+        <field name="model">cca.withdrawal</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id" filter_domain="['|', ('partner_id', 'ilike', self), ('partner_vat', 'ilike', self)]"/>
+                <filter name="overdue" string="Vencidos" domain="[('is_overdue', '=', True)]"/>
+                <filter name="unpaid" string="Impagos" domain="[('state', 'in', ('pending', 'partial'))]"/>
+                <filter name="paid" string="Pagados" domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter name="draft" string="Borradores" domain="[('state', '=', 'draft')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_partner" string="Cliente" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cca_withdrawal" model="ir.actions.act_window">
+        <field name="name">Retiros</field>
+        <field name="res_model">cca.withdrawal</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_unpaid': 1}</field>
+    </record>
+</odoo>

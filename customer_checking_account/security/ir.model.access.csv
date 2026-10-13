@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_cca_account,cca.account,model_cca_account,group_cca_user,1,1,1,1
+access_cca_allocation,cca.allocation,model_cca_allocation,group_cca_user,1,1,1,1
+access_cca_withdrawal,cca.withdrawal,model_cca_withdrawal,group_cca_user,1,1,1,1
+access_cca_installment,cca.installment,model_cca_installment,group_cca_user,1,1,1,1
+access_cca_payment,cca.payment,model_cca_payment,group_cca_user,1,1,1,1
+access_cca_withdrawal_line,cca.withdrawal.line,model_cca_withdrawal_line,group_cca_user,1,1,1,1
+access_stock_picking_cca,stock.picking cca read,stock.model_stock_picking,group_cca_user,1,0,0,0
+access_stock_move_cca,stock.move cca read,stock.model_stock_move,group_cca_user,1,0,0,0
+access_stock_move_line_cca,stock.move.line cca read,stock.model_stock_move_line,group_cca_user,1,0,0,0
+access_cca_statement_wizard,cca.statement.wizard,model_cca_statement_wizard,group_cca_user,1,1,1,1

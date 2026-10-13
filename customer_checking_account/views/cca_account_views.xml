@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_account_list" model="ir.ui.view">
+        <field name="name">cca.account.list</field>
+        <field name="model">cca.account</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="overdue_balance > 0">
+                <field name="partner_id"/>
+                <field name="balance" sum="Total"/>
+                <field name="overdue_balance" sum="Vencido"/>
+                <field name="credit_balance" sum="A favor"/>
+                <field name="credit_limit"/>
+                <field name="limit_mode"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cca_account_form" model="ir.ui.view">
+        <field name="name">cca.account.form</field>
+        <field name="model">cca.account</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_register_payment" type="object" string="Registrar pago"
+                            class="btn-primary" invisible="balance &lt;= 0"/>
+                    <button name="%(action_cca_statement_wizard)d" type="action" string="Estado de cuenta" context="{'default_account_id': id}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="partner_id" readonly="1"/></h1></div>
+                    <group>
+                        <group string="Saldos">
+                            <field name="balance"/>
+                            <field name="overdue_balance"/>
+                            <field name="credit_balance"/>
+                        </group>
+                        <group string="Límite">
+                            <field name="credit_limit"/>
+                            <field name="limit_mode"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Retiros"><field name="withdrawal_ids" readonly="1"/></page>
+                        <page string="Pagos"><field name="payment_ids" readonly="1"/></page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_cca_account_search" model="ir.ui.view">
+        <field name="name">cca.account.search</field>
+        <field name="model">cca.account</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id" filter_domain="['|', ('partner_id', 'ilike', self), ('partner_id.vat', 'ilike', self)]"/>
+                <filter name="with_debt" string="Con deuda" domain="[('balance', '>', 0)]"/>
+                <filter name="overdue" string="Con vencidos" domain="[('overdue_balance', '>', 0)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_cca_account" model="ir.actions.act_window">
+        <field name="name">Clientes</field>
+        <field name="res_model">cca.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_with_debt': 1}</field>
+    </record>
+</odoo>
