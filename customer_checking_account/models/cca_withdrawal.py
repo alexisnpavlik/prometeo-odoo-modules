@@ -19,7 +19,15 @@ STATE_SELECTION = [
 # Campos cuyo cambio en borrador obliga a regenerar las cuotas.
 FINANCING_FIELDS = {
     "line_ids", "surcharge_percent", "installment_count", "first_due_date", "frequency", "date",
+    "down_payment",
 }
+
+PAYMENT_METHODS = [
+    ("cash", "Efectivo"),
+    ("transfer", "Transferencia"),
+    ("card", "Tarjeta"),
+    ("other", "Otro"),
+]
 
 
 class CcaWithdrawal(models.Model):
@@ -75,6 +83,30 @@ class CcaWithdrawal(models.Model):
         default="monthly",
         required=True,
     )
+    down_payment = fields.Monetary(
+        string="Entrega inicial",
+        currency_field="currency_id",
+        tracking=True,
+        help="Lo que el cliente paga en el momento. No lleva recargo: el recargo se aplica "
+             "solo sobre lo que se financia en cuotas.",
+    )
+    down_payment_method = fields.Selection(
+        selection=PAYMENT_METHODS,
+        string="Medio de la entrega",
+        default="cash",
+    )
+    down_payment_id = fields.Many2one(
+        "cca.payment", string="Pago de la entrega", readonly=True, copy=False,
+    )
+    amount_financed = fields.Monetary(
+        string="A financiar", compute="_compute_amounts", store=True, currency_field="currency_id",
+        help="Lo que se paga en cuotas: subtotal menos entrega, más recargo.",
+    )
+    cca_has_payments = fields.Boolean(
+        string="Tiene pagos",
+        compute="_compute_cca_has_payments",
+        help="Pagos imputados además de la entrega inicial. Con pagos solo se editan vencimientos.",
+    )
     amount_untaxed = fields.Monetary(
         string="Subtotal", compute="_compute_amounts", store=True, currency_field="currency_id"
     )
@@ -115,16 +147,24 @@ class CcaWithdrawal(models.Model):
         "stock.picking", string="Devolución", readonly=True, copy=False
     )
 
-    @api.depends("line_ids.price_subtotal", "surcharge_percent")
+    @api.depends("line_ids.price_subtotal", "surcharge_percent", "down_payment")
     def _compute_amounts(self):
-        """Subtotal de líneas, recargo sobre el subtotal y total."""
+        """Subtotal de líneas; el recargo va solo sobre lo financiado (subtotal - entrega)."""
         for withdrawal in self:
             currency = withdrawal.currency_id or self.env.company.currency_id
             untaxed = sum(withdrawal.line_ids.mapped("price_subtotal"))
-            surcharge = currency.round(untaxed * (withdrawal.surcharge_percent or 0.0) / 100.0)
+            base = max(untaxed - (withdrawal.down_payment or 0.0), 0.0)
+            surcharge = currency.round(base * (withdrawal.surcharge_percent or 0.0) / 100.0)
             withdrawal.amount_untaxed = untaxed
             withdrawal.amount_surcharge = surcharge
+            withdrawal.amount_financed = base + surcharge
             withdrawal.amount_total = untaxed + surcharge
+
+    @api.depends("installment_ids.allocation_ids.payment_id.state", "down_payment_id")
+    def _compute_cca_has_payments(self):
+        """Hay pagos imputados que no son la entrega inicial."""
+        for withdrawal in self:
+            withdrawal.cca_has_payments = bool(withdrawal._cca_external_allocations())
 
     @api.depends("installment_ids.amount_residual", "is_confirmed", "is_cancelled")
     def _compute_amount_residual(self):
@@ -167,10 +207,17 @@ class CcaWithdrawal(models.Model):
             else:
                 withdrawal.state = "pending"
 
-    @api.constrains("surcharge_percent", "installment_count")
+    @api.constrains("surcharge_percent", "installment_count", "down_payment", "line_ids")
     def _check_financing(self):
-        """Recargo no negativo y al menos una cuota."""
+        """Recargo no negativo, al menos una cuota y entrega entre 0 y el subtotal."""
         for withdrawal in self:
+            currency = withdrawal.currency_id
+            if currency.compare_amounts(withdrawal.down_payment or 0.0, 0.0) < 0:
+                raise ValidationError(_("La entrega inicial no puede ser negativa."))
+            if withdrawal.line_ids and currency.compare_amounts(
+                withdrawal.down_payment or 0.0, withdrawal.amount_untaxed
+            ) > 0:
+                raise ValidationError(_("La entrega inicial no puede superar el subtotal del retiro."))
             if withdrawal.surcharge_percent < 0:
                 raise ValidationError(_("El recargo no puede ser negativo."))
             if withdrawal.installment_count < 1:
@@ -194,15 +241,26 @@ class CcaWithdrawal(models.Model):
         return self.first_due_date + step
 
     def _cca_installment_values(self):
-        """Valores de las cuotas a partir del total. El resto del redondeo va a la última."""
+        """Fila de entrega (número 0, vence el día del retiro) y cuotas sobre lo financiado.
+
+        El resto del redondeo va a la última cuota.
+        """
         self.ensure_one()
         count = max(self.installment_count, 1)
         currency = self.currency_id or self.env.company.currency_id
-        total = self.amount_total
+        values = []
+        if currency.compare_amounts(self.down_payment or 0.0, 0.0) > 0 and self.date:
+            values.append({
+                "sequence": 0,
+                "date_due": self.date,
+                "amount": self.down_payment,
+                "is_down_payment": True,
+            })
+        total = self.amount_financed
         if currency.compare_amounts(total, 0.0) <= 0 or not self.first_due_date:
-            return []
+            return values
         base = currency.round(total / count)
-        values, accumulated = [], 0.0
+        accumulated = 0.0
         for index in range(count):
             amount = currency.round(total - accumulated) if index == count - 1 else base
             accumulated += amount
@@ -224,7 +282,8 @@ class CcaWithdrawal(models.Model):
             ])
         return True
 
-    @api.onchange("line_ids", "surcharge_percent", "installment_count", "first_due_date", "frequency")
+    @api.onchange("line_ids", "surcharge_percent", "installment_count", "first_due_date", "frequency",
+                  "down_payment", "date")
     def _onchange_financing(self):
         """Vista previa de las cuotas mientras se carga el retiro."""
         if self.is_confirmed or self.is_cancelled:
@@ -248,6 +307,45 @@ class CcaWithdrawal(models.Model):
         return self.installment_ids.mapped("allocation_ids").filtered(
             lambda a: a.payment_id.state == "posted"
         )
+
+    def _cca_external_allocations(self):
+        """Imputaciones vigentes que no son la entrega inicial del propio retiro."""
+        self.ensure_one()
+        return self._cca_posted_allocations().filtered(
+            lambda a: a.payment_id != self.down_payment_id
+        )
+
+    def _cca_register_down_payment(self):
+        """Registra la entrega como pago y la imputa solo a la fila de entrega de este retiro."""
+        self.ensure_one()
+        down_line = self.installment_ids.filtered("is_down_payment")
+        if not down_line:
+            return False
+        payment = self.env["cca.payment"].with_context(cca_no_auto_allocate=True).create({
+            "partner_id": self.partner_id.id,
+            "company_id": self.company_id.id,
+            "date": self.date,
+            "amount": down_line.amount,
+            "payment_method": self.down_payment_method or "cash",
+            "ref": _("Entrega inicial %s", self.name),
+        })
+        self.env["cca.allocation"].sudo().create({
+            "payment_id": payment.id,
+            "installment_id": down_line.id,
+            "amount": down_line.amount,
+        })
+        self.down_payment_id = payment.id
+        return payment
+
+    def _cca_void_down_payment(self):
+        """Anula el pago de la entrega (al devolver o reabrir el retiro)."""
+        for withdrawal in self:
+            payment = withdrawal.down_payment_id
+            if payment and payment.state == "posted":
+                payment.allocation_ids.sudo().unlink()
+                payment.state = "cancel"
+                payment._message_log(body=_("Anulado al reabrir o devolver el retiro %s.", withdrawal.name))
+            withdrawal.down_payment_id = False
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -436,6 +534,8 @@ class CcaWithdrawal(models.Model):
             withdrawal._cca_regenerate_installments()
             withdrawal._cca_create_and_validate_picking()
             withdrawal.is_confirmed = True
+            # La entrega va antes que el saldo a favor: así el saldo no la cubre por FIFO.
+            withdrawal._cca_register_down_payment()
             withdrawal._cca_after_confirm()
             withdrawal._message_log(body=_("Retiro confirmado por %s.", self.env.user.display_name))
             if warning:
@@ -460,7 +560,7 @@ class CcaWithdrawal(models.Model):
         for withdrawal in self:
             if withdrawal.is_cancelled:
                 raise UserError(_("El retiro %s ya está cancelado.", withdrawal.name))
-            allocations = withdrawal._cca_posted_allocations()
+            allocations = withdrawal._cca_external_allocations()
             if allocations:
                 raise UserError(_(
                     "El retiro %(name)s tiene pagos imputados por %(amount)s. Anulá esos pagos primero.",
@@ -469,6 +569,7 @@ class CcaWithdrawal(models.Model):
                 ))
             if withdrawal.picking_id and withdrawal.picking_id.state == "done":
                 withdrawal._cca_return_picking()
+            withdrawal._cca_void_down_payment()
             withdrawal.installment_ids.sudo().unlink()
             withdrawal.is_cancelled = True
             withdrawal._message_log(body=_("Retiro cancelado por %s.", self.env.user.display_name))
@@ -484,11 +585,12 @@ class CcaWithdrawal(models.Model):
         for withdrawal in self:
             if withdrawal.state not in ("pending", "partial", "paid"):
                 raise UserError(_("Solo se puede editar un retiro confirmado."))
-            if withdrawal._cca_posted_allocations():
+            if withdrawal._cca_external_allocations():
                 withdrawal.edit_due_dates = True
                 continue
             if withdrawal.picking_id and withdrawal.picking_id.state == "done":
                 withdrawal._cca_return_picking()
+            withdrawal._cca_void_down_payment()
             withdrawal.installment_ids.sudo().unlink()
             withdrawal.write({"is_confirmed": False, "picking_id": False, "edit_due_dates": False})
             withdrawal._cca_regenerate_installments()

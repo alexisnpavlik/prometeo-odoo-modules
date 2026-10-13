@@ -32,16 +32,16 @@
                     <button name="action_register_payment" type="object" string="Registrar pago"
                             class="btn-primary" invisible="state not in ('pending', 'partial')"/>
                     <button name="action_edit" type="object" string="Editar" icon="fa-pencil"
-                            invisible="state != 'pending'"
+                            invisible="state in ('draft', 'cancel') or cca_has_payments"
                             confirm="El retiro vuelve a borrador: se devuelve el stock y al confirmar se vuelve a descontar. ¿Seguir?"/>
                     <button name="action_edit" type="object" string="Editar vencimientos" icon="fa-pencil"
-                            invisible="state not in ('partial', 'paid') or edit_due_dates"/>
+                            invisible="state in ('draft', 'cancel') or not cca_has_payments or edit_due_dates"/>
                     <button name="action_stop_edit" type="object" string="Terminar edición"
                             invisible="not edit_due_dates"/>
                     <!-- Solo sin pagos imputados: 'pending' es confirmado sin ninguna imputación. -->
                     <button name="action_cancel" type="object" string="Devolver"
-                            invisible="state != 'pending'"
-                            confirm="¿Devolver el retiro? La mercadería vuelve al stock y se anula la deuda."/>
+                            invisible="state in ('draft', 'cancel') or cca_has_payments"
+                            confirm="¿Devolver el retiro? La mercadería vuelve al stock y se anulan la deuda y la entrega inicial."/>
                     <button name="action_draft" type="object" string="Volver a borrador"
                             invisible="state != 'cancel'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending,partial,paid"/>
@@ -88,6 +88,9 @@
                             </field>
                             <group>
                                 <group string="Financiación" name="financing">
+                                    <field name="down_payment" readonly="state != 'draft'"/>
+                                    <field name="down_payment_method" readonly="state != 'draft'"
+                                           invisible="not down_payment"/>
                                     <field name="surcharge_percent" readonly="state != 'draft'"/>
                                     <field name="installment_count" readonly="state != 'draft'"/>
                                     <field name="first_due_date" readonly="state != 'draft'"/>
@@ -95,7 +98,9 @@
                                 </group>
                                 <group class="oe_subtotal_footer" name="totals">
                                     <field name="amount_untaxed"/>
+                                    <field name="down_payment" string="Entrega" invisible="not down_payment"/>
                                     <field name="amount_surcharge"/>
+                                    <field name="amount_financed" invisible="not down_payment"/>
                                     <field name="amount_total" class="oe_subtotal_footer_separator"/>
                                     <field name="amount_residual" invisible="state == 'draft'"/>
                                 </group>
@@ -105,10 +110,14 @@
                                 Retiro con pagos: solo podés cambiar los vencimientos. Guardá para terminar.
                             </div>
                             <field name="edit_due_dates" invisible="1"/>
+                            <field name="cca_has_payments" invisible="1"/>
+                            <field name="down_payment_id" invisible="1"/>
                             <field name="installment_ids" readonly="not edit_due_dates">
                                 <list editable="bottom" create="0" delete="0">
-                                    <field name="sequence" string="Nº" readonly="1"/>
-                                    <field name="date_due"/>
+                                    <field name="sequence" column_invisible="1"/>
+                                    <field name="is_down_payment" column_invisible="1"/>
+                                    <field name="label" string="Cuota" readonly="1"/>
+                                    <field name="date_due" readonly="is_down_payment"/>
                                     <field name="amount" sum="Total" readonly="1"/>
                                     <field name="amount_residual" column_invisible="parent.state == 'draft'" readonly="1"/>
                                     <field name="state" widget="badge" column_invisible="parent.state == 'draft'" readonly="1"

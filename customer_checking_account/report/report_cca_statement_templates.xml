@@ -128,7 +128,7 @@
                         <tbody>
                             <tr t-foreach="data['installments']" t-as="installment">
                                 <td><span t-field="installment.withdrawal_id.name"/></td>
-                                <td><span t-field="installment.sequence"/></td>
+                                <td><span t-esc="installment.label"/></td>
                                 <td><span t-field="installment.date_due"/></td>
                                 <td class="text-end">
                                     <span t-field="installment.amount"

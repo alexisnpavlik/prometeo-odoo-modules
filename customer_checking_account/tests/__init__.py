@@ -10,3 +10,4 @@ from . import test_dashboard_controller
 from . import test_payment_ux
 from . import test_collect
 from . import test_edit
+from . import test_down_payment

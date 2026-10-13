@@ -138,11 +138,11 @@ class CcaPayment(models.Model):
                 status, css = _("Pago parcial"), "text-warning fw-bold"
             overdue = installment.date_due < fields.Date.context_today(self)
             rows.append(Markup(
-                "<tr><td>%s</td><td>%s/%s</td><td class='%s'>%s</td><td class='text-end'>%s</td>"
+                "<tr><td>%s</td><td>%s</td><td class='%s'>%s</td><td class='text-end'>%s</td>"
                 "<td class='text-end fw-bold'>%s</td><td class='text-end'>%s</td><td class='%s'>%s</td></tr>"
             ) % (
                 installment.withdrawal_id.name,
-                installment.sequence, len(installment.withdrawal_id.installment_ids),
+                installment.label,
                 "text-danger" if overdue else "", installment.date_due.strftime("%d/%m/%Y"),
                 money(installment.amount_residual), money(portion) if portion else "—",
                 money(left), css, status,
@@ -182,7 +182,8 @@ class CcaPayment(models.Model):
                 vals["company_id"] = company.id
                 vals["account_id"] = account_model._get_or_create(partner, company).id
         payments = super().create(vals_list)
-        payments._cca_allocate_fifo()
+        if not self.env.context.get("cca_no_auto_allocate"):
+            payments._cca_allocate_fifo()
         return payments
 
     def _cca_allocate_fifo(self):
@@ -237,10 +238,7 @@ class CcaPayment(models.Model):
         self.ensure_one()
         return [{
             "withdrawal": allocation.withdrawal_id.name,
-            "installment": "%s/%s" % (
-                allocation.installment_id.sequence,
-                len(allocation.withdrawal_id.installment_ids),
-            ),
+            "installment": allocation.installment_id.label,
             "date_due": allocation.installment_id.date_due,
             "amount": allocation.amount,
             "residual": allocation.installment_id.amount_residual,

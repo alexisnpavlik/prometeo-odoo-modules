@@ -48,6 +48,11 @@ class CcaInstallment(models.Model):
     )
     currency_id = fields.Many2one(related="withdrawal_id.currency_id", readonly=True)
     sequence = fields.Integer(string="Nº de cuota", default=1, required=True)
+    is_down_payment = fields.Boolean(
+        string="Entrega inicial",
+        help="Fila de la entrega inicial (número 0). Se paga al confirmar el retiro.",
+    )
+    label = fields.Char(string="Cuota", compute="_compute_label")
     allocation_ids = fields.One2many(
         comodel_name="cca.allocation",
         inverse_name="installment_id",
@@ -87,6 +92,16 @@ class CcaInstallment(models.Model):
             "El monto de la cuota debe ser mayor a cero.",
         ),
     ]
+
+    @api.depends("sequence", "is_down_payment", "withdrawal_id.installment_ids")
+    def _compute_label(self):
+        """'Entrega' para la entrega inicial; 'n/N' para las cuotas."""
+        for installment in self:
+            if installment.is_down_payment:
+                installment.label = _("Entrega")
+                continue
+            total = len(installment.withdrawal_id.installment_ids.filtered(lambda i: not i.is_down_payment))
+            installment.label = "%s/%s" % (installment.sequence, total)
 
     @api.depends("allocation_ids.amount", "allocation_ids.payment_id.state")
     def _compute_amount_allocated(self):
