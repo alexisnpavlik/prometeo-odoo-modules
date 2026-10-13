@@ -389,7 +389,17 @@ class CcaWithdrawal(models.Model):
         return return_picking
 
     def _cca_after_confirm(self):
-        """Hook post-confirmación. Task 5 lo usa para imputar saldo a favor."""
+        """Imputa al retiro recién confirmado el saldo a favor de pagos anteriores."""
+        self.ensure_one()
+        payments = self.env["cca.payment"].search(
+            [
+                ("account_id", "=", self.account_id.id),
+                ("state", "=", "posted"),
+                ("amount_unallocated", ">", 0),
+            ],
+            order="date asc, id asc",
+        )
+        payments._cca_allocate_fifo()
         return True
 
     def action_confirm(self):
