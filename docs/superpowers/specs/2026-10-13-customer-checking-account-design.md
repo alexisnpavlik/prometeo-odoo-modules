@@ -31,8 +31,8 @@ Prefijo `cca.`. Un archivo por modelo.
 - **`cca.account`**: una cuenta por (contacto, compañía). Se crea sola en el primer retiro. Campos: `partner_id`, `company_id`, `credit_limit`, `limit_mode` (`none`/`warn`/`block`), y saldos computados (`balance`, `overdue_balance`, `credit_balance`).
 - **`cca.withdrawal`**: `name` (secuencia), `account_id`, `partner_id`, `partner_vat` (related), `date`, `line_ids`, `surcharge_percent`, `installment_count` (mín. 1), `first_due_date`, `frequency` (`monthly`/`weekly`), `installment_ids`, `amount_untaxed` (suma de líneas sin recargo), `amount_surcharge`, `amount_total`, `amount_residual`, `state`, `is_overdue`, `picking_id`, `note`.
 - **`cca.withdrawal.line`**: `product_id`, `name`, `quantity`, `price_unit` (por defecto `list_price`, editable en borrador), `price_subtotal` = `quantity × price_unit` (sin recargo; el recargo se muestra en el total del retiro).
-- **`cca.installment`**: `withdrawal_id`, `sequence`, `date_due`, `amount`, `amount_allocated`, `amount_residual`, `state` (`open`/`partial`/`paid`/`overdue`/`cancelled`).
-- **`cca.payment`**: `name` (secuencia), `account_id`, `partner_id`, `date`, `amount`, `payment_method`, `ref`, `state` (`posted`/`cancelled`), `amount_allocated`, `amount_unallocated`.
+- **`cca.installment`**: `withdrawal_id`, `sequence`, `date_due`, `amount`, `amount_allocated`, `amount_residual`, `state` (`pending`/`partial`/`paid`/`overdue`).
+- **`cca.payment`**: `name` (secuencia), `account_id`, `partner_id`, `date`, `amount`, `payment_method` (selección fija: efectivo, transferencia, tarjeta, otro), `ref`, `state` (`posted`/`cancel`), `amount_allocated`, `amount_unallocated`.
 - **`cca.allocation`**: `payment_id`, `installment_id`, `amount`. Es interno: no tiene vista propia.
 
 ### Cálculo de recargo y cuotas
@@ -46,7 +46,7 @@ Prefijo `cca.`. Un archivo por modelo.
 
 ## Flujo
 
-**Estados del retiro:** `draft → confirmed → paid` y `cancelled`. `is_overdue` es un flag aparte: es verdadero cuando el retiro está confirmado y alguna cuota abierta está vencida. El estado `paid` se deriva de las cuotas y se da solo cuando **todas** quedan pagadas.
+**Estados del retiro:** `draft → pending → partial → paid` y `cancel` (mismos valores que `caw` sin `delivered`, así el dashboard se porta sin cambiar estados; `pending`/`partial`/`paid` son "confirmado"). `is_overdue` es un flag aparte: es verdadero cuando el retiro está confirmado y alguna cuota abierta está vencida. El estado `paid` se deriva de las cuotas y se da solo cuando **todas** quedan pagadas.
 
 **Confirmar** (`action_confirm`), un solo paso:
 1. Valida: el contacto tiene `vat`, hay al menos una línea y la suma de las cuotas es igual a `amount_total`.
@@ -55,7 +55,7 @@ Prefijo `cca.`. Un archivo por modelo.
 4. Congela líneas y cuotas.
 5. Imputa por FIFO el saldo a favor que tenga la cuenta.
 
-**Cancelar** (`action_cancel`): solo se permite si ninguna cuota tiene imputaciones. Si había albarán validado, crea y valida una devolución. Las cuotas pasan a `cancelled`.
+**Cancelar** (`action_cancel`): solo se permite si ninguna cuota tiene imputaciones. Si había albarán validado, crea y valida una devolución. Las cuotas se borran (como en `caw`); al volver a borrador se regeneran como vista previa.
 
 **Volver a borrador:** solo desde `cancelled`.
 
@@ -79,7 +79,7 @@ Prefijo `cca.`. Un archivo por modelo.
 - **Pagos:** lista y formulario de alta.
 - **Clientes:** cuentas con saldo, vencido y límite. Smart buttons a retiros, pagos y estado de cuenta.
 - **Dashboard.**
-- **Ajustes:** app propia en Ajustes (`<app>` con un `<block>` por sección): medios de pago y `limit_mode` por defecto para las cuentas nuevas.
+- **Ajustes:** app propia en Ajustes (`<app>` con un `<block>` por sección): `limit_mode` y `credit_limit` por defecto para las cuentas nuevas, y tipo de operación del albarán.
 
 **Formulario de retiro:**
 1. Cliente (búsqueda por nombre o DNI), DNI visible y saldo actual de la cuenta.
