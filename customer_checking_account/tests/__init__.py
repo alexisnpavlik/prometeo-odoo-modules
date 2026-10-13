@@ -7,3 +7,4 @@ from . import test_payment
 from . import test_partner
 from . import test_statement
 from . import test_dashboard_controller
+from . import test_payment_ux

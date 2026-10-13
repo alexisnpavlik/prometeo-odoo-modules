@@ -26,29 +26,53 @@
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="not id or state == 'cancel'"
                             confirm="¿Anular el pago? Se deshacen sus imputaciones."/>
-                    <field name="state" widget="statusbar"/>
+                    <field name="state" widget="statusbar" invisible="not id"/>
                 </header>
                 <sheet>
-                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="oe_title" invisible="not id"><h1><field name="name" readonly="1"/></h1></div>
+                    <div class="oe_title" invisible="id"><h1>Registrar pago</h1></div>
                     <group>
                         <group>
-                            <field name="account_id" readonly="id"
-                                   options="{'no_create': True}"/>
+                            <field name="partner_id" readonly="id"
+                                   context="{'show_vat': True}"
+                                   options="{'no_create': True}"
+                                   placeholder="Nombre o DNI del cliente"/>
                             <field name="date" readonly="id"/>
-                            <field name="ref"/>
+                            <field name="payment_method" readonly="id" widget="radio"
+                                   options="{'horizontal': true}"/>
+                            <field name="ref" placeholder="Opcional: Nº de transferencia, nota..."/>
                         </group>
-                        <group>
-                            <field name="amount" readonly="id"/>
-                            <field name="payment_method" readonly="id"/>
-                            <field name="amount_allocated" invisible="not id"/>
-                            <field name="amount_unallocated" invisible="not id"/>
-                            <field name="currency_id" invisible="1"/>
+                        <group invisible="id or not partner_id" string="Situación del cliente">
+                            <field name="account_balance" string="Deuda total"/>
+                            <field name="account_overdue_balance" string="Vencido"
+                                   decoration-danger="account_overdue_balance &gt; 0"/>
+                            <field name="account_credit_balance" string="Saldo a favor"
+                                   invisible="not account_credit_balance"/>
+                        </group>
+                        <group invisible="not id" string="Imputación">
+                            <field name="amount_allocated"/>
+                            <field name="amount_unallocated" string="Saldo a favor"/>
                         </group>
                     </group>
+                    <group invisible="id or not partner_id">
+                        <field name="quick_amount" widget="radio" options="{'horizontal': true}"
+                               string="Cuánto paga"/>
+                    </group>
+                    <group>
+                        <field name="amount" readonly="id" class="fs-3 fw-bold"
+                               string="Monto"/>
+                    </group>
+                    <field name="account_id" invisible="1" force_save="1"/>
+                    <field name="company_id" invisible="1" force_save="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <separator string="Qué cubre este pago" invisible="id or not partner_id"/>
+                    <field name="allocation_preview" nolabel="1" readonly="1"
+                           invisible="id or not partner_id"/>
+                    <separator string="Cuotas que pagó" invisible="not id"/>
                     <field name="allocation_ids" readonly="1" invisible="not id">
                         <list>
                             <field name="withdrawal_id"/>
-                            <field name="installment_id"/>
+                            <field name="installment_id" string="Cuota"/>
                             <field name="amount" sum="Total"/>
                             <field name="currency_id" column_invisible="1"/>
                         </list>
@@ -59,9 +83,27 @@
         </field>
     </record>
 
+    <record id="view_cca_payment_search" model="ir.ui.view">
+        <field name="name">cca.payment.search</field>
+        <field name="model">cca.payment</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id" filter_domain="['|', ('partner_id', 'ilike', self), ('partner_id.vat', 'ilike', self)]"/>
+                <filter name="posted" string="Vigentes" domain="[('state', '=', 'posted')]"/>
+                <filter name="with_credit" string="Con saldo a favor" domain="[('amount_unallocated', '&gt;', 0)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_partner" string="Cliente" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_method" string="Medio de pago" context="{'group_by': 'payment_method'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_cca_payment" model="ir.actions.act_window">
         <field name="name">Pagos</field>
         <field name="res_model">cca.payment</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_posted': 1}</field>
     </record>
 </odoo>

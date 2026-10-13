@@ -29,6 +29,8 @@
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar"
                             class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_register_payment" type="object" string="Registrar pago"
+                            class="btn-primary" invisible="state not in ('pending', 'partial')"/>
                     <!-- Solo sin pagos imputados: 'pending' es confirmado sin ninguna imputación. -->
                     <button name="action_cancel" type="object" string="Devolver"
                             invisible="state != 'pending'"

@@ -487,6 +487,11 @@ class CcaWithdrawal(models.Model):
             withdrawal._cca_regenerate_installments()
         return True
 
+    def action_register_payment(self):
+        """Abre un pago nuevo del cliente sugiriendo el saldo de este retiro."""
+        self.ensure_one()
+        return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.amount_residual)
+
     def action_view_picking(self):
         """Abre el albarán del retiro."""
         self.ensure_one()

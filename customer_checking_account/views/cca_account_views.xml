@@ -22,8 +22,9 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="%(action_cca_statement_wizard)d" type="action" string="Estado de cuenta"
-                            class="btn-primary" context="{'default_account_id': id}"/>
+                    <button name="action_register_payment" type="object" string="Registrar pago"
+                            class="btn-primary" invisible="balance &lt;= 0"/>
+                    <button name="%(action_cca_statement_wizard)d" type="action" string="Estado de cuenta" context="{'default_account_id': id}"/>
                 </header>
                 <sheet>
                     <div class="oe_title"><h1><field name="partner_id" readonly="1"/></h1></div>

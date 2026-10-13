@@ -150,3 +150,40 @@ class CcaAccount(models.Model):
             "credit_limit": company.cca_default_credit_limit,
             "limit_mode": company.cca_default_limit_mode or "none",
         })
+
+    def _cca_open_installments(self):
+        """Cuotas abiertas de la cuenta en orden FIFO: vencimiento, retiro, número."""
+        self.ensure_one()
+        return self.env["cca.installment"].search(
+            [
+                ("account_id", "=", self.id),
+                ("amount_residual", ">", 0),
+                ("withdrawal_id.state", "not in", ("draft", "cancel")),
+            ],
+            order="date_due asc, withdrawal_id asc, sequence asc",
+        )
+
+    def _cca_fifo_plan(self, amount):
+        """Reparto FIFO de `amount` sobre las cuotas abiertas.
+
+        Devuelve ([(cuota, monto), ...], sobrante). Lo usan tanto la vista previa del
+        pago como la imputación real, así lo que se muestra es lo que se imputa.
+        """
+        self.ensure_one()
+        currency = self.currency_id
+        remaining = amount or 0.0
+        plan = []
+        for installment in self._cca_open_installments():
+            if currency.compare_amounts(remaining, 0.0) <= 0:
+                break
+            portion = currency.round(min(remaining, installment.amount_residual))
+            if currency.compare_amounts(portion, 0.0) <= 0:
+                continue
+            plan.append((installment, portion))
+            remaining -= portion
+        return plan, max(currency.round(remaining), 0.0)
+
+    def action_register_payment(self):
+        """Abre un pago nuevo del cliente sugiriendo la deuda total."""
+        self.ensure_one()
+        return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.balance)
