@@ -47,9 +47,9 @@ class CcaDashboard extends Component {
             charts: {
                 balance_trend: { labels: [], companies: {} },
                 collected_vs_overdue: { labels: [], collected: [], overdue: [] },
-                installment_status: { labels: [], values: [] },
+                installment_status: { keys: [], labels: [], values: [] },
                 top_partners: { labels: [], values: [] },
-                by_company: { labels: [], values: [] }
+
             }
         });
 
@@ -349,17 +349,20 @@ class CcaDashboard extends Component {
             }
         });
 
-        // 3. Distribución de cuotas por estado (doughnut)
+        // 3. Distribución de cuotas por estado (doughnut). La leyenda va en HTML debajo
+        // del gráfico (statusLegend), así se ve siempre y muestra las cantidades.
+        const status = this.metricsData.charts.installment_status;
+        const colors = (status.keys || []).map((key) => this.statusColor(key));
         this.createOrUpdateChart("chart-installment-status", "doughnut", {
-            labels: this.metricsData.charts.installment_status.labels,
+            labels: status.labels,
             datasets: [{
-                data: this.metricsData.charts.installment_status.values,
-                backgroundColor: ["rgba(59, 130, 246, 0.75)", "rgba(245, 158, 11, 0.75)", "rgba(16, 185, 129, 0.75)", "rgba(239, 68, 68, 0.75)"],
-                borderColor: ["#3b82f6", "#f59e0b", "#10b981", "#ef4444"],
+                data: status.values,
+                backgroundColor: colors.map((c) => c + "bf"),
+                borderColor: colors,
                 borderWidth: 1.5
             }]
         }, {
-            plugins: { legend: { display: true, position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", padding: 15 } } }
+            plugins: { legend: { display: false } }
         });
 
         // 4. Top deudores (bar horizontal)
@@ -384,24 +387,24 @@ class CcaDashboard extends Component {
                 y: { grid: { display: false } }
             }
         });
+    }
 
-        // 5. Retiros por compañía
-        this.createOrUpdateChart("chart-by-company", "bar", {
-            labels: this.metricsData.charts.by_company.labels,
-            datasets: [{
-                label: "Retirado",
-                data: this.metricsData.charts.by_company.values,
-                backgroundColor: "rgba(16, 185, 129, 0.65)",
-                borderColor: "#10b981",
-                borderWidth: 1.5,
-                borderRadius: 6
-            }]
-        }, {
-            scales: {
-                x: { grid: { display: false } },
-                y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
-            }
-        });
+    /** Color por estado de cuota: igual en el gráfico y en su leyenda. */
+    statusColor(key) {
+        return { pending: "#3b82f6", partial: "#f59e0b", paid: "#10b981", overdue: "#ef4444" }[key] || "#94a3b8";
+    }
+
+    /** Filas de la leyenda del gráfico de estados: color, nombre, cantidad y porcentaje. */
+    get statusLegend() {
+        const status = this.metricsData.charts.installment_status;
+        const total = (status.values || []).reduce((a, b) => a + b, 0) || 1;
+        return (status.keys || []).map((key, index) => ({
+            key,
+            label: status.labels[index],
+            value: status.values[index],
+            percent: Math.round((status.values[index] * 100) / total),
+            color: this.statusColor(key),
+        }));
     }
 
     createOrUpdateChart(canvasId, type, data, options = {}) {

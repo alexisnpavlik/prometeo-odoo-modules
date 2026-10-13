@@ -159,7 +159,12 @@ class CcaDashboardController(http.Controller):
             WHERE {where}
             GROUP BY i.state
         """, params)
-        status_rows = env.cr.dictfetchall()
+        # Orden fijo de estados: el color de cada uno no depende del orden del GROUP BY.
+        order = list(INSTALLMENT_STATES)
+        status_rows = sorted(
+            env.cr.dictfetchall(),
+            key=lambda r: order.index(r["state"]) if r["state"] in order else len(order),
+        )
 
         env.cr.execute(f"""
             SELECT w.partner_id, COALESCE(SUM(i.amount_residual), 0) AS residual
@@ -174,15 +179,6 @@ class CcaDashboardController(http.Controller):
         top_rows = env.cr.dictfetchall()
         partner_names = self._resolve_names(env, "res.partner", [r["partner_id"] for r in top_rows])
 
-        env.cr.execute(f"""
-            SELECT w.company_id, COALESCE(SUM(w.amount_total), 0) AS total
-            FROM cca_withdrawal w
-            WHERE {where}
-            GROUP BY w.company_id
-            ORDER BY total DESC
-        """, params)
-        company_rows = env.cr.dictfetchall()
-
         return {
             "balance_trend": {"labels": labels, "companies": companies_series},
             "collected_vs_overdue": {
@@ -191,16 +187,13 @@ class CcaDashboardController(http.Controller):
                 "overdue": [float(r["overdue"]) for r in vs_rows],
             },
             "installment_status": {
+                "keys": [r["state"] for r in status_rows],
                 "labels": [INSTALLMENT_STATES.get(r["state"], r["state"]) for r in status_rows],
                 "values": [int(r["qty"]) for r in status_rows],
             },
             "top_partners": {
                 "labels": [partner_names.get(r["partner_id"], "N/D") for r in top_rows],
                 "values": [float(r["residual"]) for r in top_rows],
-            },
-            "by_company": {
-                "labels": [company_names.get(r["company_id"], "N/D") for r in company_rows],
-                "values": [float(r["total"]) for r in company_rows],
             },
         }
 

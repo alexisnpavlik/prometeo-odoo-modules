@@ -371,6 +371,14 @@
                                 <div class="chart-body">
                                     <canvas id="chart-installment-status"></canvas>
                                 </div>
+                                <ul class="cca-status-legend">
+                                    <li t-foreach="statusLegend" t-as="item" t-key="item_index + '-' + item.key">
+                                        <span class="cca-status-dot" t-attf-style="background: {{ item.color }};"/>
+                                        <span class="cca-status-label" t-esc="item.label"/>
+                                        <strong t-esc="item.value"/>
+                                        <span class="cca-status-pct">(<t t-esc="item.percent"/>%)</span>
+                                    </li>
+                                </ul>
                             </div>
 
                             <!-- Top Deudores -->
@@ -393,25 +401,6 @@
                                 </div>
                             </div>
 
-                            <!-- Retiros por Compañía -->
-                            <div class="chart-container glass-panel">
-                                <div class="chart-header" style="position: relative;">
-                                    <h3>Retiros por Compañía</h3>
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Compara el monto total retirado de cada empresa del grupo en el período seleccionado.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="chart-body">
-                                    <canvas id="chart-by-company"></canvas>
-                                </div>
-                            </div>
                         </div>
                     </section>
 
