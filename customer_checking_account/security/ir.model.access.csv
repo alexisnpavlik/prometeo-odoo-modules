@@ -4,3 +4,7 @@ access_cca_allocation,cca.allocation,model_cca_allocation,group_cca_user,1,1,1,1
 access_cca_withdrawal,cca.withdrawal,model_cca_withdrawal,group_cca_user,1,1,1,1
 access_cca_installment,cca.installment,model_cca_installment,group_cca_user,1,1,1,1
 access_cca_payment,cca.payment,model_cca_payment,group_cca_user,1,1,1,1
+access_cca_withdrawal_line,cca.withdrawal.line,model_cca_withdrawal_line,group_cca_user,1,1,1,1
+access_stock_picking_cca,stock.picking cca read,stock.model_stock_picking,group_cca_user,1,0,0,0
+access_stock_move_cca,stock.move cca read,stock.model_stock_move,group_cca_user,1,0,0,0
+access_stock_move_line_cca,stock.move.line cca read,stock.model_stock_move_line,group_cca_user,1,0,0,0

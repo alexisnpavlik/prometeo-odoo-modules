@@ -47,4 +47,11 @@
         <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         <field name="global" eval="True"/>
     </record>
+
+    <record id="cca_withdrawal_line_company_rule" model="ir.rule">
+        <field name="name">cca.withdrawal.line: multi-compañía</field>
+        <field name="model_id" ref="model_cca_withdrawal_line"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
 </odoo>

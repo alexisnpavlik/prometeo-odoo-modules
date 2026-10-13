@@ -25,6 +25,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
+        "views/cca_withdrawal_views.xml",
     ],
     "installable": True,
     "auto_install": False,
