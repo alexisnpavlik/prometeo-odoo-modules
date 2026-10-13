@@ -29,9 +29,10 @@
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar"
                             class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_cancel" type="object" string="Cancelar"
-                            invisible="state in ('draft', 'cancel')"
-                            confirm="¿Cancelar el retiro? Se devuelve la mercadería al stock."/>
+                    <!-- Solo sin pagos imputados: 'pending' es confirmado sin ninguna imputación. -->
+                    <button name="action_cancel" type="object" string="Devolver"
+                            invisible="state != 'pending'"
+                            confirm="¿Devolver el retiro? La mercadería vuelve al stock y se anula la deuda."/>
                     <button name="action_draft" type="object" string="Volver a borrador"
                             invisible="state != 'cancel'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending,partial,paid"/>
