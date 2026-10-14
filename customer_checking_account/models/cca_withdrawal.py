@@ -92,7 +92,7 @@ class CcaWithdrawal(models.Model):
     )
     late_fee_enabled = fields.Boolean(
         string="Cobrar mora",
-        default=True,
+        default=False,
         tracking=True,
         help="Suma un monto fijo por cada día que una cuota sigue impaga después de los días de gracia.",
     )

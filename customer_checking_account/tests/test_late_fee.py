@@ -19,6 +19,7 @@ class TestLateFee(CcaCommon):
             "partner_id": self.partner.id,
             "date": due - relativedelta(days=30),
             "first_due_date": due,
+            "late_fee_enabled": True,
             "late_fee_daily_amount": 500.0,
             "late_fee_grace_days": 5,
             "line_ids": [(0, 0, {"product_id": self.service.id, "quantity": qty})],
@@ -74,10 +75,10 @@ class TestLateFee(CcaCommon):
         self.assertEqual(withdrawal.installment_ids.late_fee, 4000.0)
         self.assertEqual(payment.amount_unallocated, 0.0)
 
-    def test_late_fee_enabled_by_default_on_withdrawal(self):
-        """La mora viene activada por defecto en cada retiro, con monto a cargar."""
+    def test_late_fee_disabled_by_default_on_withdrawal(self):
+        """La mora viene desactivada por defecto: se activa a mano en cada retiro."""
         withdrawal = self.env["cca.withdrawal"].create({"partner_id": self.partner.id})
-        self.assertTrue(withdrawal.late_fee_enabled)
+        self.assertFalse(withdrawal.late_fee_enabled)
 
     def test_each_withdrawal_has_its_own_rate(self):
         """Cada retiro usa su propio monto por día."""
