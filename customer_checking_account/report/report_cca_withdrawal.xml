@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_cca_withdrawal" model="ir.actions.report">
+        <field name="name">Comprobante de retiro</field>
+        <field name="model">cca.withdrawal</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">customer_checking_account.report_cca_withdrawal</field>
+        <field name="report_file">customer_checking_account.report_cca_withdrawal</field>
+        <field name="print_report_name">'Retiro %s - %s' % (object.name, object.partner_id.name)</field>
+        <field name="binding_model_id" ref="model_cca_withdrawal"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_cca_receipt"/>
+    </record>
+
+    <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
+    <template id="report_cca_withdrawal_document">
+        <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+        <div class="page" style="font-size: 12px;">
+            <table style="width: 100%; border-bottom: 2px solid #333;">
+                <tr>
+                    <td style="vertical-align: top; padding-bottom: 6px;">
+                        <strong style="font-size: 16px;" t-esc="o.company_id.name"/>
+                        <div t-if="o.company_id.vat">CUIT <t t-esc="o.company_id.vat"/></div>
+                    </td>
+                    <td style="vertical-align: top; text-align: right; padding-bottom: 6px;">
+                        <strong style="font-size: 16px;">Comprobante de retiro</strong>
+                        <div>Nº <t t-esc="o.name"/></div>
+                        <div>Fecha <span t-field="o.date"/></div>
+                    </td>
+                </tr>
+            </table>
+
+            <div t-if="o.state == 'cancel'"
+                 style="margin-top: 8px; padding: 4px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold;">
+                RETIRO DEVUELTO
+            </div>
+            <div t-if="o.state == 'draft'"
+                 style="margin-top: 8px; padding: 4px; border: 2px solid #999; color: #666; text-align: center; font-weight: bold;">
+                BORRADOR - SIN CONFIRMAR
+            </div>
+
+            <p style="margin-top: 10px; font-size: 14px;">
+                Cliente: <strong t-esc="o.partner_id.name"/>
+                <t t-if="o.partner_id.vat">(DNI/CUIT <t t-esc="o.partner_id.vat"/>)</t>
+            </p>
+
+            <table class="table table-sm" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th style="text-align: right;">Cant.</th>
+                        <th style="text-align: right;">Precio</th>
+                        <th style="text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.line_ids" t-as="line">
+                        <td t-esc="line.name or line.product_id.display_name"/>
+                        <td style="text-align: right;"><span t-field="line.quantity"/></td>
+                        <td style="text-align: right;"><span t-esc="line.price_unit" t-options="money"/></td>
+                        <td style="text-align: right;"><span t-field="line.price_subtotal" t-options="money"/></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table style="width: 55%; margin-left: 45%; font-size: 13px;">
+                <tr><td>Subtotal</td><td style="text-align: right;"><span t-field="o.amount_untaxed" t-options="money"/></td></tr>
+                <tr t-if="o.down_payment"><td>Entrega</td><td style="text-align: right;">- <span t-field="o.down_payment" t-options="money"/></td></tr>
+                <tr t-if="o.amount_surcharge">
+                    <td>Recargo <t t-esc="o.surcharge_percent"/>%</td>
+                    <td style="text-align: right;"><span t-field="o.amount_surcharge" t-options="money"/></td>
+                </tr>
+                <tr style="border-top: 1px solid #333;">
+                    <td><strong>A pagar en cuotas</strong></td>
+                    <td style="text-align: right;"><strong><span t-field="o.amount_financed" t-options="money"/></strong></td>
+                </tr>
+            </table>
+
+            <h5 style="margin-top: 14px;">Plan de pagos</h5>
+            <table class="table table-sm" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Cuota</th>
+                        <th>Vencimiento</th>
+                        <th style="text-align: right;">Monto</th>
+                        <th style="text-align: right;" t-if="o.state != 'draft'">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.installment_ids.sorted('sequence')" t-as="inst">
+                        <td t-esc="inst.label"/>
+                        <td t-esc="inst.date_due.strftime('%d/%m/%Y')"/>
+                        <td style="text-align: right;"><span t-esc="inst.amount" t-options="money"/></td>
+                        <td style="text-align: right;" t-if="o.state != 'draft'">
+                            <t t-if="o.currency_id.is_zero(inst.amount_residual)">Pagada</t>
+                            <span t-else="" t-esc="inst.amount_residual" t-options="money"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p t-if="o.company_id.cca_late_fee_enabled" style="font-size: 11px; color: #555;">
+                Las cuotas impagas suman <span t-field="o.company_id.cca_late_fee_daily_amount" t-options="money"/>
+                por día de atraso<t t-if="o.company_id.cca_late_fee_grace_days"> después de
+                <t t-esc="o.company_id.cca_late_fee_grace_days"/> días de gracia</t>.
+            </p>
+
+            <table style="width: 100%; margin-top: 36px;">
+                <tr>
+                    <td style="width: 55%;"/>
+                    <td style="border-top: 1px solid #333; text-align: center; padding-top: 4px;">Firma del cliente</td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_cca_withdrawal">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <t t-call="customer_checking_account.report_cca_withdrawal_document"/>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

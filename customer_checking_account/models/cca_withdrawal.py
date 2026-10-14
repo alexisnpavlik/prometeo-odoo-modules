@@ -619,6 +619,12 @@ class CcaWithdrawal(models.Model):
             withdrawal._cca_regenerate_installments()
         return True
 
+    def action_print(self):
+        """Comprobante del retiro en PDF (productos, financiación y cuotas) para el cliente."""
+        return self.env.ref(
+            "customer_checking_account.action_report_cca_withdrawal"
+        ).report_action(self, config=False)
+
     def action_register_payment(self):
         """Abre un pago nuevo del cliente sugiriendo el saldo de este retiro."""
         self.ensure_one()

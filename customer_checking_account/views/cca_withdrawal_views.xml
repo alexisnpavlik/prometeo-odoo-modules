@@ -29,8 +29,8 @@
                 <header>
                     <button name="action_confirm" type="object" string="Confirmar"
                             class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_register_payment" type="object" string="Registrar pago"
-                            class="btn-primary" invisible="state not in ('pending', 'partial')"/>
+                    <button name="action_print" type="object" string="Imprimir" icon="fa-print"
+                            class="btn-primary" invisible="state in ('draft', 'cancel')"/>
                     <button name="action_edit" type="object" string="Editar" icon="fa-pencil"
                             invisible="state in ('draft', 'cancel') or cca_has_payments"
                             confirm="El retiro vuelve a borrador: se devuelve el stock y al confirmar se vuelve a descontar. ¿Seguir?"/>
@@ -44,6 +44,8 @@
                             confirm="¿Devolver el retiro? La mercadería vuelve al stock y se anulan la deuda y la entrega inicial."/>
                     <button name="action_draft" type="object" string="Volver a borrador"
                             invisible="state != 'cancel'"/>
+                    <button name="action_register_payment" type="object" string="Registrar pago"
+                            icon="fa-money" invisible="state not in ('pending', 'partial')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending,partial,paid"/>
                 </header>
                 <sheet>
