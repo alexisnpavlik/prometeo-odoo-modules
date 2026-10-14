@@ -170,6 +170,8 @@ class CcaAccount(models.Model):
         pago como la imputación real, así lo que se muestra es lo que se imputa.
         """
         self.ensure_one()
+        # La mora del día se calcula antes de repartir: así el pago la cubre sin esperar al cron.
+        self._cca_open_installments()._cca_update_late_fees()
         currency = self.currency_id
         remaining = amount or 0.0
         plan = []

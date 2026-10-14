@@ -64,6 +64,12 @@ class CcaInstallment(models.Model):
         required=True,
         currency_field="currency_id",
     )
+    late_fee = fields.Monetary(
+        string="Mora",
+        currency_field="currency_id",
+        readonly=True,
+        help="Mora acumulada por días de atraso. La actualizan el cron diario y cada pago.",
+    )
     amount_allocated = fields.Monetary(
         string="Imputado",
         compute="_compute_amount_allocated",
@@ -113,11 +119,11 @@ class CcaInstallment(models.Model):
                 .mapped("amount")
             )
 
-    @api.depends("amount", "amount_allocated")
+    @api.depends("amount", "amount_allocated", "late_fee")
     def _compute_amount_residual(self):
-        """Residual de la cuota: monto menos lo imputado, nunca negativo."""
+        """Residual de la cuota: monto más mora menos lo imputado, nunca negativo."""
         for installment in self:
-            residual = installment.amount - installment.amount_allocated
+            residual = installment.amount + installment.late_fee - installment.amount_allocated
             installment.amount_residual = max(residual, 0.0)
 
     @api.depends("amount", "amount_allocated", "amount_residual", "date_due")
@@ -180,6 +186,10 @@ class CcaInstallment(models.Model):
         El estado es computado y almacenado, pero depende de la fecha de hoy, que no es
         un campo. Este cron fuerza el recálculo invalidando la caché de las candidatas.
         """
+        self.search([
+            ("amount_residual", ">", 0),
+            ("withdrawal_id.state", "not in", ("draft", "cancel")),
+        ])._cca_update_late_fees()
         today = fields.Date.context_today(self)
         candidates = self.search([
             ("date_due", "<", today),
@@ -195,7 +205,7 @@ class CcaInstallment(models.Model):
 
     def write(self, vals):
         """En retiros confirmados, desde la pantalla solo se puede mover el vencimiento."""
-        if set(vals) - {"date_due"} and not self.env.context.get("cca_skip_total_check") and any(
+        if set(vals) - {"date_due", "late_fee"} and not self.env.context.get("cca_skip_total_check") and any(
             installment.withdrawal_id.is_confirmed for installment in self
         ):
             raise UserError(_(
@@ -217,3 +227,24 @@ class CcaInstallment(models.Model):
         """Botón Cobrar: abre el pago del cliente sugiriendo el saldo de esta cuota."""
         self.ensure_one()
         return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.amount_residual)
+
+    def _cca_update_late_fees(self):
+        """Recalcula la mora de las cuotas impagas: días de atraso pasada la gracia × monto diario.
+
+        Una cuota ya pagada no se toca: su mora queda congelada en lo que se cobró.
+        `cca_today` en el contexto permite simular otra fecha (tests).
+        """
+        today = self.env.context.get("cca_today") or fields.Date.context_today(self)
+        for installment in self:
+            company = installment.company_id
+            if not company.cca_late_fee_enabled or not installment.withdrawal_id.is_confirmed:
+                continue
+            if installment.withdrawal_id.is_cancelled or installment.is_down_payment:
+                continue
+            if installment.currency_id.is_zero(installment.amount_residual):
+                continue
+            days = (today - installment.date_due).days - (company.cca_late_fee_grace_days or 0)
+            fee = max(days, 0) * (company.cca_late_fee_daily_amount or 0.0)
+            if installment.currency_id.compare_amounts(fee, installment.late_fee) != 0:
+                installment.sudo().write({"late_fee": fee})
+        return True

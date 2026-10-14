@@ -55,7 +55,7 @@ class CcaAllocation(models.Model):
             others = sum(
                 installment.allocation_ids.filtered(lambda a: a.id != allocation.id).mapped("amount")
             )
-            if currency.compare_amounts(others + allocation.amount, installment.amount) > 0:
+            if currency.compare_amounts(others + allocation.amount, installment.amount + installment.late_fee) > 0:
                 raise ValidationError(_(
                     "No se puede imputar %(amount)s a la cuota %(seq)s: supera su residual.",
                     amount=allocation.amount,

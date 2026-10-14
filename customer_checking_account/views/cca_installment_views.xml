@@ -11,6 +11,7 @@
                 <field name="withdrawal_id"/>
                 <field name="sequence" string="Cuota"/>
                 <field name="amount" optional="hide"/>
+                <field name="late_fee" string="Mora" sum="Mora" optional="show" decoration-danger="late_fee &gt; 0"/>
                 <field name="amount_residual" string="Debe" sum="Total"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="state" widget="badge" decoration-danger="state == 'overdue'"

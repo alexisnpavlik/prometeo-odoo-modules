@@ -119,6 +119,9 @@
                                     <field name="label" string="Cuota" readonly="1"/>
                                     <field name="date_due" readonly="is_down_payment"/>
                                     <field name="amount" sum="Total" readonly="1"/>
+                                    <field name="late_fee" string="Mora" sum="Mora" readonly="1"
+                                           column_invisible="parent.state == 'draft'"
+                                           decoration-danger="late_fee &gt; 0"/>
                                     <field name="amount_residual" column_invisible="parent.state == 'draft'" readonly="1"/>
                                     <field name="state" widget="badge" column_invisible="parent.state == 'draft'" readonly="1"
                                            decoration-danger="state == 'overdue'"
