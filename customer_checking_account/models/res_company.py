@@ -21,18 +21,3 @@ class ResCompany(models.Model):
         domain="[('code', '=', 'outgoing'), ('company_id', '=', id)]",
         help="Vacío = salidas del almacén principal de la compañía.",
     )
-
-    cca_late_fee_enabled = fields.Boolean(
-        string="Cobrar mora por atraso",
-        help="Suma un monto fijo por cada día que una cuota sigue impaga después de los días de gracia.",
-    )
-    cca_late_fee_grace_days = fields.Integer(
-        string="Días de gracia",
-        default=0,
-        help="Días después del vencimiento en los que todavía no corre la mora.",
-    )
-    cca_late_fee_daily_amount = fields.Monetary(
-        string="Mora por día",
-        currency_field="currency_id",
-        help="Monto que se suma por cada día de atraso, por cuota.",
-    )

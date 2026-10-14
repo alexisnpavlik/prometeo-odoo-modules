@@ -90,6 +90,23 @@ class CcaWithdrawal(models.Model):
         help="Lo que el cliente paga en el momento. No lleva recargo: el recargo se aplica "
              "solo sobre lo que se financia en cuotas.",
     )
+    late_fee_enabled = fields.Boolean(
+        string="Cobrar mora",
+        default=False,
+        tracking=True,
+        help="Suma un monto fijo por cada día que una cuota sigue impaga después de los días de gracia.",
+    )
+    late_fee_daily_amount = fields.Monetary(
+        string="Mora por día",
+        currency_field="currency_id",
+        tracking=True,
+        help="Monto que se suma por cada día de atraso, por cuota.",
+    )
+    late_fee_grace_days = fields.Integer(
+        string="Días de gracia",
+        tracking=True,
+        help="Días después del vencimiento en los que todavía no corre la mora.",
+    )
     down_payment_method = fields.Selection(
         selection=PAYMENT_METHODS,
         string="Medio de la entrega",
@@ -142,6 +159,10 @@ class CcaWithdrawal(models.Model):
         copy=False,
         help="Lo levanta el botón Editar en retiros con pagos: habilita solo los vencimientos. "
              "Se baja solo al guardar.",
+    )
+    sale_order_id = fields.Many2one(
+        "sale.order", string="Venta", readonly=True, copy=False,
+        help="Venta confirmada que genera el retiro: así figura en los reportes de Ventas.",
     )
     return_picking_id = fields.Many2one(
         "stock.picking", string="Devolución", readonly=True, copy=False
@@ -473,6 +494,61 @@ class CcaWithdrawal(models.Model):
             ))
         return True
 
+    def _cca_sale_line_values(self):
+        """Líneas de la venta: los productos al mismo precio, sin impuestos, y el recargo aparte."""
+        self.ensure_one()
+        values = [{
+            "product_id": line.product_id.id,
+            "name": line.name or line.product_id.display_name,
+            "product_uom_qty": line.quantity,
+            "price_unit": line.price_unit,
+            "tax_id": [fields.Command.clear()],
+        } for line in self.line_ids]
+        if not self.currency_id.is_zero(self.amount_surcharge):
+            product = self.env.ref("customer_checking_account.product_cca_surcharge")
+            values.append({
+                "product_id": product.product_variant_id.id,
+                "name": _("Recargo por financiación %s%%", self.surcharge_percent),
+                "product_uom_qty": 1.0,
+                "price_unit": self.amount_surcharge,
+                "tax_id": [fields.Command.clear()],
+            })
+        return values
+
+    def _cca_create_sale_order(self):
+        """Crea la venta confirmada del retiro y valida su entrega (el stock baja ahora).
+
+        Usa sudo: el usuario de cuenta corriente no necesita ser de Ventas ni de Inventario.
+        Sin factura: la deuda vive en la cuenta corriente.
+        """
+        self.ensure_one()
+        picking_type = self._cca_picking_type()
+        order = self.env["sale.order"].sudo().create({
+            "partner_id": self.partner_id.id,
+            "company_id": self.company_id.id,
+            "date_order": fields.Datetime.to_datetime(self.date),
+            "origin": self.name,
+            "client_order_ref": self.name,
+            "user_id": self.env.user.id,
+            "warehouse_id": picking_type.warehouse_id.id or False,
+            "order_line": [fields.Command.create(vals) for vals in self._cca_sale_line_values()],
+        })
+        order.action_confirm()
+        self.sale_order_id = order.id
+        pickings = order.picking_ids.filtered(lambda p: p.state not in ("done", "cancel"))
+        for picking in pickings:
+            self._cca_validate_picking(picking)
+        self.picking_id = order.picking_ids[:1].id
+        return order
+
+    def _cca_cancel_sale_order(self):
+        """Cancela la venta del retiro (la entrega ya se devolvió aparte)."""
+        for withdrawal in self.filtered("sale_order_id"):
+            order = withdrawal.sale_order_id.sudo()
+            if order.state != "cancel":
+                order.with_context(disable_cancel_warning=True)._action_cancel()
+            withdrawal.sale_order_id = False
+
     def _cca_create_and_validate_picking(self):
         """Crea el albarán de salida de las líneas almacenables y lo valida."""
         self.ensure_one()
@@ -532,7 +608,7 @@ class CcaWithdrawal(models.Model):
         for withdrawal in self:
             warning = withdrawal._cca_check_limit()
             withdrawal._cca_regenerate_installments()
-            withdrawal._cca_create_and_validate_picking()
+            withdrawal._cca_create_sale_order()
             withdrawal.is_confirmed = True
             # La entrega va antes que el saldo a favor: así el saldo no la cubre por FIFO.
             withdrawal._cca_register_down_payment()
@@ -570,6 +646,7 @@ class CcaWithdrawal(models.Model):
             if withdrawal.picking_id and withdrawal.picking_id.state == "done":
                 withdrawal._cca_return_picking()
             withdrawal._cca_void_down_payment()
+            withdrawal._cca_cancel_sale_order()
             withdrawal.installment_ids.sudo().unlink()
             withdrawal.is_cancelled = True
             withdrawal._message_log(body=_("Retiro cancelado por %s.", self.env.user.display_name))
@@ -591,6 +668,7 @@ class CcaWithdrawal(models.Model):
             if withdrawal.picking_id and withdrawal.picking_id.state == "done":
                 withdrawal._cca_return_picking()
             withdrawal._cca_void_down_payment()
+            withdrawal._cca_cancel_sale_order()
             withdrawal.installment_ids.sudo().unlink()
             withdrawal.write({"is_confirmed": False, "picking_id": False, "edit_due_dates": False})
             withdrawal._cca_regenerate_installments()
@@ -629,6 +707,17 @@ class CcaWithdrawal(models.Model):
         """Abre un pago nuevo del cliente sugiriendo el saldo de este retiro."""
         self.ensure_one()
         return self.env["cca.payment"]._cca_new_payment_action(self.partner_id, self.amount_residual)
+
+    def action_view_sale_order(self):
+        """Abre la venta generada por el retiro."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Venta de %s", self.name),
+            "res_model": "sale.order",
+            "res_id": self.sale_order_id.id,
+            "view_mode": "form",
+        }
 
     def action_view_picking(self):
         """Abre el albarán del retiro."""

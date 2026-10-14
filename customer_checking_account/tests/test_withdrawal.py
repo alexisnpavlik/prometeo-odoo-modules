@@ -123,3 +123,4 @@ class TestWithdrawal(CcaCommon):
         withdrawal.partner_id = other
         self.assertEqual(withdrawal.account_id.partner_id, other)
         self.assertEqual(withdrawal.installment_ids.account_id.partner_id, other)
+
