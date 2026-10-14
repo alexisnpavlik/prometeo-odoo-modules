@@ -83,14 +83,14 @@
                     </group>
                     <notebook>
                         <page string="Productos" name="lines">
-                            <field name="line_ids" readonly="state != 'draft'">
-                                <list editable="bottom">
-                                    <field name="product_id" options="{'no_open': False}"/>
-                                    <button name="action_open_product" type="object" icon="fa-external-link"
-                                            title="Abrir producto" invisible="not product_id or not id"/>
-                                    <field name="name" optional="hide"/>
-                                    <field name="quantity"/>
-                                    <field name="price_unit"/>
+                            <!-- La lista no es readonly entera: los campos sí, por fila. Así, confirmado,
+                                 el producto se ve como link a su ficha, igual que en Compras. -->
+                            <field name="line_ids">
+                                <list editable="bottom" create="parent.state == 'draft'" delete="parent.state == 'draft'">
+                                    <field name="product_id" readonly="parent.state != 'draft'"/>
+                                    <field name="name" optional="hide" readonly="parent.state != 'draft'"/>
+                                    <field name="quantity" readonly="parent.state != 'draft'"/>
+                                    <field name="price_unit" readonly="parent.state != 'draft'"/>
                                     <field name="price_subtotal"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
