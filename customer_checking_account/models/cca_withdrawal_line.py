@@ -59,6 +59,17 @@ class CcaWithdrawalLine(models.Model):
         if self.product_id:
             self.name = self.product_id.display_name
 
+    def action_open_product(self):
+        """Abre la ficha del producto de la línea."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.product_id.display_name,
+            "res_model": "product.product",
+            "res_id": self.product_id.id,
+            "view_mode": "form",
+        }
+
     @api.constrains("quantity", "price_unit")
     def _check_values(self):
         """Cantidad positiva y precio no negativo."""

@@ -123,3 +123,10 @@ class TestWithdrawal(CcaCommon):
         withdrawal.partner_id = other
         self.assertEqual(withdrawal.account_id.partner_id, other)
         self.assertEqual(withdrawal.installment_ids.account_id.partner_id, other)
+
+    def test_open_product_from_line(self):
+        """La línea abre la ficha de su producto."""
+        withdrawal = self._withdrawal()
+        action = withdrawal.line_ids.action_open_product()
+        self.assertEqual(action["res_model"], "product.product")
+        self.assertEqual(action["res_id"], self.product.id)
