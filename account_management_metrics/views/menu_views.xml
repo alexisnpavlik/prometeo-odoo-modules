@@ -10,6 +10,7 @@
     <menuitem id="menu_account_management_metrics_root"
               name="Métricas de Facturación"
               action="action_account_management_metrics"
+              web_icon="account_management_metrics,static/description/icon.png"
               groups="account_management_metrics.group_account_metrics_user"
               sequence="51"/>
 </odoo>
