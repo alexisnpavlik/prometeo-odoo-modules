@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (69 Módulos)](#-catálogo-completo-de-módulos-69-módulos)
+- [📂 Catálogo Completo de Módulos (71 Módulos)](#-catálogo-completo-de-módulos-71-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -41,7 +41,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (69 Módulos)
+## 📂 Catálogo Completo de Módulos (71 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -152,7 +152,8 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Web Company Color** | [`web_company_color`](./web_company_color) | Cambia el color de la barra superior de Odoo dinámicamente según la compañía activa. |
-| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Modo kiosco: oculta apps (Ventas, Compras, Facturación, Conversaciones), menús avanzados, campos y botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Menú de apps a pantalla completa con íconos grandes, Inventario abre en Productos y acceso a Facturas desde Punto de venta. |
+| **Menús simplificados** | [`web_menu_simplify`](./web_menu_simplify) | Modo kiosco: oculta apps (Ventas, Compras, Facturación, Conversaciones), menús avanzados, campos y botones de producto y chat/actividades, con un interruptor por opción en Ajustes. Inventario abre en Productos y acceso a Facturas desde Punto de venta. |
+| **Menú de apps a pantalla completa** | [`web_fullscreen_apps_menu`](./web_fullscreen_apps_menu) | El botón de apps abre una grilla a pantalla completa con íconos grandes, como en versiones anteriores de Odoo; también en el teléfono. |
 | **Foto con cámara** | [`web_image_camera`](./web_image_camera) | En el teléfono, los campos de imagen suman un botón que abre directo la cámara trasera (funciona sin HTTPS). |
 | **Botones Guardar y Descartar grandes** | [`web_form_save_buttons`](./web_form_save_buttons) | Reemplaza los íconos de guardar/descartar del formulario por botones grandes con texto; compactos en el teléfono. |
 | **Marca Prometeo ERP** | [`prometeo_branding`](./prometeo_branding) | Reemplaza la marca Odoo por Prometeo ERP en títulos, diálogos, logos y Punto de venta. |

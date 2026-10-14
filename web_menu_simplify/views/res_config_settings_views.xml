@@ -29,9 +29,6 @@
                         <setting help="Queda nombre, CUIT, dirección, teléfono, correo, Cuenta corriente y Datos Fiscales. Se ocultan Puesto, Sitio web, Título, Idioma, Etiquetas y las pestañas que no se usan.">
                             <field name="simplify_partner_form_simple"/>
                         </setting>
-                        <setting help="El botón de apps abre una pantalla completa con íconos grandes, en lugar de la lista desplegable.">
-                            <field name="simplify_fullscreen_apps"/>
-                        </setting>
                         <setting help="Si un menú de la barra queda con una sola opción visible, se abre directo en lugar de desplegar una lista.">
                             <field name="simplify_flatten_single_menus"/>
                         </setting>

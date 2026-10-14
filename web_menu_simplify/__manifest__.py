@@ -47,9 +47,6 @@
         "web.assets_backend": [
             "web_menu_simplify/static/src/js/systray_cleanup.js",
             "web_menu_simplify/static/src/scss/chat_hub_hidden.scss",
-            "web_menu_simplify/static/src/js/home_menu.js",
-            "web_menu_simplify/static/src/xml/home_menu.xml",
-            "web_menu_simplify/static/src/scss/home_menu.scss",
             "web_menu_simplify/static/src/scss/product_form.scss",
         ],
     },

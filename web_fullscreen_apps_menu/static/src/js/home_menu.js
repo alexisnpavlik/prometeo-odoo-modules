@@ -1,7 +1,6 @@
 /** @odoo-module **/
 import { NavBar } from "@web/webclient/navbar/navbar";
 import { patch } from "@web/core/utils/patch";
-import { session } from "@web/session";
 import { useExternalListener, useState } from "@odoo/owl";
 
 patch(NavBar.prototype, {
@@ -15,9 +14,9 @@ patch(NavBar.prototype, {
         });
     },
 
-    /** Indica si la opción de Ajustes reemplaza el desplegable por la pantalla completa. */
+    /** Siempre activo: para volver al desplegable se desinstala el módulo. */
     get simplifyFullscreenApps() {
-        return Boolean(session.web_menu_simplify_fullscreen_apps);
+        return true;
     },
 
     toggleSimplifyHome() {

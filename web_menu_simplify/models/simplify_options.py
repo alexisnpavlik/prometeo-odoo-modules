@@ -206,7 +206,6 @@ APP_START_OPTIONS = {
 # Opciones sin menús ni vistas: las resuelve el frontend.
 OTHER_OPTIONS = (
     "hide_systray",
-    "fullscreen_apps",
     "flatten_single_menus",
     "pos_first",
     "replenish_immediate",
