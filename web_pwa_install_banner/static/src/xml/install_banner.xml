@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="web_pwa_install_banner.PwaInstallBanner">
+        <div t-if="isVisible" class="o_pwa_install_banner">
+            <i class="fa fa-mobile fa-2x"/>
+            <div class="o_pwa_install_text">
+                <strong>Instalar como app</strong>
+                <small>Acceso directo desde la pantalla de inicio</small>
+            </div>
+            <button class="btn btn-primary btn-sm" t-on-click="onInstall">Instalar</button>
+            <button class="btn btn-link btn-sm text-muted" t-on-click="onDismiss">Ahora no</button>
+        </div>
+    </t>
+</templates>
