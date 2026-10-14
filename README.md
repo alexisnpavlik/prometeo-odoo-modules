@@ -211,6 +211,23 @@ addons_path = /ruta/a/odoo/addons, /ruta/a/prometeo-odoo-modules
 
 Luego, reinicia el servicio de Odoo, activa el **Modo Desarrollador**, ve a **Aplicaciones** > **Actualizar lista de aplicaciones** e instala los módulos que requieras.
 
+### Notas de deploy
+
+#### `web_fullscreen_apps_menu` (separado de `web_menu_simplify`)
+
+La grilla de apps a pantalla completa salió de `web_menu_simplify` a su propio módulo. En cada base que tenga `web_menu_simplify` instalado, el orden es:
+
+1. Actualizar el código del repo (`git pull`).
+2. Actualizar `web_menu_simplify`: borra el interruptor viejo de Ajustes.
+3. Instalar `web_fullscreen_apps_menu`; si no, el botón de apps vuelve al desplegable estándar de Odoo.
+4. Reiniciar Odoo.
+
+```bash
+odoo -d <base> -u web_menu_simplify -i web_fullscreen_apps_menu --stop-after-init
+```
+
+`web_fullscreen_apps_menu` no tiene configuración: instalado, la grilla queda activa para todos los usuarios.
+
 ---
 
 ## 👥 Créditos y Agradecimientos
