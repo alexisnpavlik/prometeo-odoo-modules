@@ -1,12 +1,15 @@
 /** @odoo-module **/
 import { NavBar } from "@web/webclient/navbar/navbar";
 import { patch } from "@web/core/utils/patch";
+import { browser } from "@web/core/browser/browser";
 import { useExternalListener, useState } from "@odoo/owl";
 
 patch(NavBar.prototype, {
     setup() {
         super.setup();
-        this.simplifyHome = useState({ open: false });
+        // Entrar a /odoo sin app elegida abre la grilla de apps.
+        const path = browser.location.pathname.replace(/\/+$/, "");
+        this.simplifyHome = useState({ open: path === "/odoo" });
         useExternalListener(window, "keydown", (ev) => {
             if (ev.key === "Escape" && this.simplifyHome.open) {
                 this.simplifyHome.open = false;
