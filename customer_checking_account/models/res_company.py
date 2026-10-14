@@ -24,6 +24,7 @@ class ResCompany(models.Model):
 
     cca_late_fee_enabled = fields.Boolean(
         string="Cobrar mora por atraso",
+        default=True,
         help="Suma un monto fijo por cada día que una cuota sigue impaga después de los días de gracia.",
     )
     cca_late_fee_grace_days = fields.Integer(
