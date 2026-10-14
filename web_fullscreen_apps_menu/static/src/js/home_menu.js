@@ -26,6 +26,12 @@ patch(NavBar.prototype, {
         this.simplifyHome.open = !this.simplifyHome.open;
     },
 
+    /** Celular: "All Apps" de la barra lateral abre la grilla en vez de la lista. */
+    onAllAppsBtnClick() {
+        this._closeAppMenuSidebar();
+        this.simplifyHome.open = true;
+    },
+
     /** Cierra la pantalla de apps y abre la elegida. */
     onSimplifyHomeSelect(app) {
         this.simplifyHome.open = false;
