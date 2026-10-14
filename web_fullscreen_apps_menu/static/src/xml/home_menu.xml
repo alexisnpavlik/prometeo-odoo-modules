@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-inherit="web.NavBar.AppsMenu" t-inherit-mode="extension">
-        <!-- En celular también: sin esto Odoo usa su barra lateral y la grilla nunca aparece. -->
-        <xpath expr="//t[@t-if='env.isSmall']" position="attributes">
-            <attribute name="t-if">env.isSmall and !simplifyFullscreenApps</attribute>
+        <!-- En celular se conserva la barra lateral de Odoo (trae los submenús de la app);
+             su botón "All Apps" abre la grilla. -->
+        <xpath expr="//t[@t-if='env.isSmall']" position="inside">
+            <t t-call="web_fullscreen_apps_menu.Grid"/>
         </xpath>
         <xpath expr="//div[hasclass('o_navbar_apps_menu')]" position="attributes">
             <attribute name="t-if">!isScopedApp and !simplifyFullscreenApps</attribute>
@@ -17,22 +18,26 @@
                         <i class="oi oi-apps"/>
                     </button>
                 </div>
-                <t t-portal="'body'">
-                    <div t-if="simplifyHome.open" class="o_simplify_home" t-on-click.self="toggleSimplifyHome">
-                        <div class="o_simplify_home_grid">
-                            <a t-foreach="apps" t-as="app" t-key="app.id"
-                               class="o_simplify_home_app"
-                               t-att-class="{ 'o_simplify_home_app_current': menuService.getCurrentApp() === app }"
-                               t-att-href="getMenuItemHref(app)"
-                               t-att-data-menu-xmlid="app.xmlid"
-                               t-on-click.prevent="() => this.onSimplifyHomeSelect(app)">
-                                <img t-att-src="app.webIconData or '/web/static/img/default_icon_app.png'" alt=""/>
-                                <span t-esc="app.name"/>
-                            </a>
-                        </div>
-                    </div>
-                </t>
+                <t t-call="web_fullscreen_apps_menu.Grid"/>
             </t>
         </xpath>
+    </t>
+
+    <t t-name="web_fullscreen_apps_menu.Grid">
+        <t t-portal="'body'">
+            <div t-if="simplifyHome.open" class="o_simplify_home" t-on-click.self="toggleSimplifyHome">
+                <div class="o_simplify_home_grid">
+                    <a t-foreach="apps" t-as="app" t-key="app.id"
+                       class="o_simplify_home_app"
+                       t-att-class="{ 'o_simplify_home_app_current': menuService.getCurrentApp() === app }"
+                       t-att-href="getMenuItemHref(app)"
+                       t-att-data-menu-xmlid="app.xmlid"
+                       t-on-click.prevent="() => this.onSimplifyHomeSelect(app)">
+                        <img t-att-src="app.webIconData or '/web/static/img/default_icon_app.png'" alt=""/>
+                        <span t-esc="app.name"/>
+                    </a>
+                </div>
+            </div>
+        </t>
     </t>
 </templates>
