@@ -99,10 +99,10 @@
                 </tbody>
             </table>
 
-            <p t-if="o.company_id.cca_late_fee_enabled" style="font-size: 11px; color: #555;">
-                Las cuotas impagas suman <span t-field="o.company_id.cca_late_fee_daily_amount" t-options="money"/>
-                por día de atraso<t t-if="o.company_id.cca_late_fee_grace_days"> después de
-                <t t-esc="o.company_id.cca_late_fee_grace_days"/> días de gracia</t>.
+            <p t-if="o.late_fee_enabled and o.late_fee_daily_amount" style="font-size: 11px; color: #555;">
+                Las cuotas impagas suman <span t-field="o.late_fee_daily_amount" t-options="money"/>
+                por día de atraso<t t-if="o.late_fee_grace_days"> después de
+                <t t-esc="o.late_fee_grace_days"/> días de gracia</t>.
             </p>
 
             <table style="width: 100%; margin-top: 36px;">

@@ -90,6 +90,23 @@ class CcaWithdrawal(models.Model):
         help="Lo que el cliente paga en el momento. No lleva recargo: el recargo se aplica "
              "solo sobre lo que se financia en cuotas.",
     )
+    late_fee_enabled = fields.Boolean(
+        string="Cobrar mora",
+        default=True,
+        tracking=True,
+        help="Suma un monto fijo por cada día que una cuota sigue impaga después de los días de gracia.",
+    )
+    late_fee_daily_amount = fields.Monetary(
+        string="Mora por día",
+        currency_field="currency_id",
+        tracking=True,
+        help="Monto que se suma por cada día de atraso, por cuota.",
+    )
+    late_fee_grace_days = fields.Integer(
+        string="Días de gracia",
+        tracking=True,
+        help="Días después del vencimiento en los que todavía no corre la mora.",
+    )
     down_payment_method = fields.Selection(
         selection=PAYMENT_METHODS,
         string="Medio de la entrega",

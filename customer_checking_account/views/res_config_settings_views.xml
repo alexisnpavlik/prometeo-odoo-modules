@@ -19,22 +19,6 @@
                             <field name="cca_default_limit_mode"/>
                         </setting>
                     </block>
-                    <block title="Mora por atraso" name="cca_late_fee_container">
-                        <setting string="Cobrar mora por atraso"
-                                 help="Suma un monto por cada día que una cuota sigue impaga después de los días de gracia.">
-                            <field name="cca_late_fee_enabled"/>
-                            <div class="content-group" invisible="not cca_late_fee_enabled">
-                                <div class="row mt-2">
-                                    <label for="cca_late_fee_daily_amount" string="Mora por día" class="col-lg-5 o_light_label"/>
-                                    <field name="cca_late_fee_daily_amount"/>
-                                </div>
-                                <div class="row">
-                                    <label for="cca_late_fee_grace_days" string="Días de gracia" class="col-lg-5 o_light_label"/>
-                                    <field name="cca_late_fee_grace_days"/>
-                                </div>
-                            </div>
-                        </setting>
-                    </block>
                     <block title="Stock" name="cca_stock_container">
                         <setting string="Tipo de operación para retiros"
                                  help="Vacío = salidas del almacén principal.">

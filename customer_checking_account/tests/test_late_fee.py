@@ -11,20 +11,18 @@ class TestLateFee(CcaCommon):
     def setUp(self):
         super().setUp()
         self.today = fields.Date.context_today(self.env.user)
-        self.company.write({
-            "cca_late_fee_enabled": True,
-            "cca_late_fee_grace_days": 5,
-            "cca_late_fee_daily_amount": 500.0,
-        })
 
-    def _confirmed(self, days_overdue, qty=20):
+    def _confirmed(self, days_overdue, qty=20, **vals):
         """Retiro de qty × 50 en una cuota vencida hace `days_overdue` días."""
         due = self.today - relativedelta(days=days_overdue)
         withdrawal = self.env["cca.withdrawal"].create({
             "partner_id": self.partner.id,
             "date": due - relativedelta(days=30),
             "first_due_date": due,
+            "late_fee_daily_amount": 500.0,
+            "late_fee_grace_days": 5,
             "line_ids": [(0, 0, {"product_id": self.service.id, "quantity": qty})],
+            **vals,
         })
         withdrawal.action_confirm()
         return withdrawal
@@ -51,8 +49,7 @@ class TestLateFee(CcaCommon):
 
     def test_no_fee_when_disabled(self):
         """Con la casilla apagada no se cobra mora."""
-        self.company.cca_late_fee_enabled = False
-        withdrawal = self._confirmed(30)
+        withdrawal = self._confirmed(30, late_fee_enabled=False)
         self._run_cron()
         self.assertEqual(withdrawal.installment_ids.late_fee, 0.0)
 
@@ -76,3 +73,14 @@ class TestLateFee(CcaCommon):
         payment = self.env["cca.payment"].create({"partner_id": self.partner.id, "amount": 5000})
         self.assertEqual(withdrawal.installment_ids.late_fee, 4000.0)
         self.assertEqual(payment.amount_unallocated, 0.0)
+
+    def test_late_fee_enabled_by_default_on_withdrawal(self):
+        """La mora viene activada por defecto en cada retiro, con monto a cargar."""
+        withdrawal = self.env["cca.withdrawal"].create({"partner_id": self.partner.id})
+        self.assertTrue(withdrawal.late_fee_enabled)
+
+    def test_each_withdrawal_has_its_own_rate(self):
+        """Cada retiro usa su propio monto por día."""
+        cheap = self._confirmed(13, late_fee_daily_amount=100.0)
+        self._run_cron()
+        self.assertEqual(cheap.installment_ids.late_fee, 800.0)

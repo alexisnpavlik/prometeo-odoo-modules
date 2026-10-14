@@ -102,6 +102,11 @@
                                     <field name="installment_count" readonly="state != 'draft'"/>
                                     <field name="first_due_date" readonly="state != 'draft'"/>
                                     <field name="frequency" readonly="state != 'draft'"/>
+                                    <field name="late_fee_enabled" readonly="state not in ('draft', 'pending', 'partial')"/>
+                                    <field name="late_fee_daily_amount" invisible="not late_fee_enabled"
+                                           readonly="state not in ('draft', 'pending', 'partial')"/>
+                                    <field name="late_fee_grace_days" invisible="not late_fee_enabled"
+                                           readonly="state not in ('draft', 'pending', 'partial')"/>
                                 </group>
                                 <group class="oe_subtotal_footer" name="totals">
                                     <field name="amount_untaxed"/>

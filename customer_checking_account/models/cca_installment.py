@@ -236,15 +236,15 @@ class CcaInstallment(models.Model):
         """
         today = self.env.context.get("cca_today") or fields.Date.context_today(self)
         for installment in self:
-            company = installment.company_id
-            if not company.cca_late_fee_enabled or not installment.withdrawal_id.is_confirmed:
+            withdrawal = installment.withdrawal_id
+            if not withdrawal.late_fee_enabled or not withdrawal.is_confirmed:
                 continue
             if installment.withdrawal_id.is_cancelled or installment.is_down_payment:
                 continue
             if installment.currency_id.is_zero(installment.amount_residual):
                 continue
-            days = (today - installment.date_due).days - (company.cca_late_fee_grace_days or 0)
-            fee = max(days, 0) * (company.cca_late_fee_daily_amount or 0.0)
+            days = (today - installment.date_due).days - (withdrawal.late_fee_grace_days or 0)
+            fee = max(days, 0) * (withdrawal.late_fee_daily_amount or 0.0)
             if installment.currency_id.compare_amounts(fee, installment.late_fee) != 0:
                 installment.sudo().write({"late_fee": fee})
         return True
