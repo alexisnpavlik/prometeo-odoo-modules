@@ -50,6 +50,11 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
+                        <button name="action_view_sale_order" type="object" class="oe_stat_button"
+                                icon="fa-shopping-cart" invisible="not sale_order_id">
+                            <span>Venta</span>
+                        </button>
+                        <field name="sale_order_id" invisible="1"/>
                         <button name="action_view_picking" type="object" class="oe_stat_button"
                                 icon="fa-truck" invisible="not picking_id">
                             <span>Albarán</span>

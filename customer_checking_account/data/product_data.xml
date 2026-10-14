@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Línea de recargo en las ventas que generan los retiros. Servicio sin impuestos. -->
+    <record id="product_cca_surcharge" model="product.template">
+        <field name="name">Recargo por financiación</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="taxes_id" eval="[(5, 0, 0)]"/>
+        <field name="invoice_policy">order</field>
+    </record>
+</odoo>
