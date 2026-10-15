@@ -183,6 +183,9 @@ VIEW_OPTIONS = {
     "hide_update_quantity": {
         "form": ("//header/button[@name='action_update_quantity_on_hand']",),
     },
+    "hide_sale_taxes": {
+        "form": ("//label[@for='taxes_id']", "//div[@name='taxes_div']"),
+    },
     "hide_purchase_taxes": {
         "form": ("//page[@name='general_information']//field[@name='supplier_taxes_id']",),
     },
