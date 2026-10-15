@@ -171,6 +171,9 @@
                         <setting help="En la ficha: las casillas Ventas, Compras y Punto de venta debajo del nombre.">
                             <field name="simplify_hide_product_sale_flags"/>
                         </setting>
+                        <setting help="Campo Impuestos de venta de la ficha de producto. Solo se oculta: el producto conserva sus impuestos.">
+                            <field name="simplify_hide_sale_taxes"/>
+                        </setting>
                         <setting help="Campo Impuestos de compra de la ficha de producto.">
                             <field name="simplify_hide_purchase_taxes"/>
                         </setting>

@@ -69,6 +69,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_reordering_rules = fields.Boolean("Ocultar Reglas de reordenamiento")
     simplify_hide_product_type_fields = fields.Boolean("Ocultar tipo de producto, facturación e inventario")
     simplify_hide_product_sale_flags = fields.Boolean("Ocultar casillas Ventas, Compras y Punto de venta")
+    simplify_hide_sale_taxes = fields.Boolean("Ocultar Impuestos de venta")
     simplify_hide_purchase_taxes = fields.Boolean("Ocultar Impuestos de compra")
     simplify_product_form_comfort = fields.Boolean("Ficha de producto más legible")
 
