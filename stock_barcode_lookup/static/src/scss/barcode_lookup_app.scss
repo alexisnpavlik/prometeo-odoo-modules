@@ -41,6 +41,37 @@
     }
 }
 
+.o_barcode_lookup_results {
+    width: 100%;
+
+    .list-group-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-height: 64px;
+        text-align: left;
+        font-size: 1.05rem;
+    }
+
+    img {
+        width: 48px;
+        height: 48px;
+        flex-shrink: 0;
+        object-fit: contain;
+    }
+}
+
+.o_barcode_lookup_results_info {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.o_barcode_lookup_results_price {
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
 .o_barcode_lookup_loading {
     font-size: 1.2rem;
 }
