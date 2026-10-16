@@ -130,6 +130,7 @@ class InventoryDashboardMetrics extends Component {
                 qty,
                 total: qty * c.price,
                 min_qty: c.supplier_min > qty ? c.supplier_min : 0,
+                days_after: roundUnits((Math.max(c.stock, 0) + qty) / c.daily),
             });
         }
         return rows.sort((a, b) =>

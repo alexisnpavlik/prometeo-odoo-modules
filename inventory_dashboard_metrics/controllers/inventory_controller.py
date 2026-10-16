@@ -189,7 +189,9 @@ class InventoryMetricsController(http.Controller):
                 continue
             # El mínimo del proveedor se informa pero no se impone: forzarlo genera sobrestock
             result.append(dict(c, qty=qty, total=round(qty * c["price"], 2),
-                               min_qty=c["supplier_min"] if c["supplier_min"] > qty else 0))
+                               min_qty=c["supplier_min"] if c["supplier_min"] > qty else 0,
+                               # Días que cubriría el stock después de comprar
+                               days_after=_round_units((max(c["stock"], 0.0) + qty) / c["daily"])))
         result.sort(key=lambda r: (r["status"] != "urgente", r["vendor"] == NO_VENDOR, r["vendor"], -r["total"]))
         return result
 
@@ -313,9 +315,9 @@ class InventoryMetricsController(http.Controller):
                 data = self._purchase_rows(self._purchase_candidates(rows, suppliers), cover)
                 title = f"Recomendador de compra ({cover} días)"
                 headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
-                           "Alcanza para (días)", "Comprar", "Mínimo del proveedor",
+                           "Alcanzaría para (días)", "Comprar", "Mínimo del proveedor",
                            "Precio", "Total", "Prioridad"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "days_left",
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "days_after",
                         "qty", "min_qty", "price", "total", "status"]
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
