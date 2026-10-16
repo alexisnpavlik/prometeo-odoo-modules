@@ -1,8 +1,8 @@
 {
     "name": "Product Image Zoom",
-    "version": "18.0.1.0.0",
+    "version": "18.0.2.0.0",
     "category": "Inventory",
-    "summary": "Ampliar imagen del producto al hacer clic en la ficha",
+    "summary": "Tocar la imagen del producto abre un popup para verla en grande, cambiarla o quitarla",
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "depends": ["product", "web"],

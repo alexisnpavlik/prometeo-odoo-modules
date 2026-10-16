@@ -1,33 +1,69 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<templates>
+<templates xml:space="preserve">
 
     <!--
-        ImageZoomField: envuelve ImageField estándar y agrega botón lupa.
-        La lupa aparece al hacer hover. t-on-click.stop evita que el clic
-        en la lupa propague al ImageField (que abriría el diálogo de carga).
+        ImageZoomField: misma imagen que web.ImageField pero sin los botones
+        superpuestos (lápiz, tacho, cámara). Tocar la imagen abre el popup.
     -->
-    <t t-name="product_image_zoom.ImageZoomField">
-        <div class="o_field_image_zoom">
-            <ImageField t-props="props"/>
-            <div class="o_zoom_overlay" t-on-click.stop="openZoom">
-                <i class="fa fa-search-plus o_zoom_icon"/>
+    <t t-name="product_image_zoom.ImageZoomField" t-inherit="web.ImageField" t-inherit-mode="primary">
+        <xpath expr="//div[hasclass('opacity-trigger-hover')]" position="attributes">
+            <attribute name="class">d-inline-block position-relative o_field_image_zoom</attribute>
+            <attribute name="t-on-click">openZoom</attribute>
+        </xpath>
+        <xpath expr="//FileUploader/.." position="replace">
+            <div class="o_zoom_hint">
+                <i t-attf-class="fa {{ hasImage ? 'fa-search-plus' : 'fa-camera' }}"/>
             </div>
-        </div>
+        </xpath>
     </t>
 
     <!--
-        ImageZoomDialog: modal con la imagen en alta resolución.
+        ImageZoomDialog: imagen grande + botones grandes.
         props.close es inyectado por el dialog service de Odoo.
     -->
     <t t-name="product_image_zoom.ImageZoomDialog">
-        <Dialog title="''" size="'xl'">
+        <Dialog title="''" size="'xl'" contentClass="'o_image_zoom_dialog'">
             <div class="d-flex align-items-center justify-content-center p-2">
-                <img
+                <img t-if="props.src"
                     t-att-src="props.src"
                     alt="Imagen del producto"
-                    style="max-width: 90vw; max-height: 82vh; object-fit: contain;"
+                    class="o_image_zoom_dialog_img"
                 />
+                <div t-else="" class="text-muted fs-4 py-5">Sin imagen</div>
             </div>
+            <t t-set-slot="footer">
+                <div class="o_image_zoom_actions d-flex flex-wrap gap-2 w-100">
+                    <t t-if="!props.readonly">
+                        <FileUploader
+                            acceptedFileExtensions="props.acceptedFileExtensions"
+                            onUploaded.bind="onUploaded"
+                        >
+                            <t t-set-slot="toggler">
+                                <button class="btn btn-primary btn-lg">
+                                    <i class="fa fa-pencil me-2"/>
+                                    <t t-if="props.src">Cambiar imagen</t>
+                                    <t t-else="">Agregar imagen</t>
+                                </button>
+                            </t>
+                        </FileUploader>
+                        <FileUploader t-if="cameraSupported"
+                            acceptedFileExtensions="'image/*'"
+                            capture="'environment'"
+                            onUploaded.bind="onUploaded"
+                        >
+                            <t t-set-slot="toggler">
+                                <button class="btn btn-primary btn-lg">
+                                    <i class="fa fa-camera me-2"/>Sacar foto
+                                </button>
+                            </t>
+                        </FileUploader>
+                        <button t-if="props.src" class="btn btn-outline-danger btn-lg" t-on-click="onRemove">
+                            <i class="fa fa-trash-o me-2"/>Quitar
+                        </button>
+                    </t>
+                    <button class="btn btn-secondary btn-lg ms-auto" t-on-click="props.close">Cerrar</button>
+                </div>
+            </t>
         </Dialog>
     </t>
 
