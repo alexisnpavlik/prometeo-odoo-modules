@@ -6,6 +6,8 @@ import { rpc } from "@web/core/network/rpc";
 
 const PAGE_SIZE = 25;
 const LOW_COVER_DAYS = 15;
+// Umbral fijo de sobrestock: debe coincidir con DEFAULT_TARGET del controlador
+const OVERSTOCK_DAYS = 90;
 
 // Mismo redondeo y misma cuenta que _purchase_rows en el controlador
 const roundUnits = (value) => Math.floor(value + 0.5);
@@ -31,10 +33,10 @@ class InventoryDashboardMetrics extends Component {
 
     setup() {
         this.lowCoverDays = LOW_COVER_DAYS;
+        this.overstockDays = OVERSTOCK_DAYS;
         this.state = useState({
             company: "all",
             period: "90",
-            target: "90",
             lead: "7",
             tab: "stock",
             showFilters: false,
@@ -232,7 +234,6 @@ class InventoryDashboardMetrics extends Component {
             table,
             company: this.state.company,
             period: this.state.period,
-            target: this.state.target,
             lead: this.state.lead,
             vendor: this.state.vendor,
             cover: this.state.buyCover,
@@ -258,7 +259,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async clearFilters() {
-        Object.assign(this.state, { company: "all", period: "90", target: "90", lead: "7", category: "all", vendor: "all", showFilters: false });
+        Object.assign(this.state, { company: "all", period: "90", lead: "7", category: "all", vendor: "all", showFilters: false });
         await this.refreshData();
     }
 
@@ -311,7 +312,6 @@ class InventoryDashboardMetrics extends Component {
             const metrics = await rpc("/inventory_dashboard_metrics/inventory", {
                 company: this.state.company,
                 period: parseInt(this.state.period) || 90,
-                target: parseInt(this.state.target) || 90,
             });
             Object.assign(this.metricsData, metrics);
             Object.assign(this.state, { overPage: 1, restPage: 1 });

@@ -60,19 +60,6 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Cobertura objetivo</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.target">
-                                <option value="30">30 días</option>
-                                <option value="60">60 días</option>
-                                <option value="90">90 días</option>
-                                <option value="120">120 días</option>
-                                <option value="180">180 días</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
                         <label>Plazo de entrega (si el proveedor no lo indica)</label>
                         <div class="select-wrapper">
                             <select t-model="state.lead">
@@ -240,11 +227,11 @@
                                     <p class="section-sub">
                                         <t t-esc="formatNumber(filteredOverstock.length)"/> productos ·
                                         <b><t t-esc="formatCurrency(overFilteredExcess)"/></b> de plata de más
-                                        (stock que supera <t t-esc="state.target"/> días de venta)
+                                        (stock para más de <t t-esc="overstockDays"/> días de venta)
                                     </p>
                                 </div>
                                 <t t-call="inventory_dashboard_metrics.InfoTip">
-                                    <t t-set="tip" t-value="'Sin ventas: hay stock pero no se vendió nada en el período. Sobrestock: se vende, pero el stock alcanza para más días que la cobertura objetivo. De más = stock que sobra, a costo.'"/>
+                                    <t t-set="tip" t-value="'Sin ventas: hay stock pero no se vendió nada en el período. Sobrestock: se vende, pero el stock alcanza para más de 90 días de venta. De más = stock que sobra por encima de esos 90 días, a costo.'"/>
                                 </t>
                             </div>
                             <div class="filter-row">
