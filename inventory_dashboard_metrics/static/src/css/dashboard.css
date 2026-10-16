@@ -1371,3 +1371,4 @@
     border: 1px solid rgba(245, 158, 11, 0.4);
     cursor: help;
 }
+.inv-dashboard-wrap .data-table .cell-note.muted { color: var(--text-muted); font-weight: 500; }

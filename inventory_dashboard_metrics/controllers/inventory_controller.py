@@ -19,6 +19,10 @@ DEFAULT_TARGET = 90
 NO_VENDOR = "Sin proveedor"
 BUY_COVER_MIN, BUY_COVER_MAX, DEFAULT_BUY_COVER = 7, 180, 30
 LOW_COVER_DAYS = 15
+# Un producto con menos historia que el período se promedia sobre sus días reales, con este mínimo
+MIN_HISTORY_DAYS = 7
+# Decimales del promedio diario: el mismo valor redondeado se muestra y se usa en la cuenta
+DAILY_DECIMALS = 3
 MAX_TABLE_ROWS = 20000
 UNCATEGORIZED = "Sin categorizar"
 GENERIC_CATEGORIES = ("all", "todos", "all / saleable")
@@ -26,9 +30,8 @@ GENERIC_CATEGORIES = ("all", "todos", "all / saleable")
 
 OVER_SORTS = {
     "excess": lambda r: -r["excess_value"],
-    "value": lambda r: -r["value"],
+    "cover": lambda r: -(r["cover"] if r["cover"] is not None else 10 ** 9),
     "stock": lambda r: -r["stock"],
-    "idle": lambda r: -(r["days_since_sale"] if r["days_since_sale"] is not None else 10 ** 9),
 }
 STATUS_LABELS = {
     "sin_venta": "Sin ventas", "sobrestock": "Sobrestock",
@@ -111,6 +114,12 @@ class InventoryMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = sm.product_id
                 WHERE sm.state = 'done' AND sm.company_id IN %(companies)s
                 GROUP BY sm.product_id
+            ),
+            first_move AS (
+                SELECT product_id, MIN(date) AS first_move
+                FROM stock_move
+                WHERE state = 'done' AND company_id IN %(companies)s
+                GROUP BY product_id
             )
             SELECT pp.id AS product_id,
                    pt.id AS tmpl_id,
@@ -121,12 +130,14 @@ class InventoryMetricsController(http.Controller):
                    COALESCE(st.stock, 0.0) AS stock,
                    COALESCE(st.value, 0.0) AS value,
                    COALESCE(sa.qty_period, 0.0) AS qty_period,
-                   sa.last_sale
+                   sa.last_sale,
+                   fm.first_move
             FROM product_product pp
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category pc ON pc.id = pt.categ_id
             LEFT JOIN stock st ON st.product_id = pp.id
             LEFT JOIN sales sa ON sa.product_id = pp.id
+            LEFT JOIN first_move fm ON fm.product_id = pp.id
             WHERE pp.active = TRUE AND pt.active = TRUE
               AND pt.type = 'consu' AND pt.is_storable = TRUE
               AND (st.product_id IS NOT NULL OR sa.product_id IS NOT NULL)
@@ -171,6 +182,7 @@ class InventoryMetricsController(http.Controller):
                 "vendor": sup["vendor"] if sup else NO_VENDOR,
                 "stock": round(r["stock"], 2),
                 "sold": round(r["qty_period"], 2),
+                "days": r["days"],
                 "daily": r["daily"],
                 "days_left": int(round(days_left)),
                 "supplier_min": int(math.ceil(sup["min_qty"])) if sup and sup["min_qty"] else 0,
@@ -208,7 +220,11 @@ class InventoryMetricsController(http.Controller):
             r["qty_period"] = qty
             r["categoria"] = r["categoria"] if r["categoria"] and r["categoria"].lower() not in GENERIC_CATEGORIES \
                 else UNCATEGORIZED
-            r["daily"] = qty / period
+            # Se promedia sobre el período, salvo que el producto tenga menos historia (base o producto
+            # nuevos): dividir siempre por el período subestimaba la venta (kiosco: 9 días de datos / 90).
+            history = (now - r["first_move"]).total_seconds() / 86400 if r["first_move"] else period
+            r["days"] = int(round(min(period, max(history, MIN_HISTORY_DAYS))))
+            r["daily"] = round(qty / r["days"], DAILY_DECIMALS)
             r["value"] = max(float(r["value"] or 0.0), 0.0) if stock > 0 else 0.0
             unit_cost = r["value"] / stock if stock > 0 else 0.0
             r["cover"] = stock / r["daily"] if stock > 0 and r["daily"] > 0 else None
@@ -217,7 +233,7 @@ class InventoryMetricsController(http.Controller):
             r["status"] = "ok"
             r["excess_units"] = 0.0
             if stock > 0:
-                if qty <= 0:
+                if r["daily"] <= 0:
                     r["status"] = "sin_venta"
                     r["excess_units"] = stock
                 elif r["cover"] > target:
@@ -236,7 +252,8 @@ class InventoryMetricsController(http.Controller):
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
             "sold": round(r["qty_period"], 2),
-            "daily": round(r["daily"], 2),
+            "days": r["days"],
+            "daily": r["daily"],
             "cover": int(round(r["cover"])) if r["cover"] is not None else None,
             "last_sale": r["last_sale"].strftime("%d/%m/%Y") if r["last_sale"] else None,
             "days_since_sale": r["days_since_sale"],
@@ -247,7 +264,7 @@ class InventoryMetricsController(http.Controller):
 
     def _restock_rows(self, rows):
         """Productos con demanda que se quedaron sin stock o les quedan pocos días."""
-        urgent = [r for r in rows if r["qty_period"] > 0 and (r["stock"] <= 0 or (
+        urgent = [r for r in rows if r["daily"] > 0 and (r["stock"] <= 0 or (
             r["cover"] is not None and r["cover"] <= LOW_COVER_DAYS))]
         urgent.sort(key=lambda r: (r["cover"] if r["cover"] is not None else -1, -r["daily"]))
         return len(urgent), [{
@@ -257,7 +274,8 @@ class InventoryMetricsController(http.Controller):
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
             "sold": round(r["qty_period"], 2),
-            "daily": round(r["daily"], 2),
+            "days": r["days"],
+            "daily": r["daily"],
             "cover": int(round(r["cover"])) if r["cover"] is not None else 0,
             "status": "sin_stock" if r["stock"] <= 0 else "por_agotarse",
         } for r in urgent[:MAX_TABLE_ROWS]]
@@ -317,24 +335,24 @@ class InventoryMetricsController(http.Controller):
                 cover = _to_int(cover, range(BUY_COVER_MIN, BUY_COVER_MAX + 1), DEFAULT_BUY_COVER)
                 data = self._purchase_rows(self._purchase_candidates(rows, suppliers), cover)
                 title = f"Recomendador de compra ({cover} días)"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día",
                            "Alcanzaría para (días)", "Comprar", "Mínimo del proveedor",
                            "Precio", "Total", "Prioridad"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "days_after",
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "days_after",
                         "qty", "min_qty", "price", "total", "status"]
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
                 title = "Productos por reponer"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día",
                            "Alcanza para (días)", "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
             else:
                 _total, data = self._overstock_rows(rows)
                 data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
                 title = "Mucho stock y poca venta"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día", "Alcanza para (días)",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día", "Alcanza para (días)",
                            "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
 
             query = (search or '').lower().strip()
             data = [r for r in data
@@ -352,6 +370,7 @@ class InventoryMetricsController(http.Controller):
             fmt_text = workbook.add_format({'border': 1})
             fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
             fmt_num = workbook.add_format({'border': 1, 'num_format': '#,##0.##'})
+            fmt_daily = workbook.add_format({'border': 1, 'num_format': '0.000'})
             money_keys = {"value", "excess_value", "price", "total"}
 
             sheet = workbook.add_worksheet(title[:31])
@@ -369,7 +388,7 @@ class InventoryMetricsController(http.Controller):
                     if key == "status":
                         sheet.write_string(4 + idx, col, STATUS_LABELS.get(value, ''), fmt_text)
                     elif key == "daily":
-                        sheet.write_number(4 + idx, col, round(value, 2), fmt_num)
+                        sheet.write_number(4 + idx, col, value, fmt_daily)
                     elif isinstance(value, (int, float)):
                         sheet.write_number(4 + idx, col, value, fmt_money if key in money_keys else fmt_num)
                     else:

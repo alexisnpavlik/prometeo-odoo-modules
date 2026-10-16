@@ -23,9 +23,8 @@ const BUY_COVER_LEVELS = [
 
 const OVER_SORTS = {
     excess: (a, b) => b.excess_value - a.excess_value,
-    value: (a, b) => b.value - a.value,
+    cover: (a, b) => (b.cover ?? 1e9) - (a.cover ?? 1e9),
     stock: (a, b) => b.stock - a.stock,
-    idle: (a, b) => (b.days_since_sale ?? 1e9) - (a.days_since_sale ?? 1e9),
 };
 
 class InventoryDashboardMetrics extends Component {
@@ -148,6 +147,10 @@ class InventoryDashboardMetrics extends Component {
             (vendor === "all" || r.vendor === vendor) &&
             (category === "all" || r.categoria === category) &&
             (!q || r.producto.toLowerCase().includes(q)));
+    }
+
+    get periodDays() {
+        return parseInt(this.state.period) || 90;
     }
 
     get buyCoverLabel() {
@@ -279,7 +282,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     formatDaily(val) {
-        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+        // Mismos 3 decimales con los que el controlador redondea y calcula: la cuenta se puede rehacer a mano
+        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(val || 0);
     }
 
     formatNumber(val) {

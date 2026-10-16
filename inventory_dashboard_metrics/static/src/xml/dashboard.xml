@@ -192,7 +192,10 @@
                                                     <t t-esc="formatNumber(r.stock)"/>
                                                     <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
                                                 </td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num"><span t-att-class="coverClass(r.cover)"><t t-esc="formatNumber(r.cover)"/> días</span></td>
                                                 <td><span t-att-class="'stock-badge ' + (r.status === 'sin_stock' ? 'rotura' : 'critico')"><t t-esc="r.status === 'sin_stock' ? 'Sin stock' : 'Por agotarse'"/></span></td>
@@ -234,9 +237,8 @@
                                 </select>
                                 <select t-model="state.overSort">
                                     <option value="excess">Ordenar: más plata de más</option>
-                                    <option value="value">Ordenar: mayor valor en stock</option>
+                                    <option value="cover">Ordenar: alcanza para más días</option>
                                     <option value="stock">Ordenar: más unidades</option>
-                                    <option value="idle">Ordenar: más tiempo sin vender</option>
                                 </select>
                                 <button class="btn btn-secondary" t-on-click="clearOverFilters">Limpiar</button>
                                 <button class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
@@ -268,7 +270,10 @@
                                                     <t t-esc="formatNumber(r.stock)"/>
                                                     <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
                                                 </td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num">
                                                     <span t-att-class="coverClass(r.cover)">
@@ -304,7 +309,7 @@
                                     </span>
                                 </div>
                                 <t t-call="inventory_dashboard_metrics.InfoTip">
-                                    <t t-set="tip" t-value="'Comprar = promedio de ventas por día x días de la barra Cantidad a comprar - stock, redondeado. Un stock negativo se toma como 0 y se marca con revisar: suele ser una venta sin la entrada de mercadería registrada. Alcanzaría para = días que cubre el stock después de esa compra. Si el proveedor pide un mínimo mayor, se avisa debajo de la cantidad. Urgente: sin stock o alcanza para 15 días o menos. Es una sugerencia: no crea órdenes.'"/>
+                                    <t t-set="tip" t-value="'Promedio de ventas por día = vendidas / días del período (o los días de historia del producto si tiene menos, mínimo 7). Comprar = promedio x días de la barra Cantidad a comprar - stock, redondeado. Un stock negativo se toma como 0 y se marca con revisar: suele ser una venta sin la entrada de mercadería registrada. Alcanzaría para = días que cubre el stock después de esa compra. Si el proveedor pide un mínimo mayor, se avisa debajo de la cantidad. Urgente: sin stock o alcanza para 15 días o menos. Es una sugerencia: no crea órdenes.'"/>
                                 </t>
                             </div>
                             <div class="buy-slider">
@@ -356,7 +361,10 @@
                                                     <t t-esc="formatNumber(r.stock)"/>
                                                     <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
                                                 </td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.days_after)"/> días</td>
                                                 <td class="num">
