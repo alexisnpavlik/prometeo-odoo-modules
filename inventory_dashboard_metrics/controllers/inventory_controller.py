@@ -16,8 +16,6 @@ PERIODS = (30, 60, 90, 180, 365)
 TARGET_DAYS = (30, 60, 90, 120, 180)
 DEFAULT_PERIOD = 90
 DEFAULT_TARGET = 90
-LEAD_DAYS = (3, 7, 15, 30)
-DEFAULT_LEAD = 7
 NO_VENDOR = "Sin proveedor"
 BUY_COVER_MIN, BUY_COVER_MAX, DEFAULT_BUY_COVER = 7, 180, 30
 LOW_COVER_DAYS = 15
@@ -141,7 +139,7 @@ class InventoryMetricsController(http.Controller):
         cr = request.env.cr
         cr.execute("""
             SELECT DISTINCT ON (si.product_tmpl_id)
-                   si.product_tmpl_id, rp.name AS vendor, si.price, si.delay, si.min_qty
+                   si.product_tmpl_id, rp.name AS vendor, si.price, si.min_qty
             FROM product_supplierinfo si
             JOIN res_partner rp ON rp.id = si.partner_id
             WHERE (si.company_id IS NULL OR si.company_id IN %s)
@@ -151,35 +149,20 @@ class InventoryMetricsController(http.Controller):
         """, (companies,))
         return {r["product_tmpl_id"]: r for r in cr.dictfetchall()}
 
-    def _fetch_incoming(self, companies):
-        """Unidades pedidas en órdenes confirmadas que todavía no se recibieron."""
-        cr = request.env.cr
-        cr.execute("""
-            SELECT pol.product_id, SUM(pol.product_qty - pol.qty_received) AS qty
-            FROM purchase_order_line pol
-            JOIN purchase_order po ON po.id = pol.order_id
-            WHERE po.state = 'purchase' AND po.company_id IN %s
-              AND pol.product_id IS NOT NULL AND pol.product_qty > pol.qty_received
-            GROUP BY pol.product_id
-        """, (companies,))
-        return {r["product_id"]: float(r["qty"]) for r in cr.dictfetchall()}
-
     def _attach_vendor(self, rows, suppliers):
         for r in rows:
             sup = suppliers.get(r["tmpl_id"])
             r["vendor"] = sup["vendor"] if sup else NO_VENDOR
         return rows
 
-    def _purchase_candidates(self, rows, suppliers, incoming, lead_default):
+    def _purchase_candidates(self, rows, suppliers):
         """Productos con ventas en el período, con todo lo necesario para calcular cuánto comprar."""
         result = []
         for r in rows:
             if r["daily"] <= 0:
                 continue
             sup = suppliers.get(r["tmpl_id"])
-            lead = int(sup["delay"]) if sup and sup["delay"] and sup["delay"] > 0 else lead_default
-            pending = incoming.get(r["product_id"], 0.0)
-            days_left = (max(r["stock"], 0.0) + pending) / r["daily"]
+            days_left = max(r["stock"], 0.0) / r["daily"]
             price = float(sup["price"]) if sup and sup["price"] and sup["price"] > 0 else float(r["cost"] or 0.0)
             result.append({
                 "product_id": r["product_id"],
@@ -187,22 +170,21 @@ class InventoryMetricsController(http.Controller):
                 "categoria": r["categoria"],
                 "vendor": sup["vendor"] if sup else NO_VENDOR,
                 "stock": round(r["stock"], 2),
-                "incoming": round(pending, 2),
                 "sold": round(r["qty_period"], 2),
                 "daily": r["daily"],
                 "days_left": int(round(days_left)),
-                "lead": lead,
                 "supplier_min": int(math.ceil(sup["min_qty"])) if sup and sup["min_qty"] else 0,
                 "price": round(price, 2),
-                "status": "urgente" if days_left < lead else "normal",
+                # Mismo criterio que "Por reponer": sin stock o con 15 días o menos
+                "status": "urgente" if days_left <= LOW_COVER_DAYS else "normal",
             })
         return result
 
     def _purchase_rows(self, candidates, cover):
-        """Comprar = venta diaria x (plazo + días a cubrir) - stock - lo ya pedido. Misma cuenta que el JS."""
+        """Comprar = venta diaria x días a cubrir - stock. Misma cuenta que el JS."""
         result = []
         for c in candidates:
-            qty = _round_units(c["daily"] * (c["lead"] + cover) - max(c["stock"], 0.0) - c["incoming"])
+            qty = _round_units(c["daily"] * cover - max(c["stock"], 0.0))
             if qty <= 0:
                 continue
             # El mínimo del proveedor se informa pero no se impone: forzarlo genera sobrestock
@@ -304,18 +286,16 @@ class InventoryMetricsController(http.Controller):
         self._check_access()
         period = _to_int(kwargs.get('period'), PERIODS, DEFAULT_PERIOD)
         target = _to_int(kwargs.get('target'), TARGET_DAYS, DEFAULT_TARGET)
-        lead = _to_int(kwargs.get('lead'), LEAD_DAYS, DEFAULT_LEAD)
         companies = self._resolve_companies(company)
         if not companies:
             return {"rows": []}
         rows = self._classify(self._fetch_product_rows(companies, period, self._get_lang()), period, target)
-        return {"rows": self._purchase_candidates(
-            rows, self._fetch_suppliers(companies), self._fetch_incoming(companies), lead)}
+        return {"rows": self._purchase_candidates(rows, self._fetch_suppliers(companies))}
 
     @http.route('/inventory_dashboard_metrics/export', type='http', auth='user')
     def export_xlsx(self, table='overstock', company='all', period=None, target=None,
                     status='all', category='all', search='', sort='excess',
-                    lead=None, vendor='all', cover=None, **kwargs):
+                    vendor='all', cover=None, **kwargs):
         """Exporta a Excel la tabla activa con los mismos filtros que ve el usuario."""
         try:
             self._check_access()
@@ -329,16 +309,14 @@ class InventoryMetricsController(http.Controller):
             self._attach_vendor(rows, suppliers)
 
             if table == 'purchase':
-                lead = _to_int(lead, LEAD_DAYS, DEFAULT_LEAD)
                 cover = _to_int(cover, range(BUY_COVER_MIN, BUY_COVER_MAX + 1), DEFAULT_BUY_COVER)
-                data = self._purchase_rows(
-                    self._purchase_candidates(rows, suppliers, self._fetch_incoming(companies), lead), cover)
+                data = self._purchase_rows(self._purchase_candidates(rows, suppliers), cover)
                 title = f"Recomendador de compra ({cover} días)"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)", "Promedio de ventas por día",
-                           "Alcanza para (días)", "Plazo (días)", "Comprar", "Mínimo del proveedor",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
+                           "Alcanza para (días)", "Comprar", "Mínimo del proveedor",
                            "Precio", "Total", "Prioridad"]
-                keys = ["producto", "categoria", "vendor", "stock", "incoming", "sold", "daily", "days_left",
-                        "lead", "qty", "min_qty", "price", "total", "status"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "days_left",
+                        "qty", "min_qty", "price", "total", "status"]
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
                 title = "Productos por reponer"
