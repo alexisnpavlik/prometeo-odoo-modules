@@ -1,9 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+
+    <!-- Ícono de ayuda con tooltip. Parámetro: tip -->
+    <t t-name="inventory_dashboard_metrics.InfoTip">
+        <div t-att-class="'info-tooltip-wrapper ' + (align or 'tooltip-left')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div class="info-tooltip-text"><t t-esc="tip"/></div>
+        </div>
+    </t>
+
     <t t-name="inventory_dashboard_metrics.DashboardTemplate">
-        <div t-att-class="'pos-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
-            <!-- Sidebar de Filtros (Glassmorphic) -->
-            <aside class="sidebar" id="sidebar">
+        <div t-att-class="'inv-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+
+            <!-- Sidebar de filtros -->
+            <aside t-att-class="'sidebar ' + (state.showFilters ? 'open' : '')" id="sidebar">
+                <button class="btn btn-secondary sidebar-close" t-on-click="toggleFilters">Cerrar</button>
                 <div class="sidebar-brand">
                     <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
@@ -15,11 +30,10 @@
                         <span>Inventory Hub</span>
                     </div>
                 </div>
-                
-                <!-- Filtros de Almacén -->
-                <div class="sidebar-section" style="margin-top: 10px;">
+
+                <div class="sidebar-section">
                     <h3>Filtros de Almacén</h3>
-                    
+
                     <div class="input-group">
                         <label>Empresa / Central</label>
                         <div class="select-wrapper">
@@ -32,48 +46,80 @@
                         </div>
                     </div>
 
-                    <div class="input-group" style="margin-top: 12px;">
-                        <label>Período de Análisis</label>
+                    <div class="input-group">
+                        <label>Período de ventas</label>
                         <div class="select-wrapper">
                             <select t-model="state.period">
-                                <option value="7">Últimos 7 días</option>
-                                <option value="15">Últimos 15 días</option>
                                 <option value="30">Últimos 30 días</option>
                                 <option value="60">Últimos 60 días</option>
                                 <option value="90">Últimos 90 días</option>
+                                <option value="180">Últimos 180 días</option>
+                                <option value="365">Últimos 365 días</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Cobertura objetivo</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.target">
+                                <option value="30">30 días</option>
+                                <option value="60">60 días</option>
+                                <option value="90">90 días</option>
+                                <option value="120">120 días</option>
+                                <option value="180">180 días</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Plazo de entrega (si el proveedor no lo indica)</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.lead">
+                                <option value="3">3 días</option>
+                                <option value="7">7 días</option>
+                                <option value="15">15 días</option>
+                                <option value="30">30 días</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Categoría</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.category" t-on-change="onCategoryChange">
+                                <option value="all">Todas las categorías</option>
+                                <t t-foreach="categories" t-as="cat" t-key="cat">
+                                    <option t-att-value="cat"><t t-esc="cat"/></option>
+                                </t>
                             </select>
                         </div>
                     </div>
                 </div>
-                
-                <div class="sidebar-footer" style="display: flex; gap: 8px;">
-                    <button class="btn btn-primary" style="flex: 1;" t-on-click="applyFilters">
-                        <span>Aplicar</span>
-                    </button>
-                    <button class="btn btn-secondary" style="flex: 1;" t-on-click="clearFilters">
-                        <span>Limpiar</span>
-                    </button>
+
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary" t-on-click="applyFilters"><span>Aplicar</span></button>
+                    <button class="btn btn-secondary" t-on-click="clearFilters"><span>Limpiar</span></button>
                 </div>
             </aside>
-            
-            <!-- Main Content Area -->
+
             <main class="main-content">
-                <!-- Header -->
                 <header class="main-header">
                     <div class="header-left">
                         <h1>Dashboard de Inventario y Stock</h1>
                     </div>
-                    
+
                     <div class="header-right">
-                        <!-- Botón de Alternancia de Tema Día/Noche -->
+                        <button class="btn btn-secondary filters-toggle" t-on-click="toggleFilters">Filtros</button>
+
                         <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
                             <t t-if="state.theme === 'light'">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                                 </svg>
                             </t>
                             <t t-else="">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="5"></circle>
                                     <line x1="12" y1="1" x2="12" y2="3"></line>
                                     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -91,7 +137,7 @@
                             <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
                             <span class="status-text" t-esc="state.syncTime">Cargando...</span>
                         </div>
-                        
+
                         <button class="btn btn-secondary btn-icon-only" t-on-click="refreshData" title="Sincronizar ahora">
                             <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
@@ -99,308 +145,254 @@
                         </button>
                     </div>
                 </header>
-                
-                <!-- Main Dashboard View -->
+
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.tab === 'stock' ? 'active' : '')" t-on-click="onTabClick" data-tab="stock">Stock</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'compra' ? 'active' : '')" t-on-click="onTabClick" data-tab="compra">Recomendador de compra</button>
+                </nav>
+
                 <div class="tab-content">
-                    <section class="tab-pane active" style="display: flex; flex-direction: column; gap: 24px;">
-                        
-                        <!-- KPI Cards Grid -->
-                        <div class="kpi-grid">
-                            
-                            <!-- Card 3: Quiebres de Stock -->
-                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.stockouts &gt; 0 ? 'red' : 'purple')">
-                                <div class="kpi-card-inner">
-                                    <div class="kpi-meta">
-                                        <span class="kpi-title">Quiebres de Stock</span>
-                                        <div class="kpi-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-                                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <div class="kpi-value"><t t-esc="metricsData.kpis.stockouts"/> Productos</div>
-                                    <div class="kpi-footer">
-                                        <span class="kpi-subtext">Sin stock (stock ≤ 0)</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Card 4: Stock Crítico / Bajo Mínimo -->
-                            <div t-att-class="'kpi-card shadow-glow ' + (metricsData.kpis.low_stock &gt; 0 ? 'amber' : 'purple')">
-                                <div class="kpi-card-inner">
-                                    <div class="kpi-meta">
-                                        <span class="kpi-title">Stock Bajo Mínimo</span>
-                                        <div class="kpi-icon">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                                <line x1="12" y1="9" x2="12" y2="13"></line>
-                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <div class="kpi-value"><t t-esc="metricsData.kpis.low_stock"/> Productos</div>
-                                    <div class="kpi-footer">
-                                        <span class="kpi-subtext">Stock crítico (0 &lt; stock ≤ 10)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Charts Grid (Single Wide Chart) -->
-                        <div class="single-chart-grid">
-                            <!-- Dead Stock Bar Chart -->
-                            <div class="chart-container glass-panel">
-                                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; position: relative;">
-                                    <h3>Top 10 Dead Stock (Capital Inmovilizado)</h3>
-                                    
-                                    <!-- Info Icon with Premium CSS Tooltip -->
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon" style="color: var(--color-blue);">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Este gráfico muestra los 10 productos con existencias físicas disponibles pero con cero ventas en el período de días seleccionado. Las barras indican el valor total del capital inmovilizado (Stock × Costo Unitario), permitiendo identificar candidatos a liquidación o archivado.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="chart-body">
-                                    <canvas id="chart-dead-stock"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                        
 
-                        
-                        <!-- Interactive Listings Grid -->
-                        <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));">
-                            
-                            <!-- Searchable Critical Stock Alerts Table -->
-                            <div class="chart-container glass-panel padded" style="height: auto; max-height: 480px; display: flex; flex-direction: column;">
-                                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                                    <div>
-                                        <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" style="width: 16px; height: 16px;">
-                                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                                <line x1="12" y1="9" x2="12" y2="13"></line>
-                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                            </svg>
-                                            Alertas de Stock Crítico
-                                            
-                                            <div class="info-tooltip-wrapper tooltip-left" style="margin-left: 4px;">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon" style="color: var(--color-blue);">
-                                                    <circle cx="12" cy="12" r="10"></circle>
-                                                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                                </svg>
-                                                <div class="info-tooltip-text">
-                                                    Este panel muestra de forma proactiva todos los productos con existencias iguales o menores a 10 unidades. Permite detectar de un vistazo los quiebres de inventario inminentes y las roturas físicas de stock para gestionar compras y abastecimientos prioritarios.
-                                                </div>
-                                            </div>
-                                        </h3>
-                                        <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Productos con existencia menor o igual a 10 unidades</p>
-                                    </div>
-                                    <div class="search-box">
-                                        <input type="text" placeholder="Filtrar alertas..." t-att-value="state.inventorySearch" t-on-input="onInventorySearchInput" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 6px 12px; color: #fff; outline: none; font-size: 12px; width: 160px;"/>
-                                    </div>
-                                </div>
-                                <div class="table-responsive" style="flex: 1; overflow-y: auto;">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Producto</th>
-                                                <th>Categoría</th>
-                                                <th style="text-align: right;">Stock</th>
-                                                <th style="text-align: right;">Costo</th>
-                                                <th style="text-align: right;">Valor</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <t t-if="filteredInventoryAlerts.length === 0">
-                                                <tr>
-                                                    <td colspan="5" class="text-center text-muted" style="padding: 24px;">No se encontraron alertas de stock crítico.</td>
-                                                </tr>
-                                            </t>
-                                            <t t-foreach="filteredInventoryAlerts" t-as="a" t-key="'alert-' + a.producto">
-                                                <tr>
-                                                    <td style="font-weight: 700; color: #fff;"><t t-esc="a.producto"/></td>
-                                                    <td style="font-size: 12px; color: var(--text-secondary);"><t t-esc="a.categoria || 'Sin categoría'"/></td>
-                                                    <td style="text-align: right;">
-                                                        <span t-att-class="'stock-badge ' + (a.stock &lt;= 0 ? 'rotura' : 'critico')">
-                                                            <t t-esc="a.stock"/>
-                                                        </span>
-                                                    </td>
-                                                    <td style="text-align: right; font-size: 12px; color: var(--text-secondary);"><t t-esc="formatCurrency(a.costo)"/></td>
-                                                    <td style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(a.total_value)"/></td>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- Category Valuation Summary List with Progress Bars -->
-                            <div class="chart-container glass-panel padded" style="height: auto; max-height: 480px; display: flex; flex-direction: column;">
-                                <div class="section-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                                    <div>
-                                        <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" style="width: 16px; height: 16px;">
-                                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                                <polyline points="2 17 12 22 22 17"></polyline>
-                                                <polyline points="2 12 12 17 22 12"></polyline>
-                                            </svg>
-                                            Resumen por Categoría
-                                            
-                                            <div class="info-tooltip-wrapper tooltip-left" style="margin-left: 4px;">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon" style="color: var(--color-blue);">
-                                                    <circle cx="12" cy="12" r="10"></circle>
-                                                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                                </svg>
-                                                <div class="info-tooltip-text">
-                                                    Este listado resume la cantidad física total disponible de unidades agrupadas por cada categoría comercial, así como su porcentaje de participación financiera sobre el valor completo del inventario de la empresa.
-                                                </div>
-                                            </div>
-                                        </h3>
-                                        <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Participación sobre el valor total del inventario</p>
-                                    </div>
-                                </div>
-                                <div class="table-responsive" style="flex: 1; overflow-y: auto;">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Categoría</th>
-                                                <th style="text-align: right;">Cantidad</th>
-                                                <th style="text-align: right;">Valoración</th>
-                                                <th>Participación (%)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <t t-if="metricsData.category_valuation.length === 0">
-                                                <tr>
-                                                    <td colspan="4" class="text-center text-muted" style="padding: 24px;">No hay valoraciones por categoría disponibles.</td>
-                                                </tr>
-                                            </t>
-                                            <t t-foreach="metricsData.category_valuation" t-as="c" t-key="'cat-val-' + c.categoria">
-                                                <tr>
-                                                    <td style="font-weight: 700; color: #fff;"><t t-esc="c.categoria"/></td>
-                                                    <td style="text-align: right;"><t t-esc="(c.total_qty || 0).toLocaleString()"/> Uds</td>
-                                                    <td style="text-align: right; font-weight: 600; color: #fff;"><t t-esc="formatCurrency(c.total_value)"/></td>
-                                                    <td>
-                                                        <div class="margin-progress-wrapper">
-                                                            <div class="margin-progress-container">
-                                                                <div class="margin-progress-bar medium" t-attf-style="width: {{c.value_percent}}%;"></div>
-                                                            </div>
-                                                            <span class="margin-percent-text" style="font-size: 12px; font-weight: 600; width: 45px; text-align: right;">
-                                                                <t t-esc="c.value_percent"/>%
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Heatmap de Cobertura de Stock por Sucursal -->
-                        <div class="glass-panel padded" style="margin-top: 24px;">
-                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                    <!-- ============ POR REPONER ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'stock'">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
                                 <div>
-                                    <h3 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" style="width: 16px; height: 16px;">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                            <line x1="9" y1="3" x2="9" y2="21"></line>
-                                            <line x1="15" y1="3" x2="15" y2="21"></line>
-                                            <line x1="3" y1="9" x2="21" y2="9"></line>
-                                            <line x1="3" y1="15" x2="21" y2="15"></line>
-                                        </svg>
-                                        Heatmap de Cobertura por Sucursal (Días)
-                                        
-                                        <div class="info-tooltip-wrapper tooltip-left" style="margin-left: 4px;">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon" style="color: var(--color-blue);">
-                                                <circle cx="12" cy="12" r="10"></circle>
-                                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                            </svg>
-                                            <div class="info-tooltip-text">
-                                                Esta matriz muestra los días de cobertura de stock estimados para cada producto y sucursal. Los días indican cuánto tiempo te durará el stock actual basándose en tu ritmo de venta diario de los últimos días seleccionados. Código de colores: Rojo (0-7d), Naranja (8-14d), Amarillo (15-30d), Verde (30d+), Gris (Sin venta).
-                                            </div>
-                                        </div>
-                                    </h3>
-                                    <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Días de cobertura estimados = Stock Actual / Ventas Diarias Promedio (últimos <t t-esc="state.period"/> días)</p>
+                                    <h3>Productos por reponer</h3>
+                                    <p class="section-sub">
+                                        <t t-esc="formatNumber(filteredRestock.length)"/> productos que se venden y no tienen stock
+                                        o les quedan <t t-esc="lowCoverDays"/> días o menos
+                                    </p>
                                 </div>
-                                <div class="heatmap-legend" style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-secondary); font-weight: 600;">
-                                    <span>Cobertura:</span>
-                                    <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.4);"></span>
-                                        <span>0-7d</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: rgba(245, 158, 11, 0.25); border: 1px solid rgba(245, 158, 11, 0.4);"></span>
-                                        <span>8-14d</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: rgba(253, 224, 71, 0.2); border: 1px solid rgba(253, 224, 71, 0.4);"></span>
-                                        <span>15-30d</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.4);"></span>
-                                        <span>30d+</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color);"></span>
-                                        <span>Sin venta</span>
-                                    </div>
-                                </div>
+                                <t t-call="inventory_dashboard_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Para saber cuánto comprar de cada uno, usá la pestaña Recomendador de compra. Un stock negativo suele indicar ventas registradas sin la entrada de mercadería.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <input type="text" placeholder="Buscar producto..." t-model="state.restSearch" t-on-input="resetRestPage"/>
+                                <select t-model="state.restStatus" t-on-change="resetRestPage">
+                                    <option value="all">Todos los estados</option>
+                                    <option value="sin_stock">Sin stock</option>
+                                    <option value="por_agotarse">Por agotarse</option>
+                                </select>
+                                <button class="btn btn-secondary" t-on-click="clearRestFilters">Limpiar</button>
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="restock">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
-                                <table class="data-table heatmap-table">
+                                <table class="data-table">
                                     <thead>
                                         <tr>
                                             <th>Producto</th>
-                                            <t t-foreach="metricsData.heatmap_companies" t-as="comp" t-key="comp.id">
-                                                <th style="text-align: center;"><t t-esc="comp.name"/></th>
-                                            </t>
+                                            <th>Categoría</th>
+                                            <th>Proveedor</th>
+                                            <th class="num">Stock</th>
+                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Alcanza para</th>
+                                            <th>Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <t t-if="metricsData.heatmap_data.length === 0">
+                                        <tr t-if="restPage.rows.length === 0">
+                                            <td colspan="7" class="text-center text-muted empty-row">No hay productos para reponer con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="restPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
-                                                <td t-att-colspan="metricsData.heatmap_companies.length + 1" class="text-center text-muted" style="padding: 24px;">No hay datos de cobertura de stock para mostrar.</td>
-                                            </tr>
-                                        </t>
-                                        <t t-foreach="metricsData.heatmap_data" t-as="p" t-key="p.product_id">
-                                            <tr>
-                                                <td style="font-weight: 700; color: #fff;"><t t-esc="p.product_name"/></td>
-                                                <t t-foreach="metricsData.heatmap_companies" t-as="comp" t-key="comp.id">
-                                                    <td style="text-align: center; padding: 6px;">
-                                                        <t t-set="cov" t-value="p.coverages[comp.id]"/>
-                                                        <t t-if="cov === undefined || cov === null">
-                                                            <div class="heatmap-cell cobertura-sin-venta">—</div>
-                                                        </t>
-                                                        <t t-elif="cov &lt;= 7">
-                                                            <div class="heatmap-cell cobertura-critica"><t t-esc="cov"/></div>
-                                                        </t>
-                                                        <t t-elif="cov &lt;= 14">
-                                                            <div class="heatmap-cell cobertura-baja"><t t-esc="cov"/></div>
-                                                        </t>
-                                                        <t t-elif="cov &lt;= 30">
-                                                            <div class="heatmap-cell cobertura-media"><t t-esc="cov"/></div>
-                                                        </t>
-                                                        <t t-else="">
-                                                            <div class="heatmap-cell cobertura-alta"><t t-esc="cov"/></div>
-                                                        </t>
-                                                    </td>
-                                                </t>
+                                                <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.categoria"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.vendor"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num"><t t-esc="r.cover"/> días</td>
+                                                <td><span t-att-class="'stock-badge ' + (r.status === 'sin_stock' ? 'rotura' : 'critico')"><t t-esc="r.status === 'sin_stock' ? 'Sin stock' : 'Por agotarse'"/></span></td>
                                             </tr>
                                         </t>
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="pagination" t-if="restPage.pages &gt; 1">
+                                <button class="btn btn-secondary" t-att-disabled="restPage.current &lt;= 1" t-on-click="changePage" data-key="restPage" data-dir="-1">Anterior</button>
+                                <span class="page-info">Página <t t-esc="restPage.current"/> de <t t-esc="restPage.pages"/></span>
+                                <button class="btn btn-secondary" t-att-disabled="restPage.current &gt;= restPage.pages" t-on-click="changePage" data-key="restPage" data-dir="1">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ============ MUCHO STOCK Y POCA SALIDA ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'stock'">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Productos con mucho stock y poca venta</h3>
+                                    <p class="section-sub">
+                                        <t t-esc="formatNumber(filteredOverstock.length)"/> productos ·
+                                        <b><t t-esc="formatCurrency(overFilteredExcess)"/></b> de plata de más
+                                        (stock que supera <t t-esc="state.target"/> días de venta)
+                                    </p>
+                                </div>
+                                <t t-call="inventory_dashboard_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Sin ventas: hay stock pero no se vendió nada en el período. Sobrestock: se vende, pero el stock alcanza para más días que la cobertura objetivo. De más = stock que sobra, a costo.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <input type="text" placeholder="Buscar producto..." t-model="state.overSearch" t-on-input="resetOverPage"/>
+                                <select t-model="state.overStatus" t-on-change="resetOverPage">
+                                    <option value="all">Todos los estados</option>
+                                    <option value="sin_venta">Sin ventas</option>
+                                    <option value="sobrestock">Sobrestock</option>
+                                </select>
+                                <select t-model="state.overSort">
+                                    <option value="excess">Ordenar: más plata de más</option>
+                                    <option value="value">Ordenar: mayor valor en stock</option>
+                                    <option value="stock">Ordenar: más unidades</option>
+                                    <option value="idle">Ordenar: más tiempo sin vender</option>
+                                </select>
+                                <button class="btn btn-secondary" t-on-click="clearOverFilters">Limpiar</button>
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th>Proveedor</th>
+                                            <th class="num">Stock</th>
+                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Alcanza para</th>
+                                            <th>Última venta</th>
+                                            <th class="num">Valor</th>
+                                            <th class="num">De más</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="overPage.rows.length === 0">
+                                            <td colspan="10" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="overPage.rows" t-as="r" t-key="r.product_id">
+                                            <tr>
+                                                <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.categoria"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.vendor"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-if="r.cover === null">—</t>
+                                                    <t t-else=""><t t-esc="formatNumber(r.cover)"/> días</t>
+                                                </td>
+                                                <td class="cell-secondary">
+                                                    <t t-if="r.last_sale"><t t-esc="r.last_sale"/> <span class="text-muted">(hace <t t-esc="r.days_since_sale"/> d)</span></t>
+                                                    <t t-else="">Nunca</t>
+                                                </td>
+                                                <td class="num"><t t-esc="formatCurrency(r.value)"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.excess_value)"/></td>
+                                                <td><span t-att-class="'stock-badge ' + r.status"><t t-esc="r.status === 'sin_venta' ? 'Sin ventas' : 'Sobrestock'"/></span></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="pagination" t-if="overPage.pages &gt; 1">
+                                <button class="btn btn-secondary" t-att-disabled="overPage.current &lt;= 1" t-on-click="changePage" data-key="overPage" data-dir="-1">Anterior</button>
+                                <span class="page-info">Página <t t-esc="overPage.current"/> de <t t-esc="overPage.pages"/></span>
+                                <button class="btn btn-secondary" t-att-disabled="overPage.current &gt;= overPage.pages" t-on-click="changePage" data-key="overPage" data-dir="1">Siguiente</button>
+                            </div>
+                        </div>
+                    </section>
+                    <!-- ============ RECOMENDADOR DE COMPRA ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'compra'">
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div class="buy-summary">
+                                    <span class="buy-total-label">Total a comprar</span>
+                                    <span class="buy-total"><t t-esc="formatCurrency(buyFilteredTotal)"/></span>
+                                    <span class="section-sub">
+                                        <t t-esc="formatNumber(filteredPurchase.length)"/> productos ·
+                                        <t t-esc="formatNumber(buyFilteredUnits)"/> unidades ·
+                                        para <t t-esc="state.buyCover"/> días de venta más el plazo del proveedor
+                                        <t t-if="buyNoPrice"> · <t t-esc="buyNoPrice"/> sin precio, no suman al total</t>
+                                    </span>
+                                </div>
+                                <t t-call="inventory_dashboard_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Comprar = vendidas en el período / días del período x (plazo del proveedor + días de la barra Cantidad a comprar) - stock - lo ya pedido y sin recibir, redondeado. Un stock negativo cuenta como 0. Si el proveedor pide un mínimo mayor, se avisa debajo de la cantidad. Urgente: el stock no alcanza hasta que llegue el pedido. Es una sugerencia: no crea órdenes.'"/>
+                                </t>
+                            </div>
+                            <div class="buy-slider">
+                                <div class="buy-slider-head">
+                                    <span class="buy-slider-label">Cantidad a comprar</span>
+                                    <span class="buy-slider-value"><t t-esc="buyCoverLabel"/> · para <t t-esc="state.buyCover"/> días de venta</span>
+                                </div>
+                                <input type="range" min="7" max="180" step="1" t-model="state.buyCover" t-on-input="resetBuyPage"/>
+                                <div class="buy-slider-scale"><span>Poca</span><span>Mucha</span></div>
+                            </div>
+                            <div class="filter-row">
+                                <input type="text" placeholder="Buscar producto..." t-model="state.buySearch" t-on-input="resetBuyPage"/>
+                                <select t-model="state.buyVendor" t-on-change="resetBuyPage">
+                                    <option value="all">Todos los proveedores</option>
+                                    <t t-foreach="vendors" t-as="v" t-key="v">
+                                        <option t-att-value="v"><t t-esc="v"/></option>
+                                    </t>
+                                </select>
+                                <select t-model="state.buyStatus" t-on-change="resetBuyPage">
+                                    <option value="all">Todas las prioridades</option>
+                                    <option value="urgente">Urgente</option>
+                                    <option value="normal">Normal</option>
+                                </select>
+                                <button class="btn btn-secondary" t-on-click="clearBuyFilters">Limpiar</button>
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="purchase">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Proveedor</th>
+                                            <th class="num">Stock</th>
+                                            <th class="num">Ya pedido</th>
+                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Alcanza para</th>
+                                            <th class="num">Plazo</th>
+                                            <th class="num">Comprar</th>
+                                            <th class="num">Precio</th>
+                                            <th class="num">Total</th>
+                                            <th>Prioridad</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="state.buyLoading">
+                                            <td colspan="11" class="text-center text-muted empty-row">Calculando...</td>
+                                        </tr>
+                                        <tr t-elif="buyPage.rows.length === 0">
+                                            <td colspan="11" class="text-center text-muted empty-row">No hay nada para comprar con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="buyPage.rows" t-as="r" t-key="r.product_id">
+                                            <tr>
+                                                <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.vendor"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.incoming)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num"><t t-esc="r.days_left"/> días</td>
+                                                <td class="num"><t t-esc="r.lead"/> días</td>
+                                                <td class="num cell-strong">
+                                                    <t t-esc="formatNumber(r.qty)"/>
+                                                    <div t-if="r.min_qty" class="cell-note">mín. proveedor <t t-esc="formatNumber(r.min_qty)"/></div>
+                                                </td>
+                                                <td class="num">
+                                                    <t t-if="r.price"><t t-esc="formatCurrency(r.price)"/></t>
+                                                    <t t-else=""><span class="text-muted">Sin precio</span></t>
+                                                </td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.total)"/></td>
+                                                <td><span t-att-class="'stock-badge ' + (r.status === 'urgente' ? 'rotura' : 'critico')"><t t-esc="r.status === 'urgente' ? 'Urgente' : 'Normal'"/></span></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="pagination" t-if="buyPage.pages &gt; 1">
+                                <button class="btn btn-secondary" t-att-disabled="buyPage.current &lt;= 1" t-on-click="changePage" data-key="buyPage" data-dir="-1">Anterior</button>
+                                <span class="page-info">Página <t t-esc="buyPage.current"/> de <t t-esc="buyPage.pages"/></span>
+                                <button class="btn btn-secondary" t-att-disabled="buyPage.current &gt;= buyPage.pages" t-on-click="changePage" data-key="buyPage" data-dir="1">Siguiente</button>
                             </div>
                         </div>
                     </section>
