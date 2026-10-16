@@ -4,6 +4,7 @@ import { _t } from "@web/core/l10n/translation";
 import { loadJS } from "@web/core/assets";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useDebounced } from "@web/core/utils/timing";
 import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 import { isBarcodeScannerSupported } from "@web/core/barcode/barcode_video_scanner";
 
@@ -19,7 +20,8 @@ export class BarcodeLookupApp extends Component {
         this.action = useService("action");
         this.notification = useService("notification");
         this.photoInput = useRef("photoInput");
-        this.state = useState({ code: "", result: null, loading: false });
+        this.state = useState({ code: "", result: null, results: [], loading: false });
+        this.searchDebounced = useDebounced(() => this.search(), 300);
     }
 
     /** Video en vivo solo en contexto seguro (HTTPS o localhost); si no, foto. */
@@ -104,9 +106,64 @@ export class BarcodeLookupApp extends Component {
         return canvas;
     }
 
+    /** Mientras se escribe: lista de coincidencias por nombre, código o referencia. */
+    onSearchInput(ev) {
+        this.state.code = ev.target.value;
+        this.state.result = null;
+        this.searchDebounced();
+    }
+
+    async search() {
+        const term = this.state.code.trim();
+        if (term.length < 2) {
+            this.state.results = [];
+            return;
+        }
+        const results = await this.orm.call("product.product", "barcode_lookup_search", [term]);
+        // Descarta respuestas viejas (se siguió escribiendo o ya se eligió un producto)
+        if (term === this.state.code.trim() && !this.state.result) {
+            this.state.results = results;
+        }
+    }
+
+    /** Enter / Buscar: código exacto va directo al producto; si no, lista por nombre. */
     async onManualSubmit(ev) {
         ev.preventDefault();
-        await this.lookup(this.state.code);
+        this.searchDebounced.cancel();
+        const term = this.state.code.trim();
+        if (!term) {
+            return;
+        }
+        this.state.loading = true;
+        try {
+            const result = await this.orm.call("product.product", "barcode_lookup", [term]);
+            if (result.found) {
+                this.state.results = [];
+                this.state.result = result;
+                return;
+            }
+            const results = await this.orm.call("product.product", "barcode_lookup_search", [term]);
+            if (results.length === 1) {
+                await this.selectProduct(results[0].product_id);
+            } else if (results.length) {
+                this.state.results = results;
+            } else {
+                this.state.results = [];
+                this.state.result = result;
+            }
+        } finally {
+            this.state.loading = false;
+        }
+    }
+
+    async selectProduct(productId) {
+        this.state.loading = true;
+        try {
+            this.state.results = [];
+            this.state.result = await this.orm.call("product.product", "barcode_lookup_product", [productId]);
+        } finally {
+            this.state.loading = false;
+        }
     }
 
     async lookup(code) {
@@ -114,7 +171,9 @@ export class BarcodeLookupApp extends Component {
         if (!code) {
             return;
         }
+        this.searchDebounced.cancel();
         this.state.code = code;
+        this.state.results = [];
         this.state.loading = true;
         try {
             this.state.result = await this.orm.call("product.product", "barcode_lookup", [code]);
@@ -133,24 +192,26 @@ export class BarcodeLookupApp extends Component {
     }
 
     replenish() {
-        const { template_id, product_id, code } = this.state.result;
+        const { template_id, product_id } = this.state.result;
         this.action.doAction("stock.action_product_replenish", {
             additionalContext: { default_product_tmpl_id: template_id, default_product_id: product_id },
-            onClose: () => this.lookup(code),
+            onClose: () => this.selectProduct(product_id),
         });
     }
 
     createProduct() {
+        const { code, is_code } = this.state.result;
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "product.template",
             views: [[false, "form"]],
-            context: { default_barcode: this.state.result.code },
+            context: is_code ? { default_barcode: code } : { default_name: code },
         });
     }
 
     reset() {
         this.state.result = null;
+        this.state.results = [];
         this.state.code = "";
     }
 }

@@ -1,6 +1,6 @@
 {
     "name": "Escáner de productos",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Inventory/Inventory",
     "summary": "App para buscar un producto escaneando su código de barras con la cámara",
     "description": """
@@ -12,7 +12,7 @@
         Cámara: con HTTPS (o localhost) abre el video en vivo de Odoo; por
         HTTP, como al entrar desde el teléfono por la IP local, saca una foto
         y lee el código de la imagen (BarcodeDetector del navegador o la
-        librería ZXing que trae Odoo). También acepta tipear el código o una
+        librería ZXing que trae Odoo). También tiene un buscador por nombre, código o referencia, y acepta una
         pistola lectora USB.
     """,
     "author": "Alexis Medina",

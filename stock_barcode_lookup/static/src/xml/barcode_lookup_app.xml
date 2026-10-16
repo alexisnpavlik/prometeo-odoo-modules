@@ -11,14 +11,26 @@
                        t-ref="photoInput" t-on-change="onPhoto"/>
 
                 <form class="o_barcode_lookup_manual" t-on-submit="onManualSubmit">
-                    <input type="text" class="form-control" inputmode="numeric"
-                           placeholder="O escribí el código"
-                           t-model="state.code"/>
-                    <button type="submit" class="btn btn-secondary">Buscar</button>
+                    <input type="search" class="form-control" enterkeyhint="search"
+                           placeholder="O buscá por nombre o código"
+                           t-att-value="state.code" t-on-input="onSearchInput"/>
+                    <button type="submit" class="btn btn-secondary"><i class="fa fa-search"/></button>
                 </form>
 
                 <div t-if="state.loading" class="o_barcode_lookup_loading">
                     <i class="fa fa-spinner fa-spin"/> Buscando...
+                </div>
+
+                <div t-elif="state.results.length" class="o_barcode_lookup_results list-group">
+                    <button t-foreach="state.results" t-as="item" t-key="item.product_id"
+                            class="list-group-item list-group-item-action" t-on-click="() => this.selectProduct(item.product_id)">
+                        <img t-att-src="item.image_url" alt=""/>
+                        <div class="o_barcode_lookup_results_info">
+                            <div class="fw-bold" t-esc="item.name"/>
+                            <div t-if="item.code" class="text-muted small" t-esc="item.code"/>
+                        </div>
+                        <div class="o_barcode_lookup_results_price" t-esc="item.price"/>
+                    </button>
                 </div>
 
                 <t t-elif="state.result">
@@ -38,9 +50,13 @@
                         </div>
                     </div>
                     <div t-else="" class="o_barcode_lookup_card o_barcode_lookup_missing">
-                        <h2>No hay ningún producto con el código <t t-esc="state.result.code"/></h2>
+                        <h2 t-if="state.result.is_code">No hay ningún producto con el código <t t-esc="state.result.code"/></h2>
+                        <h2 t-else="">No hay productos que coincidan con «<t t-esc="state.result.code"/>»</h2>
                         <div class="o_barcode_lookup_actions">
-                            <button class="btn btn-primary" t-on-click="createProduct">Crear producto con este código</button>
+                            <button class="btn btn-primary" t-on-click="createProduct">
+                                <t t-if="state.result.is_code">Crear producto con este código</t>
+                                <t t-else="">Crear producto con este nombre</t>
+                            </button>
                             <button class="btn btn-outline-secondary" t-on-click="reset">Escanear otro</button>
                         </div>
                     </div>
