@@ -274,15 +274,12 @@
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
                                             <th class="num th-wrap">Promedio de ventas por día</th>
                                             <th class="num">Alcanza para</th>
-                                            <th>Última venta</th>
-                                            <th class="num">Valor</th>
-                                            <th class="num">De más</th>
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr t-if="overPage.rows.length === 0">
-                                            <td colspan="11" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
+                                            <td colspan="8" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
                                         </tr>
                                         <t t-foreach="overPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
@@ -296,12 +293,6 @@
                                                     <t t-if="r.cover === null">—</t>
                                                     <t t-else=""><t t-esc="formatNumber(r.cover)"/> días</t>
                                                 </td>
-                                                <td class="cell-secondary">
-                                                    <t t-if="r.last_sale"><t t-esc="r.last_sale"/> <span class="text-muted">(hace <t t-esc="r.days_since_sale"/> d)</span></t>
-                                                    <t t-else="">Nunca</t>
-                                                </td>
-                                                <td class="num"><t t-esc="formatCurrency(r.value)"/></td>
-                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.excess_value)"/></td>
                                                 <td><span t-att-class="'stock-badge ' + r.status"><t t-esc="r.status === 'sin_venta' ? 'Sin ventas' : 'Sobrestock'"/></span></td>
                                             </tr>
                                         </t>

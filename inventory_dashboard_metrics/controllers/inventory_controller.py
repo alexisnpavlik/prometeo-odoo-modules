@@ -350,9 +350,8 @@ class InventoryMetricsController(http.Controller):
                 data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
                 title = "Mucho stock y poca venta"
                 headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día", "Alcanza para (días)",
-                           "Última venta", "Valor", "De más", "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "last_sale",
-                        "value", "excess_value", "status"]
+                           "Estado"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
 
             query = (search or '').lower().strip()
             data = [r for r in data
