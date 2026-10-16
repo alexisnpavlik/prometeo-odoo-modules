@@ -3,7 +3,7 @@
 
     <!-- Ícono de ayuda con tooltip. Parámetro: tip -->
     <t t-name="inventory_dashboard_metrics.InfoTip">
-        <div t-att-class="'info-tooltip-wrapper ' + (align or 'tooltip-left')">
+        <div t-att-class="'info-tooltip-wrapper ' + (align or 'tooltip-right')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -55,18 +55,6 @@
                                 <option value="90">Últimos 90 días</option>
                                 <option value="180">Últimos 180 días</option>
                                 <option value="365">Últimos 365 días</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label>Plazo de entrega (si el proveedor no lo indica)</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.lead">
-                                <option value="3">3 días</option>
-                                <option value="7">7 días</option>
-                                <option value="15">15 días</option>
-                                <option value="30">30 días</option>
                             </select>
                         </div>
                     </div>
@@ -187,7 +175,7 @@
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
                                             <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num">Alcanza para</th>
+                                            <th class="num th-highlight">Alcanza para</th>
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
@@ -200,10 +188,16 @@
                                                 <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.categoria"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.stock)"/>
+                                                    <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
+                                                </td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
-                                                <td class="num"><t t-esc="r.cover"/> días</td>
+                                                <td class="num"><span t-att-class="coverClass(r.cover)"><t t-esc="formatNumber(r.cover)"/> días</span></td>
                                                 <td><span t-att-class="'stock-badge ' + (r.status === 'sin_stock' ? 'rotura' : 'critico')"><t t-esc="r.status === 'sin_stock' ? 'Sin stock' : 'Por agotarse'"/></span></td>
                                             </tr>
                                         </t>
@@ -243,9 +237,8 @@
                                 </select>
                                 <select t-model="state.overSort">
                                     <option value="excess">Ordenar: más plata de más</option>
-                                    <option value="value">Ordenar: mayor valor en stock</option>
+                                    <option value="cover">Ordenar: alcanza para más días</option>
                                     <option value="stock">Ordenar: más unidades</option>
-                                    <option value="idle">Ordenar: más tiempo sin vender</option>
                                 </select>
                                 <button class="btn btn-secondary" t-on-click="clearOverFilters">Limpiar</button>
                                 <button class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
@@ -260,7 +253,7 @@
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
                                             <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num">Alcanza para</th>
+                                            <th class="num th-highlight">Alcanza para</th>
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
@@ -273,12 +266,20 @@
                                                 <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.categoria"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.stock)"/>
+                                                    <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
+                                                </td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num">
-                                                    <t t-if="r.cover === null">—</t>
-                                                    <t t-else=""><t t-esc="formatNumber(r.cover)"/> días</t>
+                                                    <span t-att-class="coverClass(r.cover)">
+                                                        <t t-if="r.cover === null">Sin ventas</t>
+                                                        <t t-else=""><t t-esc="formatNumber(r.cover)"/> días</t>
+                                                    </span>
                                                 </td>
                                                 <td><span t-att-class="'stock-badge ' + r.status"><t t-esc="r.status === 'sin_venta' ? 'Sin ventas' : 'Sobrestock'"/></span></td>
                                             </tr>
@@ -303,12 +304,12 @@
                                     <span class="section-sub">
                                         <t t-esc="formatNumber(filteredPurchase.length)"/> productos ·
                                         <t t-esc="formatNumber(buyFilteredUnits)"/> unidades ·
-                                        para <t t-esc="state.buyCover"/> días de venta más el plazo del proveedor
+                                        para <t t-esc="state.buyCover"/> días de venta
                                         <t t-if="buyNoPrice"> · <t t-esc="buyNoPrice"/> sin precio, no suman al total</t>
                                     </span>
                                 </div>
                                 <t t-call="inventory_dashboard_metrics.InfoTip">
-                                    <t t-set="tip" t-value="'Comprar = vendidas en el período / días del período x (plazo del proveedor + días de la barra Cantidad a comprar) - stock - lo ya pedido y sin recibir, redondeado. Un stock negativo cuenta como 0. Si el proveedor pide un mínimo mayor, se avisa debajo de la cantidad. Urgente: el stock no alcanza hasta que llegue el pedido. Es una sugerencia: no crea órdenes.'"/>
+                                    <t t-set="tip" t-value="'Promedio de ventas por día = vendidas / días del período (o los días de historia del producto si tiene menos, mínimo 7). Comprar = promedio x días de la barra Cantidad a comprar - stock, redondeado. Un stock negativo se toma como 0 y se marca con revisar: suele ser una venta sin la entrada de mercadería registrada. Alcanzaría para = días que cubre el stock después de esa compra. Si el proveedor pide un mínimo mayor, se avisa debajo de la cantidad. Urgente: sin stock o alcanza para 15 días o menos. Es una sugerencia: no crea órdenes.'"/>
                                 </t>
                             </div>
                             <div class="buy-slider">
@@ -336,12 +337,10 @@
                                             <th>Producto</th>
                                             <th>Proveedor</th>
                                             <th class="num">Stock</th>
-                                            <th class="num">Ya pedido</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
                                             <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num">Alcanza para</th>
-                                            <th class="num">Plazo</th>
-                                            <th class="num">Comprar</th>
+                                            <th class="num">Alcanzaría para</th>
+                                            <th class="num th-highlight">Comprar</th>
                                             <th class="num">Precio</th>
                                             <th class="num">Total</th>
                                             <th>Prioridad</th>
@@ -349,23 +348,27 @@
                                     </thead>
                                     <tbody>
                                         <tr t-if="state.buyLoading">
-                                            <td colspan="12" class="text-center text-muted empty-row">Calculando...</td>
+                                            <td colspan="10" class="text-center text-muted empty-row">Calculando...</td>
                                         </tr>
                                         <tr t-elif="buyPage.rows.length === 0">
-                                            <td colspan="12" class="text-center text-muted empty-row">No hay nada para comprar con estos filtros.</td>
+                                            <td colspan="10" class="text-center text-muted empty-row">No hay nada para comprar con estos filtros.</td>
                                         </tr>
                                         <t t-foreach="buyPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
                                                 <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.incoming)"/></td>
-                                                <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.stock)"/>
+                                                    <span t-if="r.stock &lt; 0" class="review-tag" title="Stock negativo: falta registrar una entrada de mercadería o un conteo. Para calcular la compra se toma como 0.">revisar</span>
+                                                </td>
+                                                <td class="num">
+                                                    <t t-esc="formatNumber(r.sold)"/>
+                                                    <div t-if="r.days &lt; periodDays" class="cell-note muted" title="El producto tiene menos historia que el período: el promedio se calcula sobre estos días.">en <t t-esc="r.days"/> días</div>
+                                                </td>
                                                 <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
-                                                <td class="num"><t t-esc="r.days_left"/> días</td>
-                                                <td class="num"><t t-esc="r.lead"/> días</td>
-                                                <td class="num cell-strong">
-                                                    <t t-esc="formatNumber(r.qty)"/>
+                                                <td class="num"><t t-esc="formatNumber(r.days_after)"/> días</td>
+                                                <td class="num">
+                                                    <span class="buy-qty"><t t-esc="formatNumber(r.qty)"/></span>
                                                     <div t-if="r.min_qty" class="cell-note">mín. proveedor <t t-esc="formatNumber(r.min_qty)"/></div>
                                                 </td>
                                                 <td class="num">

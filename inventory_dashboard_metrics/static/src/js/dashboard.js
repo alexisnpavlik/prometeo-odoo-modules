@@ -23,9 +23,8 @@ const BUY_COVER_LEVELS = [
 
 const OVER_SORTS = {
     excess: (a, b) => b.excess_value - a.excess_value,
-    value: (a, b) => b.value - a.value,
+    cover: (a, b) => (b.cover ?? 1e9) - (a.cover ?? 1e9),
     stock: (a, b) => b.stock - a.stock,
-    idle: (a, b) => (b.days_since_sale ?? 1e9) - (a.days_since_sale ?? 1e9),
 };
 
 class InventoryDashboardMetrics extends Component {
@@ -37,7 +36,6 @@ class InventoryDashboardMetrics extends Component {
         this.state = useState({
             company: "all",
             period: "90",
-            lead: "7",
             tab: "stock",
             showFilters: false,
             loading: false,
@@ -122,7 +120,7 @@ class InventoryDashboardMetrics extends Component {
         const cover = parseInt(this.state.buyCover) || 30;
         const rows = [];
         for (const c of this.purchaseData.rows) {
-            const qty = roundUnits(c.daily * (c.lead + cover) - Math.max(c.stock, 0) - c.incoming);
+            const qty = roundUnits(c.daily * cover - Math.max(c.stock, 0));
             if (qty <= 0) {
                 continue;
             }
@@ -131,6 +129,7 @@ class InventoryDashboardMetrics extends Component {
                 qty,
                 total: qty * c.price,
                 min_qty: c.supplier_min > qty ? c.supplier_min : 0,
+                days_after: roundUnits((Math.max(c.stock, 0) + qty) / c.daily),
             });
         }
         return rows.sort((a, b) =>
@@ -148,6 +147,10 @@ class InventoryDashboardMetrics extends Component {
             (vendor === "all" || r.vendor === vendor) &&
             (category === "all" || r.categoria === category) &&
             (!q || r.producto.toLowerCase().includes(q)));
+    }
+
+    get periodDays() {
+        return parseInt(this.state.period) || 90;
     }
 
     get buyCoverLabel() {
@@ -234,7 +237,6 @@ class InventoryDashboardMetrics extends Component {
             table,
             company: this.state.company,
             period: this.state.period,
-            lead: this.state.lead,
             vendor: this.state.vendor,
             cover: this.state.buyCover,
             status: buy ? this.state.buyStatus : over ? this.state.overStatus : this.state.restStatus,
@@ -259,7 +261,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async clearFilters() {
-        Object.assign(this.state, { company: "all", period: "90", lead: "7", category: "all", vendor: "all", showFilters: false });
+        Object.assign(this.state, { company: "all", period: "90", category: "all", vendor: "all", showFilters: false });
         await this.refreshData();
     }
 
@@ -270,8 +272,18 @@ class InventoryDashboardMetrics extends Component {
         }).format(val || 0);
     }
 
+    // Color de "Alcanza para": rojo se agota, ámbar poco, verde bien, violeta sobra (más de 90 días)
+    coverClass(days) {
+        if (days === null || days === undefined) return "cover-pill none";
+        if (days <= LOW_COVER_DAYS) return "cover-pill low";
+        if (days <= 45) return "cover-pill mid";
+        if (days <= OVERSTOCK_DAYS) return "cover-pill ok";
+        return "cover-pill over";
+    }
+
     formatDaily(val) {
-        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+        // Mismos 3 decimales con los que el controlador redondea y calcula: la cuenta se puede rehacer a mano
+        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(val || 0);
     }
 
     formatNumber(val) {
@@ -293,7 +305,6 @@ class InventoryDashboardMetrics extends Component {
             const data = await rpc("/inventory_dashboard_metrics/purchase", {
                 company: this.state.company,
                 period: parseInt(this.state.period) || 90,
-                lead: parseInt(this.state.lead) || 7,
             });
             Object.assign(this.purchaseData, data);
             this.state.buyPage = 1;

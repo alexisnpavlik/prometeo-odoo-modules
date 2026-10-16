@@ -13,7 +13,7 @@
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["stock", "purchase", "web"],
+    "depends": ["stock", "web"],
     "data": [
         "security/security.xml",
         "views/menu_views.xml",
