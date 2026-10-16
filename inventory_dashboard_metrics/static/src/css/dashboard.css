@@ -1356,3 +1356,18 @@
     border: 1px solid rgba(59, 130, 246, 0.5);
 }
 .inv-dashboard-wrap.theme-light .buy-qty { color: #1d4ed8; }
+
+/* Stock negativo: dato a revisar */
+.inv-dashboard-wrap .review-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+    color: var(--color-amber);
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    cursor: help;
+}

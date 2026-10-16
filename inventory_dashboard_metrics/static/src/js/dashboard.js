@@ -121,7 +121,7 @@ class InventoryDashboardMetrics extends Component {
         const cover = parseInt(this.state.buyCover) || 30;
         const rows = [];
         for (const c of this.purchaseData.rows) {
-            const qty = roundUnits(c.daily * cover - c.stock);
+            const qty = roundUnits(c.daily * cover - Math.max(c.stock, 0));
             if (qty <= 0) {
                 continue;
             }
@@ -130,7 +130,7 @@ class InventoryDashboardMetrics extends Component {
                 qty,
                 total: qty * c.price,
                 min_qty: c.supplier_min > qty ? c.supplier_min : 0,
-                days_after: roundUnits((c.stock + qty) / c.daily),
+                days_after: roundUnits((Math.max(c.stock, 0) + qty) / c.daily),
             });
         }
         return rows.sort((a, b) =>
