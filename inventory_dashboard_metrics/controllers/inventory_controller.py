@@ -249,6 +249,7 @@ class InventoryMetricsController(http.Controller):
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
             "sold": round(r["qty_period"], 2),
+            "daily": round(r["daily"], 2),
             "cover": int(round(r["cover"])) if r["cover"] is not None else None,
             "last_sale": r["last_sale"].strftime("%d/%m/%Y") if r["last_sale"] else None,
             "days_since_sale": r["days_since_sale"],
@@ -269,6 +270,7 @@ class InventoryMetricsController(http.Controller):
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
             "sold": round(r["qty_period"], 2),
+            "daily": round(r["daily"], 2),
             "cover": int(round(r["cover"])) if r["cover"] is not None else 0,
             "status": "sin_stock" if r["stock"] <= 0 else "por_agotarse",
         } for r in urgent[:MAX_TABLE_ROWS]]
@@ -332,25 +334,25 @@ class InventoryMetricsController(http.Controller):
                 data = self._purchase_rows(
                     self._purchase_candidates(rows, suppliers, self._fetch_incoming(companies), lead), cover)
                 title = f"Recomendador de compra ({cover} días)"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)", "Venta/día",
                            "Alcanza para (días)", "Plazo (días)", "Comprar", "Mínimo del proveedor",
                            "Precio", "Total", "Prioridad"]
-                keys = ["producto", "categoria", "vendor", "stock", "incoming", "sold", "days_left",
+                keys = ["producto", "categoria", "vendor", "stock", "incoming", "sold", "daily", "days_left",
                         "lead", "qty", "min_qty", "price", "total", "status"]
                 data = [r for r in data if vendor in ('', 'all') or r["vendor"] == vendor]
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
                 title = "Productos por reponer"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Venta/día",
                            "Alcanza para (días)", "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "cover", "status"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
             else:
                 _total, data = self._overstock_rows(rows)
                 data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
                 title = "Mucho stock y poca venta"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Alcanza para (días)",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Venta/día", "Alcanza para (días)",
                            "Última venta", "Valor", "De más", "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "cover", "last_sale",
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "last_sale",
                         "value", "excess_value", "status"]
 
             query = (search or '').lower().strip()
@@ -384,6 +386,8 @@ class InventoryMetricsController(http.Controller):
                     value = row.get(key)
                     if key == "status":
                         sheet.write_string(4 + idx, col, STATUS_LABELS.get(value, ''), fmt_text)
+                    elif key == "daily":
+                        sheet.write_number(4 + idx, col, round(value, 2), fmt_num)
                     elif isinstance(value, (int, float)):
                         sheet.write_number(4 + idx, col, value, fmt_money if key in money_keys else fmt_num)
                     else:

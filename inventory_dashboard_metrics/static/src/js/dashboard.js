@@ -266,6 +266,10 @@ class InventoryDashboardMetrics extends Component {
         }).format(val || 0);
     }
 
+    formatDaily(val) {
+        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+    }
+
     formatNumber(val) {
         return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(val || 0);
     }

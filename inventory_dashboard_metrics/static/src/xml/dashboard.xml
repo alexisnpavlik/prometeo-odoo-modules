@@ -187,13 +187,14 @@
                                             <th>Proveedor</th>
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Venta/día</th>
                                             <th class="num">Alcanza para</th>
                                             <th>Estado</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr t-if="restPage.rows.length === 0">
-                                            <td colspan="7" class="text-center text-muted empty-row">No hay productos para reponer con estos filtros.</td>
+                                            <td colspan="8" class="text-center text-muted empty-row">No hay productos para reponer con estos filtros.</td>
                                         </tr>
                                         <t t-foreach="restPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
@@ -202,6 +203,7 @@
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num"><t t-esc="r.cover"/> días</td>
                                                 <td><span t-att-class="'stock-badge ' + (r.status === 'sin_stock' ? 'rotura' : 'critico')"><t t-esc="r.status === 'sin_stock' ? 'Sin stock' : 'Por agotarse'"/></span></td>
                                             </tr>
@@ -258,6 +260,7 @@
                                             <th>Proveedor</th>
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Venta/día</th>
                                             <th class="num">Alcanza para</th>
                                             <th>Última venta</th>
                                             <th class="num">Valor</th>
@@ -267,7 +270,7 @@
                                     </thead>
                                     <tbody>
                                         <tr t-if="overPage.rows.length === 0">
-                                            <td colspan="10" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
+                                            <td colspan="11" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
                                         </tr>
                                         <t t-foreach="overPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
@@ -276,6 +279,7 @@
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num">
                                                     <t t-if="r.cover === null">—</t>
                                                     <t t-else=""><t t-esc="formatNumber(r.cover)"/> días</t>
@@ -350,6 +354,7 @@
                                             <th class="num">Stock</th>
                                             <th class="num">Ya pedido</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
+                                            <th class="num">Venta/día</th>
                                             <th class="num">Alcanza para</th>
                                             <th class="num">Plazo</th>
                                             <th class="num">Comprar</th>
@@ -360,10 +365,10 @@
                                     </thead>
                                     <tbody>
                                         <tr t-if="state.buyLoading">
-                                            <td colspan="11" class="text-center text-muted empty-row">Calculando...</td>
+                                            <td colspan="12" class="text-center text-muted empty-row">Calculando...</td>
                                         </tr>
                                         <tr t-elif="buyPage.rows.length === 0">
-                                            <td colspan="11" class="text-center text-muted empty-row">No hay nada para comprar con estos filtros.</td>
+                                            <td colspan="12" class="text-center text-muted empty-row">No hay nada para comprar con estos filtros.</td>
                                         </tr>
                                         <t t-foreach="buyPage.rows" t-as="r" t-key="r.product_id">
                                             <tr>
@@ -372,6 +377,7 @@
                                                 <td class="num"><t t-esc="formatNumber(r.stock)"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.incoming)"/></td>
                                                 <td class="num"><t t-esc="formatNumber(r.sold)"/></td>
+                                                <td class="num"><t t-esc="formatDaily(r.daily)"/></td>
                                                 <td class="num"><t t-esc="r.days_left"/> días</td>
                                                 <td class="num"><t t-esc="r.lead"/> días</td>
                                                 <td class="num cell-strong">
