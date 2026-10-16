@@ -184,14 +184,15 @@ class InventoryMetricsController(http.Controller):
         """Comprar = venta diaria x días a cubrir - stock. Misma cuenta que el JS."""
         result = []
         for c in candidates:
-            qty = _round_units(c["daily"] * cover - max(c["stock"], 0.0))
+            # El stock negativo se resta tal cual: son unidades vendidas sin stock que también hay que reponer
+            qty = _round_units(c["daily"] * cover - c["stock"])
             if qty <= 0:
                 continue
             # El mínimo del proveedor se informa pero no se impone: forzarlo genera sobrestock
             result.append(dict(c, qty=qty, total=round(qty * c["price"], 2),
                                min_qty=c["supplier_min"] if c["supplier_min"] > qty else 0,
                                # Días que cubriría el stock después de comprar
-                               days_after=_round_units((max(c["stock"], 0.0) + qty) / c["daily"])))
+                               days_after=_round_units((c["stock"] + qty) / c["daily"])))
         result.sort(key=lambda r: (r["status"] != "urgente", r["vendor"] == NO_VENDOR, r["vendor"], -r["total"]))
         return result
 
