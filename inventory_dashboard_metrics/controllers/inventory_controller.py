@@ -334,23 +334,22 @@ class InventoryMetricsController(http.Controller):
                 data = self._purchase_rows(
                     self._purchase_candidates(rows, suppliers, self._fetch_incoming(companies), lead), cover)
                 title = f"Recomendador de compra ({cover} días)"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)", "Venta/día",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)", "Promedio de ventas por día",
                            "Alcanza para (días)", "Plazo (días)", "Comprar", "Mínimo del proveedor",
                            "Precio", "Total", "Prioridad"]
                 keys = ["producto", "categoria", "vendor", "stock", "incoming", "sold", "daily", "days_left",
                         "lead", "qty", "min_qty", "price", "total", "status"]
-                data = [r for r in data if vendor in ('', 'all') or r["vendor"] == vendor]
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
                 title = "Productos por reponer"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Venta/día",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
                            "Alcanza para (días)", "Estado"]
                 keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
             else:
                 _total, data = self._overstock_rows(rows)
                 data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
                 title = "Mucho stock y poca venta"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Venta/día", "Alcanza para (días)",
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día", "Alcanza para (días)",
                            "Última venta", "Valor", "De más", "Estado"]
                 keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "last_sale",
                         "value", "excess_value", "status"]
@@ -359,6 +358,7 @@ class InventoryMetricsController(http.Controller):
             data = [r for r in data
                     if (status in ('', 'all') or r["status"] == status)
                     and (category in ('', 'all') or r["categoria"] == category)
+                    and (vendor in ('', 'all') or r["vendor"] == vendor)
                     and (not query or query in r["producto"].lower())]
 
             output = io.BytesIO()

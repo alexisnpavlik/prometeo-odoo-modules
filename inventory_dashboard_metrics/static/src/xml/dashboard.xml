@@ -95,6 +95,18 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="input-group">
+                        <label>Proveedor</label>
+                        <div class="select-wrapper">
+                            <select t-model="state.vendor" t-on-change="onCategoryChange">
+                                <option value="all">Todos los proveedores</option>
+                                <t t-foreach="vendors" t-as="v" t-key="v">
+                                    <option t-att-value="v"><t t-esc="v"/></option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="sidebar-footer">
@@ -187,7 +199,7 @@
                                             <th>Proveedor</th>
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num">Venta/día</th>
+                                            <th class="num th-wrap">Promedio de ventas por día</th>
                                             <th class="num">Alcanza para</th>
                                             <th>Estado</th>
                                         </tr>
@@ -260,7 +272,7 @@
                                             <th>Proveedor</th>
                                             <th class="num">Stock</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num">Venta/día</th>
+                                            <th class="num th-wrap">Promedio de ventas por día</th>
                                             <th class="num">Alcanza para</th>
                                             <th>Última venta</th>
                                             <th class="num">Valor</th>
@@ -331,12 +343,6 @@
                             </div>
                             <div class="filter-row">
                                 <input type="text" placeholder="Buscar producto..." t-model="state.buySearch" t-on-input="resetBuyPage"/>
-                                <select t-model="state.buyVendor" t-on-change="resetBuyPage">
-                                    <option value="all">Todos los proveedores</option>
-                                    <t t-foreach="vendors" t-as="v" t-key="v">
-                                        <option t-att-value="v"><t t-esc="v"/></option>
-                                    </t>
-                                </select>
                                 <select t-model="state.buyStatus" t-on-change="resetBuyPage">
                                     <option value="all">Todas las prioridades</option>
                                     <option value="urgente">Urgente</option>
@@ -354,7 +360,7 @@
                                             <th class="num">Stock</th>
                                             <th class="num">Ya pedido</th>
                                             <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num">Venta/día</th>
+                                            <th class="num th-wrap">Promedio de ventas por día</th>
                                             <th class="num">Alcanza para</th>
                                             <th class="num">Plazo</th>
                                             <th class="num">Comprar</th>

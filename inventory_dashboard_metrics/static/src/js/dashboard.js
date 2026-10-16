@@ -48,10 +48,10 @@ class InventoryDashboardMetrics extends Component {
             restSearch: "",
             restStatus: "all",
             category: "all",
+            vendor: "all",
             restPage: 1,
             buySearch: "",
             buyStatus: "all",
-            buyVendor: "all",
             buyPage: 1,
             buyCover: "30",
             buyLoading: false,
@@ -87,21 +87,23 @@ class InventoryDashboardMetrics extends Component {
 
     get filteredOverstock() {
         const q = this.state.overSearch.toLowerCase().trim();
-        const { overStatus, category, overSort } = this.state;
+        const { overStatus, category, vendor, overSort } = this.state;
         return this.metricsData.overstock
             .filter((r) =>
                 (overStatus === "all" || r.status === overStatus) &&
                 (category === "all" || r.categoria === category) &&
+                (vendor === "all" || r.vendor === vendor) &&
                 (!q || r.producto.toLowerCase().includes(q)))
             .sort(OVER_SORTS[overSort]);
     }
 
     get filteredRestock() {
         const q = this.state.restSearch.toLowerCase().trim();
-        const { restStatus, category } = this.state;
+        const { restStatus, category, vendor } = this.state;
         return this.metricsData.restock.filter((r) =>
             (restStatus === "all" || r.status === restStatus) &&
             (category === "all" || r.categoria === category) &&
+            (vendor === "all" || r.vendor === vendor) &&
             (!q || r.producto.toLowerCase().includes(q)));
     }
 
@@ -110,7 +112,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     get vendors() {
-        return [...new Set(this.purchaseData.rows.map((r) => r.vendor))].sort();
+        const rows = [...this.metricsData.overstock, ...this.metricsData.restock, ...this.purchaseData.rows];
+        return [...new Set(rows.map((r) => r.vendor))].sort();
     }
 
     get purchaseRows() {
@@ -137,10 +140,10 @@ class InventoryDashboardMetrics extends Component {
 
     get filteredPurchase() {
         const q = this.state.buySearch.toLowerCase().trim();
-        const { buyStatus, buyVendor, category } = this.state;
+        const { buyStatus, vendor, category } = this.state;
         return this.purchaseRows.filter((r) =>
             (buyStatus === "all" || r.status === buyStatus) &&
-            (buyVendor === "all" || r.vendor === buyVendor) &&
+            (vendor === "all" || r.vendor === vendor) &&
             (category === "all" || r.categoria === category) &&
             (!q || r.producto.toLowerCase().includes(q)));
     }
@@ -197,7 +200,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     clearBuyFilters() {
-        Object.assign(this.state, { buySearch: "", buyStatus: "all", buyVendor: "all", buyPage: 1 });
+        Object.assign(this.state, { buySearch: "", buyStatus: "all", buyPage: 1 });
     }
 
     resetOverPage() {
@@ -231,7 +234,7 @@ class InventoryDashboardMetrics extends Component {
             period: this.state.period,
             target: this.state.target,
             lead: this.state.lead,
-            vendor: this.state.buyVendor,
+            vendor: this.state.vendor,
             cover: this.state.buyCover,
             status: buy ? this.state.buyStatus : over ? this.state.overStatus : this.state.restStatus,
             category: this.state.category,
@@ -255,7 +258,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async clearFilters() {
-        Object.assign(this.state, { company: "all", period: "90", target: "90", lead: "7", category: "all", showFilters: false });
+        Object.assign(this.state, { company: "all", period: "90", target: "90", lead: "7", category: "all", vendor: "all", showFilters: false });
         await this.refreshData();
     }
 
@@ -292,7 +295,7 @@ class InventoryDashboardMetrics extends Component {
                 lead: parseInt(this.state.lead) || 7,
             });
             Object.assign(this.purchaseData, data);
-            Object.assign(this.state, { buyPage: 1, buyVendor: "all" });
+            this.state.buyPage = 1;
             this.purchaseStale = false;
         } catch (e) {
             console.error("Error al calcular la recomendación de compra:", e);
@@ -314,6 +317,9 @@ class InventoryDashboardMetrics extends Component {
             Object.assign(this.state, { overPage: 1, restPage: 1 });
             if (!this.categories.includes(this.state.category)) {
                 this.state.category = "all";
+            }
+            if (!this.vendors.includes(this.state.vendor)) {
+                this.state.vendor = "all";
             }
             this.purchaseStale = true;
             if (this.state.tab === "compra") {

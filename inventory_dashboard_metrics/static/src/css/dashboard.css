@@ -1315,3 +1315,4 @@
     color: var(--text-muted);
     font-weight: 600;
 }
+.inv-dashboard-wrap .data-table th.th-wrap { white-space: normal; min-width: 90px; max-width: 110px; line-height: 1.3; }
