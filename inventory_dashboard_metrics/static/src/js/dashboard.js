@@ -1,137 +1,330 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, useState, onWillUnmount } from "@odoo/owl";
+import { Component, onWillStart, useState } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
-import { loadJS } from "@web/core/assets";
+
+const PAGE_SIZE = 25;
+const LOW_COVER_DAYS = 15;
+// Umbral fijo de sobrestock: debe coincidir con DEFAULT_TARGET del controlador
+const OVERSTOCK_DAYS = 90;
+
+// Mismo redondeo y misma cuenta que _purchase_rows en el controlador
+const roundUnits = (value) => Math.floor(value + 0.5);
+
+// Etiqueta de la barra "Cantidad a comprar" según los días de venta a cubrir
+const BUY_COVER_LEVELS = [
+    [15, "Poca"],
+    [45, "Normal"],
+    [75, "Bastante"],
+    [120, "Mucha"],
+    [Infinity, "Muchísima"],
+];
+
+const OVER_SORTS = {
+    excess: (a, b) => b.excess_value - a.excess_value,
+    value: (a, b) => b.value - a.value,
+    stock: (a, b) => b.stock - a.stock,
+    idle: (a, b) => (b.days_since_sale ?? 1e9) - (a.days_since_sale ?? 1e9),
+};
 
 class InventoryDashboardMetrics extends Component {
     static template = "inventory_dashboard_metrics.DashboardTemplate";
 
     setup() {
+        this.lowCoverDays = LOW_COVER_DAYS;
+        this.overstockDays = OVERSTOCK_DAYS;
         this.state = useState({
             company: "all",
-            period: "30",
-            inventorySearch: "",
+            period: "90",
+            lead: "7",
+            tab: "stock",
+            showFilters: false,
             loading: false,
             syncTime: "Cargando...",
-            theme: "dark"
+            theme: "dark",
+            overSearch: "",
+            overStatus: "all",
+            overSort: "excess",
+            overPage: 1,
+            restSearch: "",
+            restStatus: "all",
+            category: "all",
+            vendor: "all",
+            restPage: 1,
+            buySearch: "",
+            buyStatus: "all",
+            buyPage: 1,
+            buyCover: "30",
+            buyLoading: false,
         });
 
-        this.filtersData = useState({
-            companies: []
-        });
+        this.filtersData = useState({ companies: [] });
 
         this.metricsData = useState({
-            kpis: {
-                total_value: 0,
-                total_units: 0,
-                stockouts: 0,
-                low_stock: 0
-            },
-            category_valuation: [],
-            top_movements: { labels: [], values: [] },
-            top_value_products: [],
-            critical_stock_alerts: [],
-            heatmap_companies: [],
-            heatmap_data: [],
-            dead_stock: { labels: [], values: [], stocks: [] }
+            overstock_total: 0,
+            excess_value: 0,
+            overstock: [],
+            restock_total: 0,
+            restock: [],
         });
 
-        this.charts = {};
+        this.purchaseData = useState({ rows: [] });
+        this.purchaseStale = true;
 
         onWillStart(async () => {
-            try {
-                if (typeof Chart === "undefined") {
-                    await loadJS("https://cdn.jsdelivr.net/npm/chart.js");
-                }
-            } catch (e) {
-                console.warn("No se pudo cargar Chart.js desde CDN, intentando usar la versión global/local de Odoo:", e);
-            }
             await this.loadFiltersMetadata();
             await this.refreshData();
         });
+    }
 
-        onMounted(() => {
-            this.renderCharts();
-        });
+    // --- Listas filtradas ---
+    categoriesOf(rows) {
+        return [...new Set(rows.map((r) => r.categoria))].sort();
+    }
 
-        onWillUnmount(() => {
-            Object.values(this.charts).forEach(chart => {
-                if (chart) {
-                    chart.destroy();
-                }
+    get categories() {
+        return this.categoriesOf([...this.metricsData.overstock, ...this.metricsData.restock]);
+    }
+
+    get filteredOverstock() {
+        const q = this.state.overSearch.toLowerCase().trim();
+        const { overStatus, category, vendor, overSort } = this.state;
+        return this.metricsData.overstock
+            .filter((r) =>
+                (overStatus === "all" || r.status === overStatus) &&
+                (category === "all" || r.categoria === category) &&
+                (vendor === "all" || r.vendor === vendor) &&
+                (!q || r.producto.toLowerCase().includes(q)))
+            .sort(OVER_SORTS[overSort]);
+    }
+
+    get filteredRestock() {
+        const q = this.state.restSearch.toLowerCase().trim();
+        const { restStatus, category, vendor } = this.state;
+        return this.metricsData.restock.filter((r) =>
+            (restStatus === "all" || r.status === restStatus) &&
+            (category === "all" || r.categoria === category) &&
+            (vendor === "all" || r.vendor === vendor) &&
+            (!q || r.producto.toLowerCase().includes(q)));
+    }
+
+    get overFilteredExcess() {
+        return this.filteredOverstock.reduce((sum, r) => sum + r.excess_value, 0);
+    }
+
+    get vendors() {
+        const rows = [...this.metricsData.overstock, ...this.metricsData.restock, ...this.purchaseData.rows];
+        return [...new Set(rows.map((r) => r.vendor))].sort();
+    }
+
+    get purchaseRows() {
+        const cover = parseInt(this.state.buyCover) || 30;
+        const rows = [];
+        for (const c of this.purchaseData.rows) {
+            const qty = roundUnits(c.daily * (c.lead + cover) - Math.max(c.stock, 0) - c.incoming);
+            if (qty <= 0) {
+                continue;
+            }
+            rows.push({
+                ...c,
+                qty,
+                total: qty * c.price,
+                min_qty: c.supplier_min > qty ? c.supplier_min : 0,
             });
-        });
-    }
-
-    // --- Getters Reactivos ---
-    get filteredInventoryAlerts() {
-        const query = (this.state.inventorySearch || "").toLowerCase().trim();
-        if (!query) {
-            return this.metricsData.critical_stock_alerts || [];
         }
-        return (this.metricsData.critical_stock_alerts || []).filter(a => 
-            (a.producto || "").toLowerCase().includes(query) ||
-            (a.categoria || "").toLowerCase().includes(query)
-        );
+        return rows.sort((a, b) =>
+            (a.status !== "urgente") - (b.status !== "urgente") ||
+            (a.vendor === "Sin proveedor") - (b.vendor === "Sin proveedor") ||
+            a.vendor.localeCompare(b.vendor) ||
+            b.total - a.total);
     }
 
-    // --- Manejo de Eventos y Inputs ---
-    onInventorySearchInput(ev) {
-        this.state.inventorySearch = ev.target.value;
+    get filteredPurchase() {
+        const q = this.state.buySearch.toLowerCase().trim();
+        const { buyStatus, vendor, category } = this.state;
+        return this.purchaseRows.filter((r) =>
+            (buyStatus === "all" || r.status === buyStatus) &&
+            (vendor === "all" || r.vendor === vendor) &&
+            (category === "all" || r.categoria === category) &&
+            (!q || r.producto.toLowerCase().includes(q)));
+    }
+
+    get buyCoverLabel() {
+        const days = parseInt(this.state.buyCover) || 30;
+        return BUY_COVER_LEVELS.find(([limit]) => days <= limit)[1];
+    }
+
+    get buyFilteredUnits() {
+        return this.filteredPurchase.reduce((sum, r) => sum + r.qty, 0);
+    }
+
+    get buyNoPrice() {
+        return this.filteredPurchase.filter((r) => !r.price).length;
+    }
+
+    get buyFilteredTotal() {
+        return this.filteredPurchase.reduce((sum, r) => sum + r.total, 0);
+    }
+
+    get buyPage() {
+        return this.pageOf(this.filteredPurchase, this.state.buyPage);
+    }
+
+    pageOf(rows, page) {
+        const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        const current = Math.min(page, pages);
+        return { rows: rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE), current, pages };
+    }
+
+    get overPage() {
+        return this.pageOf(this.filteredOverstock, this.state.overPage);
+    }
+
+    get restPage() {
+        return this.pageOf(this.filteredRestock, this.state.restPage);
+    }
+
+    // --- Eventos ---
+    onCategoryChange() {
+        Object.assign(this.state, { overPage: 1, restPage: 1, buyPage: 1 });
+    }
+
+    async onTabClick(ev) {
+        this.state.tab = ev.currentTarget.dataset.tab;
+        if (this.state.tab === "compra" && this.purchaseStale) {
+            await this.loadPurchase();
+        }
+    }
+
+    resetBuyPage() {
+        this.state.buyPage = 1;
+    }
+
+    clearBuyFilters() {
+        Object.assign(this.state, { buySearch: "", buyStatus: "all", buyPage: 1 });
+    }
+
+    resetOverPage() {
+        this.state.overPage = 1;
+    }
+
+    resetRestPage() {
+        this.state.restPage = 1;
+    }
+
+    changePage(ev) {
+        const { key, dir } = ev.currentTarget.dataset;
+        this.state[key] = Math.max(1, this.state[key] + parseInt(dir));
+    }
+
+    clearOverFilters() {
+        Object.assign(this.state, { overSearch: "", overStatus: "all", overSort: "excess", overPage: 1 });
+    }
+
+    clearRestFilters() {
+        Object.assign(this.state, { restSearch: "", restStatus: "all", restPage: 1 });
+    }
+
+    exportExcel(ev) {
+        const table = ev.currentTarget.dataset.table;
+        const over = table === "overstock";
+        const buy = table === "purchase";
+        const params = new URLSearchParams({
+            table,
+            company: this.state.company,
+            period: this.state.period,
+            lead: this.state.lead,
+            vendor: this.state.vendor,
+            cover: this.state.buyCover,
+            status: buy ? this.state.buyStatus : over ? this.state.overStatus : this.state.restStatus,
+            category: this.state.category,
+            search: buy ? this.state.buySearch : over ? this.state.overSearch : this.state.restSearch,
+            sort: this.state.overSort,
+        });
+        window.open(`/inventory_dashboard_metrics/export?${params.toString()}`, "_blank");
+    }
+
+    toggleFilters() {
+        this.state.showFilters = !this.state.showFilters;
     }
 
     toggleTheme() {
         this.state.theme = this.state.theme === "dark" ? "light" : "dark";
-        setTimeout(() => {
-            this.renderCharts();
-        }, 50);
     }
 
     async applyFilters() {
+        this.state.showFilters = false;
         await this.refreshData();
     }
 
     async clearFilters() {
-        this.state.company = "all";
-        this.state.period = "30";
-        this.state.inventorySearch = "";
+        Object.assign(this.state, { company: "all", period: "90", lead: "7", category: "all", vendor: "all", showFilters: false });
         await this.refreshData();
     }
 
-    // --- Formateadores Auxiliares ---
+    // --- Formateadores ---
     formatCurrency(val) {
-        return new Intl.NumberFormat('es-AR', {
-            style: 'currency',
-            currency: 'ARS',
-            minimumFractionDigits: 2
+        return new Intl.NumberFormat("es-AR", {
+            style: "currency", currency: "ARS", maximumFractionDigits: 0,
         }).format(val || 0);
     }
 
-    // --- Llamadas RPC a Odoo Controller ---
+    formatDaily(val) {
+        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+    }
+
+    formatNumber(val) {
+        return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(val || 0);
+    }
+
+    // --- RPC ---
     async loadFiltersMetadata() {
         try {
-            const data = await rpc("/inventory_dashboard_metrics/filters", {});
-            Object.assign(this.filtersData, data);
+            Object.assign(this.filtersData, await rpc("/inventory_dashboard_metrics/filters", {}));
         } catch (e) {
             console.error("Error al cargar metadatos de filtros:", e);
+        }
+    }
+
+    async loadPurchase() {
+        this.state.buyLoading = true;
+        try {
+            const data = await rpc("/inventory_dashboard_metrics/purchase", {
+                company: this.state.company,
+                period: parseInt(this.state.period) || 90,
+                lead: parseInt(this.state.lead) || 7,
+            });
+            Object.assign(this.purchaseData, data);
+            this.state.buyPage = 1;
+            this.purchaseStale = false;
+        } catch (e) {
+            console.error("Error al calcular la recomendación de compra:", e);
+        } finally {
+            this.state.buyLoading = false;
         }
     }
 
     async refreshData() {
         this.state.loading = true;
         this.state.syncTime = "Sincronizando...";
-
         try {
             const metrics = await rpc("/inventory_dashboard_metrics/inventory", {
                 company: this.state.company,
-                period: parseInt(this.state.period) || 30
+                period: parseInt(this.state.period) || 90,
             });
-
             Object.assign(this.metricsData, metrics);
-            setTimeout(() => this.renderCharts(), 50);
-
+            Object.assign(this.state, { overPage: 1, restPage: 1 });
+            if (!this.categories.includes(this.state.category)) {
+                this.state.category = "all";
+            }
+            if (!this.vendors.includes(this.state.vendor)) {
+                this.state.vendor = "all";
+            }
+            this.purchaseStale = true;
+            if (this.state.tab === "compra") {
+                await this.loadPurchase();
+            }
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
         } catch (e) {
             console.error("Error al sincronizar métricas de inventario:", e);
@@ -139,115 +332,6 @@ class InventoryDashboardMetrics extends Component {
         } finally {
             this.state.loading = false;
         }
-    }
-
-    renderCharts() {
-        if (typeof Chart === "undefined") {
-            console.warn("Chart.js no está cargado. No se renderizarán los gráficos.");
-            return;
-        }
-
-        const isLight = this.state.theme === "light";
-        const textColor = isLight ? "#475569" : "#94a3b8";
-        const gridColor = isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.04)";
-
-        const gridConfig = {
-            color: gridColor,
-            borderColor: "transparent",
-            drawBorder: false
-        };
-
-        const metrics = this.metricsData;
-
-        // 1. Gráfico de Dead Stock (Horizontal Bar)
-        const dead = metrics.dead_stock || { labels: [], values: [], stocks: [] };
-        const shortLabels = (dead.labels || []).map(l => l.length > 20 ? l.substring(0, 17) + "..." : l);
-
-        this.createOrUpdateChart("chart-dead-stock", "bar", {
-            labels: shortLabels,
-            datasets: [{
-                label: "Capital Inmovilizado",
-                data: dead.values || [],
-                backgroundColor: "rgba(245, 158, 11, 0.65)", // Naranja brillante
-                borderColor: "#f59e0b",
-                borderWidth: 1.5,
-                borderRadius: 4
-            }]
-        }, {
-            indexAxis: "y",
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => {
-                            const val = context.raw;
-                            const fullLabel = dead.labels[context.dataIndex] || "";
-                            return ` ${fullLabel}: ${this.formatCurrency(val)} inmovilizados`;
-                        },
-                        afterLabel: (context) => {
-                            const stock = dead.stocks[context.dataIndex] || 0;
-                            return ` Existencias: ${stock.toLocaleString()} unidades sin ventas en los últimos ${this.state.period} días.`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: gridConfig,
-                    ticks: {
-                        callback: (value) => {
-                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
-                            if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
-                            return value;
-                        }
-                    }
-                },
-                y: { grid: { display: false } }
-            }
-        });
-    }
-
-    createOrUpdateChart(canvasId, type, data, options = {}) {
-        if (typeof Chart === "undefined") return;
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-
-        if (this.charts[canvasId]) {
-            this.charts[canvasId].destroy();
-        }
-
-        Chart.defaults.color = "#94a3b8";
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.font.size = 10;
-
-        const mergedOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: type === "doughnut" },
-                tooltip: {
-                    backgroundColor: "rgba(15, 23, 42, 0.95)",
-                    borderColor: "rgba(255, 255, 255, 0.08)",
-                    borderWidth: 1,
-                    padding: 8,
-                    titleColor: "#fff",
-                    bodyColor: "#94a3b8"
-                }
-            }
-        };
-
-        if (options.plugins) {
-            Object.assign(mergedOptions.plugins, options.plugins);
-            delete options.plugins;
-        }
-        Object.assign(mergedOptions, options);
-
-        this.charts[canvasId] = new Chart(ctx, {
-            type: type,
-            data: data,
-            options: mergedOptions
-        });
     }
 }
 

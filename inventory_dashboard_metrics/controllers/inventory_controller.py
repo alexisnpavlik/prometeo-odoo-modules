@@ -1,10 +1,56 @@
 # -*- coding: utf-8 -*-
-from odoo import http
-from odoo.http import request
-from odoo.exceptions import AccessError
+import io
 import logging
+import math
+from datetime import datetime
+
+import xlsxwriter
+
+from odoo import http
+from odoo.exceptions import AccessError
+from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+PERIODS = (30, 60, 90, 180, 365)
+TARGET_DAYS = (30, 60, 90, 120, 180)
+DEFAULT_PERIOD = 90
+DEFAULT_TARGET = 90
+LEAD_DAYS = (3, 7, 15, 30)
+DEFAULT_LEAD = 7
+NO_VENDOR = "Sin proveedor"
+BUY_COVER_MIN, BUY_COVER_MAX, DEFAULT_BUY_COVER = 7, 180, 30
+LOW_COVER_DAYS = 15
+MAX_TABLE_ROWS = 20000
+UNCATEGORIZED = "Sin categorizar"
+GENERIC_CATEGORIES = ("all", "todos", "all / saleable")
+
+
+OVER_SORTS = {
+    "excess": lambda r: -r["excess_value"],
+    "value": lambda r: -r["value"],
+    "stock": lambda r: -r["stock"],
+    "idle": lambda r: -(r["days_since_sale"] if r["days_since_sale"] is not None else 10 ** 9),
+}
+STATUS_LABELS = {
+    "sin_venta": "Sin ventas", "sobrestock": "Sobrestock",
+    "sin_stock": "Sin stock", "por_agotarse": "Por agotarse",
+    "urgente": "Urgente", "normal": "Normal",
+}
+
+
+def _round_units(value):
+    """Redondeo comercial: 4,2 -> 4 y 4,5 -> 5. Hacia arriba compraba de más en productos de poca venta."""
+    return int(math.floor(value + 0.5))
+
+
+def _to_int(value, allowed, default):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return default
+    return value if value in allowed else default
+
 
 class InventoryMetricsController(http.Controller):
 
@@ -15,428 +61,347 @@ class InventoryMetricsController(http.Controller):
     def _get_lang(self):
         return request.env.context.get('lang') or 'es_AR'
 
+    def _resolve_companies(self, company):
+        """Empresas a consultar: la elegida (si el usuario puede verla) o todas las permitidas."""
+        allowed = tuple(request.env.companies.ids)
+        if company and company != 'all':
+            request.env.cr.execute("SELECT id FROM res_company WHERE name = %s AND id IN %s",
+                                   (company, allowed or (0,)))
+            row = request.env.cr.fetchone()
+            if row:
+                return (row[0],)
+        return allowed
+
     @http.route('/inventory_dashboard_metrics/filters', type='json', auth='user')
     def get_filters(self, **kwargs):
         self._check_access()
-        cr = request.env.cr
         allowed_companies = tuple(request.env.companies.ids)
-        lang = self._get_lang()
-
         if not allowed_companies:
-            return {
-                "companies": [],
-                "categories": [],
-                "products": []
-            }
+            return {"companies": []}
+        request.env.cr.execute(
+            "SELECT name FROM res_company WHERE id IN %s ORDER BY name", (allowed_companies,))
+        return {"companies": [r[0] for r in request.env.cr.fetchall() if r[0]]}
 
-        # 1. Empresas permitidas
+    def _fetch_product_rows(self, companies, period, lang):
+        """Una fila por producto almacenable: stock actual, valor, ventas del período y última venta.
+
+        Venta = movimiento hecho de ubicación interna a cliente (incluye POS).
+        """
+        cr = request.env.cr
         cr.execute("""
-            SELECT DISTINCT rc.name 
-            FROM res_company rc 
-            WHERE rc.id IN %s
-            ORDER BY rc.name
-        """, (allowed_companies,))
-        companies = [r[0] for r in cr.fetchall() if r[0]]
+            WITH stock AS (
+                SELECT sq.product_id,
+                       SUM(sq.quantity) AS stock,
+                       SUM(sq.quantity * COALESCE(
+                           (pp.standard_price->>(sq.company_id::text))::numeric,
+                           (pp.standard_price->>'1')::numeric, 0.0)) AS value
+                FROM stock_quant sq
+                JOIN stock_location sl ON sl.id = sq.location_id
+                     AND sl.usage = 'internal' AND sl.active = TRUE
+                JOIN product_product pp ON pp.id = sq.product_id
+                WHERE sq.company_id IN %(companies)s
+                GROUP BY sq.product_id
+            ),
+            sales AS (
+                SELECT sm.product_id,
+                       SUM(sm.product_qty) FILTER (
+                           WHERE sm.date >= NOW() - %(period)s * INTERVAL '1 day') AS qty_period,
+                       MAX(sm.date) AS last_sale
+                FROM stock_move sm
+                JOIN stock_location sls ON sls.id = sm.location_id AND sls.usage = 'internal'
+                JOIN stock_location sld ON sld.id = sm.location_dest_id AND sld.usage = 'customer'
+                JOIN product_product pp ON pp.id = sm.product_id
+                WHERE sm.state = 'done' AND sm.company_id IN %(companies)s
+                GROUP BY sm.product_id
+            )
+            SELECT pp.id AS product_id,
+                   pt.id AS tmpl_id,
+                   COALESCE((pp.standard_price->>%(first_company)s)::numeric,
+                            (pp.standard_price->>'1')::numeric, 0.0) AS cost,
+                   COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS producto,
+                   pc.name AS categoria,
+                   COALESCE(st.stock, 0.0) AS stock,
+                   COALESCE(st.value, 0.0) AS value,
+                   COALESCE(sa.qty_period, 0.0) AS qty_period,
+                   sa.last_sale
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category pc ON pc.id = pt.categ_id
+            LEFT JOIN stock st ON st.product_id = pp.id
+            LEFT JOIN sales sa ON sa.product_id = pp.id
+            WHERE pp.active = TRUE AND pt.active = TRUE
+              AND pt.type = 'consu' AND pt.is_storable = TRUE
+              AND (st.product_id IS NOT NULL OR sa.product_id IS NOT NULL)
+        """, {"companies": companies, "period": period, "lang": lang,
+                    "first_company": str(companies[0])})
+        return cr.dictfetchall()
 
-        # 2. Categorías comerciales
+    def _fetch_suppliers(self, companies):
+        """Proveedor principal por plantilla: primera línea vigente de la ficha (misma regla que Odoo)."""
+        cr = request.env.cr
         cr.execute("""
-            SELECT DISTINCT ic.name 
-            FROM product_category ic 
-            WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-            ORDER BY ic.name
-        """)
-        categories = [r[0] for r in cr.fetchall() if r[0]]
+            SELECT DISTINCT ON (si.product_tmpl_id)
+                   si.product_tmpl_id, rp.name AS vendor, si.price, si.delay, si.min_qty
+            FROM product_supplierinfo si
+            JOIN res_partner rp ON rp.id = si.partner_id
+            WHERE (si.company_id IS NULL OR si.company_id IN %s)
+              AND (si.date_start IS NULL OR si.date_start <= CURRENT_DATE)
+              AND (si.date_end IS NULL OR si.date_end >= CURRENT_DATE)
+            ORDER BY si.product_tmpl_id, si.sequence, si.id
+        """, (companies,))
+        return {r["product_tmpl_id"]: r for r in cr.dictfetchall()}
 
-        # 3. Productos activos (traducidos dinámicamente)
+    def _fetch_incoming(self, companies):
+        """Unidades pedidas en órdenes confirmadas que todavía no se recibieron."""
+        cr = request.env.cr
         cr.execute("""
-            SELECT DISTINCT COALESCE(pt.name->>%s, pt.name->>'en_US') 
-            FROM product_template pt
-            WHERE pt.active = TRUE
-            ORDER BY 1
-        """, (lang,))
-        products = [r[0] for r in cr.fetchall() if r[0]]
+            SELECT pol.product_id, SUM(pol.product_qty - pol.qty_received) AS qty
+            FROM purchase_order_line pol
+            JOIN purchase_order po ON po.id = pol.order_id
+            WHERE po.state = 'purchase' AND po.company_id IN %s
+              AND pol.product_id IS NOT NULL AND pol.product_qty > pol.qty_received
+            GROUP BY pol.product_id
+        """, (companies,))
+        return {r["product_id"]: float(r["qty"]) for r in cr.dictfetchall()}
 
-        return {
-            "companies": companies,
-            "categories": categories,
-            "products": products
-        }
+    def _attach_vendor(self, rows, suppliers):
+        for r in rows:
+            sup = suppliers.get(r["tmpl_id"])
+            r["vendor"] = sup["vendor"] if sup else NO_VENDOR
+        return rows
+
+    def _purchase_candidates(self, rows, suppliers, incoming, lead_default):
+        """Productos con ventas en el período, con todo lo necesario para calcular cuánto comprar."""
+        result = []
+        for r in rows:
+            if r["daily"] <= 0:
+                continue
+            sup = suppliers.get(r["tmpl_id"])
+            lead = int(sup["delay"]) if sup and sup["delay"] and sup["delay"] > 0 else lead_default
+            pending = incoming.get(r["product_id"], 0.0)
+            days_left = (max(r["stock"], 0.0) + pending) / r["daily"]
+            price = float(sup["price"]) if sup and sup["price"] and sup["price"] > 0 else float(r["cost"] or 0.0)
+            result.append({
+                "product_id": r["product_id"],
+                "producto": r["producto"],
+                "categoria": r["categoria"],
+                "vendor": sup["vendor"] if sup else NO_VENDOR,
+                "stock": round(r["stock"], 2),
+                "incoming": round(pending, 2),
+                "sold": round(r["qty_period"], 2),
+                "daily": r["daily"],
+                "days_left": int(round(days_left)),
+                "lead": lead,
+                "supplier_min": int(math.ceil(sup["min_qty"])) if sup and sup["min_qty"] else 0,
+                "price": round(price, 2),
+                "status": "urgente" if days_left < lead else "normal",
+            })
+        return result
+
+    def _purchase_rows(self, candidates, cover):
+        """Comprar = venta diaria x (plazo + días a cubrir) - stock - lo ya pedido. Misma cuenta que el JS."""
+        result = []
+        for c in candidates:
+            qty = _round_units(c["daily"] * (c["lead"] + cover) - max(c["stock"], 0.0) - c["incoming"])
+            if qty <= 0:
+                continue
+            # El mínimo del proveedor se informa pero no se impone: forzarlo genera sobrestock
+            result.append(dict(c, qty=qty, total=round(qty * c["price"], 2),
+                               min_qty=c["supplier_min"] if c["supplier_min"] > qty else 0))
+        result.sort(key=lambda r: (r["status"] != "urgente", r["vendor"] == NO_VENDOR, r["vendor"], -r["total"]))
+        return result
+
+    def _classify(self, rows, period, target):
+        """Agrega por producto: cobertura, estado (sin_venta/sobrestock/ok) y excedente."""
+        now = datetime.now()
+        for r in rows:
+            stock = float(r["stock"] or 0.0)
+            qty = float(r["qty_period"] or 0.0)
+            r["stock"] = stock
+            r["qty_period"] = qty
+            r["categoria"] = r["categoria"] if r["categoria"] and r["categoria"].lower() not in GENERIC_CATEGORIES \
+                else UNCATEGORIZED
+            r["daily"] = qty / period
+            r["value"] = max(float(r["value"] or 0.0), 0.0) if stock > 0 else 0.0
+            unit_cost = r["value"] / stock if stock > 0 else 0.0
+            r["cover"] = stock / r["daily"] if stock > 0 and r["daily"] > 0 else None
+            r["days_since_sale"] = (now - r["last_sale"]).days if r["last_sale"] else None
+
+            r["status"] = "ok"
+            r["excess_units"] = 0.0
+            if stock > 0:
+                if qty <= 0:
+                    r["status"] = "sin_venta"
+                    r["excess_units"] = stock
+                elif r["cover"] > target:
+                    r["status"] = "sobrestock"
+                    r["excess_units"] = stock - r["daily"] * target
+            r["excess_value"] = r["excess_units"] * unit_cost
+        return rows
+
+    def _overstock_rows(self, rows):
+        flagged = [r for r in rows if r["status"] in ("sin_venta", "sobrestock")]
+        flagged.sort(key=lambda r: (r["excess_value"], r["stock"]), reverse=True)
+        return len(flagged), [{
+            "product_id": r["product_id"],
+            "producto": r["producto"],
+            "categoria": r["categoria"],
+            "vendor": r["vendor"],
+            "stock": round(r["stock"], 2),
+            "sold": round(r["qty_period"], 2),
+            "daily": round(r["daily"], 2),
+            "cover": int(round(r["cover"])) if r["cover"] is not None else None,
+            "last_sale": r["last_sale"].strftime("%d/%m/%Y") if r["last_sale"] else None,
+            "days_since_sale": r["days_since_sale"],
+            "value": round(r["value"], 2),
+            "excess_value": round(r["excess_value"], 2),
+            "status": r["status"],
+        } for r in flagged[:MAX_TABLE_ROWS]]
+
+    def _restock_rows(self, rows):
+        """Productos con demanda que se quedaron sin stock o les quedan pocos días."""
+        urgent = [r for r in rows if r["qty_period"] > 0 and (r["stock"] <= 0 or (
+            r["cover"] is not None and r["cover"] <= LOW_COVER_DAYS))]
+        urgent.sort(key=lambda r: (r["cover"] if r["cover"] is not None else -1, -r["daily"]))
+        return len(urgent), [{
+            "product_id": r["product_id"],
+            "producto": r["producto"],
+            "categoria": r["categoria"],
+            "vendor": r["vendor"],
+            "stock": round(r["stock"], 2),
+            "sold": round(r["qty_period"], 2),
+            "daily": round(r["daily"], 2),
+            "cover": int(round(r["cover"])) if r["cover"] is not None else 0,
+            "status": "sin_stock" if r["stock"] <= 0 else "por_agotarse",
+        } for r in urgent[:MAX_TABLE_ROWS]]
 
     @http.route('/inventory_dashboard_metrics/inventory', type='json', auth='user')
     def get_inventory(self, company='all', **kwargs):
         self._check_access()
-        cr = request.env.cr
-        # Obtener y validar el filtro de tiempo (período en días)
-        try:
-            period = int(kwargs.get('period') or 30)
-            if period not in (7, 15, 30, 60, 90):
-                period = 30
-        except ValueError:
-            period = 30
-
+        period = _to_int(kwargs.get('period'), PERIODS, DEFAULT_PERIOD)
+        target = _to_int(kwargs.get('target'), TARGET_DAYS, DEFAULT_TARGET)
         lang = self._get_lang()
+        companies = self._resolve_companies(company)
 
-        # Configuración de filtro multi-compañía
-        if company and company != 'all':
-            cr.execute("SELECT id FROM res_company WHERE name = %s", (company,))
-            comp_row = cr.fetchone()
-            allowed_companies = (comp_row[0],) if comp_row else tuple(request.env.companies.ids)
-        else:
-            allowed_companies = tuple(request.env.companies.ids)
+        if not companies:
+            return {"overstock_total": 0, "excess_value": 0, "overstock": [], "restock_total": 0, "restock": []}
 
-        if not allowed_companies:
-            return {
-                "kpis": {"total_value": 0, "total_units": 0, "stockouts": 0, "low_stock": 0},
-                "category_valuation": [],
-                "top_movements": {"labels": [], "values": []},
-                "top_value_products": [],
-                "critical_stock_alerts": []
-            }
-
-        selected_comp_str = str(allowed_companies[0])
-
-        # 1. KPIs principales de Inventario
-        cr.execute("""
-            WITH product_stock AS (
-                SELECT 
-                    pp.id AS product_id,
-                    COALESCE(SUM(sq.quantity), 0.0) AS total_stock,
-                    SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                        (pp.standard_price->>(sq.company_id::text))::numeric, 
-                        (pp.standard_price->>'1')::numeric, 
-                        0.0
-                    )) AS total_value
-                FROM product_product pp
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                LEFT JOIN stock_quant sq ON sq.product_id = pp.id 
-                    AND sq.company_id IN %s
-                    AND sq.location_id IN (
-                        SELECT id FROM stock_location WHERE usage = 'internal' AND active = TRUE
-                    )
-                WHERE pp.active = TRUE AND pt.active = TRUE
-                GROUP BY pp.id
-            )
-            SELECT
-                SUM(total_value) AS total_value,
-                SUM(CASE WHEN total_stock > 0 THEN total_stock ELSE 0.0 END) AS total_units,
-                COUNT(CASE WHEN total_stock <= 0 THEN 1 END) AS stockouts,
-                COUNT(CASE WHEN total_stock > 0 AND total_stock <= 10 THEN 1 END) AS low_stock
-            FROM product_stock
-        """, (allowed_companies,))
-        kpi_res = cr.dictfetchone() or {}
-        
-        total_value = float(kpi_res.get("total_value") or 0.0)
-        total_units = float(kpi_res.get("total_units") or 0.0)
-        stockouts = int(kpi_res.get("stockouts") or 0)
-        low_stock = int(kpi_res.get("low_stock") or 0)
-
-        # 2. Valoración de Stock por Categoría
-        cr.execute("""
-            WITH product_stock AS (
-                SELECT 
-                    pp.id AS product_id,
-                    pt.categ_id,
-                    COALESCE(SUM(sq.quantity), 0.0) AS total_stock,
-                    SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                        (pp.standard_price->>(sq.company_id::text))::numeric, 
-                        (pp.standard_price->>'1')::numeric, 
-                        0.0
-                    )) AS total_value
-                FROM product_product pp
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                LEFT JOIN stock_quant sq ON sq.product_id = pp.id 
-                    AND sq.company_id IN %s
-                    AND sq.location_id IN (
-                        SELECT id FROM stock_location WHERE usage = 'internal' AND active = TRUE
-                    )
-                WHERE pp.active = TRUE AND pt.active = TRUE
-                GROUP BY pp.id, pt.categ_id
-            )
-            SELECT
-                ic.name AS categoria,
-                SUM(CASE WHEN ps.total_stock > 0 THEN ps.total_stock ELSE 0.0 END) AS total_qty,
-                SUM(ps.total_value) AS total_value
-            FROM product_stock ps
-            JOIN product_category ic ON ic.id = ps.categ_id
-            WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-            GROUP BY ic.name
-            HAVING SUM(CASE WHEN ps.total_stock > 0 THEN ps.total_stock ELSE 0.0 END) > 0 OR SUM(ps.total_value) > 0
-            ORDER BY total_value DESC
-        """, (allowed_companies,))
-        cat_valuation = cr.dictfetchall()
-        for c in cat_valuation:
-            c['total_qty'] = float(c['total_qty'] or 0.0)
-            c['total_value'] = round(float(c['total_value'] or 0.0), 2)
-            c['value_percent'] = round((c['total_value'] / total_value * 100.0), 2) if total_value > 0 else 0.0
-
-        # 3. Top 10 Movimientos / Rotación (dinámico según período)
-        cr.execute("""
-            SELECT
-                COALESCE(pt.name->>%s, pt.name->>'en_US') AS product,
-                SUM(sm.product_uom_qty) AS qty
-            FROM stock_move sm
-            JOIN product_product pp ON pp.id = sm.product_id
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            WHERE sm.state = 'done'
-              AND sm.date >= NOW() - CAST(%s || ' days' AS INTERVAL)
-              AND sm.company_id IN %s
-              AND pp.active = TRUE AND pt.active = TRUE
-            GROUP BY product
-            ORDER BY qty DESC
-            LIMIT 10
-        """, (lang, str(period), allowed_companies))
-        move_rows = cr.fetchall()
-        top_movements = {
-            "labels": [r[0] for r in move_rows],
-            "values": [float(r[1]) for r in move_rows]
-        }
-
-        # 4. Top 10 Productos con Mayor Valor de Inventario
-        cr.execute("""
-            WITH product_stock AS (
-                SELECT 
-                    pp.id AS product_id,
-                    COALESCE(SUM(sq.quantity), 0.0) AS total_stock,
-                    SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                        (pp.standard_price->>(sq.company_id::text))::numeric, 
-                        (pp.standard_price->>'1')::numeric, 
-                        0.0
-                    )) AS total_value,
-                    CASE WHEN COALESCE(SUM(sq.quantity), 0.0) > 0 THEN
-                        SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                            (pp.standard_price->>(sq.company_id::text))::numeric, 
-                            (pp.standard_price->>'1')::numeric, 
-                            0.0
-                        )) / SUM(sq.quantity)
-                    ELSE 0.0 END AS avg_unit_cost
-                FROM product_product pp
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                LEFT JOIN stock_quant sq ON sq.product_id = pp.id 
-                    AND sq.company_id IN %s
-                    AND sq.location_id IN (
-                        SELECT id FROM stock_location WHERE usage = 'internal' AND active = TRUE
-                    )
-                WHERE pp.active = TRUE AND pt.active = TRUE
-                GROUP BY pp.id
-            )
-            SELECT
-                COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
-                ic.name AS categoria,
-                ps.total_stock AS stock,
-                ps.avg_unit_cost AS costo,
-                ps.total_value AS total_value
-            FROM product_stock ps
-            JOIN product_product pp ON pp.id = ps.product_id
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE ps.total_stock > 0
-            ORDER BY total_value DESC
-            LIMIT 10
-        """, (allowed_companies, lang))
-        top_value_products = cr.dictfetchall()
-        for p in top_value_products:
-            p['stock'] = float(p['stock'] or 0.0)
-            p['costo'] = round(float(p['costo'] or 0.0), 2)
-            p['total_value'] = round(float(p['total_value'] or 0.0), 2)
-
-        # 5. Alertas de Stock Crítico (≤ 10 unidades)
-        cr.execute("""
-            WITH product_stock AS (
-                SELECT 
-                    pp.id AS product_id,
-                    COALESCE(SUM(sq.quantity), 0.0) AS total_stock,
-                    SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                        (pp.standard_price->>(sq.company_id::text))::numeric, 
-                        (pp.standard_price->>'1')::numeric, 
-                        0.0
-                    )) AS total_value,
-                    CASE WHEN COALESCE(SUM(sq.quantity), 0.0) > 0 THEN
-                        SUM(COALESCE(sq.quantity, 0.0) * COALESCE(
-                            (pp.standard_price->>(sq.company_id::text))::numeric, 
-                            (pp.standard_price->>'1')::numeric, 
-                            0.0
-                        )) / SUM(sq.quantity)
-                    ELSE
-                        COALESCE(
-                            (pp.standard_price->>(%s::text))::numeric, 
-                            (pp.standard_price->>'1')::numeric, 
-                            0.0
-                        )
-                    END AS avg_unit_cost
-                FROM product_product pp
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                LEFT JOIN stock_quant sq ON sq.product_id = pp.id 
-                    AND sq.company_id IN %s
-                    AND sq.location_id IN (
-                        SELECT id FROM stock_location WHERE usage = 'internal' AND active = TRUE
-                    )
-                WHERE pp.active = TRUE AND pt.active = TRUE
-                GROUP BY pp.id
-            )
-            SELECT
-                COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
-                ic.name AS categoria,
-                ps.total_stock AS stock,
-                ps.avg_unit_cost AS costo,
-                ps.total_value AS total_value
-            FROM product_stock ps
-            JOIN product_product pp ON pp.id = ps.product_id
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE ps.total_stock <= 10
-            ORDER BY ps.total_stock ASC
-            LIMIT 100
-        """, (selected_comp_str, allowed_companies, lang))
-        critical_stock_alerts = cr.dictfetchall()
-        for a in critical_stock_alerts:
-            a['stock'] = float(a['stock'] or 0.0)
-            a['costo'] = round(float(a['costo'] or 0.0), 2)
-            a['total_value'] = round(float(a['total_value'] or 0.0), 2)
-
-        # 6. Heatmap de Cobertura de Stock por Sucursal
-        cr.execute("""
-            SELECT id, name FROM res_company WHERE id IN %s ORDER BY id
-        """, (allowed_companies,))
-        company_rows = cr.dictfetchall()
-        heatmap_companies = [{"id": r["id"], "name": r["name"]} for r in company_rows]
-
-        cr.execute("""
-            WITH target_products AS (
-                SELECT 
-                    pp.id AS product_id,
-                    COALESCE(pt.name->>%s, pt.name->>'en_US') AS product_name,
-                    SUM(sq.quantity * COALESCE((pp.standard_price->>(sq.company_id::text))::numeric, (pp.standard_price->>'1')::numeric, 0.0)) AS total_val
-                FROM product_product pp
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                JOIN stock_quant sq ON sq.product_id = pp.id
-                JOIN stock_location sl ON sl.id = sq.location_id AND sl.usage = 'internal' AND sl.active = TRUE
-                WHERE pp.active = TRUE AND pt.active = TRUE
-                  AND sq.company_id IN %s
-                GROUP BY pp.id, pt.name
-                ORDER BY total_val DESC NULLS LAST
-                LIMIT 15
-            ),
-            stock_data AS (
-                SELECT 
-                    sq.product_id,
-                    sq.company_id,
-                    SUM(sq.quantity) AS stock
-                FROM stock_quant sq
-                JOIN stock_location sl ON sl.id = sq.location_id
-                WHERE sl.usage = 'internal' AND sl.active = TRUE
-                  AND sq.company_id IN %s
-                GROUP BY sq.product_id, sq.company_id
-            ),
-            sales_data AS (
-                SELECT 
-                    sm.product_id,
-                    sm.company_id,
-                    SUM(sm.product_uom_qty) AS sales_30d
-                FROM stock_move sm
-                JOIN stock_location sld ON sld.id = sm.location_dest_id
-                JOIN stock_location sls ON sls.id = sm.location_id
-                WHERE sm.state = 'done'
-                  AND sld.usage = 'customer'
-                  AND sls.usage = 'internal'
-                  AND sm.company_id IN %s
-                  AND sm.date >= NOW() - CAST(%s || ' days' AS INTERVAL)
-                GROUP BY sm.product_id, sm.company_id
-            )
-            SELECT 
-                tp.product_id,
-                tp.product_name,
-                rc.id AS company_id,
-                rc.name AS company_name,
-                COALESCE(sd.stock, 0.0) AS stock,
-                COALESCE(sa.sales_30d, 0.0) AS sales_30d
-            FROM target_products tp
-            CROSS JOIN res_company rc
-            LEFT JOIN stock_data sd ON sd.product_id = tp.product_id AND sd.company_id = rc.id
-            LEFT JOIN sales_data sa ON sa.product_id = tp.product_id AND sa.company_id = rc.id
-            WHERE rc.id IN %s
-            ORDER BY tp.total_val DESC, tp.product_name ASC, rc.id ASC
-        """, (lang, allowed_companies, allowed_companies, allowed_companies, str(period), allowed_companies))
-        
-        heatmap_rows = cr.dictfetchall()
-        
-        heatmap_dict = {}
-        for r in heatmap_rows:
-            p_id = r["product_id"]
-            if p_id not in heatmap_dict:
-                heatmap_dict[p_id] = {
-                    "product_id": p_id,
-                    "product_name": r["product_name"],
-                    "coverages": {}
-                }
-            
-            stock = float(r["stock"] or 0.0)
-            sales = float(r["sales_30d"] or 0.0)
-            daily_sales = sales / float(period)
-            
-            if daily_sales > 0:
-                coverage = int(round(stock / daily_sales))
-            else:
-                coverage = None
-            
-            heatmap_dict[p_id]["coverages"][str(r["company_id"])] = coverage
-
-        heatmap_data = []
-        seen = set()
-        for r in heatmap_rows:
-            p_id = r["product_id"]
-            if p_id not in seen:
-                heatmap_data.append(heatmap_dict[p_id])
-                seen.add(p_id)
-
-        # 7. Métricas de Dead Stock (stock > 0 pero sin ventas en los últimos N días)
-        cr.execute("""
-            SELECT 
-                pp.id AS product_id,
-                COALESCE(pt.name->>%s, pt.name->>'en_US') AS product_name,
-                SUM(sq.quantity) AS stock,
-                SUM(sq.quantity * COALESCE((pp.standard_price->>(sq.company_id::text))::numeric, (pp.standard_price->>'1')::numeric, 0.0)) AS dead_val
-            FROM product_product pp
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            JOIN stock_quant sq ON sq.product_id = pp.id
-            JOIN stock_location sl ON sl.id = sq.location_id AND sl.usage = 'internal' AND sl.active = TRUE
-            WHERE pp.active = TRUE AND pt.active = TRUE
-              AND sq.company_id IN %s
-              AND pp.id NOT IN (
-                  SELECT DISTINCT sm.product_id
-                  FROM stock_move sm
-                  JOIN stock_location sld ON sld.id = sm.location_dest_id
-                  JOIN stock_location sls ON sls.id = sm.location_id
-                  WHERE sm.state = 'done'
-                    AND sld.usage = 'customer'
-                    AND sls.usage = 'internal'
-                    AND sm.company_id IN %s
-                    AND sm.date >= NOW() - CAST(%s || ' days' AS INTERVAL)
-              )
-            GROUP BY pp.id, pt.name
-            HAVING SUM(sq.quantity) > 0
-            ORDER BY dead_val DESC, stock DESC
-            LIMIT 10
-        """, (lang, allowed_companies, allowed_companies, str(period)))
-        
-        dead_rows = cr.dictfetchall()
-        dead_stock = {
-            "labels": [r["product_name"] for r in dead_rows],
-            "values": [float(r["dead_val"]) for r in dead_rows],
-            "stocks": [float(r["stock"]) for r in dead_rows]
-        }
+        rows = self._classify(self._fetch_product_rows(companies, period, lang), period, target)
+        self._attach_vendor(rows, self._fetch_suppliers(companies))
+        overstock_total, overstock = self._overstock_rows(rows)
+        restock_total, restock = self._restock_rows(rows)
 
         return {
-            "kpis": {
-                "total_value": round(total_value, 2),
-                "total_units": round(total_units, 2),
-                "stockouts": stockouts,
-                "low_stock": low_stock
-            },
-            "category_valuation": cat_valuation,
-            "top_movements": top_movements,
-            "top_value_products": top_value_products,
-            "critical_stock_alerts": critical_stock_alerts,
-            "heatmap_companies": heatmap_companies,
-            "heatmap_data": heatmap_data,
-            "dead_stock": dead_stock
+            "overstock_total": overstock_total,
+            "excess_value": round(sum(r["excess_value"] for r in rows if r["stock"] > 0), 2),
+            "overstock": overstock,
+            "restock_total": restock_total,
+            "restock": restock,
         }
+
+    @http.route('/inventory_dashboard_metrics/purchase', type='json', auth='user')
+    def get_purchase(self, company='all', **kwargs):
+        self._check_access()
+        period = _to_int(kwargs.get('period'), PERIODS, DEFAULT_PERIOD)
+        target = _to_int(kwargs.get('target'), TARGET_DAYS, DEFAULT_TARGET)
+        lead = _to_int(kwargs.get('lead'), LEAD_DAYS, DEFAULT_LEAD)
+        companies = self._resolve_companies(company)
+        if not companies:
+            return {"rows": []}
+        rows = self._classify(self._fetch_product_rows(companies, period, self._get_lang()), period, target)
+        return {"rows": self._purchase_candidates(
+            rows, self._fetch_suppliers(companies), self._fetch_incoming(companies), lead)}
+
+    @http.route('/inventory_dashboard_metrics/export', type='http', auth='user')
+    def export_xlsx(self, table='overstock', company='all', period=None, target=None,
+                    status='all', category='all', search='', sort='excess',
+                    lead=None, vendor='all', cover=None, **kwargs):
+        """Exporta a Excel la tabla activa con los mismos filtros que ve el usuario."""
+        try:
+            self._check_access()
+            period = _to_int(period, PERIODS, DEFAULT_PERIOD)
+            target = _to_int(target, TARGET_DAYS, DEFAULT_TARGET)
+            companies = self._resolve_companies(company)
+            rows = self._classify(
+                self._fetch_product_rows(companies, period, self._get_lang()), period, target)
+
+            suppliers = self._fetch_suppliers(companies)
+            self._attach_vendor(rows, suppliers)
+
+            if table == 'purchase':
+                lead = _to_int(lead, LEAD_DAYS, DEFAULT_LEAD)
+                cover = _to_int(cover, range(BUY_COVER_MIN, BUY_COVER_MAX + 1), DEFAULT_BUY_COVER)
+                data = self._purchase_rows(
+                    self._purchase_candidates(rows, suppliers, self._fetch_incoming(companies), lead), cover)
+                title = f"Recomendador de compra ({cover} días)"
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", "Ya pedido", f"Vendidas ({period} días)", "Promedio de ventas por día",
+                           "Alcanza para (días)", "Plazo (días)", "Comprar", "Mínimo del proveedor",
+                           "Precio", "Total", "Prioridad"]
+                keys = ["producto", "categoria", "vendor", "stock", "incoming", "sold", "daily", "days_left",
+                        "lead", "qty", "min_qty", "price", "total", "status"]
+            elif table == 'restock':
+                _total, data = self._restock_rows(rows)
+                title = "Productos por reponer"
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día",
+                           "Alcanza para (días)", "Estado"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
+            else:
+                _total, data = self._overstock_rows(rows)
+                data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
+                title = "Mucho stock y poca venta"
+                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Promedio de ventas por día", "Alcanza para (días)",
+                           "Estado"]
+                keys = ["producto", "categoria", "vendor", "stock", "sold", "daily", "cover", "status"]
+
+            query = (search or '').lower().strip()
+            data = [r for r in data
+                    if (status in ('', 'all') or r["status"] == status)
+                    and (category in ('', 'all') or r["categoria"] == category)
+                    and (vendor in ('', 'all') or r["vendor"] == vendor)
+                    and (not query or query in r["producto"].lower())]
+
+            output = io.BytesIO()
+            workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+            fmt_title = workbook.add_format({'bold': True, 'font_size': 12})
+            fmt_header = workbook.add_format({
+                'bold': True, 'bg_color': '#1e293b', 'font_color': '#ffffff',
+                'border': 1, 'align': 'center', 'valign': 'vcenter'})
+            fmt_text = workbook.add_format({'border': 1})
+            fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
+            fmt_num = workbook.add_format({'border': 1, 'num_format': '#,##0.##'})
+            money_keys = {"value", "excess_value", "price", "total"}
+
+            sheet = workbook.add_worksheet(title[:31])
+            sheet.set_column(0, 0, 50)
+            sheet.set_column(1, 1, 24)
+            sheet.set_column(2, len(headers) - 1, 16)
+            company_label = company if company and company != 'all' else 'Todas las empresas'
+            sheet.write(0, 0, title, fmt_title)
+            sheet.write(1, 0, f"{company_label} · ventas de los últimos {period} días · cobertura objetivo {target} días")
+            for col, header in enumerate(headers):
+                sheet.write(3, col, header, fmt_header)
+            for idx, row in enumerate(data):
+                for col, key in enumerate(keys):
+                    value = row.get(key)
+                    if key == "status":
+                        sheet.write_string(4 + idx, col, STATUS_LABELS.get(value, ''), fmt_text)
+                    elif key == "daily":
+                        sheet.write_number(4 + idx, col, round(value, 2), fmt_num)
+                    elif isinstance(value, (int, float)):
+                        sheet.write_number(4 + idx, col, value, fmt_money if key in money_keys else fmt_num)
+                    else:
+                        sheet.write_string(4 + idx, col, value or ('Nunca' if key == "last_sale" else ''), fmt_text)
+            sheet.freeze_panes(4, 1)
+            workbook.close()
+            xlsx_data = output.getvalue()
+            output.close()
+
+            filename = f"{table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            return request.make_response(xlsx_data, headers=[
+                ('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                ('Content-Disposition', f'attachment; filename="{filename}"'),
+                ('Content-Length', str(len(xlsx_data))),
+            ])
+        except Exception as e:
+            _logger.exception("Error exportando métricas de inventario")
+            return request.make_response(str(e), status=500)

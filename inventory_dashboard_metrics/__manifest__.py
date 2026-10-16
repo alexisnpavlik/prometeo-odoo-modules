@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Métricas y Dashboard de Inventario Premium",
-    "version": "18.0.1.0.0",
+    "version": "18.0.2.0.0",
     "category": "Inventory",
-    "summary": "Dashboard interactivo en tiempo real con Chart.js para análisis de valoración de stock, rotación y alertas críticas",
+    "summary": "Dashboard de inventario: capital inmovilizado, sobrestock, antigüedad de stock y reposición",
     "description": """
-        Este módulo integra un centro de control analítico para la gestión de existencias.
-        Permite a usuarios autorizados visualizar la valoración económica del inventario por categoría,
-        la velocidad de rotación de productos basándose en movimientos de stock físicos (stock.move) de los últimos 30 días,
-        y un centro de control y alertas de stock crítico o quiebres de existencias con buscador dinámico en tiempo real.
+        Centro de control de existencias. Detecta qué productos tienen mucho stock y poca venta
+        (sin ventas o por encima de la cobertura objetivo), valoriza el capital excedente por producto y
+        categoría, muestra la antigüedad del stock desde la última venta y lista los productos a reponer
+        con cobertura por sucursal.
     """,
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["stock", "web"],
+    "depends": ["stock", "purchase", "web"],
     "data": [
         "security/security.xml",
         "views/menu_views.xml",
