@@ -204,8 +204,11 @@ class CcaInstallment(models.Model):
         return True
 
     def write(self, vals):
-        """En retiros confirmados, desde la pantalla solo se puede mover el vencimiento."""
-        if set(vals) - {"date_due", "late_fee"} and not self.env.context.get("cca_skip_total_check") and any(
+        """En retiros confirmados, desde la pantalla solo se puede mover el vencimiento.
+
+        `state` queda permitido porque el cron de vencidas lo recalcula y escribe.
+        """
+        if set(vals) - {"date_due", "late_fee", "state"} and not self.env.context.get("cca_skip_total_check") and any(
             installment.withdrawal_id.is_confirmed for installment in self
         ):
             raise UserError(_(
