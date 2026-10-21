@@ -370,7 +370,7 @@ class InventoryMetricsController(http.Controller):
             fmt_text = workbook.add_format({'border': 1})
             fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
             fmt_num = workbook.add_format({'border': 1, 'num_format': '#,##0.##'})
-            fmt_daily = workbook.add_format({'border': 1, 'num_format': '0.000'})
+            fmt_daily = workbook.add_format({'border': 1, 'num_format': '0.0'})
             money_keys = {"value", "excess_value", "price", "total"}
 
             sheet = workbook.add_worksheet(title[:31])

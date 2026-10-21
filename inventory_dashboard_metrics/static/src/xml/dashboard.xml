@@ -60,6 +60,11 @@
                     </div>
 
                     <div class="input-group">
+                        <label>Producto</label>
+                        <input type="text" placeholder="Buscar producto..." t-model="state.search" t-on-input="onCategoryChange"/>
+                    </div>
+
+                    <div class="input-group">
                         <label>Categoría</label>
                         <div class="select-wrapper">
                             <select t-model="state.category" t-on-change="onCategoryChange">
@@ -93,12 +98,6 @@
             <main class="main-content">
                 <header class="main-header">
                     <div class="header-left">
-                        <h1>Dashboard de Inventario y Stock</h1>
-                    </div>
-
-                    <div class="header-right">
-                        <button class="btn btn-secondary filters-toggle" t-on-click="toggleFilters">Filtros</button>
-
                         <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
                             <t t-if="state.theme === 'light'">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,6 +117,17 @@
                                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                                 </svg>
                             </t>
+                        </button>
+                        <h1>Dashboard de Inventario y Stock</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
                         </button>
 
                         <div class="sync-status">
@@ -156,27 +166,20 @@
                                 </t>
                             </div>
                             <div class="filter-row">
-                                <input type="text" placeholder="Buscar producto..." t-model="state.restSearch" t-on-input="resetRestPage"/>
-                                <select t-model="state.restStatus" t-on-change="resetRestPage">
-                                    <option value="all">Todos los estados</option>
-                                    <option value="sin_stock">Sin stock</option>
-                                    <option value="por_agotarse">Por agotarse</option>
-                                </select>
-                                <button class="btn btn-secondary" t-on-click="clearRestFilters">Limpiar</button>
                                 <button class="btn btn-secondary" t-on-click="exportExcel" data-table="restock">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Producto</th>
-                                            <th>Categoría</th>
-                                            <th>Proveedor</th>
-                                            <th class="num">Stock</th>
-                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num th-highlight">Alcanza para</th>
-                                            <th>Estado</th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('rest', 'producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="categoria">Categoría<span class="sort-mark" t-esc="sortMark('rest', 'categoria')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="vendor">Proveedor<span class="sort-mark" t-esc="sortMark('rest', 'vendor')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="rest" data-key="stock">Stock<span class="sort-mark" t-esc="sortMark('rest', 'stock')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="rest" data-key="sold">Vendidas (<t t-esc="state.period"/> d)<span class="sort-mark" t-esc="sortMark('rest', 'sold')"/></th>
+                                            <th class="sortable num th-wrap" t-on-click="onSortClick" data-table="rest" data-key="daily">Promedio de ventas por día<span class="sort-mark" t-esc="sortMark('rest', 'daily')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-table="rest" data-key="cover">Alcanza para<span class="sort-mark" t-esc="sortMark('rest', 'cover')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="status">Estado<span class="sort-mark" t-esc="sortMark('rest', 'status')"/></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -229,32 +232,20 @@
                                 </t>
                             </div>
                             <div class="filter-row">
-                                <input type="text" placeholder="Buscar producto..." t-model="state.overSearch" t-on-input="resetOverPage"/>
-                                <select t-model="state.overStatus" t-on-change="resetOverPage">
-                                    <option value="all">Todos los estados</option>
-                                    <option value="sin_venta">Sin ventas</option>
-                                    <option value="sobrestock">Sobrestock</option>
-                                </select>
-                                <select t-model="state.overSort">
-                                    <option value="excess">Ordenar: más plata de más</option>
-                                    <option value="cover">Ordenar: alcanza para más días</option>
-                                    <option value="stock">Ordenar: más unidades</option>
-                                </select>
-                                <button class="btn btn-secondary" t-on-click="clearOverFilters">Limpiar</button>
                                 <button class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Producto</th>
-                                            <th>Categoría</th>
-                                            <th>Proveedor</th>
-                                            <th class="num">Stock</th>
-                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num th-highlight">Alcanza para</th>
-                                            <th>Estado</th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('over', 'producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="categoria">Categoría<span class="sort-mark" t-esc="sortMark('over', 'categoria')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="vendor">Proveedor<span class="sort-mark" t-esc="sortMark('over', 'vendor')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="over" data-key="stock">Stock<span class="sort-mark" t-esc="sortMark('over', 'stock')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="over" data-key="sold">Vendidas (<t t-esc="state.period"/> d)<span class="sort-mark" t-esc="sortMark('over', 'sold')"/></th>
+                                            <th class="sortable num th-wrap" t-on-click="onSortClick" data-table="over" data-key="daily">Promedio de ventas por día<span class="sort-mark" t-esc="sortMark('over', 'daily')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-table="over" data-key="cover">Alcanza para<span class="sort-mark" t-esc="sortMark('over', 'cover')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="status">Estado<span class="sort-mark" t-esc="sortMark('over', 'status')"/></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -321,29 +312,22 @@
                                 <div class="buy-slider-scale"><span>Poca</span><span>Mucha</span></div>
                             </div>
                             <div class="filter-row">
-                                <input type="text" placeholder="Buscar producto..." t-model="state.buySearch" t-on-input="resetBuyPage"/>
-                                <select t-model="state.buyStatus" t-on-change="resetBuyPage">
-                                    <option value="all">Todas las prioridades</option>
-                                    <option value="urgente">Urgente</option>
-                                    <option value="normal">Normal</option>
-                                </select>
-                                <button class="btn btn-secondary" t-on-click="clearBuyFilters">Limpiar</button>
                                 <button class="btn btn-secondary" t-on-click="exportExcel" data-table="purchase">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table compact">
                                     <thead>
                                         <tr>
-                                            <th>Producto</th>
-                                            <th>Proveedor</th>
-                                            <th class="num">Stock</th>
-                                            <th class="num">Vendidas (<t t-esc="state.period"/> d)</th>
-                                            <th class="num th-wrap">Promedio de ventas por día</th>
-                                            <th class="num">Alcanzaría para</th>
-                                            <th class="num th-highlight">Comprar</th>
-                                            <th class="num">Precio</th>
-                                            <th class="num">Total</th>
-                                            <th>Prioridad</th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="buy" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('buy', 'producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="buy" data-key="vendor">Proveedor<span class="sort-mark" t-esc="sortMark('buy', 'vendor')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="buy" data-key="stock">Stock<span class="sort-mark" t-esc="sortMark('buy', 'stock')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="buy" data-key="sold">Vendidas (<t t-esc="state.period"/> d)<span class="sort-mark" t-esc="sortMark('buy', 'sold')"/></th>
+                                            <th class="sortable num th-wrap" t-on-click="onSortClick" data-table="buy" data-key="daily">Promedio de ventas por día<span class="sort-mark" t-esc="sortMark('buy', 'daily')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="buy" data-key="days_after">Alcanzaría para<span class="sort-mark" t-esc="sortMark('buy', 'days_after')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-table="buy" data-key="qty">Comprar<span class="sort-mark" t-esc="sortMark('buy', 'qty')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="buy" data-key="price">Precio<span class="sort-mark" t-esc="sortMark('buy', 'price')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-table="buy" data-key="total">Total<span class="sort-mark" t-esc="sortMark('buy', 'total')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="buy" data-key="status">Prioridad<span class="sort-mark" t-esc="sortMark('buy', 'status')"/></th>
                                         </tr>
                                     </thead>
                                     <tbody>
