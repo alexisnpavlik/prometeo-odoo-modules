@@ -21,10 +21,15 @@ const BUY_COVER_LEVELS = [
     [Infinity, "Muchísima"],
 ];
 
-const OVER_SORTS = {
-    excess: (a, b) => b.excess_value - a.excess_value,
-    cover: (a, b) => (b.cover ?? 1e9) - (a.cover ?? 1e9),
-    stock: (a, b) => b.stock - a.stock,
+// Orden por columna: null va siempre al final, sin importar el sentido
+const compareBy = (key, dir) => (a, b) => {
+    const x = a[key];
+    const y = b[key];
+    if (x === y) return 0;
+    if (x === null || x === undefined) return 1;
+    if (y === null || y === undefined) return -1;
+    const diff = typeof x === "string" ? x.localeCompare(y, "es") : x - y;
+    return dir === "asc" ? diff : -diff;
 };
 
 class InventoryDashboardMetrics extends Component {
@@ -41,20 +46,16 @@ class InventoryDashboardMetrics extends Component {
             loading: false,
             syncTime: "Cargando...",
             theme: "dark",
-            overSearch: "",
-            overStatus: "all",
-            overSort: "excess",
             overPage: 1,
-            restSearch: "",
-            restStatus: "all",
+            search: "",
             category: "all",
             vendor: "all",
             restPage: 1,
-            buySearch: "",
-            buyStatus: "all",
             buyPage: 1,
             buyCover: "30",
             buyLoading: false,
+            // Orden elegido tocando un encabezado: { key, dir } o null para el orden por defecto
+            sort: { over: null, rest: null, buy: null },
         });
 
         this.filtersData = useState({ companies: [] });
@@ -86,25 +87,26 @@ class InventoryDashboardMetrics extends Component {
     }
 
     get filteredOverstock() {
-        const q = this.state.overSearch.toLowerCase().trim();
-        const { overStatus, category, vendor, overSort } = this.state;
-        return this.metricsData.overstock
+        const q = this.state.search.toLowerCase().trim();
+        const { category, vendor } = this.state;
+        const rows = this.metricsData.overstock
             .filter((r) =>
-                (overStatus === "all" || r.status === overStatus) &&
                 (category === "all" || r.categoria === category) &&
                 (vendor === "all" || r.vendor === vendor) &&
                 (!q || r.producto.toLowerCase().includes(q)))
-            .sort(OVER_SORTS[overSort]);
+            // Orden por defecto: más plata de más primero, igual que el controlador
+            .sort((a, b) => b.excess_value - a.excess_value);
+        return this.sortRows(rows, "over");
     }
 
     get filteredRestock() {
-        const q = this.state.restSearch.toLowerCase().trim();
-        const { restStatus, category, vendor } = this.state;
-        return this.metricsData.restock.filter((r) =>
-            (restStatus === "all" || r.status === restStatus) &&
+        const q = this.state.search.toLowerCase().trim();
+        const { category, vendor } = this.state;
+        const rows = this.metricsData.restock.filter((r) =>
             (category === "all" || r.categoria === category) &&
             (vendor === "all" || r.vendor === vendor) &&
             (!q || r.producto.toLowerCase().includes(q)));
+        return this.sortRows(rows, "rest");
     }
 
     get overFilteredExcess() {
@@ -140,13 +142,25 @@ class InventoryDashboardMetrics extends Component {
     }
 
     get filteredPurchase() {
-        const q = this.state.buySearch.toLowerCase().trim();
-        const { buyStatus, vendor, category } = this.state;
-        return this.purchaseRows.filter((r) =>
-            (buyStatus === "all" || r.status === buyStatus) &&
+        const q = this.state.search.toLowerCase().trim();
+        const { vendor, category } = this.state;
+        const rows = this.purchaseRows.filter((r) =>
             (vendor === "all" || r.vendor === vendor) &&
             (category === "all" || r.categoria === category) &&
             (!q || r.producto.toLowerCase().includes(q)));
+        return this.sortRows(rows, "buy");
+    }
+
+    sortRows(rows, table) {
+        const sort = this.state.sort[table];
+        return sort ? [...rows].sort(compareBy(sort.key, sort.dir)) : rows;
+    }
+
+    // Indicador del encabezado: flecha si la tabla está ordenada por esa columna
+    sortMark(table, key) {
+        const sort = this.state.sort[table];
+        if (!sort || sort.key !== key) return "";
+        return sort.dir === "asc" ? "▲" : "▼";
     }
 
     get periodDays() {
@@ -200,12 +214,22 @@ class InventoryDashboardMetrics extends Component {
         }
     }
 
-    resetBuyPage() {
-        this.state.buyPage = 1;
+    // Cada click en el encabezado: ascendente → descendente → orden por defecto
+    onSortClick(ev) {
+        const { table, key } = ev.currentTarget.dataset;
+        const sort = this.state.sort[table];
+        if (!sort || sort.key !== key) {
+            this.state.sort[table] = { key, dir: "asc" };
+        } else if (sort.dir === "asc") {
+            this.state.sort[table] = { key, dir: "desc" };
+        } else {
+            this.state.sort[table] = null;
+        }
+        this.state[`${table}Page`] = 1;
     }
 
-    clearBuyFilters() {
-        Object.assign(this.state, { buySearch: "", buyStatus: "all", buyPage: 1 });
+    resetBuyPage() {
+        this.state.buyPage = 1;
     }
 
     resetOverPage() {
@@ -221,28 +245,16 @@ class InventoryDashboardMetrics extends Component {
         this.state[key] = Math.max(1, this.state[key] + parseInt(dir));
     }
 
-    clearOverFilters() {
-        Object.assign(this.state, { overSearch: "", overStatus: "all", overSort: "excess", overPage: 1 });
-    }
-
-    clearRestFilters() {
-        Object.assign(this.state, { restSearch: "", restStatus: "all", restPage: 1 });
-    }
-
     exportExcel(ev) {
         const table = ev.currentTarget.dataset.table;
-        const over = table === "overstock";
-        const buy = table === "purchase";
         const params = new URLSearchParams({
             table,
             company: this.state.company,
             period: this.state.period,
             vendor: this.state.vendor,
             cover: this.state.buyCover,
-            status: buy ? this.state.buyStatus : over ? this.state.overStatus : this.state.restStatus,
             category: this.state.category,
-            search: buy ? this.state.buySearch : over ? this.state.overSearch : this.state.restSearch,
-            sort: this.state.overSort,
+            search: this.state.search,
         });
         window.open(`/inventory_dashboard_metrics/export?${params.toString()}`, "_blank");
     }
@@ -261,7 +273,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async clearFilters() {
-        Object.assign(this.state, { company: "all", period: "90", category: "all", vendor: "all", showFilters: false });
+        Object.assign(this.state, { company: "all", period: "90", search: "", category: "all", vendor: "all", showFilters: false });
         await this.refreshData();
     }
 
@@ -282,8 +294,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     formatDaily(val) {
-        // Mismos 3 decimales con los que el controlador redondea y calcula: la cuenta se puede rehacer a mano
-        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(val || 0);
+        // Solo visual: el controlador sigue calculando con 3 decimales para no perder los productos de rotación lenta
+        return new Intl.NumberFormat("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(val || 0);
     }
 
     formatNumber(val) {
