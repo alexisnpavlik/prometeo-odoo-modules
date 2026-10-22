@@ -1,0 +1,702 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+    <!-- Ícono de ayuda con tooltip. Parámetros: tip, align (opcional) -->
+    <t t-name="pos_cash_metrics.InfoTip">
+        <div t-att-class="'info-tooltip-wrapper ' + (align or 'tooltip-right')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div class="info-tooltip-text"><t t-esc="tip"/></div>
+        </div>
+    </t>
+
+    <!-- Filtro multi-selección con búsqueda. Parámetros: field, title, allLabel, pluralLabel, placeholder -->
+    <t t-name="pos_cash_metrics.MultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="draft[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <!-- Paginación de una tabla. Parámetros: pg (resultado de pageOf), table -->
+    <t t-name="pos_cash_metrics.Pagination">
+        <div class="pagination" t-if="pg.pages &gt; 1">
+            <button class="btn btn-secondary" t-att-disabled="pg.current &lt;= 1" t-on-click="changePage" t-att-data-table="table" data-dir="-1">Anterior</button>
+            <span class="page-info">Página <t t-esc="pg.current"/> de <t t-esc="pg.pages"/></span>
+            <button class="btn btn-secondary" t-att-disabled="pg.current &gt;= pg.pages" t-on-click="changePage" t-att-data-table="table" data-dir="1">Siguiente</button>
+        </div>
+    </t>
+
+    <!-- Encabezado ordenable. Parámetros: table, key, label, cls (opcional) -->
+    <t t-name="pos_cash_metrics.SortTh">
+        <th t-att-class="'sortable ' + (cls or '')" t-on-click="onSortClick" t-att-data-table="table" t-att-data-key="key"><t t-esc="label"/><span class="sort-mark" t-esc="sortMark(table, key)"/></th>
+    </t>
+
+    <t t-name="pos_cash_metrics.DashboardTemplate">
+        <div t-att-class="'pcm-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+
+            <!-- ============ BARRA LATERAL DE FILTROS ============ -->
+            <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')">
+                <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Cerrar filtros</span>
+                </button>
+
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                        <circle cx="12" cy="12" r="2.5"></circle>
+                        <line x1="6" y1="12" x2="6.01" y2="12"></line>
+                        <line x1="18" y1="12" x2="18.01" y2="12"></line>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Cash Metrics</h2>
+                        <span>Cajas y Cajeros</span>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Rango de Fecha</h3>
+                    <div class="preset-dates">
+                        <t t-foreach="periodPresets" t-as="preset" t-key="preset[0]">
+                            <button t-att-class="'btn-preset ' + (draft.preset === preset[0] ? 'active' : '')"
+                                    t-on-click="onPresetClick" t-att-data-preset="preset[0]"><t t-esc="preset[1]"/></button>
+                        </t>
+                    </div>
+                    <div class="custom-date-inputs">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="date" t-att-value="draft.startDate" t-on-change="onDateChange" data-field="startDate"/>
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="date" t-att-value="draft.endDate" t-on-change="onDateChange" data-field="endDate"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orden común a todos los dashboards: empresa, cajas, estado, ... -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+
+                    <t t-call="pos_cash_metrics.MultiSelect">
+                        <t t-set="field" t-value="'company'"/>
+                        <t t-set="title" t-value="'Empresa'"/>
+                        <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                        <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                    </t>
+
+                    <t t-call="pos_cash_metrics.MultiSelect">
+                        <t t-set="field" t-value="'pos'"/>
+                        <t t-set="title" t-value="'Cajas'"/>
+                        <t t-set="allLabel" t-value="'Todas las cajas'"/>
+                        <t t-set="pluralLabel" t-value="'cajas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar caja...'"/>
+                    </t>
+
+                    <t t-call="pos_cash_metrics.MultiSelect">
+                        <t t-set="field" t-value="'status'"/>
+                        <t t-set="title" t-value="'Estado de la caja'"/>
+                        <t t-set="allLabel" t-value="'Todos los estados'"/>
+                        <t t-set="pluralLabel" t-value="'estados seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar estado...'"/>
+                    </t>
+
+                    <t t-call="pos_cash_metrics.MultiSelect">
+                        <t t-set="field" t-value="'cashier'"/>
+                        <t t-set="title" t-value="'Cajero'"/>
+                        <t t-set="allLabel" t-value="'Todos los cajeros'"/>
+                        <t t-set="pluralLabel" t-value="'cajeros seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar cajero...'"/>
+                    </t>
+                </div>
+
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary" t-on-click="applyFilters"><span>Aplicar</span></button>
+                    <button class="btn btn-secondary" t-on-click="clearFilters"><span>Limpiar</span></button>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <!-- ============ CABECERA ============ -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+                        <div>
+                            <h1>Métricas de Caja</h1>
+                            <span class="header-sub" t-if="data.range.start"><t t-esc="rangeLabel"/></span>
+                        </div>
+                    </div>
+
+                    <div class="header-right">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
+                        </button>
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime"/>
+                        </div>
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="refreshData" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <nav class="nav-tabs">
+                    <button t-att-class="'nav-tab ' + (state.tab === 'resumen' ? 'active' : '')" t-on-click="onTabClick" data-tab="resumen">Resumen</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'cajeros' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajeros">Cajeros</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'cajas' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajas">Cajas y cierres</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'movimientos' ? 'active' : '')" t-on-click="onTabClick" data-tab="movimientos">Retiros e ingresos</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'medios' ? 'active' : '')" t-on-click="onTabClick" data-tab="medios">Medios de pago</button>
+                </nav>
+
+                <div class="tab-content">
+
+                    <!-- ================= RESUMEN ================= -->
+                    <t t-if="state.tab === 'resumen'">
+                        <div class="kpi-grid summary-cards">
+                            <div class="kpi-card shadow-glow green">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Vendido</span>
+                                        <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(kpis.sold)"/></div>
+                                    <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="formatNumber(kpis.tickets)"/> tickets · promedio <t t-esc="formatCurrency(kpis.avg_ticket)"/></span></div>
+                                </div>
+                            </div>
+                            <button type="button" class="kpi-card shadow-glow blue status-card" t-on-click="goToSessions" data-status="abierta_hoy" title="Ver las cajas abiertas hoy">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Efectivo en cajas ahora</span>
+                                        <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle></svg></div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(kpis.cash_now)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">
+                                            <t t-esc="kpis.open_today"/> <t t-esc="kpis.open_today === 1 ? 'caja abierta hoy' : 'cajas abiertas hoy'"/>
+                                            <t t-if="kpis.open_old"> · <span class="amount-warn">+ <t t-esc="formatCurrency(kpis.cash_old)"/> en <t t-esc="kpis.open_old"/> abiertas hace días</span></t>
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+                            <div class="kpi-card shadow-glow amber">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Retiros</span>
+                                        <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatCurrency(kpis.withdrawals)"/></div>
+                                    <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="kpis.withdrawals_count"/> retiros · <t t-esc="kpis.deposits_count"/> ingresos</span></div>
+                                </div>
+                            </div>
+                            <button type="button" class="kpi-card shadow-glow red status-card" t-on-click="goToSessions" data-status="faltante" title="Ver los cierres con faltante">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title">Diferencias al cierre</span>
+                                        <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
+                                    </div>
+                                    <div t-att-class="'kpi-value ' + signClass(kpis.difference)"><t t-esc="formatSigned(kpis.difference)"/></div>
+                                    <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="kpis.closed_with_diff"/> de <t t-esc="kpis.closed"/> cierres con diferencia · faltantes <t t-esc="formatCurrency(kpis.shortage)"/></span></div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="two-cols">
+                            <section class="glass-panel padded">
+                                <div class="section-header">
+                                    <div>
+                                        <h3>Cajeros</h3>
+                                        <p class="section-sub">Ordenados por lo vendido</p>
+                                    </div>
+                                    <t t-call="pos_cash_metrics.InfoTip">
+                                        <t t-set="tip" t-value="'Vendido: ventas hechas por cada persona, sea o no quien abrió la caja. Diferencia: suma de faltantes y sobrantes de las cajas que esa persona abrió.'"/>
+                                    </t>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead><tr><th>Cajero</th><th class="num">Vendido</th><th class="num">Tickets</th><th class="num">Dif. cierre</th></tr></thead>
+                                        <tbody>
+                                            <tr t-if="!topCashiers.length"><td colspan="4" class="text-center text-muted empty-row">Sin ventas en el período.</td></tr>
+                                            <t t-foreach="topCashiers" t-as="c" t-key="c.user_id">
+                                                <tr>
+                                                    <td class="cell-strong cell-text"><t t-esc="c.name"/></td>
+                                                    <td class="num"><t t-esc="formatCurrency(c.sold)"/></td>
+                                                    <td class="num"><t t-esc="formatNumber(c.tickets)"/></td>
+                                                    <td t-att-class="'num ' + signClass(c.difference)"><t t-esc="formatSigned(c.difference)"/></td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="glass-panel padded">
+                                <div class="section-header">
+                                    <div>
+                                        <h3>Medios de pago</h3>
+                                        <p class="section-sub">Cobrado en el período</p>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead><tr><th>Medio</th><th class="num">Cobrado</th><th class="num">%</th></tr></thead>
+                                        <tbody>
+                                            <tr t-if="!data.methods.length"><td colspan="3" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
+                                            <t t-foreach="data.methods" t-as="m" t-key="m.group">
+                                                <tr>
+                                                    <td class="cell-strong"><t t-esc="m.group"/></td>
+                                                    <td class="num"><t t-esc="formatCurrency(m.amount)"/></td>
+                                                    <td class="num"><t t-esc="formatNumber(m.pct)"/>%</td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </div>
+
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Cajas abiertas en este momento</h3>
+                                    <p class="section-sub">Efectivo esperado = apertura + cobros en efectivo + ingresos − retiros</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Una caja abierta hace días casi siempre es una sesión que nadie cerró: su efectivo no se suma al de hoy.'"/>
+                                </t>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead><tr><th>Caja</th><th>Abrió</th><th>Desde</th><th class="num">Vendido</th><th class="num th-highlight">Efectivo esperado</th><th>Estado</th></tr></thead>
+                                    <tbody>
+                                        <tr t-if="!openSessions.length"><td colspan="6" class="text-center text-muted empty-row">No hay cajas abiertas.</td></tr>
+                                        <t t-foreach="openSessions" t-as="s" t-key="s.id">
+                                            <tr>
+                                                <td class="cell-strong"><t t-esc="s.caja"/></td>
+                                                <td class="cell-secondary"><t t-esc="s.opener"/></td>
+                                                <td class="cell-secondary"><t t-esc="s.start"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(s.sold)"/></td>
+                                                <td t-att-class="'num cell-strong ' + (s.status === 'abierta_vieja' ? 'amount-warn' : '')">
+                                                    <t t-if="s.expected !== null"><t t-esc="formatCurrency(s.expected)"/></t>
+                                                    <t t-else=""><span class="text-muted">Sin control de efectivo</span></t>
+                                                </td>
+                                                <td>
+                                                    <span t-att-class="'stock-badge ' + s.status">
+                                                        <t t-if="s.status === 'abierta_vieja'">Abierta hace <t t-esc="s.days_open"/> días</t>
+                                                        <t t-else="">Abierta hoy</t>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </t>
+
+                    <!-- ================= CAJEROS ================= -->
+                    <t t-if="state.tab === 'cajeros'">
+                        <div class="kpi-grid summary-cards">
+                            <t t-foreach="cashierCards" t-as="card" t-key="card.key">
+                                <div t-att-class="'kpi-card shadow-glow ' + card.color">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title"><t t-esc="card.label"/></span>
+                                        </div>
+                                        <t t-if="card.row">
+                                            <div class="kpi-name"><t t-esc="card.row.name"/></div>
+                                            <div class="kpi-value"><t t-esc="card.value(card.row)"/></div>
+                                            <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="card.sub(card.row)"/></span></div>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="kpi-value text-muted">—</div>
+                                            <div class="kpi-footer"><span class="kpi-subtext">Nadie en el período</span></div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Rendimiento por cajero</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(cashierPage.total)"/> personas · como vendedor y como responsable de caja</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Como vendedor: lo que cada uno vendió, aunque la caja la haya abierto otro. Como responsable: las cajas que abrió, la suma de sus diferencias al cierre y los retiros que registró. Devoluciones = tickets en negativo.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="cashiers">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr class="group-row">
+                                            <th></th>
+                                            <th colspan="6" class="group-head">Como vendedor</th>
+                                            <th colspan="4" class="group-head">Como responsable de caja</th>
+                                        </tr>
+                                        <tr>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'name'"/><t t-set="label" t-value="'Cajero'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'sold'"/><t t-set="label" t-value="'Vendido'"/><t t-set="cls" t-value="'num th-highlight'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'tickets'"/><t t-set="label" t-value="'Tickets'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'avg_ticket'"/><t t-set="label" t-value="'Promedio'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'cash'"/><t t-set="label" t-value="'Efectivo'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'other'"/><t t-set="label" t-value="'Otros medios'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'refunds'"/><t t-set="label" t-value="'Devol.'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'sessions'"/><t t-set="label" t-value="'Cajas'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'difference'"/><t t-set="label" t-value="'Diferencia'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'shortages'"/><t t-set="label" t-value="'Con faltante'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'cashiers'"/><t t-set="key" t-value="'withdrawals'"/><t t-set="label" t-value="'Retiros'"/><t t-set="cls" t-value="'num'"/></t>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="!cashierPage.rows.length"><td colspan="11" class="text-center text-muted empty-row">No hay cajeros con estos filtros.</td></tr>
+                                        <t t-foreach="cashierPage.rows" t-as="c" t-key="c.user_id">
+                                            <tr>
+                                                <td class="cell-strong cell-text"><t t-esc="c.name"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(c.sold)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(c.tickets)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(c.avg_ticket)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(c.cash)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(c.other)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="c.refunds"/>
+                                                    <div t-if="c.refunds" class="cell-note muted"><t t-esc="formatCurrency(c.refunds_amount)"/></div>
+                                                </td>
+                                                <td class="num"><t t-esc="c.sessions"/></td>
+                                                <td t-att-class="'num ' + signClass(c.difference)"><t t-esc="formatSigned(c.difference)"/></td>
+                                                <td class="num"><t t-esc="c.shortages"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatCurrency(c.withdrawals)"/>
+                                                    <div t-if="c.withdrawals_count" class="cell-note muted"><t t-esc="c.withdrawals_count"/> retiros</div>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="pos_cash_metrics.Pagination"><t t-set="pg" t-value="cashierPage"/><t t-set="table" t-value="'cashiers'"/></t>
+                        </section>
+                    </t>
+
+                    <!-- ================= CAJAS Y CIERRES ================= -->
+                    <t t-if="state.tab === 'cajas'">
+                        <div class="kpi-grid status-cards">
+                            <t t-foreach="statusCards" t-as="card" t-key="card.key">
+                                <button type="button" t-att-class="'kpi-card shadow-glow status-card ' + card.color + (state.status.includes(card.key) ? ' selected' : '') + (state.status.length and !state.status.includes(card.key) ? ' dimmed' : '')"
+                                        t-on-click="onStatusCardClick" t-att-data-status="card.key"
+                                        t-att-title="state.status.length === 1 and state.status[0] === card.key ? 'Quitar filtro' : 'Filtrar por ' + card.label">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title"><t t-esc="card.label"/></span>
+                                            <div class="kpi-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <t t-if="card.key === 'abierta_hoy'">
+                                                        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                                                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                                                    </t>
+                                                    <t t-elif="card.key === 'abierta_vieja'">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </t>
+                                                    <t t-elif="card.key === 'cerro_justo'">
+                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </t>
+                                                    <t t-elif="card.key === 'faltante'">
+                                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                    </t>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="formatNumber(card.count)"/></div>
+                                        <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="card.sub"/></span></div>
+                                    </div>
+                                </button>
+                            </t>
+                        </div>
+
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Sesiones de caja</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(sessionPage.total)"/> sesiones del período, más las que siguen abiertas</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Esperado = efectivo inicial + cobros en efectivo + ingresos − retiros. Diferencia = contado al cerrar − esperado: negativa es faltante, positiva sobrante. Menos de $1 se toma como justo.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="sessions">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'caja'"/><t t-set="label" t-value="'Caja'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'opener'"/><t t-set="label" t-value="'Abrió'"/></t>
+                                            <th>Apertura</th>
+                                            <th>Cierre</th>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'sold'"/><t t-set="label" t-value="'Vendido'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <th class="num">Inicial</th>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'cash_sales'"/><t t-set="label" t-value="'Cobrado efectivo'"/><t t-set="cls" t-value="'num th-wrap'"/></t>
+                                            <th class="num">Ingresos</th>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'withdrawals'"/><t t-set="label" t-value="'Retiros'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'expected'"/><t t-set="label" t-value="'Esperado'"/><t t-set="cls" t-value="'num'"/></t>
+                                            <th class="num">Contado</th>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'difference'"/><t t-set="label" t-value="'Diferencia'"/><t t-set="cls" t-value="'num th-highlight'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'sessions'"/><t t-set="key" t-value="'status'"/><t t-set="label" t-value="'Estado'"/></t>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="!sessionPage.rows.length"><td colspan="13" class="text-center text-muted empty-row">No hay sesiones con estos filtros.</td></tr>
+                                        <t t-foreach="sessionPage.rows" t-as="s" t-key="s.id">
+                                            <tr>
+                                                <td class="cell-strong">
+                                                    <t t-esc="s.caja"/>
+                                                    <div class="cell-note muted"><t t-esc="s.session"/></div>
+                                                </td>
+                                                <td class="cell-secondary"><t t-esc="s.opener"/></td>
+                                                <td class="cell-secondary"><t t-esc="s.start"/></td>
+                                                <td class="cell-secondary"><t t-esc="s.stop or '—'"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(s.sold)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(s.cash_start)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(s.cash_sales)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(s.deposits)"/></td>
+                                                <td class="num">
+                                                    <t t-esc="formatCurrency(s.withdrawals)"/>
+                                                    <div t-if="s.withdrawals_count" class="cell-note muted"><t t-esc="s.withdrawals_count"/> retiros</div>
+                                                </td>
+                                                <td class="num"><t t-esc="s.expected === null ? '—' : formatCurrency(s.expected)"/></td>
+                                                <td class="num"><t t-esc="s.counted === null ? '—' : formatCurrency(s.counted)"/></td>
+                                                <td t-att-class="'num cell-strong ' + signClass(s.difference)"><t t-esc="s.difference === null ? '—' : formatSigned(s.difference)"/></td>
+                                                <td>
+                                                    <span t-att-class="'stock-badge ' + s.status">
+                                                        <t t-if="s.status === 'abierta_vieja'">Abierta hace <t t-esc="s.days_open"/> días</t>
+                                                        <t t-else=""><t t-esc="statusLabel(s.status)"/></t>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="pos_cash_metrics.Pagination"><t t-set="pg" t-value="sessionPage"/><t t-set="table" t-value="'sessions'"/></t>
+                        </section>
+                    </t>
+
+                    <!-- ================= RETIROS E INGRESOS ================= -->
+                    <t t-if="state.tab === 'movimientos'">
+                        <div class="kpi-grid status-cards">
+                            <t t-foreach="moveCards" t-as="card" t-key="card.key">
+                                <button type="button" t-att-class="'kpi-card shadow-glow status-card ' + card.color + (state.moveKind === card.key ? ' selected' : '') + (state.moveKind and state.moveKind !== card.key ? ' dimmed' : '')"
+                                        t-on-click="onMoveCardClick" t-att-data-kind="card.key"
+                                        t-att-title="state.moveKind === card.key ? 'Quitar filtro' : 'Ver sólo ' + card.label.toLowerCase()">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title"><t t-esc="card.label"/></span>
+                                            <div class="kpi-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <t t-if="card.key === 'retiro'"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></t>
+                                                    <t t-else=""><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></t>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(card.amount)"/></div>
+                                        <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="card.count"/> movimientos</span></div>
+                                    </div>
+                                </button>
+                            </t>
+                        </div>
+
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Movimientos de efectivo</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(movePage.total)"/> movimientos registrados desde el POS (Entrada / Salida de efectivo)</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Hecho por = el usuario que registró el movimiento en el POS, que puede no ser quien abrió la caja. El motivo es el texto que escribió el cajero.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="moves">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'moves'"/><t t-set="key" t-value="'caja'"/><t t-set="label" t-value="'Caja'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'moves'"/><t t-set="key" t-value="'user_name'"/><t t-set="label" t-value="'Hecho por'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'moves'"/><t t-set="key" t-value="'kind'"/><t t-set="label" t-value="'Tipo'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'moves'"/><t t-set="key" t-value="'reason'"/><t t-set="label" t-value="'Motivo'"/></t>
+                                            <t t-call="pos_cash_metrics.SortTh"><t t-set="table" t-value="'moves'"/><t t-set="key" t-value="'amount'"/><t t-set="label" t-value="'Monto'"/><t t-set="cls" t-value="'num th-highlight'"/></t>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="!movePage.rows.length"><td colspan="6" class="text-center text-muted empty-row">No hubo retiros ni ingresos con estos filtros.</td></tr>
+                                        <t t-foreach="movePage.rows" t-as="m" t-key="m.id">
+                                            <tr>
+                                                <td class="cell-secondary"><t t-esc="m.date"/></td>
+                                                <td class="cell-strong">
+                                                    <t t-esc="m.caja"/>
+                                                    <div class="cell-note muted"><t t-esc="m.session"/></div>
+                                                </td>
+                                                <td class="cell-secondary"><t t-esc="m.user_name"/></td>
+                                                <td><span t-att-class="'stock-badge ' + (m.kind === 'retiro' ? 'mov-retiro' : 'mov-ingreso')"><t t-esc="m.kind === 'retiro' ? 'Retiro' : 'Ingreso'"/></span></td>
+                                                <td class="cell-text"><t t-esc="m.reason"/></td>
+                                                <td t-att-class="'num cell-strong ' + (m.kind === 'retiro' ? 'amount-neg' : 'amount-pos')"><t t-esc="(m.kind === 'retiro' ? '− ' : '+ ') + formatCurrency(m.amount)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="pos_cash_metrics.Pagination"><t t-set="pg" t-value="movePage"/><t t-set="table" t-value="'moves'"/></t>
+                        </section>
+                    </t>
+
+                    <!-- ================= MEDIOS DE PAGO ================= -->
+                    <t t-if="state.tab === 'medios'">
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Cobrado por medio de pago</h3>
+                                    <p class="section-sub">Tocá un grupo para ver los métodos tal como están cargados en las cajas</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Los métodos se agrupan por su nombre (Tarjeta Debito, Debito y Tarjeta de debito van a Débito). El vuelto en efectivo ya está descontado.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="methods">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead><tr><th>Medio</th><th class="num th-highlight">Cobrado</th><th class="num">%</th></tr></thead>
+                                    <tbody>
+                                        <tr t-if="!data.methods.length"><td colspan="3" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
+                                        <t t-foreach="data.methods" t-as="m" t-key="m.group">
+                                            <tr class="clickable-row" t-on-click="toggleGroup" t-att-data-group="m.group">
+                                                <td class="cell-strong"><span class="expand-mark"><t t-esc="state.expanded[m.group] ? '▾' : '▸'"/></span> <t t-esc="m.group"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(m.amount)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(m.pct)"/>%</td>
+                                            </tr>
+                                            <t t-if="state.expanded[m.group]">
+                                                <t t-foreach="m.details" t-as="d" t-key="m.group + '|' + d_index">
+                                                    <tr class="detail-row">
+                                                        <td class="cell-secondary"><t t-esc="d.name"/></td>
+                                                        <td class="num cell-secondary"><t t-esc="formatCurrency(d.amount)"/></td>
+                                                        <td></td>
+                                                    </tr>
+                                                </t>
+                                            </t>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Por caja</h3>
+                                    <p class="section-sub">Cuánto cobró cada caja con cada medio</p>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>Caja</th>
+                                            <t t-foreach="data.methods_by_pos.groups" t-as="g" t-key="g"><th class="num"><t t-esc="g"/></th></t>
+                                            <th class="num th-highlight">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="!data.methods_by_pos.rows.length"><td t-att-colspan="data.methods_by_pos.groups.length + 2" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
+                                        <t t-foreach="data.methods_by_pos.rows" t-as="r" t-key="r.caja">
+                                            <tr>
+                                                <td class="cell-strong"><t t-esc="r.caja"/></td>
+                                                <t t-foreach="data.methods_by_pos.groups" t-as="g" t-key="r.caja + '|' + g">
+                                                    <td class="num"><t t-esc="r.values[g] ? formatCurrency(r.values[g]) : '—'"/></td>
+                                                </t>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.total)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </t>
+                </div>
+            </main>
+        </div>
+    </t>
+</templates>

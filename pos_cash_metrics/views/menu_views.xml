@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Acción de cliente: el tag es el nombre con que el JS se registra en registry.category("actions") -->
+    <record id="action_pos_cash_metrics" model="ir.actions.client">
+        <field name="name">Métricas de Caja</field>
+        <field name="tag">pos_cash_metrics.dashboard</field>
+    </record>
+
+    <menuitem id="menu_pos_cash_metrics_root"
+              name="Métricas de Caja"
+              action="action_pos_cash_metrics"
+              groups="pos_cash_metrics.group_pos_cash_metrics_user"
+              web_icon="pos_cash_metrics,static/description/icon.png"
+              sequence="52"/>
+</odoo>
