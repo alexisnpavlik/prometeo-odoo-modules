@@ -25,6 +25,19 @@ class PosMetricsController(http.Controller):
     def _get_lang(self):
         return request.env.context.get('lang') or 'es_AR'
 
+    def _employee_join(self, user_alias, company_expr, alias):
+        """LATERAL con el nombre del empleado del usuario, eligiendo el de la empresa de la venta.
+
+        Un usuario con empleado en varias sucursales duplicaba cada línea con un JOIN simple.
+        Sin el módulo hr (base kiosco) la tabla hr_employee no existe: se devuelve un LATERAL
+        vacío y COALESCE(<alias>.name, <usuario>.login) cae al login.
+        """
+        if 'hr.employee' not in request.env:
+            return f"LEFT JOIN LATERAL (SELECT NULL::varchar AS name) {alias} ON TRUE"
+        return (f"LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = {user_alias}.id "
+                f"ORDER BY (e.company_id = {company_expr}) IS TRUE DESC, e.active DESC, e.id LIMIT 1) "
+                f"{alias} ON TRUE")
+
     def _normalize_multi(self, value):
         """Normaliza un filtro que puede llegar como string simple, como lista o como JSON.
 
@@ -136,13 +149,28 @@ class PosMetricsController(http.Controller):
             return "(SELECT surcharge_product_id FROM pos_config WHERE surcharge_product_id IS NOT NULL)"
         return "(SELECT NULL::integer WHERE FALSE)"
 
+    def _discount_products_sql(self):
+        """Subconsulta con los productos de descuento global de las cajas (pos_discount).
+
+        pos_discount tampoco es dependencia (la base kiosco no lo tiene): sin la columna,
+        subconsulta vacía, igual que con el recargo.
+        """
+        cr = request.env.cr
+        cr.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'pos_config' AND column_name = 'discount_product_id'
+        """)
+        if cr.fetchone():
+            return "(SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)"
+        return "(SELECT NULL::integer WHERE FALSE)"
+
     def _non_merchandise_sql(self):
         """Subconsulta con los productos que no son mercadería: descuento global y recargo.
 
         Entran en la facturación (son plata cobrada o descontada) pero no en rankings ni márgenes.
         """
         return (
-            "(SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL"
+            f"(SELECT * FROM {self._discount_products_sql()} d"
             f" UNION SELECT * FROM {self._surcharge_products_sql()} s)"
         )
 
@@ -179,11 +207,11 @@ class PosMetricsController(http.Controller):
         pos_configs = [r[0] for r in cr.fetchall() if r[0]]
 
         # 2. Cajeros
-        cr.execute("""
+        cr.execute(f"""
             SELECT DISTINCT COALESCE(emp.name, ru.login) 
             FROM pos_order po 
             JOIN res_users ru ON ru.id = po.user_id 
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             WHERE po.state IN ('done', 'invoiced') 
               AND po.company_id IN %s
             ORDER BY 1
@@ -269,7 +297,7 @@ class PosMetricsController(http.Controller):
         
         # La línea de descuento global (pos_discount) entra en la facturación, que debe
         # coincidir con lo cobrado; el costo y las unidades salen sólo de productos reales.
-        is_discount = "pp.id IN (SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)"
+        is_discount = f"pp.id IN {self._discount_products_sql()}"
         is_surcharge = f"pp.id IN {self._surcharge_products_sql()}"
         is_merchandise = f"NOT {is_discount} AND NOT {is_surcharge}"
         unit_cost = "COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)"
@@ -299,7 +327,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
@@ -385,7 +413,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE{extra}
         """
@@ -481,7 +509,7 @@ class PosMetricsController(http.Controller):
             FROM pos_order po
             JOIN pos_config pc ON pc.id = po.config_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause}
         """
@@ -575,7 +603,7 @@ class PosMetricsController(http.Controller):
         ticket_avg = sales_revenue / total_orders if total_orders > 0 else 0.0
 
         # 2. Diferencia de arqueo de caja (Sesiones) respetando las compañías permitidas
-        sessions_sql = """
+        sessions_sql = f"""
             SELECT SUM(
                 ps.cash_register_balance_end_real
                 - ps.cash_register_balance_start
@@ -594,7 +622,7 @@ class PosMetricsController(http.Controller):
             ) cash ON cash.session_id = ps.id
             LEFT JOIN res_company rc ON rc.id = pc.company_id
             LEFT JOIN res_users ru ON ru.id = ps.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = pc.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'pc.company_id', 'emp')}
             WHERE ps.state = 'closed'
               AND pc.company_id IN %s
         """
@@ -1021,7 +1049,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
@@ -1063,7 +1091,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
@@ -1105,7 +1133,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
         """
@@ -1225,7 +1253,7 @@ class PosMetricsController(http.Controller):
             FROM pos_session              ps
             JOIN pos_config               pc       ON pc.id = ps.config_id
             LEFT JOIN res_users           ru_o     ON ru_o.id = ps.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru_o.id ORDER BY (e.company_id = pc.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp_open ON TRUE
+            {self._employee_join('ru_o', 'pc.company_id', 'emp_open')}
             LEFT JOIN pos_order           po       ON po.session_id = ps.id
                                                      AND po.state IN ('done', 'invoiced')
             LEFT JOIN res_company         rc       ON rc.id = pc.company_id
@@ -1294,7 +1322,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
         """
@@ -1344,7 +1372,7 @@ class PosMetricsController(http.Controller):
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
@@ -1380,7 +1408,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_partner rp ON rp.id = po.partner_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
-            LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+            {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
         """
@@ -1532,7 +1560,7 @@ class PosMetricsController(http.Controller):
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
                 LEFT JOIN res_partner rp ON rp.id = po.partner_id
                 LEFT JOIN res_users ru ON ru.id = po.user_id
-                LEFT JOIN LATERAL (SELECT e.name FROM hr_employee e WHERE e.user_id = ru.id ORDER BY (e.company_id = po.company_id) IS TRUE DESC, e.active DESC, e.id LIMIT 1) emp ON TRUE
+                {self._employee_join('ru', 'po.company_id', 'emp')}
                 LEFT JOIN res_company rc ON rc.id = po.company_id
                 WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
             """
