@@ -331,7 +331,7 @@ class InventoryMetricsController(http.Controller):
 
     @http.route('/inventory_dashboard_metrics/export', type='http', auth='user')
     def export_xlsx(self, table='overstock', company='all', period=None, target=None,
-                    status='all', category='all', search='', sort='excess',
+                    status='all', category='all', product='all', sort='excess',
                     vendor='all', cover=None, **kwargs):
         """Exporta a Excel la tabla activa con los mismos filtros que ve el usuario."""
         try:
@@ -368,13 +368,12 @@ class InventoryMetricsController(http.Controller):
                            "Estado"]
                 keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
 
-            query = (search or '').lower().strip()
-            status, category, vendor = _to_list(status), _to_list(category), _to_list(vendor)
+            status, category, vendor, product = _to_list(status), _to_list(category), _to_list(vendor), _to_list(product)
             data = [r for r in data
                     if (not status or r["status"] in status)
                     and (not category or r["categoria"] in category)
                     and (not vendor or r["vendor"] in vendor)
-                    and (not query or query in r["producto"].lower())]
+                    and (not product or r["producto"] in product)]
 
             output = io.BytesIO()
             workbook = xlsxwriter.Workbook(output, {'in_memory': True})

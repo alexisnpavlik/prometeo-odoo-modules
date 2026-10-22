@@ -118,10 +118,13 @@
                         <t t-set="placeholder" t-value="'Buscar categoría...'"/>
                     </t>
 
-                    <div class="input-group">
-                        <label>Producto</label>
-                        <input type="text" placeholder="Buscar producto..." t-model="draft.search"/>
-                    </div>
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'product'"/>
+                        <t t-set="title" t-value="'Producto'"/>
+                        <t t-set="allLabel" t-value="'Todos los productos'"/>
+                        <t t-set="pluralLabel" t-value="'productos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar producto...'"/>
+                    </t>
                 </div>
 
                 <div class="sidebar-footer">

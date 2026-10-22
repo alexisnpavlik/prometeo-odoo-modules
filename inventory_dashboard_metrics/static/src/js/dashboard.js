@@ -65,13 +65,13 @@ class InventoryDashboardMetrics extends Component {
             syncTime: "Cargando...",
             theme: "dark",
             overPage: 1,
-            search: "",
+            product: [],
             category: [],
             vendor: [],
             status: [],
             // Multi-selección abierta y el texto de búsqueda de cada una
             openFilter: null,
-            filterSearch: { company: "", category: "", vendor: "", status: "" },
+            filterSearch: { company: "", category: "", vendor: "", status: "", product: "" },
             restPage: 1,
             buyPage: 1,
             buyCover: "30",
@@ -108,8 +108,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     // Copia de los filtros: las listas se duplican para que el borrador no edite el estado aplicado
-    pickFilters({ company, period, search, category, vendor, status }) {
-        return { company: [...company], period, search, category: [...category], vendor: [...vendor], status: [...status] };
+    pickFilters({ company, period, product, category, vendor, status }) {
+        return { company: [...company], period, product: [...product], category: [...category], vendor: [...vendor], status: [...status] };
     }
 
     // --- Listas filtradas ---
@@ -121,14 +121,21 @@ class InventoryDashboardMetrics extends Component {
         return this.categoriesOf([...this.metricsData.overstock, ...this.metricsData.restock]);
     }
 
+    // Productos para el filtro: sólo los de las categorías elegidas en el borrador, como en pos_management_metrics
+    get products() {
+        const { category } = this.draft;
+        const rows = [...this.metricsData.overstock, ...this.metricsData.restock, ...this.purchaseData.rows]
+            .filter((r) => !category.length || category.includes(r.categoria));
+        return [...new Set(rows.map((r) => r.producto))].sort((a, b) => a.localeCompare(b, "es"));
+    }
+
     // Filtros de producto, categoría y proveedor: sin el estado, para que las tarjetas cuenten todos
     baseFilter(rows) {
-        const q = this.state.search.toLowerCase().trim();
-        const { category, vendor } = this.state;
+        const { category, vendor, product } = this.state;
         return rows.filter((r) =>
             (!category.length || category.includes(r.categoria)) &&
             (!vendor.length || vendor.includes(r.vendor)) &&
-            (!q || r.producto.toLowerCase().includes(q)));
+            (!product.length || product.includes(r.producto)));
     }
 
     byStatus(rows) {
@@ -167,6 +174,7 @@ class InventoryDashboardMetrics extends Component {
         if (field === "company") return this.filtersData.companies.map((c) => [c, c]);
         if (field === "category") return this.categories.map((c) => [c, c]);
         if (field === "vendor") return this.vendors.map((v) => [v, v]);
+        if (field === "product") return this.products.map((p) => [p, p]);
         return this.statusOptions.map(([key, label]) => [key, label]);
     }
 
@@ -202,10 +210,22 @@ class InventoryDashboardMetrics extends Component {
         } else {
             selection.splice(idx, 1);
         }
+        if (field === "category") {
+            this.pruneDraftProducts();
+        }
     }
 
     selectAllFilterValues(field) {
         this.draft[field] = [];
+        if (field === "category") {
+            this.pruneDraftProducts();
+        }
+    }
+
+    // Al cambiar de categoría se descartan los productos que ya no están en la lista
+    pruneDraftProducts() {
+        const products = this.products;
+        this.draft.product = this.draft.product.filter((p) => products.includes(p));
     }
 
     onFilterSearchInput(field, ev) {
@@ -382,7 +402,7 @@ class InventoryDashboardMetrics extends Component {
             cover: this.state.buyCover,
             category: JSON.stringify(this.state.category),
             status: JSON.stringify(this.state.status),
-            search: this.state.search,
+            product: JSON.stringify(this.state.product),
         });
         window.open(`/inventory_dashboard_metrics/export?${params.toString()}`, "_blank");
     }
@@ -402,8 +422,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async clearFilters() {
-        Object.assign(this.draft, { company: [], period: "90", search: "", category: [], vendor: [], status: [] });
-        this.state.filterSearch = { company: "", category: "", vendor: "", status: "" };
+        Object.assign(this.draft, { company: [], period: "90", product: [], category: [], vendor: [], status: [] });
+        this.state.filterSearch = { company: "", category: "", vendor: "", status: "", product: "" };
         await this.applyFilters();
     }
 
@@ -469,7 +489,7 @@ class InventoryDashboardMetrics extends Component {
             Object.assign(this.metricsData, metrics);
             Object.assign(this.state, { overPage: 1, restPage: 1 });
             // Se descartan categorías y proveedores que ya no aparecen con la nueva empresa o período
-            for (const [field, options] of [["category", this.categories], ["vendor", this.vendors]]) {
+            for (const [field, options] of [["category", this.categories], ["vendor", this.vendors], ["product", this.products]]) {
                 this.state[field] = this.state[field].filter((v) => options.includes(v));
                 this.draft[field] = this.draft[field].filter((v) => options.includes(v));
             }
