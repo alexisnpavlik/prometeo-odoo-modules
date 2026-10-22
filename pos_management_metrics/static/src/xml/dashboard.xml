@@ -61,39 +61,6 @@
                     <h3>Filtros Avanzados</h3>
                     
                     <div class="input-group">
-                        <label>Punto de Venta (Caja)</label>
-                        <div class="multiselect" t-on-click.stop="() => {}">
-                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('pos')">
-                                <span class="multiselect-label" t-esc="posLabel"/>
-                                <span class="multiselect-caret">▾</span>
-                            </button>
-                            <div class="multiselect-panel" t-if="state.openFilter === 'pos'">
-                                <input type="text" class="multiselect-search" placeholder="Buscar..."
-                                       t-att-value="state.posSearch"
-                                       t-on-input="(ev) => this.onFilterSearchInput('posSearch', ev)"/>
-                                <label class="multiselect-option multiselect-all">
-                                    <input type="checkbox" t-if="state.pos.length === 0" checked="checked"
-                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
-                                    <input type="checkbox" t-else=""
-                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
-                                    <span>Todas las cajas</span>
-                                </label>
-                                <div class="multiselect-list">
-                                    <t t-foreach="visiblePosConfigs" t-as="posCfg" t-key="posCfg + '|' + isFilterSelected('pos', posCfg)">
-                                        <label class="multiselect-option">
-                                            <input type="checkbox" t-att-checked="isFilterSelected('pos', posCfg)"
-                                                   t-on-change="() => this.toggleFilterValue('pos', posCfg)"/>
-                                            <span t-esc="posCfg"/>
-                                        </label>
-                                    </t>
-                                    <div class="multiselect-empty" t-if="visiblePosConfigs.length === 0">Sin resultados</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    
-                    <div class="input-group">
                         <label>Empresa</label>
                         <div class="multiselect" t-on-click.stop="() => {}">
                             <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('company')">
@@ -120,6 +87,39 @@
                                         </label>
                                     </t>
                                     <div class="multiselect-empty" t-if="visibleCompanies.length === 0">Sin resultados</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <div class="input-group">
+                        <label>Punto de Venta (Caja)</label>
+                        <div class="multiselect" t-on-click.stop="() => {}">
+                            <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel('pos')">
+                                <span class="multiselect-label" t-esc="posLabel"/>
+                                <span class="multiselect-caret">▾</span>
+                            </button>
+                            <div class="multiselect-panel" t-if="state.openFilter === 'pos'">
+                                <input type="text" class="multiselect-search" placeholder="Buscar..."
+                                       t-att-value="state.posSearch"
+                                       t-on-input="(ev) => this.onFilterSearchInput('posSearch', ev)"/>
+                                <label class="multiselect-option multiselect-all">
+                                    <input type="checkbox" t-if="state.pos.length === 0" checked="checked"
+                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
+                                    <input type="checkbox" t-else=""
+                                           t-on-change="() => this.selectAllFilterValues('pos')"/>
+                                    <span>Todas las cajas</span>
+                                </label>
+                                <div class="multiselect-list">
+                                    <t t-foreach="visiblePosConfigs" t-as="posCfg" t-key="posCfg + '|' + isFilterSelected('pos', posCfg)">
+                                        <label class="multiselect-option">
+                                            <input type="checkbox" t-att-checked="isFilterSelected('pos', posCfg)"
+                                                   t-on-change="() => this.toggleFilterValue('pos', posCfg)"/>
+                                            <span t-esc="posCfg"/>
+                                        </label>
+                                    </t>
+                                    <div class="multiselect-empty" t-if="visiblePosConfigs.length === 0">Sin resultados</div>
                                 </div>
                             </div>
                         </div>

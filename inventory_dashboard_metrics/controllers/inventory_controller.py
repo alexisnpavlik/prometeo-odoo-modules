@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import io
+import json
 import logging
 import math
 from datetime import datetime
@@ -45,6 +46,18 @@ def _round_units(value):
     return int(math.floor(value + 0.5))
 
 
+def _to_list(value):
+    """Filtro multi-selección: lista, JSON de lista o valor suelto. Vacío o 'all' = sin filtro."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            pass
+    if isinstance(value, str):
+        value = [value]
+    return [v for v in (value or []) if v and v != 'all']
+
+
 def _to_int(value, allowed, default):
     try:
         value = int(value)
@@ -63,14 +76,15 @@ class InventoryMetricsController(http.Controller):
         return request.env.context.get('lang') or 'es_AR'
 
     def _resolve_companies(self, company):
-        """Empresas a consultar: la elegida (si el usuario puede verla) o todas las permitidas."""
+        """Empresas a consultar: las elegidas (que el usuario pueda ver) o todas las permitidas."""
         allowed = tuple(request.env.companies.ids)
-        if company and company != 'all':
-            request.env.cr.execute("SELECT id FROM res_company WHERE name = %s AND id IN %s",
-                                   (company, allowed or (0,)))
-            row = request.env.cr.fetchone()
-            if row:
-                return (row[0],)
+        names = _to_list(company)
+        if names and allowed:
+            request.env.cr.execute("SELECT id FROM res_company WHERE name IN %s AND id IN %s ORDER BY id",
+                                   (tuple(names), allowed))
+            ids = tuple(r[0] for r in request.env.cr.fetchall())
+            if ids:
+                return ids
         return allowed
 
     @http.route('/inventory_dashboard_metrics/filters', type='json', auth='user')
@@ -355,10 +369,11 @@ class InventoryMetricsController(http.Controller):
                 keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
 
             query = (search or '').lower().strip()
+            status, category, vendor = _to_list(status), _to_list(category), _to_list(vendor)
             data = [r for r in data
-                    if (status in ('', 'all') or r["status"] == status)
-                    and (category in ('', 'all') or r["categoria"] == category)
-                    and (vendor in ('', 'all') or r["vendor"] == vendor)
+                    if (not status or r["status"] in status)
+                    and (not category or r["categoria"] in category)
+                    and (not vendor or r["vendor"] in vendor)
                     and (not query or query in r["producto"].lower())]
 
             output = io.BytesIO()
@@ -377,7 +392,7 @@ class InventoryMetricsController(http.Controller):
             sheet.set_column(0, 0, 50)
             sheet.set_column(1, 1, 24)
             sheet.set_column(2, len(headers) - 1, 16)
-            company_label = company if company and company != 'all' else 'Todas las empresas'
+            company_label = ', '.join(_to_list(company)) or 'Todas las empresas'
             sheet.write(0, 0, title, fmt_title)
             sheet.write(1, 0, f"{company_label} · ventas de los últimos {period} días · cobertura objetivo {target} días")
             for col, header in enumerate(headers):

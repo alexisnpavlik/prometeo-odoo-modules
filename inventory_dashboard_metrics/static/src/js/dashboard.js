@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart, useExternalListener, useState } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 
 const PAGE_SIZE = 25;
@@ -21,6 +21,23 @@ const BUY_COVER_LEVELS = [
     [Infinity, "Muchísima"],
 ];
 
+// Estados por pestaña: valor, etiqueta, color de la tarjeta
+const STATUSES = {
+    stock: [
+        ["sin_stock", "Sin stock", "red"],
+        ["por_agotarse", "Por agotarse", "amber"],
+        ["sin_venta", "Sin ventas", "purple"],
+        ["sobrestock", "Sobrestock", "blue"],
+    ],
+    compra: [
+        ["urgente", "Urgente", "red"],
+        ["normal", "Normal", "amber"],
+    ],
+};
+const PERIOD_PRESETS = ["30", "60", "90", "180", "365"];
+const RESTOCK_STATUSES = ["sin_stock", "por_agotarse"];
+const OVERSTOCK_STATUSES = ["sin_venta", "sobrestock"];
+
 // Orden por columna: null va siempre al final, sin importar el sentido
 const compareBy = (key, dir) => (a, b) => {
     const x = a[key];
@@ -38,8 +55,9 @@ class InventoryDashboardMetrics extends Component {
     setup() {
         this.lowCoverDays = LOW_COVER_DAYS;
         this.overstockDays = OVERSTOCK_DAYS;
+        this.periodPresets = PERIOD_PRESETS;
         this.state = useState({
-            company: "all",
+            company: [],
             period: "90",
             tab: "stock",
             showFilters: false,
@@ -48,14 +66,26 @@ class InventoryDashboardMetrics extends Component {
             theme: "dark",
             overPage: 1,
             search: "",
-            category: "all",
-            vendor: "all",
+            category: [],
+            vendor: [],
+            status: [],
+            // Multi-selección abierta y el texto de búsqueda de cada una
+            openFilter: null,
+            filterSearch: { company: "", category: "", vendor: "", status: "" },
             restPage: 1,
             buyPage: 1,
             buyCover: "30",
             buyLoading: false,
             // Orden elegido tocando un encabezado: { key, dir } o null para el orden por defecto
             sort: { over: null, rest: null, buy: null },
+        });
+
+        // Lo que se edita en la barra lateral: pasa a state recién con "Aplicar", como en los demás dashboards
+        this.draft = useState(this.pickFilters(this.state));
+
+        // Cierra el panel de checkboxes al hacer clic fuera del filtro
+        useExternalListener(window, "click", () => {
+            this.state.openFilter = null;
         });
 
         this.filtersData = useState({ companies: [] });
@@ -77,6 +107,11 @@ class InventoryDashboardMetrics extends Component {
         });
     }
 
+    // Copia de los filtros: las listas se duplican para que el borrador no edite el estado aplicado
+    pickFilters({ company, period, search, category, vendor, status }) {
+        return { company: [...company], period, search, category: [...category], vendor: [...vendor], status: [...status] };
+    }
+
     // --- Listas filtradas ---
     categoriesOf(rows) {
         return [...new Set(rows.map((r) => r.categoria))].sort();
@@ -86,27 +121,112 @@ class InventoryDashboardMetrics extends Component {
         return this.categoriesOf([...this.metricsData.overstock, ...this.metricsData.restock]);
     }
 
-    get filteredOverstock() {
+    // Filtros de producto, categoría y proveedor: sin el estado, para que las tarjetas cuenten todos
+    baseFilter(rows) {
         const q = this.state.search.toLowerCase().trim();
         const { category, vendor } = this.state;
-        const rows = this.metricsData.overstock
-            .filter((r) =>
-                (category === "all" || r.categoria === category) &&
-                (vendor === "all" || r.vendor === vendor) &&
-                (!q || r.producto.toLowerCase().includes(q)))
+        return rows.filter((r) =>
+            (!category.length || category.includes(r.categoria)) &&
+            (!vendor.length || vendor.includes(r.vendor)) &&
+            (!q || r.producto.toLowerCase().includes(q)));
+    }
+
+    byStatus(rows) {
+        const { status } = this.state;
+        return status.length ? rows.filter((r) => status.includes(r.status)) : rows;
+    }
+
+    get filteredOverstock() {
+        const rows = this.byStatus(this.baseFilter(this.metricsData.overstock))
             // Orden por defecto: más plata de más primero, igual que el controlador
             .sort((a, b) => b.excess_value - a.excess_value);
         return this.sortRows(rows, "over");
     }
 
     get filteredRestock() {
-        const q = this.state.search.toLowerCase().trim();
-        const { category, vendor } = this.state;
-        const rows = this.metricsData.restock.filter((r) =>
-            (category === "all" || r.categoria === category) &&
-            (vendor === "all" || r.vendor === vendor) &&
-            (!q || r.producto.toLowerCase().includes(q)));
-        return this.sortRows(rows, "rest");
+        return this.sortRows(this.byStatus(this.baseFilter(this.metricsData.restock)), "rest");
+    }
+
+    get statusOptions() {
+        return STATUSES[this.state.tab];
+    }
+
+    // Una tabla se oculta si el estado elegido no puede aparecer en ella
+    get showRestock() {
+        const { status } = this.state;
+        return !status.length || status.some((s) => RESTOCK_STATUSES.includes(s));
+    }
+
+    get showOverstock() {
+        const { status } = this.state;
+        return !status.length || status.some((s) => OVERSTOCK_STATUSES.includes(s));
+    }
+
+    // --- Multi-selección (mismo control que pos_management_metrics) ---
+    filterOptions(field) {
+        if (field === "company") return this.filtersData.companies.map((c) => [c, c]);
+        if (field === "category") return this.categories.map((c) => [c, c]);
+        if (field === "vendor") return this.vendors.map((v) => [v, v]);
+        return this.statusOptions.map(([key, label]) => [key, label]);
+    }
+
+    visibleOptions(field) {
+        const term = this.state.filterSearch[field].toLowerCase().trim();
+        const options = this.filterOptions(field);
+        return term ? options.filter(([, label]) => label.toLowerCase().includes(term)) : options;
+    }
+
+    multiLabel(field, emptyLabel, pluralLabel) {
+        const selection = this.draft[field];
+        if (!selection.length) return emptyLabel;
+        if (selection.length === 1) {
+            const option = this.filterOptions(field).find(([value]) => value === selection[0]);
+            return option ? option[1] : selection[0];
+        }
+        return `${selection.length} ${pluralLabel}`;
+    }
+
+    toggleFilterPanel(field) {
+        this.state.openFilter = this.state.openFilter === field ? null : field;
+    }
+
+    isFilterSelected(field, value) {
+        return this.draft[field].includes(value);
+    }
+
+    toggleFilterValue(field, value) {
+        const selection = this.draft[field];
+        const idx = selection.indexOf(value);
+        if (idx === -1) {
+            selection.push(value);
+        } else {
+            selection.splice(idx, 1);
+        }
+    }
+
+    selectAllFilterValues(field) {
+        this.draft[field] = [];
+    }
+
+    onFilterSearchInput(field, ev) {
+        this.state.filterSearch[field] = ev.target.value;
+    }
+
+    onPresetClick(ev) {
+        this.draft.period = ev.currentTarget.dataset.period;
+    }
+
+    // Tarjetas por estado: cantidad de productos y plata (de más en stock, a comprar en compra)
+    get statusCards() {
+        const isBuy = this.state.tab === "compra";
+        const rows = isBuy
+            ? this.baseFilter(this.purchaseRows)
+            : this.baseFilter([...this.metricsData.restock, ...this.metricsData.overstock]);
+        return STATUSES[this.state.tab].map(([key, label, color]) => {
+            const matched = rows.filter((r) => r.status === key);
+            const amount = matched.reduce((sum, r) => sum + (isBuy ? r.total : (r.excess_value || 0)), 0);
+            return { key, label, color, count: matched.length, amount };
+        });
     }
 
     get overFilteredExcess() {
@@ -142,13 +262,7 @@ class InventoryDashboardMetrics extends Component {
     }
 
     get filteredPurchase() {
-        const q = this.state.search.toLowerCase().trim();
-        const { vendor, category } = this.state;
-        const rows = this.purchaseRows.filter((r) =>
-            (vendor === "all" || r.vendor === vendor) &&
-            (category === "all" || r.categoria === category) &&
-            (!q || r.producto.toLowerCase().includes(q)));
-        return this.sortRows(rows, "buy");
+        return this.sortRows(this.byStatus(this.baseFilter(this.purchaseRows)), "buy");
     }
 
     sortRows(rows, table) {
@@ -209,6 +323,10 @@ class InventoryDashboardMetrics extends Component {
 
     async onTabClick(ev) {
         this.state.tab = ev.currentTarget.dataset.tab;
+        // Los estados de una pestaña no existen en la otra
+        const keys = STATUSES[this.state.tab].map(([key]) => key);
+        this.state.status = this.state.status.filter((s) => keys.includes(s));
+        this.draft.status = this.draft.status.filter((s) => keys.includes(s));
         if (this.state.tab === "compra" && this.purchaseStale) {
             await this.loadPurchase();
         }
@@ -226,6 +344,15 @@ class InventoryDashboardMetrics extends Component {
             this.state.sort[table] = null;
         }
         this.state[`${table}Page`] = 1;
+    }
+
+    // Tocar una tarjeta filtra sólo por ese estado; tocarla de nuevo lo quita
+    onStatusCardClick(ev) {
+        const { status } = ev.currentTarget.dataset;
+        const only = this.state.status.length === 1 && this.state.status[0] === status;
+        this.state.status = only ? [] : [status];
+        this.draft.status = [...this.state.status];
+        this.onCategoryChange();
     }
 
     resetBuyPage() {
@@ -249,11 +376,12 @@ class InventoryDashboardMetrics extends Component {
         const table = ev.currentTarget.dataset.table;
         const params = new URLSearchParams({
             table,
-            company: this.state.company,
+            company: JSON.stringify(this.state.company),
             period: this.state.period,
-            vendor: this.state.vendor,
+            vendor: JSON.stringify(this.state.vendor),
             cover: this.state.buyCover,
-            category: this.state.category,
+            category: JSON.stringify(this.state.category),
+            status: JSON.stringify(this.state.status),
             search: this.state.search,
         });
         window.open(`/inventory_dashboard_metrics/export?${params.toString()}`, "_blank");
@@ -268,13 +396,15 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async applyFilters() {
-        this.state.showFilters = false;
+        Object.assign(this.state, this.pickFilters(this.draft), { showFilters: false, openFilter: null });
+        this.onCategoryChange();
         await this.refreshData();
     }
 
     async clearFilters() {
-        Object.assign(this.state, { company: "all", period: "90", search: "", category: "all", vendor: "all", showFilters: false });
-        await this.refreshData();
+        Object.assign(this.draft, { company: [], period: "90", search: "", category: [], vendor: [], status: [] });
+        this.state.filterSearch = { company: "", category: "", vendor: "", status: "" };
+        await this.applyFilters();
     }
 
     // --- Formateadores ---
@@ -315,7 +445,7 @@ class InventoryDashboardMetrics extends Component {
         this.state.buyLoading = true;
         try {
             const data = await rpc("/inventory_dashboard_metrics/purchase", {
-                company: this.state.company,
+                company: JSON.stringify(this.state.company),
                 period: parseInt(this.state.period) || 90,
             });
             Object.assign(this.purchaseData, data);
@@ -333,16 +463,15 @@ class InventoryDashboardMetrics extends Component {
         this.state.syncTime = "Sincronizando...";
         try {
             const metrics = await rpc("/inventory_dashboard_metrics/inventory", {
-                company: this.state.company,
+                company: JSON.stringify(this.state.company),
                 period: parseInt(this.state.period) || 90,
             });
             Object.assign(this.metricsData, metrics);
             Object.assign(this.state, { overPage: 1, restPage: 1 });
-            if (!this.categories.includes(this.state.category)) {
-                this.state.category = "all";
-            }
-            if (!this.vendors.includes(this.state.vendor)) {
-                this.state.vendor = "all";
+            // Se descartan categorías y proveedores que ya no aparecen con la nueva empresa o período
+            for (const [field, options] of [["category", this.categories], ["vendor", this.vendors]]) {
+                this.state[field] = this.state[field].filter((v) => options.includes(v));
+                this.draft[field] = this.draft[field].filter((v) => options.includes(v));
             }
             this.purchaseStale = true;
             if (this.state.tab === "compra") {
