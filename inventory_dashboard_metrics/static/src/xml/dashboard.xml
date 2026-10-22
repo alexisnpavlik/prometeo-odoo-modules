@@ -13,12 +13,54 @@
         </div>
     </t>
 
+    <!-- Filtro multi-selección con búsqueda. Parámetros: field, title, allLabel, pluralLabel, placeholder -->
+    <t t-name="inventory_dashboard_metrics.MultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="draft[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <t t-name="inventory_dashboard_metrics.DashboardTemplate">
         <div t-att-class="'inv-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
 
-            <!-- Sidebar de filtros -->
-            <aside t-att-class="'sidebar ' + (state.showFilters ? 'open' : '')" id="sidebar">
-                <button class="btn btn-secondary sidebar-close" t-on-click="toggleFilters">Cerrar</button>
+            <!-- Sidebar de filtros: mismo formato que pos_management_metrics -->
+            <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')" id="sidebar">
+                <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Cerrar filtros</span>
+                </button>
+
                 <div class="sidebar-brand">
                     <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
@@ -32,61 +74,57 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3>Filtros de Almacén</h3>
-
-                    <div class="input-group">
-                        <label>Empresa / Central</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.company">
-                                <option value="all">Todas las empresas</option>
-                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
-                                    <option t-att-value="company"><t t-esc="company"/></option>
-                                </t>
-                            </select>
-                        </div>
+                    <h3>Período de ventas</h3>
+                    <div class="preset-dates">
+                        <t t-foreach="periodPresets" t-as="days" t-key="days">
+                            <button t-att-class="'btn-preset ' + (draft.period === days ? 'active' : '')"
+                                    t-on-click="onPresetClick" t-att-data-period="days">Últimos <t t-esc="days"/> días</button>
+                        </t>
                     </div>
+                </div>
 
-                    <div class="input-group">
-                        <label>Período de ventas</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.period">
-                                <option value="30">Últimos 30 días</option>
-                                <option value="60">Últimos 60 días</option>
-                                <option value="90">Últimos 90 días</option>
-                                <option value="180">Últimos 180 días</option>
-                                <option value="365">Últimos 365 días</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
 
-                    <div class="input-group">
-                        <label>Producto</label>
-                        <input type="text" placeholder="Buscar producto..." t-model="state.search" t-on-input="onCategoryChange"/>
-                    </div>
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'company'"/>
+                        <t t-set="title" t-value="'Empresa'"/>
+                        <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                        <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Categoría</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.category" t-on-change="onCategoryChange">
-                                <option value="all">Todas las categorías</option>
-                                <t t-foreach="categories" t-as="cat" t-key="cat">
-                                    <option t-att-value="cat"><t t-esc="cat"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'status'"/>
+                        <t t-set="title" t-value="'Estado'"/>
+                        <t t-set="allLabel" t-value="'Todos los estados'"/>
+                        <t t-set="pluralLabel" t-value="'estados seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar estado...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Proveedor</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.vendor" t-on-change="onCategoryChange">
-                                <option value="all">Todos los proveedores</option>
-                                <t t-foreach="vendors" t-as="v" t-key="v">
-                                    <option t-att-value="v"><t t-esc="v"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'vendor'"/>
+                        <t t-set="title" t-value="'Proveedor'"/>
+                        <t t-set="allLabel" t-value="'Todos los proveedores'"/>
+                        <t t-set="pluralLabel" t-value="'proveedores seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar proveedor...'"/>
+                    </t>
+
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'category'"/>
+                        <t t-set="title" t-value="'Categoría'"/>
+                        <t t-set="allLabel" t-value="'Todas las categorías'"/>
+                        <t t-set="pluralLabel" t-value="'categorías seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar categoría...'"/>
+                    </t>
+
+                    <t t-call="inventory_dashboard_metrics.MultiSelect">
+                        <t t-set="field" t-value="'product'"/>
+                        <t t-set="title" t-value="'Producto'"/>
+                        <t t-set="allLabel" t-value="'Todos los productos'"/>
+                        <t t-set="pluralLabel" t-value="'productos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar producto...'"/>
+                    </t>
                 </div>
 
                 <div class="sidebar-footer">
@@ -150,8 +188,63 @@
 
                 <div class="tab-content">
 
+                    <!-- ============ TARJETAS POR ESTADO ============ -->
+                    <div class="kpi-grid status-cards">
+                        <t t-foreach="statusCards" t-as="card" t-key="card.key">
+                            <button type="button" t-att-class="'kpi-card shadow-glow status-card ' + card.color + (state.status.includes(card.key) ? ' selected' : '') + (state.status.length and !state.status.includes(card.key) ? ' dimmed' : '')"
+                                    t-on-click="onStatusCardClick" t-att-data-status="card.key"
+                                    t-att-title="state.status.length === 1 and state.status[0] === card.key ? 'Quitar filtro' : 'Filtrar por ' + card.label">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title"><t t-esc="card.label"/></span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <t t-if="card.key === 'sin_stock'">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                                                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                                                </t>
+                                                <t t-elif="card.key === 'por_agotarse'">
+                                                    <circle cx="12" cy="12" r="10"></circle>
+                                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                                </t>
+                                                <t t-elif="card.key === 'sin_venta'">
+                                                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                                                    <polyline points="17 18 23 18 23 12"></polyline>
+                                                </t>
+                                                <t t-elif="card.key === 'sobrestock'">
+                                                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                                    <polyline points="2 17 12 22 22 17"></polyline>
+                                                    <polyline points="2 12 12 17 22 12"></polyline>
+                                                </t>
+                                                <t t-elif="card.key === 'urgente'">
+                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </t>
+                                                <t t-else="">
+                                                    <circle cx="9" cy="21" r="1"></circle>
+                                                    <circle cx="20" cy="21" r="1"></circle>
+                                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                                </t>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatNumber(card.count)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext">
+                                            <t t-if="state.tab === 'compra'"><t t-esc="formatCurrency(card.amount)"/> a comprar</t>
+                                            <t t-elif="card.amount"><t t-esc="formatCurrency(card.amount)"/> de más</t>
+                                            <t t-else="">productos</t>
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+                        </t>
+                    </div>
+
                     <!-- ============ POR REPONER ============ -->
-                    <section class="tab-pane active" t-if="state.tab === 'stock'">
+                    <section class="tab-pane active" t-if="state.tab === 'stock' and showRestock">
                         <div class="glass-panel padded">
                             <div class="section-header">
                                 <div>
@@ -216,7 +309,7 @@
                     </section>
 
                     <!-- ============ MUCHO STOCK Y POCA SALIDA ============ -->
-                    <section class="tab-pane active" t-if="state.tab === 'stock'">
+                    <section class="tab-pane active" t-if="state.tab === 'stock' and showOverstock">
                         <div class="glass-panel padded">
                             <div class="section-header">
                                 <div>

@@ -1001,9 +1001,6 @@
 .inv-dashboard-wrap .sidebar-footer .btn { flex: 1; }
 .inv-dashboard-wrap .sidebar-section .input-group { margin-top: 4px; }
 
-.inv-dashboard-wrap .sidebar-close {
-    display: none;
-}
 
 /* Pestañas: mismas medidas y barra activa que pos_management_metrics */
 .inv-dashboard-wrap .nav-tabs {
@@ -1206,11 +1203,12 @@
         border-right: none;
     }
     .inv-dashboard-wrap .sidebar.open .sidebar-close {
-        display: inline-flex;
+        display: flex;
         position: sticky;
         top: 0;
+        z-index: 3;
         flex: 0 0 auto;
-        align-self: flex-end;
+        background: var(--bg-base);
     }
     .inv-dashboard-wrap .sidebar.open .sidebar-footer {
         position: sticky;
@@ -1419,4 +1417,225 @@
 @media (max-width: 480px) {
     .inv-dashboard-wrap .main-content { padding: 10px; }
     .inv-dashboard-wrap .main-header h1 { font-size: 16px; }
+}
+
+/* Tarjetas por estado: mismo estilo que pos_management_metrics, pero son botones que filtran la tabla */
+.inv-dashboard-wrap .status-cards { flex: 0 0 auto; }
+.inv-dashboard-wrap .kpi-card.status-card {
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+}
+.inv-dashboard-wrap .kpi-card.status-card.red.selected { border-color: var(--color-red); box-shadow: 0 8px 24px -8px var(--color-red-glow); }
+.inv-dashboard-wrap .kpi-card.status-card.amber.selected { border-color: var(--color-amber); box-shadow: 0 8px 24px -8px var(--color-amber-glow); }
+.inv-dashboard-wrap .kpi-card.status-card.purple.selected { border-color: var(--color-purple); box-shadow: 0 8px 24px -8px var(--color-purple-glow); }
+.inv-dashboard-wrap .kpi-card.status-card.blue.selected { border-color: var(--color-blue); box-shadow: 0 8px 24px -8px var(--color-blue-glow); }
+.inv-dashboard-wrap .kpi-card.status-card.dimmed { opacity: 0.5; }
+
+@media (max-width: 768px) {
+    .inv-dashboard-wrap .kpi-grid { gap: 12px; }
+    .inv-dashboard-wrap .kpi-card { padding: 16px; }
+    .inv-dashboard-wrap .kpi-value { font-size: 22px; }
+}
+@media (max-width: 480px) {
+    .inv-dashboard-wrap .kpi-value { font-size: 20px; }
+}
+
+/* ===== Filtros: copiados de pos_management_metrics ===== */
+.inv-dashboard-wrap.theme-light .btn-preset {
+    background: rgba(15, 23, 42, 0.03);
+    color: #475569;
+}
+.inv-dashboard-wrap.theme-light .btn-preset:hover {
+    background: rgba(15, 23, 42, 0.07);
+    color: #0f172a;
+}
+.inv-dashboard-wrap.theme-light .btn-preset.active {
+    background: var(--color-blue-glow);
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+}
+
+.inv-dashboard-wrap .preset-dates {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.inv-dashboard-wrap .preset-dates button:last-child {
+    grid-column: span 2;
+}
+
+.inv-dashboard-wrap .btn-preset {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.inv-dashboard-wrap .btn-preset:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text-primary);
+}
+
+.inv-dashboard-wrap .btn-preset.active {
+    background: var(--color-blue-glow);
+    border-color: var(--color-blue);
+    color: var(--text-primary);
+    box-shadow: 0 0 6px var(--color-blue-glow);
+}
+
+
+/* ===== Filtros multi-selección (checkbox) ===== */
+.inv-dashboard-wrap .multiselect {
+    position: relative;
+    width: 100%;
+}
+
+.inv-dashboard-wrap .multiselect-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.inv-dashboard-wrap .multiselect-toggle:hover {
+    border-color: var(--color-blue);
+}
+
+.inv-dashboard-wrap .multiselect-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inv-dashboard-wrap .multiselect-caret {
+    color: var(--text-secondary);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.inv-dashboard-wrap .multiselect-panel {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-premium);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.inv-dashboard-wrap .multiselect-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.inv-dashboard-wrap .input-group .multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+    color: var(--text-primary);
+}
+
+.inv-dashboard-wrap .input-group .multiselect-option:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.inv-dashboard-wrap .multiselect-option input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    accent-color: var(--color-blue);
+    cursor: pointer;
+}
+
+.inv-dashboard-wrap .input-group .multiselect-all {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.inv-dashboard-wrap .multiselect-empty {
+    padding: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.inv-dashboard-wrap.theme-light .multiselect-toggle {
+    background: rgba(255, 255, 255, 0.8);
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+.inv-dashboard-wrap.theme-light .multiselect-panel {
+    background: #ffffff;
+}
+
+.inv-dashboard-wrap.theme-light .input-group .multiselect-option:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+
+.inv-dashboard-wrap .sidebar-close {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.inv-dashboard-wrap .sidebar-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+@media (max-width: 768px) {
+    .inv-dashboard-wrap .multiselect-panel {
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+    .inv-dashboard-wrap .btn-preset {
+        padding: 10px;
+        font-size: 13px;
+    }
 }
