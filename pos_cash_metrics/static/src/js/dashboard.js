@@ -67,8 +67,8 @@ const EMPTY_DATA = {
     sessions: [],
     moves: [],
     methods: [],
-    methods_by_pos: { groups: [], rows: [] },
 };
+const TOP_CASHIERS = 8;
 
 class PosCashMetricsDashboard extends Component {
     static template = "pos_cash_metrics.DashboardTemplate";
@@ -128,8 +128,32 @@ class PosCashMetricsDashboard extends Component {
         return this.data.kpis;
     }
 
-    get topCashiers() {
-        return this.data.cashiers.filter((c) => c.sold || c.sessions).slice(0, 8);
+    // Barras del resumen: largo proporcional al mayor de la lista (el primero, vienen ordenadas)
+    get cashierBars() {
+        const rows = this.data.cashiers.filter((c) => c.sold > 0).slice(0, TOP_CASHIERS);
+        const max = rows.length ? rows[0].sold : 0;
+        return rows.map((c) => ({ ...c, width: max ? Math.max(2, (c.sold / max) * 100) : 0 }));
+    }
+
+    get moreCashiers() {
+        return Math.max(0, this.data.cashiers.filter((c) => c.sold > 0).length - TOP_CASHIERS);
+    }
+
+    get methodBars() {
+        const rows = this.data.methods.filter((m) => m.amount > 0);
+        const max = rows.length ? rows[0].amount : 0;
+        return rows.map((m) => ({ ...m, width: max ? Math.max(2, (m.amount / max) * 100) : 0 }));
+    }
+
+    // Tooltip de cada barra de cajero
+    cashierTip(c) {
+        return `${c.name}: ${this.formatCurrency(c.sold)} en ${this.formatNumber(c.tickets)} tickets ` +
+            `(promedio ${this.formatCurrency(c.avg_ticket)}). Efectivo ${this.formatCurrency(c.cash)}, ` +
+            `otros medios ${this.formatCurrency(c.other)}.`;
+    }
+
+    goToCashiers() {
+        this.state.tab = "cajeros";
     }
 
     get openSessions() {

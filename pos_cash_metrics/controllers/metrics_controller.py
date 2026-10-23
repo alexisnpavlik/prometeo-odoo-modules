@@ -377,17 +377,14 @@ class CashMetricsController(http.Controller):
         return rows
 
     def _method_tables(self, payments):
-        """Cobrado por grupo (con el detalle por nombre real) y la matriz caja x grupo."""
-        groups, by_pos = {}, {}
+        """Cobrado por grupo, de mayor a menor, con el detalle por nombre real."""
+        groups = {}
         for pay in payments:
             group = _method_group(pay["method"], pay["kind"])
             amount = float(pay["amount"] or 0.0)
             g = groups.setdefault(group, {"group": group, "amount": 0.0, "details": {}})
             g["amount"] += amount
             g["details"][pay["method"]] = g["details"].get(pay["method"], 0.0) + amount
-            row = by_pos.setdefault(pay["caja"], {"caja": pay["caja"], "values": {}, "total": 0.0})
-            row["values"][group] = row["values"].get(group, 0.0) + amount
-            row["total"] += amount
         total = sum(g["amount"] for g in groups.values()) or 0.0
         methods = []
         for name in GROUP_ORDER:
@@ -401,11 +398,7 @@ class CashMetricsController(http.Controller):
                 "details": sorted(({"name": k, "amount": _money(v)} for k, v in g["details"].items()),
                                   key=lambda d: -d["amount"]),
             })
-        present = [m["group"] for m in methods]
-        pos_rows = sorted(({"caja": r["caja"], "total": _money(r["total"]),
-                            "values": {k: _money(v) for k, v in r["values"].items()}}
-                           for r in by_pos.values()), key=lambda r: -r["total"])
-        return methods, {"groups": present, "rows": pos_rows}
+        return sorted(methods, key=lambda m: -m["amount"])
 
     def _cashier_rows(self, sellers, payments, sessions, moves):
         """Una fila por persona con sus dos miradas: como vendedor y como responsable de caja."""
@@ -459,7 +452,7 @@ class CashMetricsController(http.Controller):
         payments = self._fetch_payments(p, cashiers)
         sessions = self._session_rows(self._fetch_sessions(p, cashiers), today)
         moves = self._move_rows(self._fetch_moves(p, cashiers))
-        methods, methods_by_pos = self._method_tables(payments)
+        methods = self._method_tables(payments)
         cashier_rows = self._cashier_rows(sellers, payments, sessions, moves)
 
         sold = sum(float(s["sold"]) for s in sellers)
@@ -495,7 +488,6 @@ class CashMetricsController(http.Controller):
             "sessions": sessions[:MAX_TABLE_ROWS],
             "moves": moves[:MAX_TABLE_ROWS],
             "methods": methods,
-            "methods_by_pos": methods_by_pos,
         }
 
     @http.route('/pos_cash_metrics/data', type='json', auth='user')
