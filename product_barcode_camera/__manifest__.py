@@ -24,6 +24,7 @@
         "web.assets_backend": [
             "product_barcode_camera/static/src/js/barcode_camera_field.js",
             "product_barcode_camera/static/src/xml/barcode_camera_field.xml",
+            "product_barcode_camera/static/src/scss/barcode_camera_field.scss",
         ],
     },
     "installable": True,

@@ -1,0 +1,10 @@
+// Campo + botón de cámara en la misma línea
+.o_field_barcode_camera:has(.o_barcode_camera_button) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .o_barcode_camera_button {
+        flex-shrink: 0;
+    }
+}
