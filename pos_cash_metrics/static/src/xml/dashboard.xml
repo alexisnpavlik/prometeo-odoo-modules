@@ -206,13 +206,13 @@
                     <button t-att-class="'nav-tab ' + (state.tab === 'cajeros' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajeros">Cajeros</button>
                     <button t-att-class="'nav-tab ' + (state.tab === 'cajas' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajas">Cajas y cierres</button>
                     <button t-att-class="'nav-tab ' + (state.tab === 'movimientos' ? 'active' : '')" t-on-click="onTabClick" data-tab="movimientos">Retiros e ingresos</button>
-                    <button t-att-class="'nav-tab ' + (state.tab === 'medios' ? 'active' : '')" t-on-click="onTabClick" data-tab="medios">Medios de pago</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'transacciones' ? 'active' : '')" t-on-click="onTabClick" data-tab="transacciones">Transacciones</button>
                 </nav>
 
                 <div class="tab-content">
 
                     <!-- ================= RESUMEN ================= -->
-                    <t t-if="state.tab === 'resumen'">
+                    <div t-att-class="'pane-stack' + (state.tab === 'resumen' ? '' : ' pane-hidden')">
                         <div class="kpi-grid summary-cards">
                             <div class="kpi-card shadow-glow green">
                                 <div class="kpi-card-inner">
@@ -261,58 +261,38 @@
                             </button>
                         </div>
 
-                        <div class="two-cols">
-                            <section class="glass-panel padded">
-                                <div class="section-header">
-                                    <div>
-                                        <h3>Cajeros</h3>
-                                        <p class="section-sub">Ordenados por lo vendido</p>
-                                    </div>
+                        <div class="charts-grid">
+                            <div class="chart-container glass-panel chart-h-tall">
+                                <div class="chart-header">
+                                    <h3>Tickets por cajero</h3>
                                     <t t-call="pos_cash_metrics.InfoTip">
-                                        <t t-set="tip" t-value="'Vendido: ventas hechas por cada persona, sea o no quien abrió la caja. Diferencia: suma de faltantes y sobrantes de las cajas que esa persona abrió.'"/>
+                                        <t t-set="tip" t-value="'Cantidad de ventas (tickets) que hizo cada persona, aunque la caja la haya abierto otro. Las devoluciones no cuentan. Pasá el mouse por una barra para ver lo vendido, el promedio por ticket y la diferencia al cierre de las cajas que abrió.'"/>
                                     </t>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="data-table compact">
-                                        <thead><tr><th>Cajero</th><th class="num">Vendido</th><th class="num">Tickets</th><th class="num">Dif. cierre</th></tr></thead>
-                                        <tbody>
-                                            <tr t-if="!topCashiers.length"><td colspan="4" class="text-center text-muted empty-row">Sin ventas en el período.</td></tr>
-                                            <t t-foreach="topCashiers" t-as="c" t-key="c.user_id">
-                                                <tr>
-                                                    <td class="cell-strong cell-text"><t t-esc="c.name"/></td>
-                                                    <td class="num"><t t-esc="formatCurrency(c.sold)"/></td>
-                                                    <td class="num"><t t-esc="formatNumber(c.tickets)"/></td>
-                                                    <td t-att-class="'num ' + signClass(c.difference)"><t t-esc="formatSigned(c.difference)"/></td>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
+                                <div class="chart-body">
+                                    <canvas id="pcm-chart-cashiers"></canvas>
+                                    <p t-if="!chartCashiers.length" class="chart-empty">Sin ventas en el período.</p>
                                 </div>
-                            </section>
-
-                            <section class="glass-panel padded">
-                                <div class="section-header">
-                                    <div>
-                                        <h3>Medios de pago</h3>
-                                        <p class="section-sub">Cobrado en el período</p>
+                                <button t-if="moreCashiers" type="button" class="bar-more chart-foot" t-on-click="goToCashiers">
+                                    y <t t-esc="moreCashiers"/> más · ver todos en Cajeros
+                                </button>
+                            </div>
+                            <div class="chart-container glass-panel chart-h-tall">
+                                <div class="chart-header">
+                                    <h3>Medios de pago</h3>
+                                    <div class="chart-actions">
+                                        <button class="btn btn-secondary btn-sm" t-on-click="exportExcel" data-table="methods">Exportar Excel</button>
+                                        <t t-call="pos_cash_metrics.InfoTip">
+                                            <t t-set="tip" t-value="'Participación de cada medio sobre lo cobrado. Los métodos se agrupan por su nombre (Tarjeta Debito, Debito y Tarjeta de debito van a Débito); el Excel trae el detalle por nombre real. El vuelto en efectivo ya está descontado.'"/>
+                                            <t t-set="align" t-value="'tooltip-left'"/>
+                                        </t>
                                     </div>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="data-table compact">
-                                        <thead><tr><th>Medio</th><th class="num">Cobrado</th><th class="num">%</th></tr></thead>
-                                        <tbody>
-                                            <tr t-if="!data.methods.length"><td colspan="3" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
-                                            <t t-foreach="data.methods" t-as="m" t-key="m.group">
-                                                <tr>
-                                                    <td class="cell-strong"><t t-esc="m.group"/></td>
-                                                    <td class="num"><t t-esc="formatCurrency(m.amount)"/></td>
-                                                    <td class="num"><t t-esc="formatNumber(m.pct)"/>%</td>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
+                                <div class="chart-body">
+                                    <canvas id="pcm-chart-methods"></canvas>
+                                    <p t-if="!chartMethods.length" class="chart-empty">Sin cobros en el período.</p>
                                 </div>
-                            </section>
+                            </div>
                         </div>
 
                         <section class="glass-panel padded">
@@ -352,7 +332,7 @@
                                 </table>
                             </div>
                         </section>
-                    </t>
+                    </div>
 
                     <!-- ================= CAJEROS ================= -->
                     <t t-if="state.tab === 'cajeros'">
@@ -622,76 +602,64 @@
                         </section>
                     </t>
 
-                    <!-- ================= MEDIOS DE PAGO ================= -->
-                    <t t-if="state.tab === 'medios'">
+
+                    <!-- ================= TRANSACCIONES (traída de métricas gerenciales) ================= -->
+                    <t t-if="state.tab === 'transacciones'">
                         <section class="glass-panel padded">
                             <div class="section-header">
                                 <div>
-                                    <h3>Cobrado por medio de pago</h3>
-                                    <p class="section-sub">Tocá un grupo para ver los métodos tal como están cargados en las cajas</p>
+                                    <h3>Detalle de ventas</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(tx.total)"/> líneas vendidas en el período · una fila por producto de cada ticket</p>
                                 </div>
                                 <t t-call="pos_cash_metrics.InfoTip">
-                                    <t t-set="tip" t-value="'Los métodos se agrupan por su nombre (Tarjeta Debito, Debito y Tarjeta de debito van a Débito). El vuelto en efectivo ya está descontado.'"/>
+                                    <t t-set="tip" t-value="'Incluye las ventas de cajas que todavía están abiertas. Cajero = quien hizo la venta. La búsqueda mira el número de orden, el producto, el cliente y el cajero.'"/>
+                                    <t t-set="align" t-value="'tooltip-left'"/>
                                 </t>
                             </div>
                             <div class="filter-row">
-                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="methods">Exportar Excel</button>
+                                <input type="text" class="tx-search" placeholder="Buscar orden, producto, cliente o cajero..." t-att-value="tx.search" t-on-input="onTxSearchInput"/>
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="transactions">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table">
-                                    <thead><tr><th>Medio</th><th class="num th-highlight">Cobrado</th><th class="num">%</th></tr></thead>
-                                    <tbody>
-                                        <tr t-if="!data.methods.length"><td colspan="3" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
-                                        <t t-foreach="data.methods" t-as="m" t-key="m.group">
-                                            <tr class="clickable-row" t-on-click="toggleGroup" t-att-data-group="m.group">
-                                                <td class="cell-strong"><span class="expand-mark"><t t-esc="state.expanded[m.group] ? '▾' : '▸'"/></span> <t t-esc="m.group"/></td>
-                                                <td class="num cell-strong"><t t-esc="formatCurrency(m.amount)"/></td>
-                                                <td class="num"><t t-esc="formatNumber(m.pct)"/>%</td>
-                                            </tr>
-                                            <t t-if="state.expanded[m.group]">
-                                                <t t-foreach="m.details" t-as="d" t-key="m.group + '|' + d_index">
-                                                    <tr class="detail-row">
-                                                        <td class="cell-secondary"><t t-esc="d.name"/></td>
-                                                        <td class="num cell-secondary"><t t-esc="formatCurrency(d.amount)"/></td>
-                                                        <td></td>
-                                                    </tr>
-                                                </t>
-                                            </t>
-                                        </t>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                        <section class="glass-panel padded">
-                            <div class="section-header">
-                                <div>
-                                    <h3>Por caja</h3>
-                                    <p class="section-sub">Cuánto cobró cada caja con cada medio</p>
-                                </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="data-table compact">
                                     <thead>
                                         <tr>
+                                            <th>Nro. orden</th>
+                                            <th>Fecha / hora</th>
                                             <th>Caja</th>
-                                            <t t-foreach="data.methods_by_pos.groups" t-as="g" t-key="g"><th class="num"><t t-esc="g"/></th></t>
-                                            <th class="num th-highlight">Total</th>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th class="num">Cant.</th>
+                                            <th class="num">Precio unit.</th>
+                                            <th class="num th-highlight">Subtotal con IVA</th>
+                                            <th>Cliente</th>
+                                            <th>Cajero</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr t-if="!data.methods_by_pos.rows.length"><td t-att-colspan="data.methods_by_pos.groups.length + 2" class="text-center text-muted empty-row">Sin cobros en el período.</td></tr>
-                                        <t t-foreach="data.methods_by_pos.rows" t-as="r" t-key="r.caja">
+                                        <tr t-if="tx.loading and !tx.rows.length"><td colspan="10" class="text-center text-muted empty-row">Cargando...</td></tr>
+                                        <tr t-elif="!tx.rows.length"><td colspan="10" class="text-center text-muted empty-row">No hay ventas con estos filtros.</td></tr>
+                                        <t t-foreach="tx.rows" t-as="t" t-key="t.id">
                                             <tr>
-                                                <td class="cell-strong"><t t-esc="r.caja"/></td>
-                                                <t t-foreach="data.methods_by_pos.groups" t-as="g" t-key="r.caja + '|' + g">
-                                                    <td class="num"><t t-esc="r.values[g] ? formatCurrency(r.values[g]) : '—'"/></td>
-                                                </t>
-                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.total)"/></td>
+                                                <td class="cell-strong"><t t-esc="t.order_name"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.date"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.caja"/></td>
+                                                <td class="cell-text tx-product"><t t-esc="t.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.categoria"/></td>
+                                                <td class="num"><t t-esc="formatNumber(t.qty)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(t.price_unit)"/></td>
+                                                <td t-att-class="'num cell-strong ' + (t.subtotal &lt; 0 ? 'amount-neg' : '')"><t t-esc="formatCurrency(t.subtotal)"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.cliente"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.cajero"/></td>
                                             </tr>
                                         </t>
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="pagination" t-if="tx.pages &gt; 1">
+                                <button class="btn btn-secondary" t-att-disabled="tx.page &lt;= 1 or tx.loading" t-on-click="changeTxPage" data-dir="-1">Anterior</button>
+                                <span class="page-info">Página <t t-esc="formatNumber(tx.page)"/> de <t t-esc="formatNumber(tx.pages)"/></span>
+                                <button class="btn btn-secondary" t-att-disabled="tx.page &gt;= tx.pages or tx.loading" t-on-click="changeTxPage" data-dir="1">Siguiente</button>
                             </div>
                         </section>
                     </t>

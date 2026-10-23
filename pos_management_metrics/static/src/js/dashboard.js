@@ -25,13 +25,10 @@ class PosDashboardMetrics extends Component {
             companySearch: "",
             categorySearch: "",
             productSearch: "",
-            search: "",
             profitabilitySearch: "",
             marginSign: "positive",
             marginSort: "revenue",
             showFilters: false,
-            page: 1,
-            perPage: 15,
             activeTab: "general",
             topSort: "revenue",
             loading: false,
@@ -100,13 +97,6 @@ class PosDashboardMetrics extends Component {
 
         this.topArticlesData = useState({ by_revenue: [], by_units: [] });
         
-        this.transactionsData = useState({
-            sales: [],
-            page: 1,
-            pages: 1,
-            total: 0
-        });
-
         this.charts = {};
 
         onWillStart(async () => {
@@ -300,15 +290,12 @@ class PosDashboardMetrics extends Component {
 
     switchTab(tab) {
         this.state.activeTab = tab;
-        this.state.page = 1;
 
         // Carga diferida según pestaña activa
         if (tab === "sessions") {
             this.loadSessions();
         } else if (tab === "toparticles") {
             this.loadTopArticles();
-        } else if (tab === "transactions") {
-            this.loadTransactions();
         } else if (tab === "general") {
             // Re-renderizar gráficos en pestaña general para ajustar dimensiones
             setTimeout(() => this.renderAllCharts(), 50);
@@ -328,7 +315,6 @@ class PosDashboardMetrics extends Component {
     }
 
     async applyFilters() {
-        this.state.page = 1;
         // En móvil el panel está superpuesto: se cierra para dejar ver los gráficos
         this.state.showFilters = false;
         await this.refreshData();
@@ -347,9 +333,7 @@ class PosDashboardMetrics extends Component {
         this.state.categorySearch = "";
         this.state.productSearch = "";
         this.state.openFilter = null;
-        this.state.search = "";
         this.state.profitabilitySearch = "";
-        this.state.page = 1;
         this.state.showFilters = false;
         await this.refreshData();
     }
@@ -495,8 +479,6 @@ class PosDashboardMetrics extends Component {
                 await this.loadSessions();
             } else if (this.state.activeTab === "toparticles") {
                 await this.loadTopArticles();
-            } else if (this.state.activeTab === "transactions") {
-                await this.loadTransactions();
             }
 
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
@@ -566,51 +548,6 @@ class PosDashboardMetrics extends Component {
         }
     }
 
-    async loadTransactions() {
-        try {
-            const data = await rpc("/pos_management_metrics/raw_sales", {
-                start_date: this.state.startDate || null,
-                end_date: this.state.endDate || null,
-                pos: JSON.stringify(this.posFilter),
-                cashier: this.state.cashier,
-                company: JSON.stringify(this.companyFilter),
-                category: JSON.stringify(this.categoryFilter),
-                product: JSON.stringify(this.productFilter),
-                search: this.state.search,
-                page: this.state.page,
-                per_page: this.state.perPage
-            });
-            Object.assign(this.transactionsData, data);
-        } catch (e) {
-            console.error("Error al cargar transacciones:", e);
-        }
-    }
-
-    onSearchInput(ev) {
-        this.state.search = ev.target.value;
-        this.state.page = 1;
-        
-        // Debounce de búsqueda a 350ms
-        clearTimeout(this.searchTimeout);
-        this.searchTimeout = setTimeout(() => {
-            this.loadTransactions();
-        }, 350);
-    }
-
-    async prevPage() {
-        if (this.state.page > 1) {
-            this.state.page--;
-            await this.loadTransactions();
-        }
-    }
-
-    async nextPage() {
-        if (this.state.page < this.transactionsData.pages) {
-            this.state.page++;
-            await this.loadTransactions();
-        }
-    }
-
     exportTopArticlesExcel() {
         // Exporta el top 50 (por total vendido y por unidades) a Excel con los filtros activos
         const params = new URLSearchParams({
@@ -624,20 +561,6 @@ class PosDashboardMetrics extends Component {
             limit: 50
         });
         window.open(`/pos_management_metrics/export_top_articles?${params.toString()}`, '_blank');
-    }
-
-    exportCSV() {
-        // Redireccionar al endpoint de tipo HTTP de exportación pasándole filtros GET
-        const params = new URLSearchParams({
-            start_date: this.state.startDate || '',
-            end_date: this.state.endDate || '',
-            pos: JSON.stringify(this.posFilter),
-            cashier: this.state.cashier,
-            company: JSON.stringify(this.companyFilter),
-            category: JSON.stringify(this.categoryFilter),
-            product: JSON.stringify(this.productFilter)
-        });
-        window.open(`/pos_management_metrics/export?${params.toString()}`, '_blank');
     }
 
     renderAllCharts() {

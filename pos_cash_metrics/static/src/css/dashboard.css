@@ -1712,13 +1712,8 @@
     margin-top: 2px;
 }
 
-/* Resumen: tarjetas en una fila y dos tablas lado a lado */
+/* Resumen: tarjetas en una fila */
 .pcm-dashboard-wrap .kpi-grid.summary-cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-.pcm-dashboard-wrap .two-cols {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-}
 .pcm-dashboard-wrap .kpi-name {
     font-size: 13px;
     font-weight: 700;
@@ -1742,19 +1737,40 @@
     border-bottom: 2px solid var(--border-color);
 }
 
-/* Medios de pago: grupo desplegable con el detalle por nombre real */
-.pcm-dashboard-wrap .clickable-row { cursor: pointer; }
-.pcm-dashboard-wrap .clickable-row:hover td { background: rgba(255, 255, 255, 0.03); }
-.pcm-dashboard-wrap .detail-row td:first-child { padding-left: 34px; }
-.pcm-dashboard-wrap .expand-mark {
-    display: inline-block;
-    width: 12px;
-    color: var(--text-muted);
+/* Resumen siempre montado: los <canvas> de Chart.js no pueden vivir bajo t-if */
+.pcm-dashboard-wrap .pane-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
+.pcm-dashboard-wrap .pane-stack.pane-hidden { display: none; }
+
+/* Tarjetas de gráfico: mismo estilo que métricas gerenciales */
+.pcm-dashboard-wrap .chart-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pcm-dashboard-wrap .btn.btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+.pcm-dashboard-wrap .chart-foot { margin: 0 20px 14px; }
+.pcm-dashboard-wrap .bar-more {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--color-blue);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.pcm-dashboard-wrap .bar-more:hover { text-decoration: underline; }
 
 @media (max-width: 992px) {
-    /* minmax(0, ...): con 1fr a secas la tabla ancha estira la columna y el panel se sale de la pantalla */
-    .pcm-dashboard-wrap .two-cols { grid-template-columns: minmax(0, 1fr); }
+    /* minmax(0, ...): con 1fr a secas el canvas estira la columna y el panel se sale de la pantalla */
+    .pcm-dashboard-wrap .charts-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 768px) {
     .pcm-dashboard-wrap input[type="date"] { font-size: 16px; }   /* iOS no hace zoom */
@@ -1762,3 +1778,8 @@
 .pcm-dashboard-wrap .kpi-card.status-card.green.selected { border-color: var(--color-green); box-shadow: 0 8px 24px -8px var(--color-green-glow); }
 /* Tarjetas por estado en una fila aunque sean 3 o 5: el minmax(300px) heredado las parte en 2 + 1 */
 .pcm-dashboard-wrap .kpi-grid.status-cards { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+/* Las dos cabeceras de gráfico a la misma altura, tengan o no botón */
+.pcm-dashboard-wrap .chart-header { min-height: 58px; box-sizing: border-box; }
+/* Transacciones: buscador ancho a la izquierda, Excel a la derecha */
+.pcm-dashboard-wrap .filter-row .tx-search { flex: 1 1 260px; max-width: 420px; margin-right: auto; }
+.pcm-dashboard-wrap .data-table td.tx-product { min-width: 260px; }

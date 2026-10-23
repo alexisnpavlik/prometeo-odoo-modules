@@ -3,7 +3,6 @@ from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessError
 import datetime
-import csv
 import io
 import json
 import logging
@@ -63,7 +62,7 @@ class PosMetricsController(http.Controller):
         values = [v for v in value if v and v != 'all']
         return tuple(values) if values else None
 
-    def _build_where_clause(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', search=None):
+    def _build_where_clause(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all'):
         # Filtro multi-compañía nativo de Odoo
         allowed_companies = tuple(request.env.companies.ids)
         where_clause = "po.state IN ('done', 'invoiced') AND po.company_id IN %s"
@@ -111,26 +110,6 @@ class PosMetricsController(http.Controller):
                 where_clause += " AND COALESCE(pt2.name->>%s, pt2.name->>'en_US') IN %s"
                 params.extend([lang, products])
             where_clause += ")"
-
-        # Búsqueda difusa
-        if search:
-            search_pattern = f"%{search.lower()}%"
-            where_clause += """ AND (
-                LOWER(po.name) LIKE %s OR
-                EXISTS (
-                    SELECT 1 FROM pos_order_line pol3
-                    JOIN product_product pp3 ON pp3.id = pol3.product_id
-                    JOIN product_template pt3 ON pt3.id = pp3.product_tmpl_id
-                    WHERE pol3.order_id = po.id AND pp3.active = TRUE AND pt3.active = TRUE AND (
-                        LOWER(COALESCE(pt3.name->>%s, pt3.name->>'en_US')) LIKE %s
-                    )
-                ) OR
-                EXISTS (
-                    SELECT 1 FROM res_partner rp3 WHERE rp3.id = po.partner_id AND LOWER(rp3.name) LIKE %s
-                ) OR
-                LOWER(COALESCE(emp.name, ru.login)) LIKE %s
-            )"""
-            params.extend([search_pattern, lang, search_pattern, search_pattern, search_pattern])
 
         return where_clause, params
 
@@ -1352,93 +1331,6 @@ class PosMetricsController(http.Controller):
 
         return {"by_revenue": by_revenue, "by_units": by_units}
 
-    @http.route('/pos_management_metrics/raw_sales', type='json', auth='user')
-    def get_raw_sales(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', search=None, page=1, per_page=15, **kwargs):
-        self._check_access()
-        cr = request.env.cr
-        tz = self._get_timezone()
-        lang = self._get_lang()
-
-        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product, search)
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
-
-        # 1. Contar total de filas para la paginación
-        count_query = f"""
-            SELECT COUNT(*)
-            FROM pos_order_line pol
-            JOIN pos_order po ON po.id = pol.order_id
-            JOIN pos_config pc ON pc.id = po.config_id
-            JOIN product_product pp ON pp.id = pol.product_id
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            LEFT JOIN res_users ru ON ru.id = po.user_id
-            {self._employee_join('ru', 'po.company_id', 'emp')}
-            LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
-        """
-        count_params = list(params)
-        count_query += "".join(f" AND {c}" for c in line_clauses)
-        count_params.extend(line_params)
-
-        cr.execute(count_query, count_params)
-        total_rows = cr.fetchone()[0] or 0
-
-        total_pages = max(1, (total_rows + per_page - 1) // per_page)
-        offset = (page - 1) * per_page
-
-        # 2. Consultar registros paginados
-        sales_query = f"""
-            SELECT
-                po.id                               AS orden_id,
-                po.name                             AS numero_orden,
-                (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s) AS fecha,
-                pc.name                             AS punto_venta,
-                COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
-                ic.name                             AS categoria,
-                pol.qty                             AS cantidad,
-                pol.price_unit                      AS precio_unitario,
-                pol.price_subtotal_incl             AS subtotal_con_iva,
-                rp.name                             AS cliente,
-                COALESCE(emp.name, ru.login)        AS cajero
-            FROM pos_order_line pol
-            JOIN pos_order po ON po.id = pol.order_id
-            JOIN pos_config pc ON pc.id = po.config_id
-            JOIN product_product pp ON pp.id = pol.product_id
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id
-            LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            LEFT JOIN res_partner rp ON rp.id = po.partner_id
-            LEFT JOIN res_users ru ON ru.id = po.user_id
-            {self._employee_join('ru', 'po.company_id', 'emp')}
-            LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
-        """
-        sales_params = [tz, lang] + list(params)
-        sales_query += "".join(f" AND {c}" for c in line_clauses)
-        sales_params.extend(line_params)
-
-        sales_query += f"""
-            ORDER BY po.date_order DESC, pol.id DESC
-            LIMIT %s OFFSET %s
-        """
-        sales_params.extend([per_page, offset])
-
-        cr.execute(sales_query, sales_params)
-        sales = cr.dictfetchall()
-
-        for s in sales:
-            if s['fecha']:
-                s['fecha'] = s['fecha'].strftime('%d/%m/%Y %H:%M')
-            s['cantidad'] = float(s['cantidad'] or 0.0)
-            s['precio_unitario'] = float(s['precio_unitario'] or 0.0)
-            s['subtotal_con_iva'] = float(s['subtotal_con_iva'] or 0.0)
-
-        return {
-            "sales": sales,
-            "page": page,
-            "pages": total_pages,
-            "total": total_rows
-        }
-
     @http.route('/pos_management_metrics/export_top_articles', type='http', auth='user')
     def export_top_articles_xlsx(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=50, **kwargs):
         """Exporta a Excel el top de artículos en dos hojas: por total vendido y por unidades."""
@@ -1518,97 +1410,4 @@ class PosMetricsController(http.Controller):
             )
         except Exception as e:
             _logger.exception("Error exportando top de artículos POS")
-            return request.make_response(str(e), status=500)
-
-    @http.route('/pos_management_metrics/export', type='http', auth='user')
-    def export_csv(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):
-        try:
-            self._check_access()
-            cr = request.env.cr
-            tz = self._get_timezone()
-            lang = self._get_lang()
-
-            # Sanitizar filtros en caso de peticiones http GET planas
-            start_date = start_date if start_date and start_date != 'null' and start_date != '' else None
-            end_date = end_date if end_date and end_date != 'null' and end_date != '' else None
-            pos = pos if pos else 'all'
-            cashier = cashier if cashier else 'all'
-            company = company if company else 'all'
-            category = category if category else 'all'
-            product = product if product else 'all'
-
-            where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
-            line_clauses, line_params = self._build_line_filters(category, product, lang)
-
-            sales_query = f"""
-                SELECT
-                    po.name                             AS numero_orden,
-                    (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s) AS fecha,
-                    pc.name                             AS punto_venta,
-                    COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
-                    ic.name                             AS categoria,
-                    pol.qty                             AS cantidad,
-                    pol.price_unit                      AS precio_unitario,
-                    pol.price_subtotal_incl             AS subtotal_con_iva,
-                    rp.name                             AS cliente,
-                    COALESCE(emp.name, ru.login)        AS cajero
-                FROM pos_order_line pol
-                JOIN pos_order po ON po.id = pol.order_id
-                JOIN pos_config pc ON pc.id = po.config_id
-                JOIN product_product pp ON pp.id = pol.product_id
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                LEFT JOIN res_partner rp ON rp.id = po.partner_id
-                LEFT JOIN res_users ru ON ru.id = po.user_id
-                {self._employee_join('ru', 'po.company_id', 'emp')}
-                LEFT JOIN res_company rc ON rc.id = po.company_id
-                WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
-            """
-            sales_params = [tz, lang] + list(params)
-            sales_query += "".join(f" AND {c}" for c in line_clauses)
-            sales_params.extend(line_params)
-
-            sales_query += """
-                ORDER BY po.date_order DESC, pol.id DESC
-            """
-            cr.execute(sales_query, sales_params)
-            rows = cr.dictfetchall()
-
-            # Escribir CSV
-            output = io.StringIO()
-            output.write('\ufeff') # Agregar BOM para soporte Excel nativo con acentos
-            writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-
-            writer.writerow([
-                'Nro. Orden', 'Fecha', 'Punto de Venta', 'Producto', 'Categoría', 
-                'Cantidad', 'Precio Unitario', 'Subtotal Con IVA', 'Cliente', 'Cajero'
-            ])
-
-            for row in rows:
-                writer.writerow([
-                    row['numero_orden'],
-                    row['fecha'].strftime('%d/%m/%Y %H:%M') if row['fecha'] else '',
-                    row['punto_venta'],
-                    row['producto'],
-                    row['categoria'] or '',
-                    float(row['cantidad'] or 0.0),
-                    float(row['precio_unitario'] or 0.0),
-                    float(row['subtotal_con_iva'] or 0.0),
-                    row['cliente'] or '',
-                    row['cajero']
-                ])
-
-            csv_data = output.getvalue()
-            output.close()
-
-            filename = f"reporte_ventas_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            return request.make_response(
-                csv_data,
-                headers=[
-                    ('Content-Type', 'text/csv; charset=utf-8'),
-                    ('Content-Disposition', f'attachment; filename="{filename}"')
-                ]
-            )
-        except Exception as e:
-            _logger.exception("Error exportando reporte de ventas POS")
             return request.make_response(str(e), status=500)

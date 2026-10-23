@@ -17,6 +17,9 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_TZ = 'America/Argentina/Buenos_Aires'
 MAX_TABLE_ROWS = 20000
+TX_PAGE_SIZE = 25
+# Tope del Excel de transacciones: un mes de todas las cajas ronda las 40 000 líneas
+MAX_EXPORT_ROWS = 200000
 # Diferencias de menos de $1 son redondeo, no faltante ni sobrante
 DIFF_TOLERANCE = 1.0
 ORDER_STATES = ('paid', 'done', 'invoiced')   # 'paid' = venta de una caja todavía abierta
@@ -313,6 +316,72 @@ class CashMetricsController(http.Controller):
         """, dict(p, cashiers=cashiers))
         return cr.dictfetchall()
 
+    def _fetch_transactions(self, p, cashiers, search, page=None):
+        """Líneas de venta del período (una fila por producto vendido), las más nuevas primero.
+
+        Mismas columnas que la vieja pestaña Transacciones de métricas gerenciales, con los
+        filtros de este dashboard. Sin `page` trae todo (para el Excel) hasta MAX_EXPORT_ROWS.
+        No filtra productos archivados: es una auditoría y la venta existió.
+        """
+        cr = request.env.cr
+        where = self._order_where(p, cashiers)
+        params = dict(p, states=ORDER_STATES, cashiers=cashiers)
+        if search and search.strip():
+            where += """ AND (po.name ILIKE %(q)s
+                OR COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') ILIKE %(q)s
+                OR rpc.name ILIKE %(q)s OR rpu.name ILIKE %(q)s)"""
+            # % y _ del usuario son texto, no comodines: "%" no tiene que traer todas las ventas
+            term = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            params["q"] = f"%{term}%"
+        joins = """
+            FROM pos_order_line pol
+            JOIN pos_order po ON po.id = pol.order_id
+            JOIN pos_session ps ON ps.id = po.session_id
+            JOIN pos_config pc ON pc.id = ps.config_id
+            JOIN product_product pp ON pp.id = pol.product_id
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            LEFT JOIN product_category ic ON ic.id = pt.categ_id
+            LEFT JOIN res_partner rpc ON rpc.id = po.partner_id
+            JOIN res_users ru ON ru.id = po.user_id
+            JOIN res_partner rpu ON rpu.id = ru.partner_id
+        """
+        cr.execute(f"SELECT COUNT(*) {joins} WHERE {where}", params)
+        total = cr.fetchone()[0] or 0
+        if page is None:
+            limit, offset = MAX_EXPORT_ROWS, 0
+        else:
+            # Una página más allá del final (otro filtro dejó menos filas) muestra la última
+            page = min(page, max(1, -(-total // TX_PAGE_SIZE)))
+            limit, offset = TX_PAGE_SIZE, (page - 1) * TX_PAGE_SIZE
+        cr.execute(f"""
+            SELECT pol.id, po.id AS order_id, po.name AS order_name,
+                   po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %(tz)s AS date_local,
+                   pc.name AS caja,
+                   COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS producto,
+                   ic.name AS categoria,
+                   pol.qty, pol.price_unit, pol.price_subtotal_incl AS subtotal,
+                   rpc.name AS cliente, rpu.name AS cajero
+            {joins}
+            WHERE {where}
+            ORDER BY po.date_order DESC, pol.id DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+        """, dict(params, limit=limit, offset=offset))
+        rows = [{
+            "id": r["id"],
+            "order_id": r["order_id"],
+            "order_name": r["order_name"],
+            "date": r["date_local"].strftime("%d/%m/%Y %H:%M") if r["date_local"] else None,
+            "caja": r["caja"],
+            "producto": r["producto"],
+            "categoria": r["categoria"] or "Sin categoría",
+            "qty": round(float(r["qty"] or 0.0), 2),
+            "price_unit": _money(r["price_unit"]),
+            "subtotal": _money(r["subtotal"]),
+            "cliente": r["cliente"] or "Consumidor final",
+            "cajero": r["cajero"],
+        } for r in cr.dictfetchall()]
+        return rows, total, page
+
     # ------------------------------------------------------------------
     # Armado
     # ------------------------------------------------------------------
@@ -377,17 +446,14 @@ class CashMetricsController(http.Controller):
         return rows
 
     def _method_tables(self, payments):
-        """Cobrado por grupo (con el detalle por nombre real) y la matriz caja x grupo."""
-        groups, by_pos = {}, {}
+        """Cobrado por grupo, de mayor a menor, con el detalle por nombre real."""
+        groups = {}
         for pay in payments:
             group = _method_group(pay["method"], pay["kind"])
             amount = float(pay["amount"] or 0.0)
             g = groups.setdefault(group, {"group": group, "amount": 0.0, "details": {}})
             g["amount"] += amount
             g["details"][pay["method"]] = g["details"].get(pay["method"], 0.0) + amount
-            row = by_pos.setdefault(pay["caja"], {"caja": pay["caja"], "values": {}, "total": 0.0})
-            row["values"][group] = row["values"].get(group, 0.0) + amount
-            row["total"] += amount
         total = sum(g["amount"] for g in groups.values()) or 0.0
         methods = []
         for name in GROUP_ORDER:
@@ -401,11 +467,7 @@ class CashMetricsController(http.Controller):
                 "details": sorted(({"name": k, "amount": _money(v)} for k, v in g["details"].items()),
                                   key=lambda d: -d["amount"]),
             })
-        present = [m["group"] for m in methods]
-        pos_rows = sorted(({"caja": r["caja"], "total": _money(r["total"]),
-                            "values": {k: _money(v) for k, v in r["values"].items()}}
-                           for r in by_pos.values()), key=lambda r: -r["total"])
-        return methods, {"groups": present, "rows": pos_rows}
+        return sorted(methods, key=lambda m: -m["amount"])
 
     def _cashier_rows(self, sellers, payments, sessions, moves):
         """Una fila por persona con sus dos miradas: como vendedor y como responsable de caja."""
@@ -459,7 +521,7 @@ class CashMetricsController(http.Controller):
         payments = self._fetch_payments(p, cashiers)
         sessions = self._session_rows(self._fetch_sessions(p, cashiers), today)
         moves = self._move_rows(self._fetch_moves(p, cashiers))
-        methods, methods_by_pos = self._method_tables(payments)
+        methods = self._method_tables(payments)
         cashier_rows = self._cashier_rows(sellers, payments, sessions, moves)
 
         sold = sum(float(s["sold"]) for s in sellers)
@@ -495,7 +557,6 @@ class CashMetricsController(http.Controller):
             "sessions": sessions[:MAX_TABLE_ROWS],
             "moves": moves[:MAX_TABLE_ROWS],
             "methods": methods,
-            "methods_by_pos": methods_by_pos,
         }
 
     @http.route('/pos_cash_metrics/data', type='json', auth='user')
@@ -504,11 +565,31 @@ class CashMetricsController(http.Controller):
         self._check_access()
         return self._build(company, pos, cashier, start_date, end_date)
 
+    @http.route('/pos_cash_metrics/transactions', type='json', auth='user')
+    def get_transactions(self, company='all', pos='all', cashier='all', start_date=None, end_date=None,
+                         search='', page=1, **kwargs):
+        """Transacciones paginadas en el servidor: un mes son decenas de miles de líneas."""
+        self._check_access()
+        start, end = self._resolve_range(start_date, end_date)
+        try:
+            page = max(1, int(page))
+        except (TypeError, ValueError):
+            page = 1
+        rows, total, page = self._fetch_transactions(
+            self._params(company, pos, start, end), _to_ids(cashier), search, page)
+        return {"rows": rows, "total": total, "page": page, "pages": max(1, -(-total // TX_PAGE_SIZE))}
+
     # ------------------------------------------------------------------
     # Excel
     # ------------------------------------------------------------------
     def _export_table(self, data, table, status):
         """Título, encabezados, claves y filas de la pestaña pedida, con los mismos filtros que la pantalla."""
+        if table == 'transactions':
+            return ("Transacciones",
+                    ["Nro. orden", "Fecha / hora", "Caja", "Producto", "Categoría", "Cantidad",
+                     "Precio unitario", "Subtotal con IVA", "Cliente", "Cajero"],
+                    ["order_name", "date", "caja", "producto", "categoria", "qty",
+                     "price_unit", "subtotal", "cliente", "cajero"], data["transactions"])
         if table == 'sessions':
             rows = [r for r in data["sessions"] if not status or r["status"] in status]
             return ("Cajas y cierres",
@@ -540,9 +621,16 @@ class CashMetricsController(http.Controller):
         """Exporta a Excel la pestaña activa con los mismos filtros que ve el usuario."""
         try:
             self._check_access()
-            data = self._build(company, pos, cashier, start_date, end_date)
+            if table == 'transactions':
+                # No hace falta armar el resto del dashboard: sólo las líneas de venta
+                start, end = self._resolve_range(start_date, end_date)
+                rows, _total, _page = self._fetch_transactions(
+                    self._params(company, pos, start, end), _to_ids(cashier), kwargs.get('search', ''))
+                data = {"range": {"start": start, "end": end}, "transactions": rows}
+            else:
+                data = self._build(company, pos, cashier, start_date, end_date)
             title, headers, keys, rows = self._export_table(data, table, _to_list(status))
-            money_keys = {"sold", "avg_ticket", "refunds_amount", "cash", "other", "difference", "shortage",
+            money_keys = {"price_unit", "subtotal", "sold", "avg_ticket", "refunds_amount", "cash", "other", "difference", "shortage",
                           "withdrawals", "cash_start", "cash_sales", "deposits", "expected", "counted", "amount"}
 
             output = io.BytesIO()
@@ -553,7 +641,7 @@ class CashMetricsController(http.Controller):
                 'border': 1, 'align': 'center', 'valign': 'vcenter'})
             fmt_text = workbook.add_format({'border': 1})
             fmt_money = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
-            fmt_num = workbook.add_format({'border': 1, 'num_format': '#,##0'})
+            fmt_num = workbook.add_format({'border': 1, 'num_format': '#,##0.##'})
 
             sheet = workbook.add_worksheet(title[:31])
             sheet.set_column(0, 0, 32)
