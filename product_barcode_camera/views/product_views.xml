@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="product_template_form_view_barcode_camera" model="ir.ui.view">
+        <field name="name">product.template.form.barcode.camera</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="arch" type="xml">
+            <field name="barcode" position="attributes">
+                <attribute name="widget">barcode_camera</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="product_normal_form_view_barcode_camera" model="ir.ui.view">
+        <field name="name">product.product.form.barcode.camera</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <field name="barcode" position="attributes">
+                <attribute name="widget">barcode_camera</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="product_variant_easy_edit_view_barcode_camera" model="ir.ui.view">
+        <field name="name">product.product.easy.edit.barcode.camera</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_variant_easy_edit_view"/>
+        <field name="arch" type="xml">
+            <field name="barcode" position="attributes">
+                <attribute name="widget">barcode_camera</attribute>
+            </field>
+        </field>
+    </record>
+</odoo>
