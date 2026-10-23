@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="product_barcode_camera.BarcodeCameraField" t-inherit="web.CharField" t-inherit-mode="primary">
+        <xpath expr="//div[hasclass('o_field_input_buttons')]" position="inside">
+            <button t-if="showCamera"
+                type="button"
+                class="btn m-0 py-0 px-2 fa fa-camera o_barcode_camera_button"
+                title="Escanear con la cámara"
+                aria-label="Escanear con la cámara"
+                t-on-click="onCameraClick"/>
+        </xpath>
+    </t>
+</templates>
