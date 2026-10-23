@@ -7,6 +7,38 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { Component } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
+// Odoo guarda image_1920 a 1920 px como máximo: achicar antes de subir no pierde calidad.
+const MAX_SIDE = 1920;
+const JPEG_QUALITY = 0.85;
+
+/**
+ * Achica una imagen base64 a MAX_SIDE px y la recodifica en JPEG.
+ * Si falla o el resultado no es más chico, devuelve la original.
+ */
+async function compressImage(base64, type) {
+    if (!type.startsWith("image/") || type === "image/svg+xml" || type === "image/gif") {
+        return base64;
+    }
+    try {
+        const img = new Image();
+        img.src = `data:${type};base64,${base64}`;
+        await img.decode();
+        const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        const ctx = canvas.getContext("2d");
+        // Fondo blanco: JPEG no tiene transparencia (PNG con fondo transparente)
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/jpeg", JPEG_QUALITY).split(",")[1];
+        return compressed.length < base64.length ? compressed : base64;
+    } catch {
+        return base64;
+    }
+}
+
 /**
  * Popup con la imagen en grande y botones grandes para cambiarla o quitarla.
  * El dialog service inyecta automáticamente la prop `close`.
@@ -29,9 +61,14 @@ class ImageZoomDialog extends Component {
         return this.props.isMobile && "capture" in FileUploader.props;
     }
 
+    /**
+     * Cierra el popup enseguida para seguir cargando el producto;
+     * la compresión termina en segundo plano y recién ahí se carga la imagen.
+     */
     async onUploaded(info) {
-        await this.props.onUploaded(info);
         this.props.close();
+        const data = await compressImage(info.data, info.type);
+        await this.props.onUploaded({ ...info, data });
     }
 
     onRemove() {
