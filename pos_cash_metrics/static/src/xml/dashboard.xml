@@ -274,15 +274,16 @@
                                 <div class="bar-list">
                                     <p t-if="!cashierBars.length" class="bar-empty">Sin ventas en el período.</p>
                                     <t t-foreach="cashierBars" t-as="c" t-key="c.user_id">
-                                        <div class="bar-row" t-att-title="cashierTip(c)">
-                                            <div class="bar-head">
+                                        <div class="hbar-row" t-att-title="cashierTip(c)">
+                                            <div class="hbar-axis">
                                                 <span class="bar-label"><t t-esc="c.name"/></span>
-                                                <span class="bar-value"><t t-esc="formatCurrency(c.sold)"/></span>
+                                                <span class="bar-meta">
+                                                    <t t-esc="formatNumber(c.tickets)"/> tickets<t t-if="c.difference"> · <span t-att-class="signClass(c.difference)"><t t-esc="formatSigned(c.difference)"/></span></t>
+                                                </span>
                                             </div>
-                                            <div class="bar-track"><div class="bar-fill" t-att-style="'width: ' + c.width + '%'"/></div>
-                                            <div class="bar-meta">
-                                                <span><t t-esc="formatNumber(c.tickets)"/> tickets</span>
-                                                <span t-if="c.difference" t-att-class="signClass(c.difference)">dif. cierre <t t-esc="formatSigned(c.difference)"/></span>
+                                            <div class="hbar-plot">
+                                                <div class="hbar-fill" t-att-style="'--w: ' + (c.width / 100)"/>
+                                                <span class="bar-value"><t t-esc="formatCurrency(c.sold)"/></span>
                                             </div>
                                         </div>
                                     </t>
@@ -306,13 +307,18 @@
                                 <div class="bar-list">
                                     <p t-if="!methodBars.length" class="bar-empty">Sin cobros en el período.</p>
                                     <t t-foreach="methodBars" t-as="m" t-key="m.group">
-                                        <div class="bar-row clickable-bar" t-on-click="toggleGroup" t-att-data-group="m.group"
+                                        <div class="hbar-group">
+                                        <div class="hbar-row clickable-bar" t-on-click="toggleGroup" t-att-data-group="m.group"
                                              t-att-title="m.group + ': ' + formatCurrency(m.amount) + ' (' + formatNumber(m.pct) + '%)'">
-                                            <div class="bar-head">
+                                            <div class="hbar-axis">
                                                 <span class="bar-label"><span class="expand-mark"><t t-esc="state.expanded[m.group] ? '▾' : '▸'"/></span><t t-esc="m.group"/></span>
-                                                <span class="bar-value"><t t-esc="formatCurrency(m.amount)"/> <span class="bar-pct"><t t-esc="formatNumber(m.pct)"/>%</span></span>
+                                                <span class="bar-meta"><t t-esc="formatNumber(m.pct)"/>% del total</span>
                                             </div>
-                                            <div class="bar-track"><div class="bar-fill" t-att-style="'width: ' + m.width + '%'"/></div>
+                                            <div class="hbar-plot">
+                                                <div class="hbar-fill" t-att-style="'--w: ' + (m.width / 100)"/>
+                                                <span class="bar-value"><t t-esc="formatCurrency(m.amount)"/></span>
+                                            </div>
+                                        </div>
                                             <div t-if="state.expanded[m.group]" class="bar-details">
                                                 <t t-foreach="m.details" t-as="d" t-key="m.group + '|' + d_index">
                                                     <div class="bar-detail"><span><t t-esc="d.name"/></span><span><t t-esc="formatCurrency(d.amount)"/></span></div>
