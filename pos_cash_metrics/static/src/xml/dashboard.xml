@@ -264,9 +264,9 @@
                         <div class="charts-grid">
                             <div class="chart-container glass-panel chart-h-tall">
                                 <div class="chart-header">
-                                    <h3>Ventas por cajero</h3>
+                                    <h3>Tickets por cajero</h3>
                                     <t t-call="pos_cash_metrics.InfoTip">
-                                        <t t-set="tip" t-value="'Lo que vendió cada persona, aunque la caja la haya abierto otro. Pasá el mouse por una barra para ver tickets, promedio y la diferencia al cierre de las cajas que abrió.'"/>
+                                        <t t-set="tip" t-value="'Cantidad de ventas (tickets) que hizo cada persona, aunque la caja la haya abierto otro. Las devoluciones no cuentan. Pasá el mouse por una barra para ver lo vendido, el promedio por ticket y la diferencia al cierre de las cajas que abrió.'"/>
                                     </t>
                                 </div>
                                 <div class="chart-body">

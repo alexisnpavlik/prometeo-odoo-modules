@@ -153,12 +153,15 @@ class PosCashMetricsDashboard extends Component {
         return this.data.kpis;
     }
 
+    // Tickets por cajero: los que más ventas despacharon primero
     get chartCashiers() {
-        return this.data.cashiers.filter((c) => c.sold > 0).slice(0, TOP_CASHIERS);
+        return this.data.cashiers.filter((c) => c.tickets > 0)
+            .sort((a, b) => b.tickets - a.tickets)
+            .slice(0, TOP_CASHIERS);
     }
 
     get moreCashiers() {
-        return Math.max(0, this.data.cashiers.filter((c) => c.sold > 0).length - TOP_CASHIERS);
+        return Math.max(0, this.data.cashiers.filter((c) => c.tickets > 0).length - TOP_CASHIERS);
     }
 
     get chartMethods() {
@@ -464,14 +467,13 @@ class PosCashMetricsDashboard extends Component {
         const isLight = this.state.theme === "light";
         const gridConfig = { color: isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.04)", drawBorder: false };
         const shorten = (l, n) => (l && l.length > n ? l.substring(0, n - 3) + "..." : l);
-        const money = (v) => this.formatCurrency(v).split(",")[0];
 
         const cashiers = this.chartCashiers;
         this.createOrUpdateChart("pcm-chart-cashiers", "bar", {
             labels: cashiers.map((c) => shorten(c.name, 24)),
             datasets: [{
-                label: "Vendido",
-                data: cashiers.map((c) => c.sold),
+                label: "Tickets",
+                data: cashiers.map((c) => c.tickets),
                 backgroundColor: "rgba(59, 130, 246, 0.65)",
                 borderColor: "#3b82f6",
                 borderWidth: 1.5,
@@ -486,7 +488,10 @@ class PosCashMetricsDashboard extends Component {
                         title: (items) => cashiers[items[0].dataIndex].name,
                         label: (context) => {
                             const c = cashiers[context.dataIndex];
-                            const lines = [` ${this.formatCurrency(c.sold)} · ${this.formatNumber(c.tickets)} tickets (promedio ${this.formatCurrency(c.avg_ticket)})`];
+                            const lines = [
+                                ` ${this.formatNumber(c.tickets)} tickets`,
+                                ` Vendido ${this.formatCurrency(c.sold)} · promedio ${this.formatCurrency(c.avg_ticket)} por ticket`,
+                            ];
                             if (c.difference) {
                                 lines.push(` Diferencia al cierre: ${this.formatSigned(c.difference)}`);
                             }
@@ -496,7 +501,7 @@ class PosCashMetricsDashboard extends Component {
                 },
             },
             scales: {
-                x: { grid: gridConfig, ticks: { callback: money } },
+                x: { grid: gridConfig, ticks: { precision: 0, callback: (v) => this.formatNumber(v) } },
                 y: { grid: { display: false } },
             },
         });
