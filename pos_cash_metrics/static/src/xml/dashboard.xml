@@ -206,12 +206,13 @@
                     <button t-att-class="'nav-tab ' + (state.tab === 'cajeros' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajeros">Cajeros</button>
                     <button t-att-class="'nav-tab ' + (state.tab === 'cajas' ? 'active' : '')" t-on-click="onTabClick" data-tab="cajas">Cajas y cierres</button>
                     <button t-att-class="'nav-tab ' + (state.tab === 'movimientos' ? 'active' : '')" t-on-click="onTabClick" data-tab="movimientos">Retiros e ingresos</button>
+                    <button t-att-class="'nav-tab ' + (state.tab === 'transacciones' ? 'active' : '')" t-on-click="onTabClick" data-tab="transacciones">Transacciones</button>
                 </nav>
 
                 <div class="tab-content">
 
                     <!-- ================= RESUMEN ================= -->
-                    <t t-if="state.tab === 'resumen'">
+                    <div t-att-class="'pane-stack' + (state.tab === 'resumen' ? '' : ' pane-hidden')">
                         <div class="kpi-grid summary-cards">
                             <div class="kpi-card shadow-glow green">
                                 <div class="kpi-card-inner">
@@ -260,77 +261,38 @@
                             </button>
                         </div>
 
-                        <div class="two-cols">
-                            <section class="glass-panel padded">
-                                <div class="section-header">
-                                    <div>
-                                        <h3>Ventas por cajero</h3>
-                                        <p class="section-sub">Lo que vendió cada persona, aunque la caja la haya abierto otro</p>
-                                    </div>
+                        <div class="charts-grid">
+                            <div class="chart-container glass-panel chart-h-tall">
+                                <div class="chart-header">
+                                    <h3>Ventas por cajero</h3>
                                     <t t-call="pos_cash_metrics.InfoTip">
-                                        <t t-set="tip" t-value="'Debajo de cada barra: tickets y la diferencia al cierre de las cajas que esa persona abrió (− faltante, + sobrante). Pasá el mouse por una barra para ver el detalle.'"/>
+                                        <t t-set="tip" t-value="'Lo que vendió cada persona, aunque la caja la haya abierto otro. Pasá el mouse por una barra para ver tickets, promedio y la diferencia al cierre de las cajas que abrió.'"/>
                                     </t>
                                 </div>
-                                <div class="bar-list">
-                                    <p t-if="!cashierBars.length" class="bar-empty">Sin ventas en el período.</p>
-                                    <t t-foreach="cashierBars" t-as="c" t-key="c.user_id">
-                                        <div class="hbar-row" t-att-title="cashierTip(c)">
-                                            <div class="hbar-axis">
-                                                <span class="bar-label"><t t-esc="c.name"/></span>
-                                                <span class="bar-meta">
-                                                    <t t-esc="formatNumber(c.tickets)"/> tickets<t t-if="c.difference"> · <span t-att-class="signClass(c.difference)"><t t-esc="formatSigned(c.difference)"/></span></t>
-                                                </span>
-                                            </div>
-                                            <div class="hbar-plot">
-                                                <div class="hbar-fill" t-att-style="'--w: ' + (c.width / 100)"/>
-                                                <span class="bar-value"><t t-esc="formatCurrency(c.sold)"/></span>
-                                            </div>
-                                        </div>
-                                    </t>
-                                    <button t-if="moreCashiers" type="button" class="bar-more" t-on-click="goToCashiers">
-                                        y <t t-esc="moreCashiers"/> más · ver todos en Cajeros
-                                    </button>
+                                <div class="chart-body">
+                                    <canvas id="pcm-chart-cashiers"></canvas>
+                                    <p t-if="!chartCashiers.length" class="chart-empty">Sin ventas en el período.</p>
                                 </div>
-                            </section>
-
-                            <section class="glass-panel padded">
-                                <div class="section-header">
-                                    <div>
-                                        <h3>Medios de pago</h3>
-                                        <p class="section-sub">Cobrado en el período · tocá un medio para ver el detalle</p>
+                                <button t-if="moreCashiers" type="button" class="bar-more chart-foot" t-on-click="goToCashiers">
+                                    y <t t-esc="moreCashiers"/> más · ver todos en Cajeros
+                                </button>
+                            </div>
+                            <div class="chart-container glass-panel chart-h-tall">
+                                <div class="chart-header">
+                                    <h3>Medios de pago</h3>
+                                    <div class="chart-actions">
+                                        <button class="btn btn-secondary btn-sm" t-on-click="exportExcel" data-table="methods">Exportar Excel</button>
+                                        <t t-call="pos_cash_metrics.InfoTip">
+                                            <t t-set="tip" t-value="'Participación de cada medio sobre lo cobrado. Los métodos se agrupan por su nombre (Tarjeta Debito, Debito y Tarjeta de debito van a Débito); el Excel trae el detalle por nombre real. El vuelto en efectivo ya está descontado.'"/>
+                                            <t t-set="align" t-value="'tooltip-left'"/>
+                                        </t>
                                     </div>
-                                    <t t-call="pos_cash_metrics.InfoTip">
-                                        <t t-set="tip" t-value="'Los métodos se agrupan por su nombre (Tarjeta Debito, Debito y Tarjeta de debito van a Débito). El vuelto en efectivo ya está descontado.'"/>
-                                        <t t-set="align" t-value="'tooltip-left'"/>
-                                    </t>
                                 </div>
-                                <div class="bar-list">
-                                    <p t-if="!methodBars.length" class="bar-empty">Sin cobros en el período.</p>
-                                    <t t-foreach="methodBars" t-as="m" t-key="m.group">
-                                        <div class="hbar-group">
-                                        <div class="hbar-row clickable-bar" t-on-click="toggleGroup" t-att-data-group="m.group"
-                                             t-att-title="m.group + ': ' + formatCurrency(m.amount) + ' (' + formatNumber(m.pct) + '%)'">
-                                            <div class="hbar-axis">
-                                                <span class="bar-label"><span class="expand-mark"><t t-esc="state.expanded[m.group] ? '▾' : '▸'"/></span><t t-esc="m.group"/></span>
-                                                <span class="bar-meta"><t t-esc="formatNumber(m.pct)"/>% del total</span>
-                                            </div>
-                                            <div class="hbar-plot">
-                                                <div class="hbar-fill" t-att-style="'--w: ' + (m.width / 100)"/>
-                                                <span class="bar-value"><t t-esc="formatCurrency(m.amount)"/></span>
-                                            </div>
-                                        </div>
-                                            <div t-if="state.expanded[m.group]" class="bar-details">
-                                                <t t-foreach="m.details" t-as="d" t-key="m.group + '|' + d_index">
-                                                    <div class="bar-detail"><span><t t-esc="d.name"/></span><span><t t-esc="formatCurrency(d.amount)"/></span></div>
-                                                </t>
-                                            </div>
-                                        </div>
-                                    </t>
+                                <div class="chart-body">
+                                    <canvas id="pcm-chart-methods"></canvas>
+                                    <p t-if="!chartMethods.length" class="chart-empty">Sin cobros en el período.</p>
                                 </div>
-                                <div class="filter-row">
-                                    <button class="btn btn-secondary" t-on-click="exportExcel" data-table="methods">Exportar Excel</button>
-                                </div>
-                            </section>
+                            </div>
                         </div>
 
                         <section class="glass-panel padded">
@@ -370,7 +332,7 @@
                                 </table>
                             </div>
                         </section>
-                    </t>
+                    </div>
 
                     <!-- ================= CAJEROS ================= -->
                     <t t-if="state.tab === 'cajeros'">
@@ -640,6 +602,67 @@
                         </section>
                     </t>
 
+
+                    <!-- ================= TRANSACCIONES (traída de métricas gerenciales) ================= -->
+                    <t t-if="state.tab === 'transacciones'">
+                        <section class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Detalle de ventas</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(tx.total)"/> líneas vendidas en el período · una fila por producto de cada ticket</p>
+                                </div>
+                                <t t-call="pos_cash_metrics.InfoTip">
+                                    <t t-set="tip" t-value="'Incluye las ventas de cajas que todavía están abiertas. Cajero = quien hizo la venta. La búsqueda mira el número de orden, el producto, el cliente y el cajero.'"/>
+                                    <t t-set="align" t-value="'tooltip-left'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <input type="text" class="tx-search" placeholder="Buscar orden, producto, cliente o cajero..." t-att-value="tx.search" t-on-input="onTxSearchInput"/>
+                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="transactions">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nro. orden</th>
+                                            <th>Fecha / hora</th>
+                                            <th>Caja</th>
+                                            <th>Producto</th>
+                                            <th>Categoría</th>
+                                            <th class="num">Cant.</th>
+                                            <th class="num">Precio unit.</th>
+                                            <th class="num th-highlight">Subtotal con IVA</th>
+                                            <th>Cliente</th>
+                                            <th>Cajero</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="tx.loading and !tx.rows.length"><td colspan="10" class="text-center text-muted empty-row">Cargando...</td></tr>
+                                        <tr t-elif="!tx.rows.length"><td colspan="10" class="text-center text-muted empty-row">No hay ventas con estos filtros.</td></tr>
+                                        <t t-foreach="tx.rows" t-as="t" t-key="t.id">
+                                            <tr>
+                                                <td class="cell-strong"><t t-esc="t.order_name"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.date"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.caja"/></td>
+                                                <td class="cell-text tx-product"><t t-esc="t.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.categoria"/></td>
+                                                <td class="num"><t t-esc="formatNumber(t.qty)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(t.price_unit)"/></td>
+                                                <td t-att-class="'num cell-strong ' + (t.subtotal &lt; 0 ? 'amount-neg' : '')"><t t-esc="formatCurrency(t.subtotal)"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.cliente"/></td>
+                                                <td class="cell-secondary"><t t-esc="t.cajero"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="pagination" t-if="tx.pages &gt; 1">
+                                <button class="btn btn-secondary" t-att-disabled="tx.page &lt;= 1 or tx.loading" t-on-click="changeTxPage" data-dir="-1">Anterior</button>
+                                <span class="page-info">Página <t t-esc="formatNumber(tx.page)"/> de <t t-esc="formatNumber(tx.pages)"/></span>
+                                <button class="btn btn-secondary" t-att-disabled="tx.page &gt;= tx.pages or tx.loading" t-on-click="changeTxPage" data-dir="1">Siguiente</button>
+                            </div>
+                        </section>
+                    </t>
                 </div>
             </main>
         </div>

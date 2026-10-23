@@ -1,7 +1,8 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, useExternalListener, useState } from "@odoo/owl";
+import { Component, onMounted, onWillStart, onWillUnmount, useExternalListener, useState } from "@odoo/owl";
+import { loadBundle } from "@web/core/assets";
 import { rpc } from "@web/core/network/rpc";
 
 const PAGE_SIZE = 25;
@@ -68,7 +69,14 @@ const EMPTY_DATA = {
     moves: [],
     methods: [],
 };
-const TOP_CASHIERS = 8;
+const TOP_CASHIERS = 10;
+// Mismos colores que los gráficos de métricas gerenciales (pos_management_metrics)
+const CHART_FILLS = [
+    "rgba(16, 185, 129, 0.65)", "rgba(59, 130, 246, 0.65)", "rgba(139, 92, 246, 0.65)",
+    "rgba(245, 158, 11, 0.65)", "rgba(239, 68, 68, 0.65)", "rgba(6, 182, 212, 0.65)",
+    "rgba(236, 72, 153, 0.65)", "rgba(107, 114, 128, 0.65)", "rgba(168, 85, 247, 0.65)",
+];
+const CHART_BORDERS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#6b7280", "#a855f7"];
 
 class PosCashMetricsDashboard extends Component {
     static template = "pos_cash_metrics.DashboardTemplate";
@@ -90,8 +98,6 @@ class PosCashMetricsDashboard extends Component {
             tab: "resumen",
             page: { cashiers: 1, sessions: 1, moves: 1 },
             sort: { cashiers: null, sessions: null, moves: null },
-            // Grupos de medios de pago desplegados
-            expanded: {},
             showFilters: false,
             loading: false,
             syncTime: "Cargando...",
@@ -102,6 +108,8 @@ class PosCashMetricsDashboard extends Component {
         this.draft = useState(this.pickFilters(this.state));
 
         this.filtersData = useState({ companies: [], configs: [], cashiers: [] });
+        // Transacciones: paginadas en el servidor (un mes son decenas de miles de líneas)
+        this.tx = useState({ rows: [], total: 0, page: 1, pages: 1, search: "", loading: false, loaded: false });
         this.data = useState(structuredClone(EMPTY_DATA));
 
         // Cierra el panel de checkboxes al hacer clic fuera del filtro
@@ -109,9 +117,26 @@ class PosCashMetricsDashboard extends Component {
             this.state.openFilter = null;
         });
 
+        this.charts = {};
+
         onWillStart(async () => {
+            // Chart.js v4 que sirve el propio Odoo; sin él el dashboard abre igual, sin gráficos
+            try {
+                await loadBundle("web.chartjs_lib");
+            } catch (e) {
+                console.warn("Chart.js no disponible", e);
+            }
             await this.loadFiltersMetadata();
             await this.refreshData();
+        });
+
+        onMounted(() => {
+            this.isMounted = true;
+            this.renderCharts();
+        });
+
+        onWillUnmount(() => {
+            Object.values(this.charts).forEach((chart) => chart && chart.destroy());
         });
     }
 
@@ -128,28 +153,16 @@ class PosCashMetricsDashboard extends Component {
         return this.data.kpis;
     }
 
-    // Barras del resumen: largo proporcional al mayor de la lista (el primero, vienen ordenadas)
-    get cashierBars() {
-        const rows = this.data.cashiers.filter((c) => c.sold > 0).slice(0, TOP_CASHIERS);
-        const max = rows.length ? rows[0].sold : 0;
-        return rows.map((c) => ({ ...c, width: max ? Math.max(2, (c.sold / max) * 100) : 0 }));
+    get chartCashiers() {
+        return this.data.cashiers.filter((c) => c.sold > 0).slice(0, TOP_CASHIERS);
     }
 
     get moreCashiers() {
         return Math.max(0, this.data.cashiers.filter((c) => c.sold > 0).length - TOP_CASHIERS);
     }
 
-    get methodBars() {
-        const rows = this.data.methods.filter((m) => m.amount > 0);
-        const max = rows.length ? rows[0].amount : 0;
-        return rows.map((m) => ({ ...m, width: max ? Math.max(2, (m.amount / max) * 100) : 0 }));
-    }
-
-    // Tooltip de cada barra de cajero
-    cashierTip(c) {
-        return `${c.name}: ${this.formatCurrency(c.sold)} en ${this.formatNumber(c.tickets)} tickets ` +
-            `(promedio ${this.formatCurrency(c.avg_ticket)}). Efectivo ${this.formatCurrency(c.cash)}, ` +
-            `otros medios ${this.formatCurrency(c.other)}.`;
+    get chartMethods() {
+        return this.data.methods.filter((m) => m.amount > 0);
     }
 
     goToCashiers() {
@@ -340,8 +353,54 @@ class PosCashMetricsDashboard extends Component {
         this.draft.preset = "custom";
     }
 
-    onTabClick(ev) {
+    async onTabClick(ev) {
         this.state.tab = ev.currentTarget.dataset.tab;
+        if (this.state.tab === "transacciones" && !this.tx.loaded) {
+            await this.loadTransactions();
+        }
+    }
+
+    // --- Transacciones ---
+    async loadTransactions() {
+        this.tx.loading = true;
+        try {
+            const data = await rpc("/pos_cash_metrics/transactions", {
+                ...this.serverFilters(),
+                search: this.tx.search,
+                page: this.tx.page,
+            });
+            Object.assign(this.tx, data, { loaded: true });
+        } catch (e) {
+            console.error("Error al cargar transacciones:", e);
+        } finally {
+            this.tx.loading = false;
+        }
+    }
+
+    // Búsqueda con espera de 350 ms, como en métricas gerenciales: no consultar por cada tecla
+    onTxSearchInput(ev) {
+        this.tx.search = ev.target.value;
+        this.tx.page = 1;
+        clearTimeout(this.txSearchTimeout);
+        this.txSearchTimeout = setTimeout(() => this.loadTransactions(), 350);
+    }
+
+    async changeTxPage(ev) {
+        const page = this.tx.page + parseInt(ev.currentTarget.dataset.dir);
+        if (page < 1 || page > this.tx.pages) return;
+        this.tx.page = page;
+        await this.loadTransactions();
+    }
+
+    // Filtros que van al servidor, en el formato que espera el controlador
+    serverFilters() {
+        return {
+            company: JSON.stringify(this.state.company),
+            pos: JSON.stringify(this.state.pos),
+            cashier: JSON.stringify(this.state.cashier),
+            start_date: this.state.startDate,
+            end_date: this.state.endDate,
+        };
     }
 
     // Tocar una tarjeta filtra sólo por ese estado; tocarla de nuevo lo quita. Se aplica al instante.
@@ -370,11 +429,6 @@ class PosCashMetricsDashboard extends Component {
         }
     }
 
-    toggleGroup(ev) {
-        const { group } = ev.currentTarget.dataset;
-        this.state.expanded[group] = !this.state.expanded[group];
-    }
-
     // Cada click en el encabezado: ascendente → descendente → orden por defecto
     onSortClick(ev) {
         const { table, key } = ev.currentTarget.dataset;
@@ -400,6 +454,116 @@ class PosCashMetricsDashboard extends Component {
 
     toggleTheme() {
         this.state.theme = this.state.theme === "dark" ? "light" : "dark";
+        // Chart.js toma el color de ejes y grilla al crear el gráfico: hay que rehacerlos
+        this.renderCharts();
+    }
+
+    // --- Gráficos (mismo estilo que métricas gerenciales) ---
+    renderCharts() {
+        if (typeof Chart === "undefined" || !this.isMounted) return;
+        const isLight = this.state.theme === "light";
+        const gridConfig = { color: isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.04)", drawBorder: false };
+        const shorten = (l, n) => (l && l.length > n ? l.substring(0, n - 3) + "..." : l);
+        const money = (v) => this.formatCurrency(v).split(",")[0];
+
+        const cashiers = this.chartCashiers;
+        this.createOrUpdateChart("pcm-chart-cashiers", "bar", {
+            labels: cashiers.map((c) => shorten(c.name, 24)),
+            datasets: [{
+                label: "Vendido",
+                data: cashiers.map((c) => c.sold),
+                backgroundColor: "rgba(59, 130, 246, 0.65)",
+                borderColor: "#3b82f6",
+                borderWidth: 1.5,
+                borderRadius: 4,
+            }],
+        }, {
+            indexAxis: "y",
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => cashiers[items[0].dataIndex].name,
+                        label: (context) => {
+                            const c = cashiers[context.dataIndex];
+                            const lines = [` ${this.formatCurrency(c.sold)} · ${this.formatNumber(c.tickets)} tickets (promedio ${this.formatCurrency(c.avg_ticket)})`];
+                            if (c.difference) {
+                                lines.push(` Diferencia al cierre: ${this.formatSigned(c.difference)}`);
+                            }
+                            return lines;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: gridConfig, ticks: { callback: money } },
+                y: { grid: { display: false } },
+            },
+        });
+
+        const methods = this.chartMethods;
+        this.createOrUpdateChart("pcm-chart-methods", "bar", {
+            labels: methods.map((m) => shorten(m.group, 18)),
+            datasets: [{
+                label: "Participación",
+                data: methods.map((m) => m.pct),
+                backgroundColor: methods.map((m, i) => CHART_FILLS[i % CHART_FILLS.length]),
+                borderColor: methods.map((m, i) => CHART_BORDERS[i % CHART_BORDERS.length]),
+                borderWidth: 1.5,
+                borderRadius: 4,
+            }],
+        }, {
+            indexAxis: "y",
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const m = methods[context.dataIndex];
+                            const detail = m.details.length > 1 ? ` · ${m.details.length} métodos` : "";
+                            return ` ${m.group}: ${m.pct}% (${this.formatCurrency(m.amount)})${detail}`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: gridConfig, ticks: { callback: (v) => `${v}%` } },
+                y: { grid: { display: false } },
+            },
+        });
+    }
+
+    createOrUpdateChart(canvasId, type, data, options = {}) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        // Destruir la instancia anterior evita gráficos superpuestos y hover fantasma
+        if (this.charts[canvasId]) {
+            this.charts[canvasId].destroy();
+        }
+        Chart.defaults.color = this.state.theme === "light" ? "#475569" : "#94a3b8";
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.font.size = 10;
+        const mergedOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: type === "doughnut" },
+                tooltip: {
+                    backgroundColor: "rgba(15, 23, 42, 0.95)",
+                    borderColor: "rgba(255, 255, 255, 0.08)",
+                    borderWidth: 1,
+                    padding: 8,
+                    titleColor: "#fff",
+                    bodyColor: "#94a3b8",
+                },
+            },
+        };
+        if (options.plugins) {
+            Object.assign(mergedOptions.plugins, options.plugins);
+            delete options.plugins;
+        }
+        Object.assign(mergedOptions, options);
+        this.charts[canvasId] = new Chart(canvas.getContext("2d"), { type, data, options: mergedOptions });
     }
 
     async applyFilters() {
@@ -425,12 +589,9 @@ class PosCashMetricsDashboard extends Component {
         // Listas en JSON: separadas por comas romperían los nombres que ya tienen comas
         const params = new URLSearchParams({
             table: ev.currentTarget.dataset.table,
-            company: JSON.stringify(this.state.company),
-            pos: JSON.stringify(this.state.pos),
-            cashier: JSON.stringify(this.state.cashier),
+            ...this.serverFilters(),
             status: JSON.stringify(this.state.status),
-            start_date: this.state.startDate,
-            end_date: this.state.endDate,
+            search: this.tx.search,
         });
         window.open(`/pos_cash_metrics/export?${params.toString()}`, "_blank");
     }
@@ -470,14 +631,15 @@ class PosCashMetricsDashboard extends Component {
         this.state.loading = true;
         this.state.syncTime = "Sincronizando...";
         try {
-            const data = await rpc("/pos_cash_metrics/data", {
-                company: JSON.stringify(this.state.company),
-                pos: JSON.stringify(this.state.pos),
-                cashier: JSON.stringify(this.state.cashier),
-                start_date: this.state.startDate,
-                end_date: this.state.endDate,
-            });
+            const data = await rpc("/pos_cash_metrics/data", this.serverFilters());
             Object.assign(this.data, data);
+            this.renderCharts();
+            // Las transacciones dependen de los mismos filtros: se recargan si están a la vista
+            this.tx.page = 1;
+            this.tx.loaded = false;
+            if (this.state.tab === "transacciones") {
+                await this.loadTransactions();
+            }
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
         } catch (e) {
             console.error("Error al sincronizar Métricas de Caja:", e);

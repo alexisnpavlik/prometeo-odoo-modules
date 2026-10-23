@@ -260,8 +260,6 @@
                             t-on-click="() => this.switchTab('profitability')">Márgenes</button>
                     <button t-att-class="'nav-tab ' + (state.activeTab === 'sessions' ? 'active' : '')" 
                             t-on-click="() => this.switchTab('sessions')">Auditoría de Cajas</button>
-                    <button t-att-class="'nav-tab ' + (state.activeTab === 'transactions' ? 'active' : '')" 
-                            t-on-click="() => this.switchTab('transactions')">Transacciones</button>
                 </nav>
                 
                 <!-- Tab Content Wrapper -->
@@ -868,80 +866,6 @@
                         </div>
                     </section>
                     
-                    <!-- TAB: TRANSACTIONS -->
-                    <section t-att-class="'tab-pane ' + (state.activeTab === 'transactions' ? 'active' : '')">
-                        <div class="glass-panel padded">
-                            <div class="section-header">
-                                <div>
-                                    <h2>Detalle de Ventas e Historial</h2>
-                                    <p class="subtitle">Auditoría línea por línea de las órdenes registradas</p>
-                                </div>
-                                <div class="header-actions">
-                                    <div class="search-box">
-                                        <input type="text" placeholder="Buscar orden, producto, cliente..." t-on-input="onSearchInput"/>
-                                    </div>
-                                    <button class="btn btn-secondary btn-icon" t-on-click="exportCSV">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                            <polyline points="7 10 12 15 17 10"></polyline>
-                                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                                        </svg>
-                                        <span>Exportar CSV</span>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="table-responsive">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Nro. Orden</th>
-                                            <th>Fecha / Hora</th>
-                                            <th>Caja</th>
-                                            <th>Producto</th>
-                                            <th>Categoría</th>
-                                            <th>Cant.</th>
-                                            <th>Precio Unit.</th>
-                                            <th>Subtotal Con IVA</th>
-                                            <th>Cliente</th>
-                                            <th>Cajero</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <t t-if="transactionsData.sales.length === 0">
-                                            <tr>
-                                                <td colspan="10" class="text-center text-muted">No se encontraron transacciones registradas.</td>
-                                            </tr>
-                                        </t>
-                                        <t t-foreach="transactionsData.sales" t-as="t" t-key="t_index + '-' + t.orden_id + '-' + t.producto">
-                                            <tr>
-                                                <td style="font-weight: 700; color: var(--text-primary);"><t t-esc="t.numero_orden"/></td>
-                                                <td><t t-esc="t.fecha"/></td>
-                                                <td><t t-esc="t.punto_venta"/></td>
-                                                <td><t t-esc="t.producto"/></td>
-                                                <td><t t-esc="t.categoria || 'Sin Categoría'"/></td>
-                                                <td><t t-esc="t.cantidad"/></td>
-                                                <td><t t-esc="formatCurrency(t.precio_unitario)"/></td>
-                                                <td style="font-weight: 600; color: var(--text-primary);"><t t-esc="formatCurrency(t.subtotal_con_iva)"/></td>
-                                                <td><t t-esc="t.cliente || 'Consumidor Final'"/></td>
-                                                <td><t t-esc="t.cajero"/></td>
-                                            </tr>
-                                        </t>
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <!-- Paginación -->
-                            <div class="pagination">
-                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page === 1" t-on-click="prevPage">Anterior</button>
-                                <span class="pagination-info">
-                                    Página <t t-esc="state.page"/> de <t t-esc="transactionsData.pages"/> (Total: <t t-esc="transactionsData.total"/>)
-                                </span>
-                                <button class="btn btn-secondary btn-sm" t-att-disabled="state.page >= transactionsData.pages" t-on-click="nextPage">Siguiente</button>
-                            </div>
-                        </div>
-                    </section>
-
                     <!-- TAB: VENTAS Y RENTABILIDAD -->
                     <section t-att-class="'tab-pane ' + (state.activeTab === 'profitability' ? 'active' : '')">
                         <div t-if="metricsData.kpis.total_orders &gt; 0"
