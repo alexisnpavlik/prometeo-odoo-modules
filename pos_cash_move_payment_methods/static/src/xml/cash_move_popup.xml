@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.CashMovePopup" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('form-floating')]" position="before">
+            <div t-if="moveMethods.length > 1" class="d-flex flex-wrap gap-2 mb-2">
+                <t t-foreach="moveMethods" t-as="pm" t-key="pm.id">
+                    <button type="button"
+                        t-attf-class="btn btn-lg lh-lg {{ state.paymentMethodId === pm.id ? 'btn-primary' : 'btn-secondary' }}"
+                        t-on-click="() => state.paymentMethodId = pm.id"
+                        t-esc="pm.name"/>
+                </t>
+            </div>
+        </xpath>
+    </t>
+</templates>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        <!-- Detalle de ingresos/retiros bajo cada método no efectivo, como el de efectivo -->
+        <xpath expr="(//div[@t-foreach='props.non_cash_payment_methods'])[1]/div[1]" position="after">
+            <PaymentMethodBreakdown t-if="pm.moves?.length"
+                title="'Ingresos / retiros'"
+                total_amount="pm.moves_total"
+                transactions="pm.moves"/>
+        </xpath>
+    </t>
+</templates>
