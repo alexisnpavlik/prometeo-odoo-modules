@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <!--
+        Último campo barcode y prioridad 99: barcodes_generator_product oculta el
+        campo original y agrega otro visible; la cámara tiene que ir en ese.
+    -->
     <record id="product_template_form_view_barcode_camera" model="ir.ui.view">
         <field name="name">product.template.form.barcode.camera</field>
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
-            <field name="barcode" position="attributes">
+            <xpath expr="(//field[@name='barcode'])[last()]" position="attributes">
                 <attribute name="widget">barcode_camera</attribute>
-            </field>
+            </xpath>
         </field>
     </record>
 
@@ -15,10 +20,11 @@
         <field name="name">product.product.form.barcode.camera</field>
         <field name="model">product.product</field>
         <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
-            <field name="barcode" position="attributes">
+            <xpath expr="(//field[@name='barcode'])[last()]" position="attributes">
                 <attribute name="widget">barcode_camera</attribute>
-            </field>
+            </xpath>
         </field>
     </record>
 
@@ -26,10 +32,11 @@
         <field name="name">product.product.easy.edit.barcode.camera</field>
         <field name="model">product.product</field>
         <field name="inherit_id" ref="product.product_variant_easy_edit_view"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
-            <field name="barcode" position="attributes">
+            <xpath expr="(//field[@name='barcode'])[last()]" position="attributes">
                 <attribute name="widget">barcode_camera</attribute>
-            </field>
+            </xpath>
         </field>
     </record>
 </odoo>
