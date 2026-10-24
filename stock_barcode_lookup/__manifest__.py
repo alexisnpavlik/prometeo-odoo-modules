@@ -1,12 +1,13 @@
 {
     "name": "Escáner de productos",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "category": "Inventory/Inventory",
     "summary": "App para buscar un producto escaneando su código de barras con la cámara",
     "description": """
         App "Escáner" en el panel principal. Un botón grande escanea el código
         de barras y muestra el producto (foto, precio, stock, proveedor) con
-        accesos a Abrir ficha, Reabastecer o Escanear otro. Si el código no
+        accesos a Abrir ficha, Reabastecer, Sacar foto (abre la cámara trasera
+        y guarda la foto como imagen del producto) o Escanear otro. Si el código no
         existe, ofrece crear el producto con ese código.
 
         Cámara: con HTTPS (o localhost) abre el video en vivo de Odoo; por
