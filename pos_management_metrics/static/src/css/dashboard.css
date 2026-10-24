@@ -671,6 +671,19 @@
     align-items: center;
 }
 
+.pos-dashboard-wrap .cca-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pos-dashboard-wrap .cca-section h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
 .pos-dashboard-wrap .chart-header h3 {
     font-size: 14px;
     font-weight: 700;

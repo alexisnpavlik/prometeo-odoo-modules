@@ -90,7 +90,9 @@ class PosDashboardMetrics extends Component {
                 products_with_cost_percent: 0.0,
                 top_profitable: [],
                 bottom_profitable: []
-            }
+            },
+            // null sin customer_checking_account instalado: la sección no se muestra
+            cca: null
         });
 
         this.sessionsData = useState([]);

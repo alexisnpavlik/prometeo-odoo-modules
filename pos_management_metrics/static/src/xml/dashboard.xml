@@ -364,7 +364,58 @@
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <!-- Ventas en cuenta corriente: van aparte, no pasan por el POS -->
+                        <div t-if="metricsData.cca" class="cca-section">
+                            <h3>Ventas en cuenta corriente</h3>
+                            <div class="kpi-grid">
+                                <div class="kpi-card shadow-glow green">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title">Total vendido</span>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(metricsData.cca.total)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext">Pendiente de cobro: <t t-esc="formatCurrency(metricsData.cca.residual)"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="kpi-card shadow-glow blue">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title">Retiros</span>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="metricsData.cca.withdrawals.toLocaleString()"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext">Promedio: <t t-esc="formatCurrency(metricsData.cca.average)"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="kpi-card shadow-glow amber">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title">Recargo por financiación</span>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(metricsData.cca.surcharge)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext">Sobre productos por <t t-esc="formatCurrency(metricsData.cca.sales)"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="kpi-card shadow-glow purple">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta">
+                                            <span class="kpi-title">Margen bruto</span>
+                                        </div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(metricsData.cca.gross_profit)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext"><t t-esc="metricsData.cca.margin_percent"/>% · sobre el <t t-esc="metricsData.cca.cost_coverage_percent"/>% de la venta con costo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Charts Grid -->
                         <div class="charts-grid">
                             <!-- Temporal Trend -->
