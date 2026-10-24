@@ -1,6 +1,6 @@
 {
     "name": "Web - Banner para instalar como app",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.1",
     "category": "Hidden/Tools",
     "summary": "Muestra en el móvil un cartel \"Instalar app\" para agregar el ERP a la pantalla de inicio",
     "description": """

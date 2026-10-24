@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { isDisplayStandalone } from "@web/core/browser/feature_detection";
@@ -9,7 +9,8 @@ export class PwaInstallBanner extends Component {
     static props = {};
 
     setup() {
-        this.pwa = useService("pwa");
+        // El servicio es reactive: sin useState el banner no se re-renderiza al descartar
+        this.pwa = useState(useService("pwa"));
         this.ui = useService("ui");
     }
 
