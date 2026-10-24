@@ -527,7 +527,7 @@ class PosMetricsController(http.Controller):
         costed_revenue = float(res.get("costed_revenue") or 0.0)
         gross_profit = round(costed_revenue - float(res.get("cost") or 0.0), 2)
         withdrawals = int(res.get("withdrawals") or 0)
-        return {
+        kpis = {
             "withdrawals": withdrawals,
             "sales": round(sales, 2),
             "surcharge": round(surcharge, 2),
@@ -539,6 +539,37 @@ class PosMetricsController(http.Controller):
             "cost_coverage_percent": round(costed_revenue / sales * 100.0, 1) if sales > 0 else 0.0,
         }
 
+        # Detalle: los mismos retiros que suman los KPIs, del más nuevo al más viejo
+        cr.execute(f"""
+            SELECT w.id, w.name, w.date, COALESCE(p.complete_name, p.name) AS cliente, w.state,
+                   w.amount_total AS total, w.amount_residual AS saldo
+            FROM cca_withdrawal w
+            JOIN res_partner p ON p.id = w.partner_id
+            WHERE w.id IN (
+                SELECT w.id FROM cca_withdrawal_line l
+                JOIN cca_withdrawal w ON w.id = l.withdrawal_id
+                JOIN product_product pp ON pp.id = l.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                LEFT JOIN product_category ic ON ic.id = pt.categ_id
+                LEFT JOIN res_company rc ON rc.id = w.company_id
+                WHERE {' AND '.join(where)}
+            )
+            ORDER BY w.date DESC, w.id DESC
+            LIMIT 500
+        """, params)
+        rows = [
+            {**row, "date": row["date"].isoformat(), "total": float(row["total"] or 0.0),
+             "saldo": float(row["saldo"] or 0.0)}
+            for row in cr.dictfetchall()
+        ]
+        return {"kpis": kpis, "withdrawals": rows}
+
+    @http.route('/pos_management_metrics/cca', type='json', auth='user')
+    def get_cca(self, start_date=None, end_date=None, company='all', category='all', product='all', **kwargs):
+        """Pestaña Cuenta corriente: None si customer_checking_account no está instalado."""
+        self._check_access()
+        return self._get_cca_metrics(start_date, end_date, company, category, product)
+
     @http.route('/pos_management_metrics/metrics', type='json', auth='user')
     def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):
         self._check_access()
@@ -546,8 +577,6 @@ class PosMetricsController(http.Controller):
         tz = self._get_timezone()
         lang = self._get_lang()
         allowed_companies = tuple(request.env.companies.ids)
-        # Va aparte de los KPIs del POS y se calcula aunque no haya órdenes de caja
-        cca = self._get_cca_metrics(start_date, end_date, company, category, product)
 
         # Construir cláusula de filtrado
         where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
@@ -608,8 +637,7 @@ class PosMetricsController(http.Controller):
                 "products_with_cost_percent": 0.0,
                 "top_profitable": [],
                 "bottom_profitable": []
-            },
-            "cca": cca
+            }
         }
 
         if not order_ids:
@@ -1246,8 +1274,7 @@ class PosMetricsController(http.Controller):
                 "products_with_cost_percent": products_with_cost_percent,
                 "top_profitable": top_profitable,
                 "bottom_profitable": bottom_profitable
-            },
-            "cca": cca
+            }
         }
 
     @http.route('/pos_management_metrics/sessions', type='json', auth='user')
