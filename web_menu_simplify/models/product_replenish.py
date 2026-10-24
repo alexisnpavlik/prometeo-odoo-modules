@@ -27,17 +27,20 @@ class ProductReplenish(models.TransientModel):
     )
 
     simplify_vendor_partner = fields.Boolean(compute="_compute_can_edit_route")
+    simplify_hide_route = fields.Boolean(compute="_compute_can_edit_route")
 
     # Sin dependencias Odoo no lo calcula en el registro nuevo del asistente.
     @api.depends("product_id")
     @api.depends_context("uid")
     def _compute_can_edit_route(self):
-        """Ruta bloqueada (salvo admin) y Proveedor como contacto, según Ajustes."""
+        """Ruta bloqueada (salvo admin) u oculta, y Proveedor como contacto, según Ajustes."""
         allowed = self._can_edit_route()
         vendor_partner = is_option_active(self.env, "replenish_vendor_partner")
+        hide_route = is_option_active(self.env, "replenish_hide_route")
         for wizard in self:
             wizard.can_edit_route = allowed
             wizard.simplify_vendor_partner = vendor_partner
+            wizard.simplify_hide_route = hide_route
 
     def _can_edit_route(self):
         """Con la opción de ruta bloqueada, solo el administrador la cambia."""

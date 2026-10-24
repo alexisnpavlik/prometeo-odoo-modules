@@ -124,6 +124,9 @@
                         <setting help="Propone la ruta Comprar y no deja cambiarla (solo el administrador).">
                             <field name="simplify_replenish_buy_locked"/>
                         </setting>
+                        <setting help="El asistente Reabastecer no muestra el campo Ruta preferida (se usa la ruta propuesta).">
+                            <field name="simplify_replenish_hide_route"/>
+                        </setting>
                         <setting help="El campo Proveedor del asistente busca contactos y permite crear uno nuevo; al confirmar se carga su precio en el producto.">
                             <field name="simplify_replenish_vendor_partner"/>
                         </setting>

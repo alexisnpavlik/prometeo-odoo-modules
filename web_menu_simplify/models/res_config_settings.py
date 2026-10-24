@@ -58,6 +58,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_update_quantity = fields.Boolean("Ocultar botón Actualizar cantidad")
     simplify_replenish_immediate = fields.Boolean("Reabastecer ingresa la mercadería al instante")
     simplify_replenish_buy_locked = fields.Boolean("Reabastecer siempre con la ruta Comprar")
+    simplify_replenish_hide_route = fields.Boolean("Reabastecer: ocultar Ruta preferida")
     simplify_replenish_vendor_partner = fields.Boolean("Reabastecer: crear proveedor desde el asistente")
     simplify_stock_categories_menu = fields.Boolean("Menú Categorías en Inventario")
     # Productos

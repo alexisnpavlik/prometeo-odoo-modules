@@ -213,6 +213,7 @@ OTHER_OPTIONS = (
     "pos_first",
     "replenish_immediate",
     "replenish_buy_locked",
+    "replenish_hide_route",
     "replenish_vendor_partner",
     "purchase_return_button",
 )
