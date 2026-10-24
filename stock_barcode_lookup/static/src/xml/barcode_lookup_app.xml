@@ -45,13 +45,20 @@
                             <div t-if="state.result.vendor">Proveedor: <t t-esc="state.result.vendor"/></div>
                             <div class="text-muted">Código: <t t-esc="state.result.code"/></div>
                         </div>
-                        <div class="o_barcode_lookup_actions">
-                            <button class="btn btn-primary" t-on-click="openProduct">Abrir ficha</button>
-                            <button t-if="state.result.can_replenish" class="btn btn-secondary" t-on-click="replenish">Reabastecer</button>
-                            <button class="btn btn-secondary" t-on-click="onTakeProductPhoto">
+                        <div class="o_barcode_lookup_actions o_barcode_lookup_actions_grid">
+                            <button class="btn btn-primary o_wide" t-on-click="openProduct">
+                                <i class="fa fa-external-link"/> Abrir ficha
+                            </button>
+                            <button t-if="state.result.can_replenish" class="btn btn-secondary" t-on-click="replenish">
+                                <i class="fa fa-refresh"/> Reabastecer
+                            </button>
+                            <button t-attf-class="btn btn-secondary {{ state.result.can_replenish ? '' : 'o_wide' }}"
+                                    t-on-click="onTakeProductPhoto">
                                 <i class="fa fa-camera"/> Sacar foto
                             </button>
-                            <button class="btn btn-outline-secondary" t-on-click="reset">Escanear otro</button>
+                            <button class="btn btn-outline-secondary o_wide" t-on-click="reset">
+                                <i class="fa fa-barcode"/> Escanear otro
+                            </button>
                         </div>
                     </div>
                     <div t-else="" class="o_barcode_lookup_card o_barcode_lookup_missing">

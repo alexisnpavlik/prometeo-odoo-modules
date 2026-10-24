@@ -122,3 +122,22 @@
         font-size: 1.05rem;
     }
 }
+
+// Tarjeta del producto: acción principal y "Escanear otro" a todo el ancho, el resto de a dos.
+.o_barcode_lookup_actions_grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: 420px;
+
+    .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .o_wide {
+        grid-column: 1 / -1;
+    }
+}
