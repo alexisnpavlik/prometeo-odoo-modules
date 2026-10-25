@@ -2,6 +2,8 @@
 
 from odoo import _, api, models
 
+from .product_pricelist_item import PROMOTIONS_CONTEXT_KEY
+
 
 class ProductPricelist(models.Model):
     _inherit = "product.pricelist"
@@ -20,5 +22,5 @@ class ProductPricelist(models.Model):
                 (self.env.ref("web_menu_simplify.product_pricelist_item_promotions_form").id, "form"),
             ],
             "domain": [("pricelist_id", "=", pricelist.id)] if pricelist else [],
-            "context": {"default_pricelist_id": pricelist.id} if pricelist else {},
+            "context": {PROMOTIONS_CONTEXT_KEY: True, "default_pricelist_id": pricelist.id},
         }
