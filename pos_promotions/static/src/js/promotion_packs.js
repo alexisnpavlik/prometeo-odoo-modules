@@ -41,33 +41,90 @@ patch(PosOrder.prototype, {
         );
     },
 
+    /** Junta en una línea las del mismo producto y precio que el pack separó (o que quedaron sueltas). */
+    _mergePromotionPackLines(lines) {
+        const kept = [];
+        for (const line of lines) {
+            const target = kept.find(
+                (other) =>
+                    other.product_id.id === line.product_id.id &&
+                    other.price_unit === line.price_unit &&
+                    other.price_type === line.price_type &&
+                    other.getNote() === line.getNote() &&
+                    other.get_customer_note() === line.get_customer_note() &&
+                    other.is_pos_groupable() &&
+                    !other.isLotTracked()
+            );
+            if (target) {
+                target.set_quantity(target.get_quantity() + line.get_quantity());
+                if (this.get_selected_orderline() === line) {
+                    this.select_orderline(target);
+                }
+                line.delete();
+            } else {
+                kept.push(line);
+            }
+        }
+        return kept;
+    },
+
+    /** Parte la línea: queda con `qty` unidades y el resto va a una línea nueva sin descuento. */
+    _splitPromotionPackLine(line, qty) {
+        const rest = line.get_quantity() - qty;
+        line.set_quantity(qty);
+        this.models["pos.order.line"].create({
+            order_id: this,
+            product_id: line.product_id,
+            qty: rest,
+            price_unit: line.price_unit,
+            price_type: line.price_type,
+            price_extra: line.price_extra,
+            full_product_name: line.full_product_name,
+            tax_ids: line.tax_ids.map((tax) => ["link", tax]),
+            attribute_value_ids: (line.attribute_value_ids || []).map((value) => ["link", value]),
+        });
+    },
+
     /**
-     * Busca los packs completos en la orden y reparte su ahorro como descuento % en las
-     * líneas de sus productos. Se recalcula entero en cada cambio de la orden.
+     * Busca los packs completos en la orden (respetando la cantidad de cada producto del
+     * pack) y pone su ahorro como descuento % solo en las unidades que entran en el pack:
+     * si sobran, van en otra línea a precio normal. Se recalcula entero en cada cambio.
      */
     applyPromotionPacks() {
-        if (this._applyingPromotionPacks || this.finalized) {
+        if (this._applyingPromotionPacks || this._promotionPacksPaused || this.finalized) {
             return;
         }
         this._applyingPromotionPacks = true;
         try {
-            const lines = this.get_orderlines().filter((line) => this._isPromotionPackCandidate(line));
+            let lines = this.get_orderlines().filter((line) => this._isPromotionPackCandidate(line));
+            for (const line of lines) {
+                if (line.promotion_pack_tmpl_id) {
+                    line.set_discount(0);
+                    line.update({ promotion_pack_tmpl_id: false });
+                }
+            }
+            lines = this._mergePromotionPackLines(lines);
+
             const available = new Map();
+            const unitPrice = new Map();
             for (const line of lines) {
                 const id = line.product_id.id;
                 available.set(id, (available.get(id) || 0) + line.get_quantity());
+                if (!unitPrice.has(id)) {
+                    unitPrice.set(id, line.get_unit_price());
+                }
             }
-            // Ahorro y pack por producto. Primero los packs que más ahorran.
+            // Por producto: unidades dentro de packs, ahorro y pack. Primero los que más ahorran.
+            const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
             const packs = this.getPromotionPacks()
-                .map((pack) => {
-                    const regular = pack.components.reduce(
-                        (acc, c) => acc + (lines.find((l) => l.product_id.id === c.product.id)?.get_unit_price() ?? c.product.lst_price) * c.qty,
-                        0
-                    );
-                    return { ...pack, regular, price: pack.product.lst_price };
-                })
+                .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
+                .map((pack) => ({
+                    ...pack,
+                    price: pack.product.lst_price,
+                    regular: pack.components.reduce((acc, c) => acc + unitPrice.get(c.product.id) * c.qty, 0),
+                }))
                 .filter((pack) => pack.regular > pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));
             for (const pack of packs) {
@@ -79,26 +136,30 @@ patch(PosOrder.prototype, {
                 }
                 const ratio = 1 - pack.price / pack.regular;
                 for (const c of pack.components) {
-                    const unit = lines.find((l) => l.product_id.id === c.product.id).get_unit_price();
-                    available.set(c.product.id, available.get(c.product.id) - times * c.qty);
-                    saving.set(c.product.id, (saving.get(c.product.id) || 0) + times * c.qty * unit * ratio);
-                    packByProduct.set(c.product.id, pack.template);
+                    const id = c.product.id;
+                    const units = times * c.qty;
+                    available.set(id, available.get(id) - units);
+                    packed.set(id, (packed.get(id) || 0) + units);
+                    saving.set(id, (saving.get(id) || 0) + units * unitPrice.get(id) * ratio);
+                    packByProduct.set(id, pack.template);
                 }
             }
-            for (const line of lines) {
-                const id = line.product_id.id;
-                const productLines = lines.filter((l) => l.product_id.id === id);
-                const productTotal = productLines.reduce((acc, l) => acc + l.get_unit_price() * l.get_quantity(), 0);
-                const lineTotal = line.get_unit_price() * line.get_quantity();
-                const lineSaving = productTotal ? ((saving.get(id) || 0) * lineTotal) / productTotal : 0;
+
+            for (const [id, units] of packed) {
                 // Odoo guarda el descuento con 2 decimales: el total puede diferir del pack en centavos.
-                const discount = lineTotal ? Math.round((lineSaving / lineTotal) * 10000) / 100 : 0;
-                const pack = discount > 0 ? packByProduct.get(id) : false;
-                if (Math.abs(line.get_discount() - discount) > 1e-6) {
+                const discount = Math.round((saving.get(id) / (units * unitPrice.get(id))) * 10000) / 100;
+                let remaining = units;
+                for (const line of lines.filter((l) => l.product_id.id === id)) {
+                    if (remaining <= 0) {
+                        break;
+                    }
+                    const take = Math.min(line.get_quantity(), remaining);
+                    if (take < line.get_quantity()) {
+                        this._splitPromotionPackLine(line, take);
+                    }
                     line.set_discount(discount);
-                }
-                if (recordId(line.promotion_pack_tmpl_id) !== recordId(pack)) {
-                    line.update({ promotion_pack_tmpl_id: pack || false });
+                    line.update({ promotion_pack_tmpl_id: packByProduct.get(id) });
+                    remaining -= take;
                 }
             }
         } finally {
@@ -133,21 +194,27 @@ patch(PosStore.prototype, {
         const product = typeof vals.product_id === "number"
             ? this.data.models["product.product"].get(vals.product_id)
             : vals.product_id;
-        if (product?.is_promotion_pack) {
-            const pack = order.getPromotionPacks().find((p) => p.product.id === product.id);
-            let last;
-            for (const component of pack?.components || []) {
-                last = await super.addLineToOrder(
-                    { product_id: component.product, qty: (vals.qty || 1) * component.qty },
-                    order,
-                    opts,
-                    false
-                );
+        // Pausado mientras Odoo agrega: al sumar a una línea existente, la nueva todavía
+        // está en la orden y el recálculo la contaría dos veces.
+        order._promotionPacksPaused = true;
+        let line;
+        try {
+            if (product?.is_promotion_pack) {
+                const pack = order.getPromotionPacks().find((p) => p.product.id === product.id);
+                for (const component of pack?.components || []) {
+                    line = await super.addLineToOrder(
+                        { product_id: component.product, qty: (vals.qty || 1) * component.qty },
+                        order,
+                        opts,
+                        false
+                    );
+                }
+            } else {
+                line = await super.addLineToOrder(...arguments);
             }
-            order.applyPromotionPacks();
-            return last;
+        } finally {
+            order._promotionPacksPaused = false;
         }
-        const line = await super.addLineToOrder(...arguments);
         order.applyPromotionPacks();
         return line;
     },
