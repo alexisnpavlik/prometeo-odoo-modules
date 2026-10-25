@@ -39,6 +39,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_pos_printers = fields.Boolean("Ocultar Impresoras de preparación")
     simplify_hide_pos_note_models = fields.Boolean("Ocultar Modelos de nota")
     simplify_pos_invoices_menu = fields.Boolean("Menú Facturas en Punto de venta")
+    simplify_pos_promotions_menu = fields.Boolean("App Promociones en el menú principal")
     # Facturación
     simplify_hide_account = fields.Boolean("Ocultar app Facturación")
     simplify_hide_account_dashboard = fields.Boolean("Ocultar Tablero de Facturación")
