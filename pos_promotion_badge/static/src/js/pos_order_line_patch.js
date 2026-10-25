@@ -1,0 +1,48 @@
+/** @odoo-module **/
+import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
+import { formatCurrency, roundCurrency } from "@point_of_sale/app/models/utils/currency";
+import { accountTaxHelpers } from "@account/helpers/account_tax";
+import { patch } from "@web/core/utils/patch";
+
+patch(PosOrderline.prototype, {
+    /** Precio de venta del producto sin lista de precios, con impuestos según la config del POS. */
+    getPromotionOriginalPrice() {
+        const baseLine = accountTaxHelpers.prepare_base_line_for_taxes_computation(
+            this,
+            this.prepareBaseLineForTaxesComputationExtraValues({
+                price_unit: this.product_id.lst_price + (this.price_extra || 0),
+                quantity: 1,
+                tax_ids: this.product_id.taxes_id,
+            })
+        );
+        accountTaxHelpers.add_tax_details_in_base_line(baseLine, this.company);
+        accountTaxHelpers.round_base_lines_tax_details([baseLine], this.company);
+        return this.config.iface_tax_included === "total"
+            ? baseLine.tax_details.total_included_currency
+            : baseLine.tax_details.total_excluded_currency;
+    },
+
+    /** Indica si a la línea le aplica una regla de la lista que baja el precio de venta. */
+    isPromotion() {
+        if (this.price_type === "manual" || this.combo_parent_id || this.get_quantity() <= 0) {
+            return false;
+        }
+        const rule = this.product_id.getPricelistRule(this.order_id.pricelist_id, this.get_quantity());
+        return (
+            Boolean(rule) &&
+            roundCurrency(this.get_unit_display_price(), this.currency) <
+                roundCurrency(this.getPromotionOriginalPrice(), this.currency)
+        );
+    },
+
+    /** Agrega la marca de promoción y tacha el precio original también en reglas de precio fijo. */
+    getDisplayData() {
+        const data = super.getDisplayData();
+        const promotion = this.isPromotion();
+        data.promotion = promotion;
+        if (promotion) {
+            data.oldUnitPrice = formatCurrency(this.getPromotionOriginalPrice(), this.currency);
+        }
+        return data;
+    },
+});
