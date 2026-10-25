@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Métricas Gerenciales y Dashboard POS",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.1",
     "category": "Point of Sale",
     "summary": "Dashboard interactivo premium y métricas gerenciales con Chart.js para análisis de ventas y auditoría de arqueo de cajas",
     "description": """

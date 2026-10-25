@@ -7,9 +7,11 @@
         <field name="arch" type="xml">
             <field name="route_id" position="before">
                 <field name="can_edit_route" invisible="1"/>
+                <field name="simplify_hide_route" invisible="1"/>
             </field>
             <field name="route_id" position="attributes">
                 <attribute name="readonly">not can_edit_route</attribute>
+                <attribute name="invisible">simplify_hide_route</attribute>
                 <attribute name="force_save">1</attribute>
             </field>
         </field>
