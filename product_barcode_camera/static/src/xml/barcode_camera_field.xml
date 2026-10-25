@@ -14,4 +14,10 @@
             </button>
         </xpath>
     </t>
+
+    <t t-name="product_barcode_camera.BarcodeCameraDialog" t-inherit="web.BarcodeDialog" t-inherit-mode="primary">
+        <xpath expr="//BarcodeVideoScanner" position="attributes">
+            <attribute name="onReady.bind">onReady</attribute>
+        </xpath>
+    </t>
 </templates>
