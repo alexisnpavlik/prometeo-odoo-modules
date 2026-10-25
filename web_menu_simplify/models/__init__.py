@@ -3,6 +3,7 @@
 from . import ir_http
 from . import ir_ui_menu
 from . import product_pricelist
+from . import product_pricelist_item
 from . import product_product
 from . import product_replenish
 from . import product_template
