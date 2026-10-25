@@ -2,7 +2,7 @@
 
 import re
 
-from odoo import api, models
+from odoo import api, fields, models
 from odoo.tools.misc import format_amount
 
 
@@ -16,6 +16,8 @@ class ProductProduct(models.Model):
     def _barcode_lookup_data(self, code):
         """Datos que muestra la tarjeta de resultado de la app Escáner."""
         template = self.product_tmpl_id
+        # La foto puede guardarse en la plantilla (producto sin variantes): se usa la fecha más nueva
+        last_write = max(self.write_date, template.write_date)
         return {
             "found": True,
             "code": code or self.barcode or self.default_code or "",
@@ -26,7 +28,9 @@ class ProductProduct(models.Model):
             "qty_available": "%g" % self.qty_available,
             "uom": self.uom_id.name,
             "vendor": template.seller_ids[:1].partner_id.name or "",
-            "image_url": "/web/image/product.product/%s/image_512" % self.id,
+            # unique evita que el navegador muestre la foto vieja tras sacar una nueva
+            "image_url": "/web/image/product.product/%s/image_512?unique=%s"
+            % (self.id, fields.Datetime.to_string(last_write).replace(" ", "_")),
             "can_replenish": bool(self.is_storable),
         }
 

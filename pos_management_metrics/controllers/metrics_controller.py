@@ -471,6 +471,105 @@ class PosMetricsController(http.Controller):
             "prev_end": prev_end.strftime('%Y-%m-%d'),
         }
 
+    def _get_cca_metrics(self, start_date=None, end_date=None, company='all', category='all', product='all'):
+        """Ventas en cuenta corriente (customer_checking_account): no pasan por el POS.
+
+        Cuenta los retiros confirmados (pendiente, pago parcial o pagado) por su fecha.
+        Los filtros de caja y cajero no aplican. El recargo por financiación queda fuera
+        del margen, igual que el recargo del POS. Sin el módulo instalado devuelve None.
+        """
+        if 'cca.withdrawal' not in request.env:
+            return None
+        cr = request.env.cr
+        lang = self._get_lang()
+        where = ["w.state IN ('pending', 'partial', 'paid')", "w.company_id IN %s"]
+        params = [tuple(request.env.companies.ids)]
+        if start_date:
+            where.append("w.date >= %s")
+            params.append(start_date)
+        if end_date:
+            where.append("w.date <= %s")
+            params.append(end_date)
+        companies = self._normalize_multi(company)
+        if companies:
+            where.append("rc.name IN %s")
+            params.append(companies)
+        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        where += line_clauses
+        params += line_params
+        unit_cost = "COALESCE((pp.standard_price->>(w.company_id::text))::numeric, 0.0)"
+
+        cr.execute(f"""
+            WITH lines AS (
+                SELECT w.id AS withdrawal_id, l.price_subtotal, l.quantity * {unit_cost} AS cost,
+                       {unit_cost} > 0 AS has_cost
+                FROM cca_withdrawal_line l
+                JOIN cca_withdrawal w ON w.id = l.withdrawal_id
+                JOIN product_product pp ON pp.id = l.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                LEFT JOIN product_category ic ON ic.id = pt.categ_id
+                LEFT JOIN res_company rc ON rc.id = w.company_id
+                WHERE {' AND '.join(where)}
+            )
+            SELECT
+                (SELECT COUNT(DISTINCT withdrawal_id) FROM lines) AS withdrawals,
+                (SELECT SUM(price_subtotal) FROM lines) AS sales,
+                (SELECT SUM(price_subtotal) FROM lines WHERE has_cost) AS costed_revenue,
+                (SELECT SUM(cost) FROM lines WHERE has_cost) AS cost,
+                (SELECT SUM(w.amount_surcharge) FROM cca_withdrawal w
+                 WHERE w.id IN (SELECT withdrawal_id FROM lines)) AS surcharge,
+                (SELECT SUM(w.amount_residual) FROM cca_withdrawal w
+                 WHERE w.id IN (SELECT withdrawal_id FROM lines)) AS residual
+        """, params)
+        res = cr.dictfetchone() or {}
+        sales = float(res.get("sales") or 0.0)
+        surcharge = float(res.get("surcharge") or 0.0)
+        costed_revenue = float(res.get("costed_revenue") or 0.0)
+        gross_profit = round(costed_revenue - float(res.get("cost") or 0.0), 2)
+        withdrawals = int(res.get("withdrawals") or 0)
+        kpis = {
+            "withdrawals": withdrawals,
+            "sales": round(sales, 2),
+            "surcharge": round(surcharge, 2),
+            "total": round(sales + surcharge, 2),
+            "average": round((sales + surcharge) / withdrawals, 2) if withdrawals else 0.0,
+            "residual": round(float(res.get("residual") or 0.0), 2),
+            "gross_profit": gross_profit,
+            "margin_percent": round(gross_profit / costed_revenue * 100.0, 2) if costed_revenue > 0 else 0.0,
+            "cost_coverage_percent": round(costed_revenue / sales * 100.0, 1) if sales > 0 else 0.0,
+        }
+
+        # Detalle: los mismos retiros que suman los KPIs, del más nuevo al más viejo
+        cr.execute(f"""
+            SELECT w.id, w.name, w.date, COALESCE(p.complete_name, p.name) AS cliente, w.state,
+                   w.amount_total AS total, w.amount_residual AS saldo
+            FROM cca_withdrawal w
+            JOIN res_partner p ON p.id = w.partner_id
+            WHERE w.id IN (
+                SELECT w.id FROM cca_withdrawal_line l
+                JOIN cca_withdrawal w ON w.id = l.withdrawal_id
+                JOIN product_product pp ON pp.id = l.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                LEFT JOIN product_category ic ON ic.id = pt.categ_id
+                LEFT JOIN res_company rc ON rc.id = w.company_id
+                WHERE {' AND '.join(where)}
+            )
+            ORDER BY w.date DESC, w.id DESC
+            LIMIT 500
+        """, params)
+        rows = [
+            {**row, "date": row["date"].isoformat(), "total": float(row["total"] or 0.0),
+             "saldo": float(row["saldo"] or 0.0)}
+            for row in cr.dictfetchall()
+        ]
+        return {"kpis": kpis, "withdrawals": rows}
+
+    @http.route('/pos_management_metrics/cca', type='json', auth='user')
+    def get_cca(self, start_date=None, end_date=None, company='all', category='all', product='all', **kwargs):
+        """Pestaña Cuenta corriente: None si customer_checking_account no está instalado."""
+        self._check_access()
+        return self._get_cca_metrics(start_date, end_date, company, category, product)
+
     @http.route('/pos_management_metrics/metrics', type='json', auth='user')
     def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):
         self._check_access()

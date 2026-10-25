@@ -10,6 +10,8 @@ import { isBarcodeScannerSupported } from "@web/core/barcode/barcode_video_scann
 
 // Las fotos del teléfono son grandes: se achican antes de leer el código.
 const MAX_SIDE = 1600;
+// Tamaño máximo que Odoo guarda en image_1920; achicar antes evita subir fotos de varios MB.
+const PRODUCT_PHOTO_SIDE = 1920;
 
 export class BarcodeLookupApp extends Component {
     static template = "stock_barcode_lookup.App";
@@ -20,6 +22,7 @@ export class BarcodeLookupApp extends Component {
         this.action = useService("action");
         this.notification = useService("notification");
         this.photoInput = useRef("photoInput");
+        this.productPhotoInput = useRef("productPhotoInput");
         this.state = useState({ code: "", result: null, results: [], loading: false });
         this.searchDebounced = useDebounced(() => this.search(), 300);
     }
@@ -96,9 +99,9 @@ export class BarcodeLookupApp extends Component {
         return null;
     }
 
-    async toCanvas(file) {
+    async toCanvas(file, maxSide = MAX_SIDE) {
         const bitmap = await createImageBitmap(file);
-        const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(bitmap.width * scale);
         canvas.height = Math.round(bitmap.height * scale);
@@ -197,6 +200,31 @@ export class BarcodeLookupApp extends Component {
             additionalContext: { default_product_tmpl_id: template_id, default_product_id: product_id },
             onClose: () => this.selectProduct(product_id),
         });
+    }
+
+    /** Abre la cámara trasera (capture="environment": no necesita HTTPS). */
+    onTakeProductPhoto() {
+        this.productPhotoInput.el.click();
+    }
+
+    /** Guarda la foto sacada como imagen del producto y refresca la tarjeta. */
+    async onProductPhoto(ev) {
+        const file = ev.target.files[0];
+        ev.target.value = "";
+        if (!file) {
+            return;
+        }
+        const { product_id } = this.state.result;
+        this.state.loading = true;
+        try {
+            const canvas = await this.toCanvas(file, PRODUCT_PHOTO_SIDE);
+            const image = canvas.toDataURL("image/jpeg", 0.9).split(",")[1];
+            await this.orm.write("product.product", [product_id], { image_1920: image });
+            this.state.result = await this.orm.call("product.product", "barcode_lookup_product", [product_id]);
+            this.notification.add(_t("Foto guardada."), { type: "success" });
+        } finally {
+            this.state.loading = false;
+        }
     }
 
     createProduct() {

@@ -96,6 +96,9 @@ class PosDashboardMetrics extends Component {
         this.sessionsData = useState([]);
 
         this.topArticlesData = useState({ by_revenue: [], by_units: [] });
+
+        // Pestaña Cuenta corriente: solo aparece si customer_checking_account está instalado
+        this.ccaData = useState({ available: false, kpis: {}, withdrawals: [] });
         
         this.charts = {};
 
@@ -104,6 +107,7 @@ class PosDashboardMetrics extends Component {
             this.setPresetDates(this.state.preset);
             await this.loadFiltersMetadata();
             await this.refreshData();
+            await this.loadCca();
         });
 
         onMounted(() => {
@@ -296,6 +300,8 @@ class PosDashboardMetrics extends Component {
             this.loadSessions();
         } else if (tab === "toparticles") {
             this.loadTopArticles();
+        } else if (tab === "cca") {
+            this.loadCca();
         } else if (tab === "general") {
             // Re-renderizar gráficos en pestaña general para ajustar dimensiones
             setTimeout(() => this.renderAllCharts(), 50);
@@ -479,6 +485,8 @@ class PosDashboardMetrics extends Component {
                 await this.loadSessions();
             } else if (this.state.activeTab === "toparticles") {
                 await this.loadTopArticles();
+            } else if (this.state.activeTab === "cca") {
+                await this.loadCca();
             }
 
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
@@ -546,6 +554,27 @@ class PosDashboardMetrics extends Component {
         } catch (e) {
             console.error("Error al cargar top de artículos:", e);
         }
+    }
+
+    async loadCca() {
+        try {
+            const data = await rpc("/pos_management_metrics/cca", {
+                start_date: this.state.startDate || null,
+                end_date: this.state.endDate || null,
+                company: JSON.stringify(this.companyFilter),
+                category: JSON.stringify(this.categoryFilter),
+                product: JSON.stringify(this.productFilter)
+            });
+            this.ccaData.available = Boolean(data);
+            this.ccaData.kpis = data ? data.kpis : {};
+            this.ccaData.withdrawals = data ? data.withdrawals : [];
+        } catch (e) {
+            console.error("Error al cargar cuenta corriente:", e);
+        }
+    }
+
+    ccaStateLabel(state) {
+        return { pending: "Pendiente", partial: "Pago parcial", paid: "Pagado" }[state] || state;
     }
 
     exportTopArticlesExcel() {

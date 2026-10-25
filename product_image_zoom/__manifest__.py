@@ -1,6 +1,6 @@
 {
     "name": "Product Image Zoom",
-    "version": "18.0.2.0.0",
+    "version": "18.0.2.1.0",
     "category": "Inventory",
     "summary": "Tocar la imagen del producto abre un popup para verla en grande, cambiarla o quitarla",
     "author": "Alexis Medina",

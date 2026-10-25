@@ -1,7 +1,6 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { isMobileOS } from "@web/core/browser/feature_detection";
 import { scanBarcode } from "@web/core/barcode/barcode_dialog";
 import { isBarcodeScannerSupported } from "@web/core/barcode/barcode_video_scanner";
 import { CharField, charField } from "@web/views/fields/char/char_field";
@@ -11,7 +10,8 @@ export class BarcodeCameraField extends CharField {
 
     setup() {
         super.setup();
-        this.showCamera = isMobileOS() && isBarcodeScannerSupported();
+        // En cualquier dispositivo con cámara accesible (teléfono, tablet o PC con webcam).
+        this.showCamera = isBarcodeScannerSupported();
     }
 
     /**
