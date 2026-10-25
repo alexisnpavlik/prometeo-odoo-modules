@@ -9,13 +9,15 @@ import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 
 patch(PosOrder.prototype, {
-    /** Líneas de venta con precio unitario $0 (sin devoluciones ni líneas de combo). */
+    /** Líneas de venta con precio unitario $0 (sin devoluciones, combos ni componentes de pack). */
     getZeroPriceLines() {
         return this.get_orderlines().filter(
             (line) =>
                 line.get_quantity() > 0 &&
                 !line.combo_parent_id &&
                 !line.combo_line_ids?.length &&
+                // pos_product_pack deja los componentes a $0 cuando el precio va en el pack.
+                !line.is_pack_component &&
                 roundCurrency(line.get_unit_price(), line.currency) === 0
         );
     },

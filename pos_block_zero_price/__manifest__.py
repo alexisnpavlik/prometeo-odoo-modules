@@ -12,7 +12,8 @@
         Al tocar Pago, y otra vez al validar el pago, si alguna línea tiene precio
         unitario $0 el POS muestra qué productos son y no deja seguir.
 
-        No cuenta: devoluciones, líneas de combo (el precio va en el combo) ni
+        No cuenta: devoluciones, líneas de combo (el precio va en el combo),
+        componentes de pack de pos_product_pack (el precio va en el pack) ni
         descuentos aplicados sobre un precio mayor a $0.
     """,
     "author": "Alexis Medina",
