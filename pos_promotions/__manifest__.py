@@ -15,13 +15,18 @@
           pos_product_pack: en el POS se agregan con un toque, el precio se
           reparte entre los productos y cada uno descuenta su stock.
 
-        Trae pos_promotion_badge, que marca en el POS las líneas con promoción.
+        En el POS, las líneas con promoción (una regla de Precios que baja el precio
+        de venta, o un pack más barato que sus productos sueltos) llevan la
+        etiqueta Promoción y el precio original tachado, también en reglas de
+        precio fijo (Odoo solo lo tacha en descuentos %). No marca precios
+        editados a mano ni reglas que dejan el precio igual o más alto.
+        Reemplaza al módulo pos_promotion_badge.
         Reemplaza a la app Promociones que vivía en web_menu_simplify.
     """,
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["point_of_sale", "pos_promotion_badge"],
+    "depends": ["point_of_sale"],
     "data": [
         "security/ir.model.access.csv",
         "views/promotion_price_views.xml",
@@ -30,7 +35,10 @@
     ],
     "assets": {
         "point_of_sale._assets_pos": [
+            "pos_promotions/static/src/js/pos_order_line_patch.js",
             "pos_promotions/static/src/js/product_screen_patch.js",
+            "pos_promotions/static/src/xml/orderline.xml",
+            "pos_promotions/static/src/scss/orderline.scss",
         ],
     },
     "installable": True,

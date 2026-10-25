@@ -22,10 +22,25 @@ patch(PosOrderline.prototype, {
             : baseLine.tax_details.total_excluded_currency;
     },
 
-    /** Indica si a la línea le aplica una regla de la lista que baja el precio de venta. */
+    /** Pack: precio por unidad de pack de los productos sueltos y el que se cobra. */
+    getPackPrices() {
+        const qty = this.get_quantity() || 1;
+        const sum = (fn) => this.combo_line_ids.reduce((acc, child) => acc + fn(child) * child.get_quantity(), 0) / qty;
+        return {
+            original: sum((child) => child.getPromotionOriginalPrice()),
+            current: sum((child) => child.get_unit_display_price()),
+        };
+    },
+
+    /** Indica si a la línea le aplica una regla de la lista que baja el precio de venta,
+     * o si es un pack de Promociones más barato que sus productos sueltos. */
     isPromotion() {
         if (this.price_type === "manual" || this.combo_parent_id || this.get_quantity() <= 0) {
             return false;
+        }
+        if (this.product_id.is_promotion_pack && this.combo_line_ids?.length) {
+            const { original, current } = this.getPackPrices();
+            return roundCurrency(current, this.currency) < roundCurrency(original, this.currency);
         }
         const rule = this.product_id.getPricelistRule(this.order_id.pricelist_id, this.get_quantity());
         return (
@@ -41,7 +56,10 @@ patch(PosOrderline.prototype, {
         const promotion = this.isPromotion();
         data.promotion = promotion;
         if (promotion) {
-            data.oldUnitPrice = formatCurrency(this.getPromotionOriginalPrice(), this.currency);
+            const original = this.product_id.is_promotion_pack
+                ? this.getPackPrices().original
+                : this.getPromotionOriginalPrice();
+            data.oldUnitPrice = formatCurrency(original, this.currency);
         }
         return data;
     },

@@ -32,6 +32,7 @@
                         <label for="name" string="Nombre del pack"/>
                         <h1><field name="name" placeholder="p. ej. Fernet + Coca-Cola"/></h1>
                     </div>
+                    <!-- Sin categoría del POS: el pack se muestra siempre (pos_config.py y product_screen_patch.js). -->
                     <group>
                         <group>
                             <field name="list_price" string="Precio del pack" widget="monetary"/>
@@ -40,7 +41,6 @@
                         </group>
                         <group>
                             <field name="active" widget="boolean_toggle" string="Activo"/>
-                            <field name="pos_categ_ids" widget="many2many_tags" string="Categoría en el POS"/>
                         </group>
                     </group>
                     <field name="promotion_pack_line_ids">
