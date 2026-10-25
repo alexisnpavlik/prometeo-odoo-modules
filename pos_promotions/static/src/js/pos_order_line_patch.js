@@ -2,7 +2,11 @@
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { formatCurrency, roundCurrency } from "@point_of_sale/app/models/utils/currency";
 import { accountTaxHelpers } from "@account/helpers/account_tax";
+import { Orderline } from "@point_of_sale/app/generic_components/orderline/orderline";
 import { patch } from "@web/core/utils/patch";
+
+// La línea valida la forma de sus datos (en modo debug falla con una clave desconocida).
+Orderline.props.line.shape.promotion = { type: Boolean, optional: true };
 
 patch(PosOrderline.prototype, {
     /** Precio de venta del producto sin lista de precios, con impuestos según la config del POS. */
@@ -55,10 +59,13 @@ patch(PosOrderline.prototype, {
         const data = super.getDisplayData();
         const promotion = this.isPromotion();
         data.promotion = promotion;
+        const isPack = this.product_id.is_promotion_pack && this.combo_line_ids?.length;
+        if (isPack) {
+            // En un combo Odoo muestra $0 por unidad: el precio lo llevan los productos de abajo.
+            data.unitPrice = formatCurrency(this.getPackPrices().current, this.currency);
+        }
         if (promotion) {
-            const original = this.product_id.is_promotion_pack
-                ? this.getPackPrices().original
-                : this.getPromotionOriginalPrice();
+            const original = isPack ? this.getPackPrices().original : this.getPromotionOriginalPrice();
             data.oldUnitPrice = formatCurrency(original, this.currency);
         }
         return data;
