@@ -23,6 +23,25 @@
             </list>
         </field>
     </record>
+    <!-- Ficha de la regla con producto o categoría obligatorios: vacíos, Odoo la guarda como
+         "Todos los productos" y con precio fijo $0 deja todo el catálogo gratis. -->
+    <record id="product_pricelist_item_promotions_form" model="ir.ui.view">
+        <field name="name">product.pricelist.item.form.promotions</field>
+        <field name="model">product.pricelist.item</field>
+        <field name="inherit_id" ref="product.product_pricelist_item_form_view"/>
+        <field name="mode">primary</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <field name="product_tmpl_id" position="attributes">
+                <attribute name="required">display_applied_on == '1_product'</attribute>
+                <attribute name="placeholder">Elegí un producto</attribute>
+            </field>
+            <field name="categ_id" position="attributes">
+                <attribute name="required">display_applied_on == '2_product_category'</attribute>
+                <attribute name="placeholder">Elegí una categoría</attribute>
+            </field>
+        </field>
+    </record>
     <record id="action_promotions" model="ir.actions.server">
         <field name="name">Promociones</field>
         <field name="model_id" ref="product.model_product_pricelist"/>
