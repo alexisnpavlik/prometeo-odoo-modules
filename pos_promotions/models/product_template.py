@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import logging
-
-from odoo import Command, _, api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
-
-_logger = logging.getLogger(__name__)
 
 
 class ProductTemplate(models.Model):
@@ -38,41 +34,8 @@ class ProductTemplate(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Arma los combos del POS de los packs nuevos. El pack nace como producto común y
-        pasa a combo con sus combos ya armados: Odoo no deja crear un combo vacío."""
+        """El pack es un producto sin stock propio: en el POS se venden sus productos."""
         for vals in vals_list:
             if vals.get("is_promotion_pack"):
-                vals["type"] = "consu"
-        templates = super().create(vals_list)
-        packs = templates.filtered("is_promotion_pack")
-        packs._sync_promotion_pack_combos()
-        packs.write({"type": "combo"})
-        return templates
-
-    def write(self, vals):
-        """Rearma los combos del POS si cambian los productos o el nombre del pack."""
-        res = super().write(vals)
-        if {"promotion_pack_line_ids", "name", "is_promotion_pack"} & set(vals):
-            self.filtered("is_promotion_pack")._sync_promotion_pack_combos()
-        return res
-
-    def _sync_promotion_pack_combos(self):
-        """Un combo de una sola opción por cada unidad de cada producto: el POS los agrega
-        solos (sin elegir) y reparte el precio del pack entre los productos."""
-        Combo = self.env["product.combo"].sudo()
-        for template in self:
-            old_combos = Combo.search([("promotion_pack_tmpl_id", "=", template.id)])
-            combos = Combo.create([
-                {
-                    "name": f"{template.name}: {line.product_id.display_name}"
-                    + (f" ({unit}/{line.quantity})" if line.quantity > 1 else ""),
-                    "promotion_pack_tmpl_id": template.id,
-                    "company_id": template.company_id.id,
-                    "combo_item_ids": [Command.create({"product_id": line.product_id.id})],
-                }
-                for line in template.promotion_pack_line_ids
-                for unit in range(1, line.quantity + 1)
-            ])
-            template.combo_ids = [Command.set(combos.ids)]
-            old_combos.unlink()
-            _logger.info("pos_promotions: pack %s con %s combos", template.display_name, len(combos))
+                vals.update(type="consu", is_storable=False)
+        return super().create(vals_list)

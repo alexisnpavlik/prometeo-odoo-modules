@@ -26,25 +26,10 @@ patch(PosOrderline.prototype, {
             : baseLine.tax_details.total_excluded_currency;
     },
 
-    /** Pack: precio por unidad de pack de los productos sueltos y el que se cobra. */
-    getPackPrices() {
-        const qty = this.get_quantity() || 1;
-        const sum = (fn) => this.combo_line_ids.reduce((acc, child) => acc + fn(child) * child.get_quantity(), 0) / qty;
-        return {
-            original: sum((child) => child.getPromotionOriginalPrice()),
-            current: sum((child) => child.get_unit_display_price()),
-        };
-    },
-
-    /** Indica si a la línea le aplica una regla de la lista que baja el precio de venta,
-     * o si es un pack de Promociones más barato que sus productos sueltos. */
+    /** Indica si a la línea le aplica una regla de la lista que baja el precio de venta. */
     isPromotion() {
         if (this.price_type === "manual" || this.combo_parent_id || this.get_quantity() <= 0) {
             return false;
-        }
-        if (this.product_id.is_promotion_pack && this.combo_line_ids?.length) {
-            const { original, current } = this.getPackPrices();
-            return roundCurrency(current, this.currency) < roundCurrency(original, this.currency);
         }
         const rule = this.product_id.getPricelistRule(this.order_id.pricelist_id, this.get_quantity());
         return (
@@ -57,16 +42,10 @@ patch(PosOrderline.prototype, {
     /** Agrega la marca de promoción y tacha el precio original también en reglas de precio fijo. */
     getDisplayData() {
         const data = super.getDisplayData();
-        const promotion = this.isPromotion();
-        data.promotion = promotion;
-        const isPack = this.product_id.is_promotion_pack && this.combo_line_ids?.length;
-        if (isPack) {
-            // En un combo Odoo muestra $0 por unidad: el precio lo llevan los productos de abajo.
-            data.unitPrice = formatCurrency(this.getPackPrices().current, this.currency);
-        }
-        if (promotion) {
-            const original = isPack ? this.getPackPrices().original : this.getPromotionOriginalPrice();
-            data.oldUnitPrice = formatCurrency(original, this.currency);
+        // Línea de un pack: el ahorro ya se ve como descuento %, solo se suma la etiqueta.
+        data.promotion = Boolean(this.promotion_pack_tmpl_id) || this.isPromotion();
+        if (!this.promotion_pack_tmpl_id && data.promotion) {
+            data.oldUnitPrice = formatCurrency(this.getPromotionOriginalPrice(), this.currency);
         }
         return data;
     },

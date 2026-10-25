@@ -10,13 +10,15 @@
         - Precios: las reglas de la lista de precios principal (la primera por
           secuencia). Producto o categoría obligatorios: una regla sin ninguno
           quedaría para todo el catálogo.
-        - Packs: varios productos juntos a un precio (p. ej. Fernet + Coca-Cola).
-          Se arman como combos nativos de Odoo, sin product_pack ni
-          pos_product_pack: en el POS se agregan con un toque, el precio se
-          reparte entre los productos y cada uno descuenta su stock.
+        - Packs: varios productos juntos a un precio (p. ej. Fernet + Coca-Cola),
+          sin product_pack ni pos_product_pack. En el POS el pack se activa solo
+          cuando la orden tiene todos sus productos (cargados uno por uno, o
+          tocando o escaneando el pack, que los agrega). El ahorro se reparte como
+          descuento % en esas líneas, que siguen siendo productos normales y
+          descuentan su stock.
 
         En el POS, las líneas con promoción (una regla de Precios que baja el precio
-        de venta, o un pack más barato que sus productos sueltos) llevan la
+        de venta, o un pack aplicado) llevan la
         etiqueta Promoción y el precio original tachado, también en reglas de
         precio fijo (Odoo solo lo tacha en descuentos %). No marca precios
         editados a mano ni reglas que dejan el precio igual o más alto.
@@ -37,6 +39,7 @@
         "point_of_sale._assets_pos": [
             "pos_promotions/static/src/js/pos_order_line_patch.js",
             "pos_promotions/static/src/js/product_screen_patch.js",
+            "pos_promotions/static/src/js/promotion_packs.js",
             "pos_promotions/static/src/xml/orderline.xml",
             "pos_promotions/static/src/scss/orderline.scss",
         ],
