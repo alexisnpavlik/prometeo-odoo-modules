@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Precios: las reglas de la lista de precios principal. Lista sin la columna de lista: siempre es la principal. -->
+    <record id="product_pricelist_item_promotions_list" model="ir.ui.view">
+        <field name="name">product.pricelist.item.list.promotions</field>
+        <field name="model">product.pricelist.item</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <list string="Promociones">
+                <field name="name" string="Aplicado en"/>
+                <field name="price"/>
+                <field name="min_quantity"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Ficha de la regla con producto o categoría obligatorios: vacíos, Odoo la guarda como
+         "Todos los productos" y con precio fijo $0 deja todo el catálogo gratis. -->
+    <record id="product_pricelist_item_promotions_form" model="ir.ui.view">
+        <field name="name">product.pricelist.item.form.promotions</field>
+        <field name="model">product.pricelist.item</field>
+        <field name="inherit_id" ref="product.product_pricelist_item_form_view"/>
+        <field name="mode">primary</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <field name="product_tmpl_id" position="attributes">
+                <attribute name="required">display_applied_on == '1_product'</attribute>
+                <attribute name="placeholder">Elegí un producto</attribute>
+            </field>
+            <field name="categ_id" position="attributes">
+                <attribute name="required">display_applied_on == '2_product_category'</attribute>
+                <attribute name="placeholder">Elegí una categoría</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="action_promotions" model="ir.actions.server">
+        <field name="name">Precios</field>
+        <field name="model_id" ref="product.model_product_pricelist"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_promotions()</field>
+    </record>
+</odoo>

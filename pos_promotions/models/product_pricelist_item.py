@@ -4,7 +4,7 @@ from odoo import _, api, models
 from odoo.exceptions import ValidationError
 
 # Clave de contexto que pone la acción Promociones (product.pricelist.action_open_promotions).
-PROMOTIONS_CONTEXT_KEY = "web_menu_simplify_promotions"
+PROMOTIONS_CONTEXT_KEY = "pos_promotions"
 
 
 class ProductPricelistItem(models.Model):
