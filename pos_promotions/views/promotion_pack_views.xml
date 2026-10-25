@@ -40,8 +40,7 @@
                         </group>
                         <group>
                             <field name="active" widget="boolean_toggle" string="Activo"/>
-                            <!-- Obligatoria: si el POS limita categorías, un pack sin categoría no se carga y no aparece. -->
-                            <field name="pos_categ_ids" widget="many2many_tags" string="Categoría en el POS" required="1"/>
+                            <field name="pos_categ_ids" widget="many2many_tags" string="Categoría en el POS"/>
                         </group>
                     </group>
                     <field name="promotion_pack_line_ids">
