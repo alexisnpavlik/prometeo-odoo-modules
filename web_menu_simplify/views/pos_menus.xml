@@ -6,4 +6,33 @@
               parent="point_of_sale.menu_point_of_sale"
               action="account.action_move_out_invoice_type"
               sequence="20"/>
+
+    <!-- App Promociones en el menú principal: abre directo las reglas de la lista de precios principal. -->
+    <!-- Lista sin la columna de lista de precios: siempre es la principal. -->
+    <record id="product_pricelist_item_promotions_list" model="ir.ui.view">
+        <field name="name">product.pricelist.item.list.promotions</field>
+        <field name="model">product.pricelist.item</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <list string="Promociones">
+                <field name="name" string="Aplicado en"/>
+                <field name="price"/>
+                <field name="min_quantity"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_promotions" model="ir.actions.server">
+        <field name="name">Promociones</field>
+        <field name="model_id" ref="product.model_product_pricelist"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_promotions()</field>
+    </record>
+    <menuitem id="menu_pos_promotions"
+              name="Promociones"
+              action="action_promotions"
+              groups="product.group_product_pricelist"
+              web_icon="web_menu_simplify,static/src/img/promotions_icon.png"
+              sequence="25"/>
 </odoo>

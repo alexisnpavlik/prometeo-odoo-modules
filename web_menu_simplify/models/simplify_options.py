@@ -63,6 +63,7 @@ MENU_OPTIONS = {
 # opción -> menús propios que solo existen con la opción activa (se ocultan si está apagada).
 MENU_OPTIONS_WHEN_OFF = {
     "pos_invoices_menu": ("web_menu_simplify.menu_pos_customer_invoices",),
+    "pos_promotions_menu": ("web_menu_simplify.menu_pos_promotions",),
     "stock_categories_menu": ("web_menu_simplify.menu_stock_product_categories",),
     "purchase_simple": (
         "web_menu_simplify.menu_purchase_orders_direct",

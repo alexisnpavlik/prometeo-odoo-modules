@@ -18,6 +18,7 @@
         - El administrador en modo debug (?debug=1) ve todos los menús.
         - Punto de venta > Órdenes > Facturas abre las facturas de cliente, para
           poder ocultar la app Facturación sin perder el acceso.
+        - App Promociones en el menú principal, acceso directo a las listas de precios.
         - Inventario > Categorías, acceso directo a las categorías.
         - Reabastecer: ruta siempre Comprar (solo el admin la cambia) y Proveedor
           como contacto, que se puede crear desde el asistente.

@@ -84,6 +84,9 @@
                         <setting help="Punto de venta > Órdenes > Facturas, para ver las facturas de cliente aunque la app Facturación esté oculta.">
                             <field name="simplify_pos_invoices_menu"/>
                         </setting>
+                        <setting help="App Promociones en el menú principal: abre las listas de precios, aunque estén ocultas en los menús de Productos.">
+                            <field name="simplify_pos_promotions_menu"/>
+                        </setting>
                     </block>
                     <block title="Facturación" name="simplify_invoicing">
                         <setting help="Oculta la app entera. Las facturas de cliente siguen disponibles en Punto de venta > Órdenes > Facturas.">
