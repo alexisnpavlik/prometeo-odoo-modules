@@ -28,6 +28,11 @@
         "views/promotion_pack_views.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_promotions/static/src/js/product_screen_patch.js",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,
