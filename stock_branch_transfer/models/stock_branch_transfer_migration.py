@@ -61,12 +61,16 @@ class StockBranchTransfer(models.Model):
             "legacy_receipt_id": receipt.id,
         })
         out.branch_transfer_id = transfer
+        # Transferencia interna: el puente no es una entrega y no debe aparecer como tal en Inventario.
+        internal_type = self.env["stock.warehouse"].sudo().search(
+            [("company_id", "=", out.company_id.id)], limit=1
+        ).int_type_id
         for location in out.move_ids.location_dest_id:
             items = [
                 (move.product_id, move.quantity)
                 for move in out.move_ids.filtered(lambda m: m.location_dest_id == location and m.state == "done")
             ]
-            transfer._create_legacy_transit_picking(location, out.picking_type_id, items)
+            transfer._create_legacy_transit_picking(location, internal_type, items)
         receipt.action_cancel()
         transfer._check_reconciled()
         transfer.message_post(body=_(

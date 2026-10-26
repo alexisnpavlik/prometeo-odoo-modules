@@ -52,6 +52,8 @@ class TestMigration(BranchTransferCommon):
         self.assertEqual(self.qty(self.product, self.company_a), 40.0)
         self.assertEqual(self.transit_qty(self.product), 10.0)
         self.assertEqual(self._qty_at(self.product, self.old_transit), old_transit_before - 10.0)
+        bridge = transfer.picking_ids - self.out
+        self.assertEqual(bridge.picking_type_id.code, "internal")
         transfer.with_user(self.user_b).with_company(self.company_b).action_receive()
         self.assertEqual(self.qty(self.product, self.company_a), 40.0)
         self.assertEqual(self.qty(self.product, self.company_b), 10.0)
