@@ -1,4 +1,5 @@
 from odoo.exceptions import UserError
+from odoo.tests import tagged
 
 from .common import BranchTransferCommon
 
@@ -110,16 +111,6 @@ class TestTransferFlow(BranchTransferCommon):
         with self.assertRaises(UserError):
             transfer.with_user(self.user_a).action_send()
 
-    def test_no_intercompany_counterpart(self):
-        if "counterpart_of_picking_id" not in self.env["stock.picking"]._fields:
-            self.skipTest("stock_intercompany no está instalado")
-        transfer = self._send()
-        transfer.with_user(self.user_b).action_receive()
-        count = self.env["stock.picking"].sudo().search_count(
-            [("counterpart_of_picking_id", "in", transfer.picking_ids.ids)]
-        )
-        self.assertEqual(count, 0)
-
     def test_pending_count(self):
         Transfer = self.env["stock.branch.transfer"]
         transfer = self._send()
@@ -130,3 +121,21 @@ class TestTransferFlow(BranchTransferCommon):
         self.assertEqual(Transfer.with_user(self.user_b).get_pending_count(), 1)
         transfer.with_user(self.manager).action_close()
         self.assertEqual(Transfer.with_user(self.user_b).get_pending_count(), 0)
+
+
+@tagged("post_install", "-at_install")
+class TestTransferIntercompany(BranchTransferCommon):
+    """Corre después de cargar todos los módulos, para que stock_intercompany esté en el registro."""
+
+    def test_no_intercompany_counterpart(self):
+        if "counterpart_of_picking_id" not in self.env["stock.picking"]._fields:
+            self.skipTest("stock_intercompany no está instalado")
+        self.set_stock(self.product, self.company_a, 50.0)
+        transfer = self.make_transfer(self.user_a)
+        transfer.with_user(self.user_a).with_company(self.company_a).action_send()
+        transfer.with_user(self.user_b).with_company(self.company_b).action_receive()
+        count = self.env["stock.picking"].sudo().search_count(
+            [("counterpart_of_picking_id", "in", transfer.picking_ids.ids)]
+        )
+        self.assertEqual(count, 0)
+        self.assertEqual(self.qty(self.product, self.company_b), 10.0)
