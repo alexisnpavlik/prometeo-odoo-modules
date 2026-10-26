@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class StockBranchTransferLine(models.Model):
@@ -12,7 +13,12 @@ class StockBranchTransferLine(models.Model):
         "product.product",
         string="Producto",
         required=True,
-        domain=[("company_id", "=", False), ("type", "=", "consu"), ("is_storable", "=", True)],
+        domain=[
+            ("company_id", "=", False),
+            ("type", "=", "consu"),
+            ("is_storable", "=", True),
+            ("tracking", "=", "none"),
+        ],
     )
     uom_id = fields.Many2one(related="product_id.uom_id", string="Unidad")
     qty_sent = fields.Float(string="Enviado", digits="Product Unit of Measure")
@@ -32,6 +38,15 @@ class StockBranchTransferLine(models.Model):
             location = line.transfer_id._stock_location(line.transfer_id.company_id)
             quants = Quant.search([("product_id", "=", line.product_id.id), ("location_id", "child_of", location.id)])
             line.qty_available_origin = sum(quants.mapped("quantity"))
+
+    @api.constrains("product_id")
+    def _check_product(self):
+        """Sin lotes/series ni productos propios de una empresa."""
+        for line in self:
+            if line.product_id.tracking != "none":
+                raise UserError(_("%s usa lotes o números de serie: no se puede trasladar.", line.product_id.display_name))
+            if line.product_id.company_id:
+                raise UserError(_("%s pertenece a una sola empresa: no se puede trasladar.", line.product_id.display_name))
 
     @api.model_create_multi
     def create(self, vals_list):

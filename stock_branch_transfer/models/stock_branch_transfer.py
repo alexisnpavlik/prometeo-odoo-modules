@@ -7,6 +7,13 @@ from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
 
+# Marca de escritura interna del flujo. Es un objeto (no un valor JSON) para que
+# no se pueda falsificar mandando el contexto por RPC.
+INTERNAL = object()
+
+# Campos que solo escriben las acciones del flujo, nunca un usuario directo
+PROTECTED_FIELDS = {"state", "date_sent", "date_received", "user_id"}
+
 # Campos cuyo cambio en un traslado ya enviado mueve stock
 STOCK_FIELDS = {"company_id", "dest_company_id", "line_ids"}
 
@@ -18,6 +25,11 @@ STATES = [
     ("closed", "Cerrado"),
     ("cancel", "Anulado"),
 ]
+
+
+def is_internal(context):
+    """True si la escritura viene de una acción del flujo (no de un usuario)."""
+    return context.get("branch_transfer_internal") is INTERNAL
 
 
 class StockBranchTransfer(models.Model):
@@ -74,20 +86,26 @@ class StockBranchTransfer(models.Model):
     def create(self, vals_list):
         """Asigna el número de secuencia TRS/ al crear."""
         for vals in vals_list:
+            vals["user_id"] = self.env.uid
+            vals.pop("state", None)
             if vals.get("name", "Nuevo") == "Nuevo":
                 vals["name"] = self.env["ir.sequence"].sudo().next_by_code("stock.branch.transfer") or "Nuevo"
         return super().create(vals_list)
 
     def write(self, vals):
         """Editar un traslado ya enviado es cosa de managers y corrige el stock."""
-        if self.env.context.get("branch_transfer_internal") or not STOCK_FIELDS & set(vals):
+        if is_internal(self.env.context):
+            return super().write(vals)
+        if PROTECTED_FIELDS & set(vals) and not self.env.su:
+            raise UserError(_("El estado, las fechas y el usuario de un traslado no se editan a mano."))
+        if not STOCK_FIELDS & set(vals):
             return super().write(vals)
         sent = self.filtered(lambda t: t.state != "draft")
         if not sent:
             return super().write(vals)
         sent._check_manager_edit()
         # Las líneas tocadas por esta escritura no reconcilian por su cuenta: se hace una vez acá.
-        res = super(StockBranchTransfer, self.with_context(branch_transfer_internal=True)).write(vals)
+        res = super(StockBranchTransfer, self.with_context(branch_transfer_internal=INTERNAL)).write(vals)
         sent._reconcile_stock()
         sent._log_manager_edit()
         return res
@@ -151,14 +169,14 @@ class StockBranchTransfer(models.Model):
 
     def _before_line_change(self, context):
         """Valida permisos antes de tocar líneas de traslados ya enviados."""
-        if not context.get("branch_transfer_internal"):
+        if not is_internal(context):
             sent = self.filtered(lambda t: t.state != "draft")
             if sent:
                 sent._check_manager_edit()
 
     def _after_line_change(self, context, checked=False):
         """Tras tocar líneas de traslados ya enviados: permisos, stock y chatter."""
-        if context.get("branch_transfer_internal"):
+        if is_internal(context):
             return
         sent = self.filtered(lambda t: t.state != "draft")
         if not sent:
@@ -170,7 +188,7 @@ class StockBranchTransfer(models.Model):
 
     def _write_internal(self, vals):
         """Escritura hecha por las acciones del flujo (no cuenta como edición manual)."""
-        return self.with_context(branch_transfer_internal=True).write(vals)
+        return self.with_context(branch_transfer_internal=INTERNAL).write(vals)
 
     # ------------------------------------------------------------------
     # Motor de stock: objetivo por ubicación + reconciliación
@@ -313,7 +331,7 @@ class StockBranchTransfer(models.Model):
         for transfer in self:
             transfer._check_company_access(transfer.dest_company_id)
             for line in transfer.line_ids:
-                line.with_context(branch_transfer_internal=True).qty_received = line.qty_sent
+                line.with_context(branch_transfer_internal=INTERNAL).qty_received = line.qty_sent
             transfer._write_internal({"state": "received", "date_received": fields.Datetime.now()})
         self._reconcile_stock()
         return True

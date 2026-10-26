@@ -1,5 +1,8 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools import float_compare
+
+from ..models.stock_branch_transfer import INTERNAL
 
 
 class BranchTransferReceiveDiff(models.TransientModel):
@@ -30,13 +33,15 @@ class BranchTransferReceiveDiff(models.TransientModel):
         transfer = self.transfer_id
         transfer._check_state("in_transit")
         transfer._check_company_access(transfer.dest_company_id)
+        if self.line_ids.transfer_line_id.transfer_id - transfer:
+            raise UserError(_("Hay líneas que no pertenecen a este traslado."))
         has_diff = False
         summary = []
-        Line = self.env["stock.branch.transfer.line"].with_context(branch_transfer_internal=True)
+        Line = self.env["stock.branch.transfer.line"].with_context(branch_transfer_internal=INTERNAL)
         for wiz_line in self.line_ids:
             rounding = wiz_line.product_id.uom_id.rounding
             if wiz_line.transfer_line_id:
-                wiz_line.transfer_line_id.with_context(branch_transfer_internal=True).qty_received = wiz_line.qty_received
+                wiz_line.transfer_line_id.with_context(branch_transfer_internal=INTERNAL).qty_received = wiz_line.qty_received
                 sent = wiz_line.transfer_line_id.qty_sent
             else:
                 Line.create({
@@ -75,7 +80,12 @@ class BranchTransferReceiveDiffLine(models.TransientModel):
         "product.product",
         string="Producto",
         required=True,
-        domain=[("company_id", "=", False), ("type", "=", "consu"), ("is_storable", "=", True)],
+        domain=[
+            ("company_id", "=", False),
+            ("type", "=", "consu"),
+            ("is_storable", "=", True),
+            ("tracking", "=", "none"),
+        ],
     )
     qty_sent = fields.Float(string="Enviado", readonly=True, digits="Product Unit of Measure")
     qty_received = fields.Float(string="Recibido", digits="Product Unit of Measure")
