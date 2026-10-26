@@ -125,10 +125,9 @@ corrige la cantidad, se ajusta como cualquier otra edición.
   usuario, estado), tabla de líneas con producto buscable por **nombre o código de
   barras** (igual que en Compras), columnas "Enviado" y "Recibido", nota de
   diferencias, botones según estado y rol, chatter.
-- **Destino:** selector que lista solo empresas internas (`res.company`), excluyendo
-  la de origen y las marcadas como "no es sucursal". *Llamada mía:* ese check vive
-  en Ajustes, en una sección propia de Traslados, y por defecto marca "My Company"
-  (id 1) y "test" (id 7).
+- **Destino:** selector que lista todas las empresas (`res.company`) menos la de
+  origen. Sin regla especial para "My Company"/"test" (decidido por Alexis: nadie
+  tiene acceso a esas empresas hoy).
 - **Origen:** la empresa activa del usuario (selector de empresas de Odoo).
 
 ## Contador en el ícono
@@ -156,7 +155,7 @@ sucursales. Si es 0, no se muestra.
   un aviso no bloqueante en las líneas sin stock suficiente.
 - **Productos de una sola empresa:** hay 269 productos con `company_id` propio
   (`product_company_restriction`). Las líneas solo aceptan productos sin empresa
-  o compartidos con la empresa destino.
+  (`company_id` vacío). Un producto propio de una empresa no lo puede usar la otra.
 - **Alcance del Manager:** ve y actúa sobre todos los traslados de todas las
   sucursales; su contador cuenta lo de sus sucursales (`company_ids`), igual que
   el usuario.
