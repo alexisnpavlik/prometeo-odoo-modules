@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Packs: productos combo armados con pos_promotions (is_promotion_pack). -->
+    <record id="promotion_pack_list" model="ir.ui.view">
+        <field name="name">product.template.list.promotion.pack</field>
+        <field name="model">product.template</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <list string="Packs">
+                <field name="name" string="Pack"/>
+                <field name="promotion_pack_line_ids" widget="many2many_tags" string="Productos"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="promotion_pack_regular_price" widget="monetary"/>
+                <field name="list_price" string="Precio del pack" widget="monetary"/>
+                <field name="promotion_pack_saving" widget="monetary"/>
+                <field name="active" widget="boolean_toggle" string="Activo"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="promotion_pack_form" model="ir.ui.view">
+        <field name="name">product.template.form.promotion.pack</field>
+        <field name="model">product.template</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <form string="Pack">
+                <sheet>
+                    <field name="is_promotion_pack" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>
+                    <div class="oe_title">
+                        <label for="name" string="Nombre del pack"/>
+                        <h1><field name="name" placeholder="p. ej. Fernet + Coca-Cola"/></h1>
+                    </div>
+                    <!-- Sin categoría del POS: el pack se muestra siempre (pos_config.py y product_screen_patch.js). -->
+                    <group>
+                        <group>
+                            <field name="list_price" string="Precio del pack" widget="monetary"/>
+                            <field name="promotion_pack_regular_price" widget="monetary"/>
+                            <field name="promotion_pack_saving" widget="monetary"/>
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle" string="Activo"/>
+                        </group>
+                    </group>
+                    <field name="promotion_pack_line_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="product_id" options="{'no_create': True}"/>
+                            <field name="quantity"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="lst_price" widget="monetary"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="promotion_pack_search" model="ir.ui.view">
+        <field name="name">product.template.search.promotion.pack</field>
+        <field name="model">product.template</field>
+        <field name="priority">200</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Pack"/>
+                <filter name="inactive" string="Inactivos" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_promotion_packs" model="ir.actions.act_window">
+        <field name="name">Packs</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_promotion_pack', '=', True)]</field>
+        <field name="context">{
+            'default_is_promotion_pack': True,
+            'default_available_in_pos': True,
+            'default_sale_ok': True,
+            'default_purchase_ok': False,
+        }</field>
+        <field name="search_view_id" ref="promotion_pack_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('promotion_pack_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('promotion_pack_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Creá un pack</p>
+            <p>Varios productos juntos a un precio: en el POS se agregan con un toque y descuentan el stock de cada producto.</p>
+        </field>
+    </record>
+</odoo>

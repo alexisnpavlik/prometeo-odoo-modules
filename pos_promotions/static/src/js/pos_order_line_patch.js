@@ -2,7 +2,11 @@
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { formatCurrency, roundCurrency } from "@point_of_sale/app/models/utils/currency";
 import { accountTaxHelpers } from "@account/helpers/account_tax";
+import { Orderline } from "@point_of_sale/app/generic_components/orderline/orderline";
 import { patch } from "@web/core/utils/patch";
+
+// La línea valida la forma de sus datos (en modo debug falla con una clave desconocida).
+Orderline.props.line.shape.promotion = { type: Boolean, optional: true };
 
 patch(PosOrderline.prototype, {
     /** Precio de venta del producto sin lista de precios, con impuestos según la config del POS. */
@@ -38,9 +42,9 @@ patch(PosOrderline.prototype, {
     /** Agrega la marca de promoción y tacha el precio original también en reglas de precio fijo. */
     getDisplayData() {
         const data = super.getDisplayData();
-        const promotion = this.isPromotion();
-        data.promotion = promotion;
-        if (promotion) {
+        // Línea de un pack: el ahorro ya se ve como descuento %, solo se suma la etiqueta.
+        data.promotion = Boolean(this.promotion_pack_tmpl_id) || this.isPromotion();
+        if (!this.promotion_pack_tmpl_id && data.promotion) {
             data.oldUnitPrice = formatCurrency(this.getPromotionOriginalPrice(), this.currency);
         }
         return data;

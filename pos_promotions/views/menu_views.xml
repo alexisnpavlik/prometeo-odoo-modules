@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- App Promociones en el menú principal: abre en Precios; Packs al lado. -->
+    <menuitem id="menu_promotions_root"
+              name="Promociones"
+              action="action_promotions"
+              groups="product.group_product_pricelist"
+              web_icon="pos_promotions,static/description/icon.png"
+              sequence="25"/>
+    <menuitem id="menu_promotions_prices"
+              name="Precios"
+              parent="menu_promotions_root"
+              action="action_promotions"
+              sequence="10"/>
+    <menuitem id="menu_promotions_packs"
+              name="Packs"
+              parent="menu_promotions_root"
+              action="action_promotion_packs"
+              sequence="20"/>
+</odoo>
