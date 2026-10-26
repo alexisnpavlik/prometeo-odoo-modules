@@ -1,8 +1,13 @@
 /** @odoo-module **/
+import { rpcBus } from "@web/core/network/rpc";
 import { registry } from "@web/core/registry";
 
 const REFRESH_MS = 60000;
 const BADGE_CLASS = "o_branch_transfer_badge";
+
+// Modelos y métodos que pueden cambiar los pendientes (las lecturas no cuentan)
+const WATCHED_MODELS = ["stock.branch.transfer", "stock.branch.transfer.receive.diff"];
+const WRITE_METHODS = ["web_save", "create", "write", "unlink"];
 
 // Menú → clave de get_pending_counts
 const MENU_COUNTS = {
@@ -69,6 +74,18 @@ export const transferBadgeService = {
         // Los menús se renderizan al abrirlos: se repinta cuando cambia el DOM.
         new MutationObserver(schedulePaint).observe(document.body, { childList: true, subtree: true });
         env.bus.addEventListener("ACTION_MANAGER:UI-UPDATED", refresh);
+        // Enviar, recibir, cerrar o anular desde el formulario no cambia de pantalla:
+        // se refresca cuando vuelve cualquier llamada que escribe sobre traslados.
+        rpcBus.addEventListener("RPC:RESPONSE", ({ detail }) => {
+            const params = detail.data?.params || {};
+            if (
+                WATCHED_MODELS.includes(params.model) &&
+                (params.method?.startsWith("action_") || WRITE_METHODS.includes(params.method)) &&
+                !detail.error
+            ) {
+                refresh();
+            }
+        });
         setInterval(refresh, REFRESH_MS);
         refresh();
     },
