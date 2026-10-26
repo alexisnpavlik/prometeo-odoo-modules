@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="location_branch_transit" model="stock.location">
+        <field name="name">Traslados en camino</field>
+        <field name="usage">transit</field>
+        <field name="location_id" ref="stock.stock_location_locations_virtual"/>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>
