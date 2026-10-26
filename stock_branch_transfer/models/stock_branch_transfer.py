@@ -378,3 +378,20 @@ class StockBranchTransfer(models.Model):
             "&", ("state", "=", "with_diff"),
             "|", ("company_id", "in", company_ids), ("dest_company_id", "in", company_ids),
         ])
+
+    @api.model
+    def get_pending_counts(self):
+        """Pendientes por menú: "Por recibir" (en camino o con diferencias hacia mis
+        sucursales) y "Enviados" (mis envíos con diferencias), más el total del ícono."""
+        company_ids = self.env.user.company_ids.ids
+        Transfer = self.sudo()
+        incoming = Transfer.search_count([
+            ("state", "in", ("in_transit", "with_diff")),
+            ("dest_company_id", "in", company_ids),
+        ])
+        sent = Transfer.search_count([
+            ("state", "=", "with_diff"),
+            ("company_id", "in", company_ids),
+            ("dest_company_id", "not in", company_ids),
+        ])
+        return {"total": incoming + sent, "incoming": incoming, "sent": sent}

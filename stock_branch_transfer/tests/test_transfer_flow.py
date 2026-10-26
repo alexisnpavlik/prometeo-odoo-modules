@@ -123,6 +123,20 @@ class TestTransferFlow(BranchTransferCommon):
         self.assertEqual(Transfer.with_user(self.user_b).get_pending_count(), 0)
 
 
+    def test_pending_counts_by_menu(self):
+        Transfer = self.env["stock.branch.transfer"]
+        transfer = self._send()
+        self.assertEqual(Transfer.with_user(self.user_b).get_pending_counts(),
+                         {"total": 1, "incoming": 1, "sent": 0})
+        self.assertEqual(Transfer.with_user(self.user_a).get_pending_counts(),
+                         {"total": 0, "incoming": 0, "sent": 0})
+        self._receive_diff(transfer, self.user_b, {self.product: 8.0})
+        self.assertEqual(Transfer.with_user(self.user_a).get_pending_counts(),
+                         {"total": 1, "incoming": 0, "sent": 1})
+        self.assertEqual(Transfer.with_user(self.user_b).get_pending_counts(),
+                         {"total": 1, "incoming": 1, "sent": 0})
+
+
 @tagged("post_install", "-at_install")
 class TestTransferIntercompany(BranchTransferCommon):
     """Corre después de cargar todos los módulos, para que stock_intercompany esté en el registro."""

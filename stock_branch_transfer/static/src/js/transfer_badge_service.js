@@ -1,52 +1,73 @@
 /** @odoo-module **/
 import { registry } from "@web/core/registry";
 
-const MENU_XMLID = "stock_branch_transfer.menu_branch_transfer_root";
 const REFRESH_MS = 60000;
 const BADGE_CLASS = "o_branch_transfer_badge";
 
+// Menú → clave de get_pending_counts
+const MENU_COUNTS = {
+    "stock_branch_transfer.menu_branch_transfer_root": "total",
+    "stock_branch_transfer.menu_branch_transfer_incoming": "incoming",
+    "stock_branch_transfer.menu_branch_transfer_sent": "sent",
+};
+
 /**
- * Contador de traslados pendientes sobre el ícono de la app "Traslados".
+ * Contadores de traslados pendientes en el menú.
  *
- * En vez de parchear un template concreto, busca cualquier elemento con
- * data-menu-xmlid del menú raíz: así funciona igual en el dropdown de apps
- * nativo, el sidebar móvil y web_fullscreen_apps_menu.
+ * El total va sobre el ícono de la app (menú de apps); "Por recibir" y
+ * "Enviados" llevan el suyo en la barra de la app. En el nombre de la app de
+ * la barra superior (o_menu_brand) no se muestra: ahí ya están los submenús.
+ * Se busca por data-menu-xmlid para no depender de qué menú de apps está instalado.
  */
 export const transferBadgeService = {
     dependencies: ["orm"],
     start(env, { orm }) {
-        let count = 0;
+        let counts = {};
+        let scheduled = false;
+
+        const paintEl = (el, count) => {
+            let badge = el.querySelector(`:scope > .${BADGE_CLASS}`);
+            if (!count || el.classList.contains("o_menu_brand")) {
+                badge?.remove();
+                return;
+            }
+            if (!badge) {
+                badge = document.createElement("span");
+                badge.className = `${BADGE_CLASS} badge rounded-pill text-bg-danger`;
+                el.appendChild(badge);
+            }
+            if (badge.textContent !== String(count)) {
+                badge.textContent = String(count);
+            }
+        };
 
         const paint = () => {
-            const selector = `[data-menu-xmlid="${MENU_XMLID}"]`;
-            for (const el of document.querySelectorAll(selector)) {
-                let badge = el.querySelector(`:scope > .${BADGE_CLASS}`);
-                if (!count) {
-                    badge?.remove();
-                    continue;
+            scheduled = false;
+            for (const [xmlid, key] of Object.entries(MENU_COUNTS)) {
+                for (const el of document.querySelectorAll(`[data-menu-xmlid="${xmlid}"]`)) {
+                    paintEl(el, counts[key]);
                 }
-                if (!badge) {
-                    badge = document.createElement("span");
-                    badge.className = `${BADGE_CLASS} badge rounded-pill text-bg-danger`;
-                    el.appendChild(badge);
-                }
-                if (badge.textContent !== String(count)) {
-                    badge.textContent = String(count);
-                }
+            }
+        };
+
+        const schedulePaint = () => {
+            if (!scheduled) {
+                scheduled = true;
+                requestAnimationFrame(paint);
             }
         };
 
         const refresh = async () => {
             try {
-                count = await orm.silent.call("stock.branch.transfer", "get_pending_count", []);
+                counts = await orm.silent.call("stock.branch.transfer", "get_pending_counts", []);
             } catch {
-                count = 0;
+                counts = {};
             }
-            paint();
+            schedulePaint();
         };
 
-        // El menú de apps se renderiza al abrirlo: se repinta cuando cambia el DOM.
-        new MutationObserver(paint).observe(document.body, { childList: true, subtree: true });
+        // Los menús se renderizan al abrirlos: se repinta cuando cambia el DOM.
+        new MutationObserver(schedulePaint).observe(document.body, { childList: true, subtree: true });
         env.bus.addEventListener("ACTION_MANAGER:UI-UPDATED", refresh);
         setInterval(refresh, REFRESH_MS);
         refresh();
