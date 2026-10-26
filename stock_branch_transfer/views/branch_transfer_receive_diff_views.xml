@@ -13,8 +13,8 @@
                 <field name="line_ids">
                     <list editable="bottom">
                         <field name="transfer_line_id" column_invisible="1"/>
-                        <field name="product_id" readonly="transfer_line_id" options="{'no_create': True}"/>
-                        <field name="qty_sent"/>
+                        <field name="product_id" readonly="transfer_line_id" force_save="1" options="{'no_create': True}"/>
+                        <field name="qty_sent" force_save="1"/>
                         <field name="qty_received"/>
                     </list>
                 </field>
