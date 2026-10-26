@@ -38,6 +38,37 @@ class StockBranchTransfer(models.Model):
     diff_note = fields.Text(string="Nota de diferencias", copy=False)
     line_ids = fields.One2many("stock.branch.transfer.line", "transfer_id", string="Productos", copy=True)
     picking_ids = fields.One2many("stock.picking", "branch_transfer_id", string="Movimientos", readonly=True)
+    is_manager = fields.Boolean(compute="_compute_is_manager")
+    is_origin_mine = fields.Boolean(
+        string="Enviado por mis sucursales", compute="_compute_is_mine", search="_search_is_origin_mine"
+    )
+    is_dest_mine = fields.Boolean(
+        string="Destino en mis sucursales", compute="_compute_is_mine", search="_search_is_dest_mine"
+    )
+
+    def _compute_is_manager(self):
+        """Habilita en la vista la edición posterior al envío."""
+        self.is_manager = self._is_manager()
+
+    def _compute_is_mine(self):
+        """Origen/destino dentro de las sucursales del usuario."""
+        companies = self.env.user.company_ids
+        for transfer in self:
+            transfer.is_origin_mine = transfer.company_id in companies
+            transfer.is_dest_mine = transfer.dest_company_id in companies
+
+    def _search_is_origin_mine(self, operator, value):
+        """Dominio de "Enviados"."""
+        return self._search_mine("company_id", operator, value)
+
+    def _search_is_dest_mine(self, operator, value):
+        """Dominio de "Por recibir"."""
+        return self._search_mine("dest_company_id", operator, value)
+
+    def _search_mine(self, field, operator, value):
+        """Dominio por empresa contra las sucursales del usuario."""
+        positive = (operator == "=") == bool(value)
+        return [(field, "in" if positive else "not in", self.env.user.company_ids.ids)]
 
     @api.model_create_multi
     def create(self, vals_list):

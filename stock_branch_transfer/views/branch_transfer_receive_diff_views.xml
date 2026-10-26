@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_branch_transfer_receive_diff_form" model="ir.ui.view">
+        <field name="name">stock.branch.transfer.receive.diff.form</field>
+        <field name="model">stock.branch.transfer.receive.diff</field>
+        <field name="arch" type="xml">
+            <form>
+                <p class="text-muted">
+                    Cargá lo que llegó realmente. Lo que falte queda en camino hasta que un manager
+                    cierre el traslado; lo que sobre se descuenta del stock de origen.
+                </p>
+                <field name="transfer_id" invisible="1"/>
+                <field name="line_ids">
+                    <list editable="bottom">
+                        <field name="transfer_line_id" column_invisible="1"/>
+                        <field name="product_id" readonly="transfer_line_id" options="{'no_create': True}"/>
+                        <field name="qty_sent"/>
+                        <field name="qty_received"/>
+                    </list>
+                </field>
+                <field name="note" placeholder="Qué pasó (faltantes, roturas, productos de más)..."/>
+                <footer>
+                    <button name="action_confirm" type="object" string="Confirmar recepción" class="btn-primary"/>
+                    <button special="cancel" string="Cancelar"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
