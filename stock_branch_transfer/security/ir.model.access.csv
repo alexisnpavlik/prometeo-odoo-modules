@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_branch_transfer_user,stock.branch.transfer user,model_stock_branch_transfer,group_branch_transfer_user,1,1,1,1
 access_branch_transfer_line_user,stock.branch.transfer.line user,model_stock_branch_transfer_line,group_branch_transfer_user,1,1,1,1
+access_branch_transfer_receive_diff_user,stock.branch.transfer.receive.diff user,model_stock_branch_transfer_receive_diff,group_branch_transfer_user,1,1,1,1
+access_branch_transfer_receive_diff_line_user,stock.branch.transfer.receive.diff.line user,model_stock_branch_transfer_receive_diff_line,group_branch_transfer_user,1,1,1,1

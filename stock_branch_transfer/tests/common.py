@@ -74,10 +74,12 @@ class BranchTransferCommon(TransactionCase):
     def make_transfer(self, user, qty=10.0, dest=None, product=None):
         """Crea un traslado en borrador desde la empresa del usuario."""
         Transfer = self.env["stock.branch.transfer"].with_user(user).with_company(user.company_id)
-        return Transfer.create({
+        transfer = Transfer.create({
             "dest_company_id": (dest or self.company_b).id,
             "line_ids": [(0, 0, {
                 "product_id": (product or self.product).id,
                 "qty_sent": qty,
             })],
         })
+        # Se devuelve con el entorno del test: sin el usuario ni las empresas del creador.
+        return self.env["stock.branch.transfer"].browse(transfer.id)
