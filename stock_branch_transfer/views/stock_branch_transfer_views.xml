@@ -34,7 +34,7 @@
                             confirm="¿Confirmás que llegó todo lo enviado?"/>
                     <button name="action_open_receive_diff" type="object" string="Recibido con diferencias"
                             invisible="state != 'in_transit' or not is_dest_mine"/>
-                    <button name="action_close" type="object" string="Cerrar" class="btn-primary"
+                    <button name="action_close" type="object" string="Aceptar diferencias y cerrar" class="btn-primary"
                             invisible="state != 'with_diff' or not is_manager"
                             confirm="El faltante vuelve al stock de origen. ¿Cerrar el traslado?"/>
                     <button name="action_cancel" type="object" string="Anular"
