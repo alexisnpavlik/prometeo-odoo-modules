@@ -50,6 +50,10 @@ class StockBranchTransfer(models.Model):
     diff_note = fields.Text(string="Nota de diferencias", copy=False)
     line_ids = fields.One2many("stock.branch.transfer.line", "transfer_id", string="Productos", copy=True)
     picking_ids = fields.One2many("stock.picking", "branch_transfer_id", string="Movimientos", readonly=True)
+    legacy_receipt_id = fields.Many2one(
+        "stock.picking", string="Recepción vieja (intercompany)", readonly=True, copy=False,
+        help="Recepción pendiente de stock_intercompany de la que se migró este traslado.",
+    )
     is_manager = fields.Boolean(compute="_compute_is_manager")
     is_origin_mine = fields.Boolean(
         string="Enviado por mis sucursales", compute="_compute_is_mine", search="_search_is_origin_mine"
