@@ -27,6 +27,18 @@ _logger = logging.getLogger(__name__)
 # Example match: .../local-addons/pos_sales_advisor/... -> pos_sales_advisor
 ADDON_REGEX = re.compile(r'(?:addons|local-addons|prometeo-addons)/([^/]+)/')
 
+# Conflicto de concurrencia al marcar "en línea" (varias pestañas del mismo usuario):
+# odoo.sql_db lo registra como ERROR pero Odoo reintenta solo. Era el 99% del ruido.
+IGNORED_SQL_ERRORS = (('bus_presence', 'could not serialize access'),)
+
+
+def is_ignored_event(event):
+    """Indica si el evento es ruido conocido que Odoo ya resuelve solo."""
+    if event.get('logger') != 'odoo.sql_db':
+        return False
+    message = (event.get('logentry') or {}).get('formatted') or event.get('message') or ''
+    return any(all(text in message for text in texts) for texts in IGNORED_SQL_ERRORS)
+
 
 
 def before_send(event, hint):
@@ -36,6 +48,9 @@ def before_send(event, hint):
     Odoo server stability or transaction flows.
     """
     try:
+        if is_ignored_event(event):
+            return None
+
         # 1. Extract database name from thread local context
         db_name = getattr(threading.current_thread(), 'dbname', None)
         if db_name:
