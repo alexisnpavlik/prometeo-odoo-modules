@@ -19,8 +19,8 @@ const MENU_COUNTS = {
 /**
  * Contadores de traslados pendientes en el menú.
  *
- * El total va sobre el ícono de la app (menú de apps); "Por recibir" y
- * "Enviados" llevan el suyo en la barra de la app. En el nombre de la app de
+ * El total va sobre el ícono de la app (menú de apps); "Entradas" y
+ * "Salidas" llevan el suyo en la barra de la app. En el nombre de la app de
  * la barra superior (o_menu_brand) no se muestra: ahí ya están los submenús.
  * Se busca por data-menu-xmlid para no depender de qué menú de apps está instalado.
  */

@@ -56,10 +56,10 @@ class StockBranchTransfer(models.Model):
     )
     is_manager = fields.Boolean(compute="_compute_is_manager")
     is_origin_mine = fields.Boolean(
-        string="Enviado por mis sucursales", compute="_compute_is_mine", search="_search_is_origin_mine"
+        string="Salida de mi empresa", compute="_compute_is_mine", search="_search_is_origin_mine"
     )
     is_dest_mine = fields.Boolean(
-        string="Destino en mis sucursales", compute="_compute_is_mine", search="_search_is_dest_mine"
+        string="Entrada a mi empresa", compute="_compute_is_mine", search="_search_is_dest_mine"
     )
 
     def _compute_is_manager(self):
@@ -74,11 +74,11 @@ class StockBranchTransfer(models.Model):
             transfer.is_dest_mine = transfer.dest_company_id in companies
 
     def _search_is_origin_mine(self, operator, value):
-        """Dominio de "Enviados"."""
+        """Dominio de "Salidas"."""
         return self._search_mine("company_id", operator, value)
 
     def _search_is_dest_mine(self, operator, value):
-        """Dominio de "Por recibir"."""
+        """Dominio de "Entradas"."""
         return self._search_mine("dest_company_id", operator, value)
 
     def _search_mine(self, field, operator, value):
@@ -385,8 +385,8 @@ class StockBranchTransfer(models.Model):
 
     @api.model
     def get_pending_counts(self):
-        """Pendientes por menú: "Por recibir" (en camino o con diferencias hacia mis
-        sucursales) y "Enviados" (mis envíos con diferencias), más el total del ícono."""
+        """Pendientes por menú: "Entradas" (en camino o con diferencias hacia mis
+        sucursales) y "Salidas" (mis envíos con diferencias), más el total del ícono."""
         company_ids = self.env.companies.ids
         Transfer = self.sudo()
         incoming = Transfer.search_count([

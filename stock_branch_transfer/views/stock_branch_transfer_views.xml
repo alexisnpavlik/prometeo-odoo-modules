@@ -121,7 +121,7 @@
     </record>
 
     <record id="action_branch_transfer_sent" model="ir.actions.act_window">
-        <field name="name">Enviados</field>
+        <field name="name">Salidas</field>
         <field name="res_model">stock.branch.transfer</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('is_origin_mine', '=', True)]</field>
@@ -131,7 +131,7 @@
     </record>
 
     <record id="action_branch_transfer_incoming" model="ir.actions.act_window">
-        <field name="name">Por recibir</field>
+        <field name="name">Entradas</field>
         <field name="res_model">stock.branch.transfer</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('is_dest_mine', '=', True), ('state', '!=', 'draft')]</field>
