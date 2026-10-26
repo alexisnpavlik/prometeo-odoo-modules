@@ -93,8 +93,24 @@ class TestTransferFlow(BranchTransferCommon):
         user_ab = self._make_user("sbt_user_ab", self.company_a, self.company_a | self.company_b)
         self.set_stock(self.product, self.company_c, 5.0)
         transfer = self._send(qty=5.0, user=self.user_c)
-        transfer.with_user(user_ab).with_company(self.company_a).action_receive()
+        with self.assertRaises(UserError):
+            transfer.with_user(user_ab).with_context(allowed_company_ids=[self.company_a.id]).action_receive()
+        transfer.with_user(user_ab).with_context(allowed_company_ids=[self.company_b.id]).action_receive()
         self.assertEqual(self.qty(self.product, self.company_b), 5.0)
+
+    def test_menus_follow_selected_company(self):
+        user_ab = self._make_user("sbt_user_ab2", self.company_a, self.company_a | self.company_b)
+        to_b = self._send()
+        self.set_stock(self.product, self.company_b, 5.0)
+        to_a = self._send(qty=5.0, user=self.user_b, dest=self.company_a)
+        Transfer = self.env["stock.branch.transfer"].with_user(user_ab)
+        in_a = Transfer.with_context(allowed_company_ids=[self.company_a.id])
+        self.assertEqual(in_a.search([("is_dest_mine", "=", True)]), to_a)
+        self.assertEqual(in_a.search([("is_origin_mine", "=", True)]), to_b)
+        self.assertEqual(in_a.get_pending_counts(), {"total": 1, "incoming": 1, "sent": 0})
+        in_b = Transfer.with_context(allowed_company_ids=[self.company_b.id])
+        self.assertEqual(in_b.search([("is_dest_mine", "=", True)]), to_b)
+        self.assertNotIn(to_b, in_a.search([]).filtered(lambda t: t.dest_company_id == self.company_b and t.company_id != self.company_a))
 
     def test_wrong_state_actions(self):
         transfer = self.make_transfer(self.user_a)

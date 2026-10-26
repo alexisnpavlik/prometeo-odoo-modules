@@ -63,8 +63,8 @@ class StockBranchTransfer(models.Model):
         self.is_manager = self._is_manager()
 
     def _compute_is_mine(self):
-        """Origen/destino dentro de las sucursales del usuario."""
-        companies = self.env.user.company_ids
+        """Origen/destino dentro de las empresas seleccionadas."""
+        companies = self.env.companies
         for transfer in self:
             transfer.is_origin_mine = transfer.company_id in companies
             transfer.is_dest_mine = transfer.dest_company_id in companies
@@ -78,9 +78,9 @@ class StockBranchTransfer(models.Model):
         return self._search_mine("dest_company_id", operator, value)
 
     def _search_mine(self, field, operator, value):
-        """Dominio por empresa contra las sucursales del usuario."""
+        """Dominio por empresa contra las empresas seleccionadas."""
         positive = (operator == "=") == bool(value)
-        return [(field, "in" if positive else "not in", self.env.user.company_ids.ids)]
+        return [(field, "in" if positive else "not in", self.env.companies.ids)]
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -149,7 +149,7 @@ class StockBranchTransfer(models.Model):
 
     def _check_company_access(self, company):
         """El usuario tiene que tener acceso a la sucursal (o ser manager)."""
-        if company not in self.env.user.company_ids and not self._is_manager():
+        if company not in self.env.companies and not self._is_manager():
             raise UserError(_("No tenés acceso a la sucursal %s.", company.name))
 
     def _check_manager_edit(self):
@@ -371,7 +371,7 @@ class StockBranchTransfer(models.Model):
     @api.model
     def get_pending_count(self):
         """Traslados pendientes para las sucursales del usuario (contador del ícono)."""
-        company_ids = self.env.user.company_ids.ids
+        company_ids = self.env.companies.ids
         return self.sudo().search_count([
             "|",
             "&", ("state", "=", "in_transit"), ("dest_company_id", "in", company_ids),
@@ -383,7 +383,7 @@ class StockBranchTransfer(models.Model):
     def get_pending_counts(self):
         """Pendientes por menú: "Por recibir" (en camino o con diferencias hacia mis
         sucursales) y "Enviados" (mis envíos con diferencias), más el total del ícono."""
-        company_ids = self.env.user.company_ids.ids
+        company_ids = self.env.companies.ids
         Transfer = self.sudo()
         incoming = Transfer.search_count([
             ("state", "in", ("in_transit", "with_diff")),
