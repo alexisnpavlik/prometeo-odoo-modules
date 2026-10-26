@@ -1,0 +1,18 @@
+// Contador de traslados pendientes sobre el ícono de la app
+[data-menu-xmlid="stock_branch_transfer.menu_branch_transfer_root"] {
+    position: relative;
+
+    > .o_branch_transfer_badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 0.75rem;
+        pointer-events: none;
+    }
+}
+
+// En el dropdown de apps nativo el ícono no existe: el contador va al lado del nombre
+.o_navbar_apps_menu .dropdown-item[data-menu-xmlid="stock_branch_transfer.menu_branch_transfer_root"] > .o_branch_transfer_badge {
+    position: static;
+    margin-left: 0.5rem;
+}

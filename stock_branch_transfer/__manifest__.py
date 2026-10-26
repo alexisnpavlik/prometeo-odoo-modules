@@ -32,6 +32,12 @@
         "views/branch_transfer_receive_diff_views.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "stock_branch_transfer/static/src/js/transfer_badge_service.js",
+            "stock_branch_transfer/static/src/scss/transfer_badge.scss",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,
