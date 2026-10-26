@@ -7,6 +7,9 @@ from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
 
+# Campos cuyo cambio en un traslado ya enviado mueve stock
+STOCK_FIELDS = {"company_id", "dest_company_id", "line_ids"}
+
 STATES = [
     ("draft", "Borrador"),
     ("in_transit", "En camino"),
@@ -44,6 +47,26 @@ class StockBranchTransfer(models.Model):
                 vals["name"] = self.env["ir.sequence"].sudo().next_by_code("stock.branch.transfer") or "Nuevo"
         return super().create(vals_list)
 
+    def write(self, vals):
+        """Editar un traslado ya enviado es cosa de managers y corrige el stock."""
+        if self.env.context.get("branch_transfer_internal") or not STOCK_FIELDS & set(vals):
+            return super().write(vals)
+        sent = self.filtered(lambda t: t.state != "draft")
+        if not sent:
+            return super().write(vals)
+        sent._check_manager_edit()
+        # Las líneas tocadas por esta escritura no reconcilian por su cuenta: se hace una vez acá.
+        res = super(StockBranchTransfer, self.with_context(branch_transfer_internal=True)).write(vals)
+        sent._reconcile_stock()
+        sent._log_manager_edit()
+        return res
+
+    def unlink(self):
+        """Solo se borran borradores; lo enviado se anula."""
+        if any(transfer.state != "draft" for transfer in self):
+            raise UserError(_("Usá Anular para revertir un traslado ya enviado."))
+        return super().unlink()
+
     @api.constrains("company_id", "dest_company_id")
     def _check_dest_company(self):
         """El destino tiene que ser otra sucursal."""
@@ -79,6 +102,40 @@ class StockBranchTransfer(models.Model):
         """El usuario tiene que tener acceso a la sucursal (o ser manager)."""
         if company not in self.env.user.company_ids and not self._is_manager():
             raise UserError(_("No tenés acceso a la sucursal %s.", company.name))
+
+    def _check_manager_edit(self):
+        """Un traslado ya enviado solo lo edita un manager."""
+        if not self._is_manager():
+            raise UserError(_("Solo un manager puede editar un traslado ya enviado."))
+
+    def _log_manager_edit(self):
+        """Deja constancia en el chatter de la edición posterior al envío."""
+        for transfer in self:
+            lines = "<br/>".join(
+                _("%(product)s: enviado %(sent)s, recibido %(received)s",
+                  product=line.product_id.display_name, sent=line.qty_sent, received=line.qty_received)
+                for line in transfer.line_ids
+            )
+            transfer.message_post(body=_("Editado por %s; stock corregido.", self.env.user.name) + "<br/>" + lines)
+
+    def _before_line_change(self, context):
+        """Valida permisos antes de tocar líneas de traslados ya enviados."""
+        if not context.get("branch_transfer_internal"):
+            sent = self.filtered(lambda t: t.state != "draft")
+            if sent:
+                sent._check_manager_edit()
+
+    def _after_line_change(self, context, checked=False):
+        """Tras tocar líneas de traslados ya enviados: permisos, stock y chatter."""
+        if context.get("branch_transfer_internal"):
+            return
+        sent = self.filtered(lambda t: t.state != "draft")
+        if not sent:
+            return
+        if not checked:
+            sent._check_manager_edit()
+        sent._reconcile_stock()
+        sent._log_manager_edit()
 
     def _write_internal(self, vals):
         """Escritura hecha por las acciones del flujo (no cuenta como edición manual)."""
@@ -250,6 +307,16 @@ class StockBranchTransfer(models.Model):
         self._check_state("with_diff")
         self._write_internal({"state": "closed"})
         self._reconcile_stock()
+        return True
+
+    def action_cancel(self):
+        """Anular (manager): revierte todo el stock movido y deja el traslado anulado."""
+        self._check_manager()
+        self._check_state("in_transit", "received", "with_diff", "closed")
+        self._write_internal({"state": "cancel"})
+        self._reconcile_stock()
+        for transfer in self:
+            transfer.message_post(body=_("Anulado por %s; stock revertido.", self.env.user.name))
         return True
 
     @api.model
