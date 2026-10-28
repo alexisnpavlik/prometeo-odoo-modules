@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_branch_transfer_root"
+              name="Traslados"
+              web_icon="stock_branch_transfer,static/description/icon.png"
+              groups="group_branch_transfer_user"
+              sequence="45"/>
+
+    <menuitem id="menu_branch_transfer_sent"
+              name="Salidas"
+              parent="menu_branch_transfer_root"
+              action="action_branch_transfer_sent"
+              sequence="10"/>
+
+    <menuitem id="menu_branch_transfer_incoming"
+              name="Entradas"
+              parent="menu_branch_transfer_root"
+              action="action_branch_transfer_incoming"
+              sequence="20"/>
+
+    <menuitem id="menu_branch_transfer_all"
+              name="Todos"
+              parent="menu_branch_transfer_root"
+              action="action_branch_transfer_all"
+              groups="group_branch_transfer_manager"
+              sequence="30"/>
+</odoo>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_branch_transfer" model="ir.module.category">
+        <field name="name">Traslados</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="group_branch_transfer_user" model="res.groups">
+        <field name="name">Usuario</field>
+        <field name="category_id" ref="module_category_branch_transfer"/>
+        <field name="comment">Envía traslados desde sus sucursales y recibe los que llegan a ellas.</field>
+    </record>
+
+    <record id="group_branch_transfer_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_branch_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('group_branch_transfer_user'))]"/>
+        <field name="comment">Ve todos los traslados, cierra los que tienen diferencias, los edita y los anula.</field>
+    </record>
+
+    <!-- Todo usuario interno puede enviar traslados -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_branch_transfer_user'))]"/>
+    </record>
+
+    <record id="rule_branch_transfer_user" model="ir.rule">
+        <field name="name">Traslados: sucursales del usuario</field>
+        <field name="model_id" ref="model_stock_branch_transfer"/>
+        <field name="domain_force">['|', ('company_id', 'in', company_ids), ('dest_company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('group_branch_transfer_user'))]"/>
+    </record>
+
+    <record id="rule_branch_transfer_manager" model="ir.rule">
+        <field name="name">Traslados: manager ve todo</field>
+        <field name="model_id" ref="model_stock_branch_transfer"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_branch_transfer_manager'))]"/>
+    </record>
+
+    <record id="rule_branch_transfer_line_user" model="ir.rule">
+        <field name="name">Líneas de traslado: sucursales del usuario</field>
+        <field name="model_id" ref="model_stock_branch_transfer_line"/>
+        <field name="domain_force">['|', ('transfer_id.company_id', 'in', company_ids), ('transfer_id.dest_company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('group_branch_transfer_user'))]"/>
+    </record>
+
+    <record id="rule_branch_transfer_line_manager" model="ir.rule">
+        <field name="name">Líneas de traslado: manager ve todo</field>
+        <field name="model_id" ref="model_stock_branch_transfer_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_branch_transfer_manager'))]"/>
+    </record>
+</odoo>
