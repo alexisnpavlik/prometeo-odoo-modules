@@ -17,6 +17,11 @@ class ResPartner(models.Model):
     country_id = fields.Many2one(default=_default_country_ar)
     l10n_latam_identification_type_id = fields.Many2one(default=_default_identification_type_dni)
 
+    @api.model
+    def default_get(self, fields_list):
+        """Todo contacto nuevo arranca como Persona, aunque la acción (Contactos, Clientes) pida empresa."""
+        return super(ResPartner, self.with_context(default_is_company=False, default_company_type="person")).default_get(fields_list)
+
     @api.onchange("is_company")
     def _onchange_is_company_identification_type(self):
         """En contactos nuevos alterna DNI y CUIT según sea persona o empresa; no toca CUIL ni otros tipos."""
