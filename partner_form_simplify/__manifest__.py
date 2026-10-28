@@ -1,6 +1,6 @@
 {
     "name": "Contactos - Ficha simplificada",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Hidden",
     "summary": "Oculta campos que no se usan en la ficha de contacto y pone valores por defecto argentinos",
     "description": """
@@ -8,7 +8,7 @@
 
         - Oculta las secciones AFIP y Otros (ingresos brutos, DREI) de Datos Fiscales.
         - Oculta Nombre de la empresa (para personas), Calle 2 y Teléfono (queda Móvil).
-        - Contactos nuevos: país Argentina y tipo de documento DNI (editable a CUIT/CUIL).
+        - Contactos nuevos: país Argentina y DNI para personas y CUIT para empresas (editable).
 
         Solo cambia la vista: los datos existentes no se tocan.
     """,
