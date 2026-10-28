@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_partner_form_simplify" model="ir.ui.view">
+        <field name="name">res.partner.form.simplify</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='parent_id']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='street2']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='state_id']" position="attributes">
+                <attribute name="placeholder">Provincia</attribute>
+            </xpath>
+            <xpath expr="//field[@name='child_ids']//field[@name='state_id']" position="attributes">
+                <attribute name="placeholder">Provincia</attribute>
+            </xpath>
+            <xpath expr="(//field[@name='child_ids']//field[@name='state_id'])[2]" position="attributes">
+                <attribute name="placeholder">Provincia</attribute>
+            </xpath>
+            <xpath expr="//field[@name='phone']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_property_form_simplify" model="ir.ui.view">
+        <field name="name">res.partner.property.form.simplify</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="l10n_ar_ux.view_partner_property_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <page name="fiscal_data" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </page>
+        </field>
+    </record>
+
+</odoo>
