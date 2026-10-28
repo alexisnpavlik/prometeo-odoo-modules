@@ -58,6 +58,7 @@
                                    options="{'no_create': True, 'no_open': True}"/>
                             <field name="dest_company_id"
                                    domain="[('id', '!=', company_id)]"
+                                   context="{'branch_transfer_dest': True}"
                                    readonly="state == 'cancel' or (state != 'draft' and not is_manager)"
                                    options="{'no_create': True, 'no_open': True}"/>
                         </group>

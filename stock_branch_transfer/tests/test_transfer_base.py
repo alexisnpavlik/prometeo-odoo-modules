@@ -31,3 +31,18 @@ class TestTransferBase(BranchTransferCommon):
         transfer = self.make_transfer(self.user_a)
         transfer.with_user(self.user_a).unlink()
         self.assertFalse(transfer.exists())
+
+    def test_dest_selector_lists_unselected_companies(self):
+        Company = self.env["res.company"].with_user(self.user_a).with_context(
+            allowed_company_ids=[self.company_a.id], branch_transfer_dest=True
+        )
+        ids = [r[0] for r in Company.name_search("SBT Sucursal")]
+        self.assertIn(self.company_b.id, ids)
+        self.assertIn(self.company_c.id, ids)
+        found = Company.web_search_read([("name", "ilike", "SBT Sucursal")], {"display_name": {}})
+        self.assertIn(self.company_b.id, [r["id"] for r in found["records"]])
+
+    def test_company_selector_unchanged_without_flag(self):
+        Company = self.env["res.company"].with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
+        ids = [r[0] for r in Company.name_search("SBT Sucursal")]
+        self.assertNotIn(self.company_b.id, ids)
