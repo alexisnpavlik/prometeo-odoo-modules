@@ -1,6 +1,6 @@
 {
     "name": "Traslados entre sucursales",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Inventory/Inventory",
     "summary": "Envío y recepción de mercadería entre sucursales (empresas) con aviso de pendientes",
     "description": """
@@ -28,6 +28,7 @@
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
         "data/stock_location.xml",
+        "report/report_branch_transfer.xml",
         "views/stock_branch_transfer_views.xml",
         "views/branch_transfer_receive_diff_views.xml",
         "views/menu_views.xml",

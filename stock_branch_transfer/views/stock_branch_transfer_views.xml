@@ -40,6 +40,7 @@
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="state in ('draft', 'cancel') or not is_manager"
                             confirm="Se revierte todo el stock movido por este traslado. ¿Anular?"/>
+                    <button name="%(action_report_branch_transfer)d" type="action" string="Imprimir"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,in_transit,received,closed"/>
                 </header>
                 <sheet>
@@ -71,11 +72,16 @@
                                     <field name="product_id" options="{'no_create': True}"/>
                                     <field name="qty_available_origin" column_invisible="parent.state != 'draft'"
                                            decoration-danger="qty_available_origin &lt; qty_sent"/>
+                                    <field name="qty_available_dest" column_invisible="parent.state != 'draft'"/>
                                     <field name="qty_sent"/>
                                     <field name="qty_received" column_invisible="parent.state in ('draft', 'in_transit')"/>
                                     <field name="uom_id" optional="hide"/>
                                 </list>
                             </field>
+                        </page>
+                        <page string="Nota de remito" name="note">
+                            <field name="note" placeholder="Observaciones que salen al pie del remito..."
+                                   readonly="state == 'cancel'"/>
                         </page>
                         <page string="Diferencias" name="diff" invisible="not diff_note">
                             <field name="diff_note" readonly="not is_manager"/>

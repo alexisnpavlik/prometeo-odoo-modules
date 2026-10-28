@@ -48,6 +48,7 @@ class StockBranchTransfer(models.Model):
     date_sent = fields.Datetime(string="Fecha de envío", readonly=True, copy=False)
     date_received = fields.Datetime(string="Fecha de recepción", readonly=True, copy=False)
     diff_note = fields.Text(string="Nota de diferencias", copy=False)
+    note = fields.Text(string="Nota de remito", help="Observaciones que salen al pie del remito impreso.")
     line_ids = fields.One2many("stock.branch.transfer.line", "transfer_id", string="Productos", copy=True)
     picking_ids = fields.One2many("stock.picking", "branch_transfer_id", string="Movimientos", readonly=True)
     legacy_receipt_id = fields.Many2one(

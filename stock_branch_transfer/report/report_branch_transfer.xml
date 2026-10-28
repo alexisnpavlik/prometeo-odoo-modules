@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_branch_transfer" model="ir.actions.report">
+        <field name="name">Remito de traslado</field>
+        <field name="model">stock.branch.transfer</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">stock_branch_transfer.report_branch_transfer</field>
+        <field name="report_file">stock_branch_transfer.report_branch_transfer</field>
+        <field name="print_report_name">'Traslado %s' % object.name</field>
+        <field name="binding_model_id" ref="model_stock_branch_transfer"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
+    <template id="report_branch_transfer_document">
+        <div class="page" style="font-size: 12px;">
+            <table style="width: 100%; border-bottom: 2px solid #333;">
+                <tr>
+                    <td style="vertical-align: top; padding-bottom: 6px;">
+                        <strong style="font-size: 16px;">Remito de traslado</strong>
+                        <div>Nº <t t-esc="o.name"/></div>
+                        <div>Estado: <span t-field="o.state"/></div>
+                    </td>
+                    <td style="vertical-align: top; text-align: right; padding-bottom: 6px;">
+                        <div t-field="o.name"
+                             t-options="{'widget': 'barcode', 'symbology': 'Code128', 'width': 600, 'height': 100, 'img_style': 'width:300px;height:50px;'}"/>
+                    </td>
+                </tr>
+            </table>
+
+            <div t-if="o.state == 'cancel'"
+                 style="margin-top: 8px; padding: 4px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold;">
+                TRASLADO ANULADO
+            </div>
+            <div t-if="o.state == 'draft'"
+                 style="margin-top: 8px; padding: 4px; border: 2px solid #999; color: #666; text-align: center; font-weight: bold;">
+                BORRADOR - SIN ENVIAR
+            </div>
+
+            <table style="width: 100%; margin-top: 10px;">
+                <tr>
+                    <td style="width: 50%;"><strong>Origen:</strong> <t t-esc="o.company_id.name"/></td>
+                    <td><strong>Destino:</strong> <t t-esc="o.dest_company_id.name"/></td>
+                </tr>
+                <tr>
+                    <td><strong>Envío:</strong> <span t-field="o.date_sent"/></td>
+                    <td><strong>Recepción:</strong> <span t-field="o.date_received"/></td>
+                </tr>
+                <tr>
+                    <td colspan="2"><strong>Creado por:</strong> <t t-esc="o.user_id.name"/></td>
+                </tr>
+            </table>
+
+            <t t-set="show_received" t-value="o.state in ('received', 'with_diff', 'closed')"/>
+            <table class="table table-sm" style="width: 100%; margin-top: 12px;">
+                <thead>
+                    <tr>
+                        <th>Código de barras</th>
+                        <th>Producto</th>
+                        <th style="text-align: right;">Enviado</th>
+                        <th t-if="show_received" style="text-align: right;">Recibido</th>
+                        <th>Unidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.line_ids" t-as="line">
+                        <td>
+                            <t t-if="line.product_id.barcode">
+                                <div t-field="line.product_id.barcode"
+                                     t-options="{'widget': 'barcode', 'symbology': 'auto', 'width': 400, 'height': 80, 'img_style': 'width:160px;height:32px;'}"/>
+                                <div style="font-size: 10px;" t-esc="line.product_id.barcode"/>
+                            </t>
+                        </td>
+                        <td t-esc="line.product_id.display_name"/>
+                        <td style="text-align: right;"><span t-field="line.qty_sent"/></td>
+                        <td t-if="show_received" style="text-align: right;"><span t-field="line.qty_received"/></td>
+                        <td t-esc="line.uom_id.name"/>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div t-if="o.diff_note" style="margin-top: 8px;">
+                <strong>Nota de diferencias:</strong> <t t-esc="o.diff_note"/>
+            </div>
+
+            <div t-if="o.note" style="margin-top: 8px;">
+                <strong>Observaciones:</strong>
+                <div style="white-space: pre-wrap;" t-esc="o.note"/>
+            </div>
+
+            <table style="width: 100%; margin-top: 50px;">
+                <tr>
+                    <td style="width: 45%; border-top: 1px solid #333; text-align: center;">Firma quien envía</td>
+                    <td style="width: 10%;"/>
+                    <td style="width: 45%; border-top: 1px solid #333; text-align: center;">Firma quien recibe</td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_branch_transfer">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <t t-call="stock_branch_transfer.report_branch_transfer_document"/>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
