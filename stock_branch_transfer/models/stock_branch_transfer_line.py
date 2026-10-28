@@ -31,6 +31,22 @@ class StockBranchTransferLine(models.Model):
         string="Stock en destino", compute="_compute_qty_available_dest", digits="Product Unit of Measure"
     )
 
+    sale_price = fields.Float(string="Precio de venta", compute="_compute_sale_price", digits="Product Price")
+
+    @api.depends("product_id", "transfer_id.dest_company_id")
+    def _compute_sale_price(self):
+        """Precio en la lista de la sucursal destino; sin regla para el producto, el precio de venta de la ficha."""
+        Pricelist = self.env["product.pricelist"].sudo()
+        for line in self:
+            product = line.product_id
+            price = product.lst_price
+            pricelists = Pricelist.search([("company_id", "=", line.transfer_id.dest_company_id.id)])
+            for pricelist in pricelists:
+                if pricelist._get_product_rule(product, 1.0):
+                    price = pricelist._get_product_price(product, 1.0)
+                    break
+            line.sale_price = price
+
     def _company_stock(self, company):
         """Stock actual del producto de la línea en la ubicación de stock de la empresa."""
         if not self.product_id or not company:

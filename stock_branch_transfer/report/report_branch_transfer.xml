@@ -7,12 +7,13 @@
         <field name="report_name">stock_branch_transfer.report_branch_transfer</field>
         <field name="report_file">stock_branch_transfer.report_branch_transfer</field>
         <field name="print_report_name">'Traslado %s' % object.name</field>
-        <field name="binding_model_id" ref="model_stock_branch_transfer"/>
-        <field name="binding_type">report</field>
+        <!-- Sin binding: solo se imprime con el botón, que aparece después del envío. -->
+        <field name="binding_model_id" eval="False"/>
     </record>
 
     <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
     <template id="report_branch_transfer_document">
+        <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': o.dest_company_id.currency_id}"/>
         <div class="page" style="font-size: 12px;">
             <table style="width: 100%; border-bottom: 2px solid #333;">
                 <tr>
@@ -31,10 +32,6 @@
             <div t-if="o.state == 'cancel'"
                  style="margin-top: 8px; padding: 4px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold;">
                 TRASLADO ANULADO
-            </div>
-            <div t-if="o.state == 'draft'"
-                 style="margin-top: 8px; padding: 4px; border: 2px solid #999; color: #666; text-align: center; font-weight: bold;">
-                BORRADOR - SIN ENVIAR
             </div>
 
             <table style="width: 100%; margin-top: 10px;">
@@ -60,6 +57,8 @@
                         <th style="text-align: right;">Enviado</th>
                         <th t-if="show_received" style="text-align: right;">Recibido</th>
                         <th>Unidad</th>
+                        <th style="text-align: right;">Precio</th>
+                        <th style="text-align: right;">Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -75,8 +74,17 @@
                         <td style="text-align: right;"><span t-field="line.qty_sent"/></td>
                         <td t-if="show_received" style="text-align: right;"><span t-field="line.qty_received"/></td>
                         <td t-esc="line.uom_id.name"/>
+                        <td style="text-align: right;" t-esc="line.sale_price" t-options="money"/>
+                        <td style="text-align: right;" t-esc="line.sale_price * line.qty_sent" t-options="money"/>
                     </tr>
                 </tbody>
+                <tfoot>
+                    <tr>
+                        <td t-att-colspan="7 if show_received else 6" style="text-align: right;">
+                            <strong>Total: <t t-esc="sum(l.sale_price * l.qty_sent for l in o.line_ids)" t-options="money"/></strong>
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
 
             <div t-if="o.diff_note" style="margin-top: 8px;">

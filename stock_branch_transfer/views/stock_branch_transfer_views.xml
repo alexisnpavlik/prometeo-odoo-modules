@@ -40,7 +40,8 @@
                     <button name="action_cancel" type="object" string="Anular"
                             invisible="state in ('draft', 'cancel') or not is_manager"
                             confirm="Se revierte todo el stock movido por este traslado. ¿Anular?"/>
-                    <button name="%(action_report_branch_transfer)d" type="action" string="Imprimir"/>
+                    <button name="%(action_report_branch_transfer)d" type="action" string="Imprimir"
+                            invisible="state == 'draft'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,in_transit,received,closed"/>
                 </header>
                 <sheet>
