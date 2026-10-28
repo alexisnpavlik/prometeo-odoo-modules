@@ -95,7 +95,9 @@ class StockBranchTransfer(models.Model):
             vals.pop("state", None)
             if vals.get("name", "Nuevo") == "Nuevo":
                 vals["name"] = self.env["ir.sequence"].sudo().next_by_code("stock.branch.transfer") or "Nuevo"
-        return super().create(vals_list)
+        transfers = super().create(vals_list)
+        transfers._merge_draft_lines()
+        return transfers
 
     def write(self, vals):
         """Editar un traslado ya enviado es cosa de managers y corrige el stock."""
@@ -107,13 +109,30 @@ class StockBranchTransfer(models.Model):
             return super().write(vals)
         sent = self.filtered(lambda t: t.state != "draft")
         if not sent:
-            return super().write(vals)
+            res = super().write(vals)
+            self._merge_draft_lines()
+            return res
         sent._check_manager_edit()
         # Las líneas tocadas por esta escritura no reconcilian por su cuenta: se hace una vez acá.
         res = super(StockBranchTransfer, self.with_context(branch_transfer_internal=INTERNAL)).write(vals)
         sent._reconcile_stock()
         sent._log_manager_edit()
         return res
+
+    def _merge_draft_lines(self):
+        """En borrador: una línea por producto (se suman las cantidades) y sin líneas en cero."""
+        for transfer in self.filtered(lambda t: t.state == "draft"):
+            kept = {}
+            to_delete = self.env["stock.branch.transfer.line"]
+            for line in transfer.line_ids:
+                first = kept.get(line.product_id)
+                if first:
+                    first.qty_sent += line.qty_sent
+                    to_delete |= line
+                else:
+                    kept[line.product_id] = line
+            to_delete |= transfer.line_ids.filtered(lambda l: l not in to_delete and l.qty_sent <= 0)
+            to_delete.unlink()
 
     def unlink(self):
         """Solo se borran borradores; lo enviado se anula."""
