@@ -37,6 +37,13 @@
                 <attribute name="required">display_applied_on == '2_product_category'</attribute>
                 <attribute name="placeholder">Elegí una categoría</attribute>
             </field>
+            <!-- Descuento siempre sobre el precio de venta: sin "en <otra lista>". -->
+            <xpath expr="//div[field[@name='percent_price']]/field[@name='base_pricelist_id']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//div[field[@name='percent_price']]/span[2]" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
             <xpath expr="//sheet" position="inside">
                 <group string="Resultado" invisible="applied_on not in ('0_product_variant', '1_product')">
                     <field name="promotion_regular_price"/>
