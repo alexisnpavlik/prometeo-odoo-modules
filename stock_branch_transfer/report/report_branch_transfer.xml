@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Sin header de layout: margen superior chico en lugar de los ~40 mm del formato por defecto. -->
+    <record id="paperformat_branch_transfer" model="report.paperformat">
+        <field name="name">Remito de traslado (A4)</field>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">10</field>
+        <field name="margin_left">10</field>
+        <field name="margin_right">10</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
     <record id="action_report_branch_transfer" model="ir.actions.report">
         <field name="name">Remito de traslado</field>
         <field name="model">stock.branch.transfer</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">stock_branch_transfer.report_branch_transfer</field>
         <field name="report_file">stock_branch_transfer.report_branch_transfer</field>
+        <field name="paperformat_id" ref="paperformat_branch_transfer"/>
         <field name="print_report_name">'Traslado %s' % object.name</field>
         <!-- Sin binding: solo se imprime con el botón, que aparece después del envío. -->
         <field name="binding_model_id" eval="False"/>
@@ -17,7 +32,9 @@
         <t t-set="show_received" t-value="o.state in ('received', 'with_diff', 'closed')"/>
         <t t-set="th" t-value="'background: #2f3e4e; color: #fff; padding: 6px 8px; font-weight: bold; font-size: 11px; text-transform: uppercase;'"/>
         <t t-set="box_title" t-value="'font-size: 10px; color: #777; text-transform: uppercase; letter-spacing: 1px;'"/>
-        <div class="page" style="font-size: 12px; color: #222;">
+        <div class="page o_branch_transfer" style="font-size: 12px; color: #222;">
+            <!-- El layout de reportes de la empresa le pone bordes a toda tabla; acá solo valen los inline. -->
+            <style>.o_branch_transfer table, .o_branch_transfer td, .o_branch_transfer th { border: 0; }</style>
             <!-- Encabezado: emisor a la izquierda, número y código a la derecha -->
             <table style="width: 100%;">
                 <tr>
