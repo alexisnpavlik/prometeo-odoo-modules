@@ -44,6 +44,13 @@
             <xpath expr="//div[field[@name='percent_price']]/span[2]" position="attributes">
                 <attribute name="invisible">True</attribute>
             </xpath>
+            <!-- Fórmula siempre basada en el precio de venta (default de base: list_price). -->
+            <xpath expr="//group[@name='pricelist_rule_base']//field[@name='base']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//group[@name='pricelist_rule_base']//field[@name='base_pricelist_id']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
             <xpath expr="//sheet" position="inside">
                 <group string="Resultado" invisible="applied_on not in ('0_product_variant', '1_product')">
                     <field name="promotion_regular_price"/>
