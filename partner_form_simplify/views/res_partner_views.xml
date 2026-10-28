@@ -25,12 +25,9 @@
         <field name="inherit_id" ref="l10n_ar_ux.view_partner_property_form"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
-            <group name="afip" position="attributes">
+            <page name="fiscal_data" position="attributes">
                 <attribute name="invisible">True</attribute>
-            </group>
-            <group name="others" position="attributes">
-                <attribute name="invisible">True</attribute>
-            </group>
+            </page>
         </field>
     </record>
 
