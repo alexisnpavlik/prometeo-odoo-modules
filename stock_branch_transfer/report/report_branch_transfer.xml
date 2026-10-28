@@ -28,6 +28,10 @@
 
     <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
     <template id="report_branch_transfer_document">
+        <!-- Lectura con sudo: el remito muestra datos de las dos sucursales (logo, CUIT,
+             moneda) y la regla multiempresa bloquea la que no está seleccionada. El acceso
+             al traslado ya se verificó al imprimirlo. -->
+        <t t-set="o" t-value="o.sudo()"/>
         <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': o.dest_company_id.currency_id}"/>
         <t t-set="show_received" t-value="o.state in ('received', 'with_diff', 'closed')"/>
         <t t-set="th" t-value="'background: #2f3e4e; color: #fff; padding: 6px 8px; font-weight: bold; font-size: 11px; text-transform: uppercase;'"/>
