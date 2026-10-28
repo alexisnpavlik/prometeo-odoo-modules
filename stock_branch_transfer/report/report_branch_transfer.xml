@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sin header de layout: margen superior chico en lugar de los ~40 mm del formato por defecto. -->
+    <record id="paperformat_branch_transfer" model="report.paperformat">
+        <field name="name">Remito de traslado (A4)</field>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">10</field>
+        <field name="margin_left">10</field>
+        <field name="margin_right">10</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_branch_transfer" model="ir.actions.report">
+        <field name="name">Remito de traslado</field>
+        <field name="model">stock.branch.transfer</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">stock_branch_transfer.report_branch_transfer</field>
+        <field name="report_file">stock_branch_transfer.report_branch_transfer</field>
+        <field name="paperformat_id" ref="paperformat_branch_transfer"/>
+        <field name="print_report_name">'Traslado %s' % object.name</field>
+        <!-- Sin binding: solo se imprime con el botón, que aparece después del envío. -->
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- Tablas y no flex: wkhtmltopdf no soporta flexbox. -->
+    <template id="report_branch_transfer_document">
+        <t t-set="money" t-value="{'widget': 'monetary', 'display_currency': o.dest_company_id.currency_id}"/>
+        <t t-set="show_received" t-value="o.state in ('received', 'with_diff', 'closed')"/>
+        <t t-set="th" t-value="'background: #2f3e4e; color: #fff; padding: 6px 8px; font-weight: bold; font-size: 11px; text-transform: uppercase;'"/>
+        <t t-set="box_title" t-value="'font-size: 10px; color: #777; text-transform: uppercase; letter-spacing: 1px;'"/>
+        <div class="page o_branch_transfer" style="font-size: 12px; color: #222;">
+            <!-- El layout de reportes de la empresa le pone bordes a toda tabla; acá solo valen los inline. -->
+            <style>.o_branch_transfer table, .o_branch_transfer td, .o_branch_transfer th { border: 0; }</style>
+            <!-- Encabezado: emisor a la izquierda, número y código a la derecha -->
+            <table style="width: 100%;">
+                <tr>
+                    <td style="width: 55%; vertical-align: middle;">
+                        <img t-if="o.company_id.logo" t-att-src="image_data_uri(o.company_id.logo)"
+                             style="max-height: 55px; max-width: 180px; margin-bottom: 4px;"/>
+                        <div style="font-size: 15px; font-weight: bold;" t-esc="o.company_id.name"/>
+                        <div t-if="o.company_id.vat" style="color: #555;">CUIT <t t-esc="o.company_id.vat"/></div>
+                    </td>
+                    <td style="width: 45%; vertical-align: middle; text-align: right;">
+                        <div style="font-size: 20px; font-weight: bold; letter-spacing: 1px;">REMITO DE TRASLADO</div>
+                        <div style="font-size: 15px; margin: 2px 0 6px 0;">Nº <strong t-esc="o.name"/></div>
+                        <div t-field="o.name"
+                             t-options="{'widget': 'barcode', 'symbology': 'Code128', 'width': 600, 'height': 100, 'img_style': 'width:240px;height:40px;'}"/>
+                    </td>
+                </tr>
+            </table>
+            <div style="border-bottom: 3px solid #2f3e4e; margin: 8px 0 10px 0;"/>
+
+            <div t-if="o.state == 'cancel'"
+                 style="margin-bottom: 10px; padding: 6px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold; font-size: 14px;">
+                TRASLADO ANULADO
+            </div>
+
+            <!-- Origen / destino / datos -->
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    <td style="width: 34%; vertical-align: top; border: 1px solid #ccc; padding: 8px;">
+                        <div t-att-style="box_title">Origen</div>
+                        <div style="font-size: 13px; font-weight: bold;" t-esc="o.company_id.name"/>
+                        <div style="color: #555;">Envío: <span t-field="o.date_sent"/></div>
+                    </td>
+                    <td style="width: 34%; vertical-align: top; border: 1px solid #ccc; border-left: none; padding: 8px;">
+                        <div t-att-style="box_title">Destino</div>
+                        <div style="font-size: 13px; font-weight: bold;" t-esc="o.dest_company_id.name"/>
+                        <div style="color: #555;">Recepción: <span t-if="o.date_received" t-field="o.date_received"/><t t-else="">-</t></div>
+                    </td>
+                    <td style="width: 32%; vertical-align: top; border: 1px solid #ccc; border-left: none; padding: 8px;">
+                        <div t-att-style="box_title">Estado</div>
+                        <div style="font-size: 13px; font-weight: bold;" t-field="o.state"/>
+                        <div style="color: #555;">Creado por: <t t-esc="o.user_id.name"/></div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Productos -->
+            <table style="width: 100%; margin-top: 14px; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th t-att-style="th + 'text-align: left;'">Código</th>
+                        <th t-att-style="th + 'text-align: left;'">Producto</th>
+                        <th t-att-style="th + 'text-align: right;'">Enviado</th>
+                        <th t-if="show_received" t-att-style="th + 'text-align: right;'">Recibido</th>
+                        <th t-att-style="th + 'text-align: right;'">Precio</th>
+                        <th t-att-style="th + 'text-align: right;'">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.line_ids" t-as="line"
+                        t-att-style="'page-break-inside: avoid; border-bottom: 1px solid #e3e3e3;' + (' background: #f5f7f9;' if line_index % 2 else '')">
+                        <td style="padding: 5px 8px; width: 170px; vertical-align: middle;">
+                            <t t-if="line.product_id.barcode">
+                                <div t-field="line.product_id.barcode"
+                                     t-options="{'widget': 'barcode', 'symbology': 'auto', 'width': 400, 'height': 80, 'img_style': 'width:150px;height:28px;'}"/>
+                                <div style="font-size: 9px; letter-spacing: 1px;" t-esc="line.product_id.barcode"/>
+                            </t>
+                            <span t-else="" style="color: #999;">Sin código</span>
+                        </td>
+                        <td style="padding: 5px 8px; vertical-align: middle;" t-esc="line.product_id.display_name"/>
+                        <td style="padding: 5px 8px; text-align: right; vertical-align: middle; white-space: nowrap;">
+                            <strong><span t-field="line.qty_sent"/></strong>
+                            <span style="color: #777; font-size: 10px;" t-esc="line.uom_id.name"/>
+                        </td>
+                        <td t-if="show_received" style="padding: 5px 8px; text-align: right; vertical-align: middle; white-space: nowrap;">
+                            <span t-field="line.qty_received"/>
+                        </td>
+                        <td style="padding: 5px 8px; text-align: right; vertical-align: middle; white-space: nowrap;"
+                            t-esc="line.sale_price" t-options="money"/>
+                        <td style="padding: 5px 8px; text-align: right; vertical-align: middle; white-space: nowrap;"
+                            t-esc="line.sale_price * line.qty_sent" t-options="money"/>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Totales -->
+            <table style="width: 100%; margin-top: 8px;">
+                <tr>
+                    <td style="width: 60%;"/>
+                    <td style="width: 40%; padding: 0;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 4px 8px; color: #555;">Productos</td>
+                                <td style="padding: 4px 8px; text-align: right;" t-esc="len(o.line_ids)"/>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 8px; color: #555;">Unidades enviadas</td>
+                                <td style="padding: 4px 8px; text-align: right;" t-esc="'%g' % sum(o.line_ids.mapped('qty_sent'))"/>
+                            </tr>
+                            <tr style="background: #2f3e4e; color: #fff;">
+                                <td style="padding: 6px 8px; font-weight: bold;">TOTAL</td>
+                                <td style="padding: 6px 8px; text-align: right; font-weight: bold; font-size: 14px;"
+                                    t-esc="sum(l.sale_price * l.qty_sent for l in o.line_ids)" t-options="money"/>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <div t-if="o.note" style="margin-top: 14px; border-left: 4px solid #2f3e4e; background: #f5f7f9; padding: 8px 10px; page-break-inside: avoid;">
+                <div t-att-style="box_title">Observaciones</div>
+                <div style="white-space: pre-wrap;" t-esc="o.note"/>
+            </div>
+            <div t-if="o.diff_note" style="margin-top: 10px; border-left: 4px solid #c77700; background: #fff6e8; padding: 8px 10px; page-break-inside: avoid;">
+                <div t-att-style="box_title">Nota de diferencias</div>
+                <div style="white-space: pre-wrap;" t-esc="o.diff_note"/>
+            </div>
+
+            <!-- Firmas -->
+            <table style="width: 100%; margin-top: 60px; page-break-inside: avoid;">
+                <tr>
+                    <td style="width: 42%; border-top: 1px solid #333; text-align: center; padding-top: 4px;">
+                        <div>Entregó</div>
+                        <div style="font-size: 10px; color: #777;">Firma y aclaración - <t t-esc="o.company_id.name"/></div>
+                    </td>
+                    <td style="width: 16%;"/>
+                    <td style="width: 42%; border-top: 1px solid #333; text-align: center; padding-top: 4px;">
+                        <div>Recibió</div>
+                        <div style="font-size: 10px; color: #777;">Firma y aclaración - <t t-esc="o.dest_company_id.name"/></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </template>
+
+    <template id="report_branch_transfer">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <t t-call="stock_branch_transfer.report_branch_transfer_document"/>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
