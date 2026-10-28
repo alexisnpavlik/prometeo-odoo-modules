@@ -9,6 +9,10 @@
             <list string="Promociones">
                 <field name="name" string="Aplicado en"/>
                 <field name="price"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="promotion_regular_price" optional="show"/>
+                <field name="promotion_price" optional="show"/>
+                <field name="promotion_saving" optional="show"/>
                 <field name="min_quantity"/>
                 <field name="date_start"/>
                 <field name="date_end"/>
@@ -33,6 +37,13 @@
                 <attribute name="required">display_applied_on == '2_product_category'</attribute>
                 <attribute name="placeholder">Elegí una categoría</attribute>
             </field>
+            <xpath expr="//sheet" position="inside">
+                <group string="Resultado" invisible="applied_on not in ('0_product_variant', '1_product')">
+                    <field name="promotion_regular_price"/>
+                    <field name="promotion_price"/>
+                    <field name="promotion_saving"/>
+                </group>
+            </xpath>
         </field>
     </record>
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Sales/Point Of Sale",
     "summary": "App Promociones: precios promocionales por producto o categoría y packs de varios productos a un precio",
     "description": """
