@@ -74,6 +74,19 @@ class TestCcaDashboard(CcaCommon):
         self.assertEqual(kpis["total_balance"], 1000.0)
         self.assertEqual(kpis["withdrawal_count"], 1)
 
+    def test_partner_filter_accepts_several_contacts(self):
+        """Varios contactos (lista desde el RPC o JSON desde el export) suman sus saldos."""
+        other = self.env["res.partner"].create({"name": "Otro Dashboard Test", "vat": "20999888"})
+        self._confirmed(other, qty=10)
+        third = self.env["res.partner"].create({"name": "Tercero Dashboard Test", "vat": "20999777"})
+        self._confirmed(third, qty=10)
+        for partner in ([self.partner.id, other.id], f"[{self.partner.id}, {other.id}]"):
+            with self.subTest(partner=partner):
+                kpis = self._controller()._cca_kpis(
+                    self.env, start_date=None, end_date=None, company=[], partner=partner
+                )
+                self.assertEqual(kpis["withdrawal_count"], 2)
+
     def test_filters_lists_partners_with_account(self):
         """_cca_partners expone los contactos con cuenta corriente, para el filtro."""
         names = [p["name"] for p in self._controller()._cca_partners(self.env)]

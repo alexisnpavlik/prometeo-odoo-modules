@@ -4,6 +4,7 @@ from odoo.http import request
 from odoo.exceptions import AccessError
 import datetime
 import io
+import json
 import logging
 
 import xlsxwriter
@@ -27,6 +28,27 @@ TYPE_LABELS = {
     "price_increase": "Aumento precio",
     "refund": "Reembolso",
 }
+
+
+def _to_list(value):
+    """Valores de un filtro multi-selección: lista, JSON (export), valor suelto o "all" (= sin filtro)."""
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if v not in (None, "", "all")]
+    if not value or value in ("all", "null"):
+        return []
+    if isinstance(value, str) and value.startswith("["):
+        try:
+            return _to_list(json.loads(value))
+        except ValueError:
+            return []
+    return [str(value)]
+
+
+def _filter_label(values, empty, labels=None):
+    """Texto del filtro para el encabezado del Excel."""
+    if not values:
+        return empty
+    return ", ".join((labels or {}).get(v, v) for v in values)
 
 
 class PosControlMetricsController(http.Controller):
@@ -57,6 +79,8 @@ class PosControlMetricsController(http.Controller):
         ahí el log es la única fuente del motivo y hay un solo evento por
         reembolso, así que no duplica nada.
         """
+        pos, cashier, company = _to_list(pos), _to_list(cashier), _to_list(company)
+        dtype = _to_list(dtype)
         allowed = tuple(request.env.companies.ids) or (0,)
         where = "dl.company_id IN %s"
         if exclude_refund:
@@ -70,18 +94,18 @@ class PosControlMetricsController(http.Controller):
         if end_date:
             where += " AND dl.event_datetime <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             params.extend([f"{end_date} 23:59:59", tz])
-        if pos and pos != "all":
-            where += " AND pc.name = %s"
-            params.append(pos)
-        if cashier and cashier != "all":
-            where += " AND rp.name = %s"
-            params.append(cashier)
-        if company and company != "all":
-            where += " AND rc.name = %s"
-            params.append(company)
-        if dtype and dtype != "all":
-            where += " AND dl.event_type = %s"
-            params.append(dtype)
+        if pos:
+            where += " AND pc.name IN %s"
+            params.append(tuple(pos))
+        if cashier:
+            where += " AND rp.name IN %s"
+            params.append(tuple(cashier))
+        if company:
+            where += " AND rc.name IN %s"
+            params.append(tuple(company))
+        if dtype:
+            where += " AND dl.event_type IN %s"
+            params.append(tuple(dtype))
         return where, params
 
     _JOINS = """
@@ -116,6 +140,7 @@ class PosControlMetricsController(http.Controller):
     ):
         """WHERE para las líneas de reembolso (alias pol / po). Solo órdenes
         no canceladas; misma semántica de filtros que el log de control."""
+        pos, cashier, company = _to_list(pos), _to_list(cashier), _to_list(company)
         allowed = tuple(request.env.companies.ids) or (0,)
         where = (
             "pol.refunded_orderline_id IS NOT NULL "
@@ -131,15 +156,15 @@ class PosControlMetricsController(http.Controller):
         if end_date:
             where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             params.extend([f"{end_date} 23:59:59", tz])
-        if pos and pos != "all":
-            where += " AND pc.name = %s"
-            params.append(pos)
-        if cashier and cashier != "all":
-            where += " AND rp.name = %s"
-            params.append(cashier)
-        if company and company != "all":
-            where += " AND rc.name = %s"
-            params.append(company)
+        if pos:
+            where += " AND pc.name IN %s"
+            params.append(tuple(pos))
+        if cashier:
+            where += " AND rp.name IN %s"
+            params.append(tuple(cashier))
+        if company:
+            where += " AND rc.name IN %s"
+            params.append(tuple(company))
         return where, params
 
     @http.route("/pos_control_metrics/filters", type="json", auth="user")
@@ -185,6 +210,8 @@ class PosControlMetricsController(http.Controller):
         company="all", dtype="all", detail_limit=DETAIL_LIMIT, **kwargs
     ):
         self._check_access()
+        pos, cashier, company = _to_list(pos), _to_list(cashier), _to_list(company)
+        dtype = _to_list(dtype)
         try:
             detail_limit = max(1, min(int(detail_limit), EXPORT_DETAIL_LIMIT))
         except (TypeError, ValueError):
@@ -197,7 +224,7 @@ class PosControlMetricsController(http.Controller):
         )
         # Los reembolsos entran cuando no se filtra por un tipo puntual del log
         # ("Todos") o cuando se pide expresamente el tipo "refund".
-        include_refunds = dtype in ("all", "refund")
+        include_refunds = not dtype or "refund" in dtype
 
         # --- KPIs: conteo por tipo, importe y unidades ---
         cr.execute(
@@ -268,15 +295,15 @@ class PosControlMetricsController(http.Controller):
         if end_date:
             ord_where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             ord_params.extend([f"{end_date} 23:59:59", tz])
-        if pos and pos != "all":
-            ord_where += " AND pc.name = %s"
-            ord_params.append(pos)
-        if cashier and cashier != "all":
-            ord_where += " AND rp.name = %s"
-            ord_params.append(cashier)
-        if company and company != "all":
-            ord_where += " AND rc.name = %s"
-            ord_params.append(company)
+        if pos:
+            ord_where += " AND pc.name IN %s"
+            ord_params.append(tuple(pos))
+        if cashier:
+            ord_where += " AND rp.name IN %s"
+            ord_params.append(tuple(cashier))
+        if company:
+            ord_where += " AND rc.name IN %s"
+            ord_params.append(tuple(company))
         cr.execute(
             f"""
             SELECT COUNT(*)
@@ -292,7 +319,7 @@ class PosControlMetricsController(http.Controller):
         orders_period = int(cr.fetchone()[0] or 0)
         # Con un filtro de tipo distinto de 'order' el numerador es 0 por definición:
         # la tasa no aplica y mostrar 0,00% haría creer que no hubo eliminaciones.
-        if dtype and dtype not in ("all", "order"):
+        if dtype and "order" not in dtype:
             kpis["deletion_rate"] = None
         else:
             denom = orders_period + kpis["n_order"]
@@ -550,10 +577,8 @@ class PosControlMetricsController(http.Controller):
             # se serializa como "" o "null" y no como None.
             start_date = start_date if start_date and start_date not in ("null", "") else None
             end_date = end_date if end_date and end_date not in ("null", "") else None
-            pos = pos or "all"
-            cashier = cashier or "all"
-            company = company or "all"
-            dtype = dtype or "all"
+            pos, cashier, company = _to_list(pos), _to_list(cashier), _to_list(company)
+            dtype = _to_list(dtype)
 
             data = self.get_metrics(
                 start_date=start_date, end_date=end_date, pos=pos,
@@ -587,10 +612,10 @@ class PosControlMetricsController(http.Controller):
 
             filtros = " · ".join([
                 f"Período: {start_date or 'inicio'} a {end_date or 'hoy'}",
-                f"Caja: {pos if pos != 'all' else 'Todas'}",
-                f"Cajero: {cashier if cashier != 'all' else 'Todos'}",
-                f"Empresa: {company if company != 'all' else 'Todas'}",
-                f"Tipo: {TYPE_LABELS.get(dtype, 'Todos') if dtype != 'all' else 'Todos'}",
+                f"Caja: {_filter_label(pos, 'Todas')}",
+                f"Cajero: {_filter_label(cashier, 'Todos')}",
+                f"Empresa: {_filter_label(company, 'Todas')}",
+                f"Tipo: {_filter_label(dtype, 'Todos', TYPE_LABELS)}",
             ])
             sheet.write(0, 0, "Detalle de operaciones POS", fmt_title)
             sheet.write(1, 0, filtros)

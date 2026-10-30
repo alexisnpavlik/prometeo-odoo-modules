@@ -15,3 +15,21 @@
 .ppcm-empty { text-align: center; color: #6c757d; padding: 24px; }
 .ppcm-pager { margin-top: 12px; display: flex; gap: 12px; align-items: center; }
 .ppcm-pager button { padding: 4px 10px; }
+
+/* Filtros multi-selección (checkbox), mismo comportamiento que métricas gerenciales */
+.ppcm-multiselect { position: relative; min-width: 200px; }
+.ppcm-multiselect-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid #ced4da; border-radius: 4px; background: #fff; text-align: left; cursor: pointer; }
+.ppcm-multiselect-toggle:hover { border-color: #86b7fe; }
+.ppcm-multiselect-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppcm-multiselect-caret { color: #6c757d; font-size: 11px; flex-shrink: 0; }
+.ppcm-multiselect-panel { position: absolute; z-index: 50; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 360px; background: #fff; border: 1px solid #ced4da; border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ppcm-multiselect-panel input[type="text"] { width: 100%; }
+.ppcm-multiselect-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; }
+.ppcm-multiselect-option { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 4px; cursor: pointer; margin: 0; font-weight: normal; }
+.ppcm-multiselect-option:hover { background: #f1f3f5; }
+.ppcm-multiselect-all { border-bottom: 1px solid #e9ecef; padding-bottom: 8px; color: #6c757d; }
+.ppcm-multiselect-empty { padding: 8px; color: #6c757d; text-align: center; }
+@media (max-width: 768px) {
+    .ppcm-multiselect { min-width: 0; flex: 1 1 100%; }
+    .ppcm-multiselect-panel { max-width: none; width: 100%; max-height: 50vh; overflow-y: auto; }
+}

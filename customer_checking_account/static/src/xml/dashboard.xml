@@ -1,5 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+    <t t-name="customer_checking_account.MultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="state[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <t t-name="customer_checking_account.DashboardTemplate">
         <div t-att-class="'cca-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
@@ -60,29 +94,21 @@
                 <div class="sidebar-section">
                     <h3>Filtros Avanzados</h3>
 
-                    <div class="input-group">
-                        <label>Empresa</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.company">
-                                <option value="all">Todas las empresas</option>
-                                <t t-foreach="filtersData.companies" t-as="c" t-key="c.id">
-                                    <option t-att-value="c.id"><t t-esc="c.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="customer_checking_account.MultiSelect">
+                        <t t-set="field" t-value="'company'"/>
+                        <t t-set="title" t-value="'Empresa'"/>
+                        <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                        <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Contacto</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.partner">
-                                <option value="all">Todos los contactos</option>
-                                <t t-foreach="filtersData.partners" t-as="p" t-key="p.id">
-                                    <option t-att-value="p.id"><t t-esc="p.name"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="customer_checking_account.MultiSelect">
+                        <t t-set="field" t-value="'partner'"/>
+                        <t t-set="title" t-value="'Contacto'"/>
+                        <t t-set="allLabel" t-value="'Todos los contactos'"/>
+                        <t t-set="pluralLabel" t-value="'contactos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar contacto...'"/>
+                    </t>
 
                 </div>
 

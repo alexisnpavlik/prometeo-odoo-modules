@@ -308,6 +308,22 @@ class TestCviDashboardController(CviCommon):
             with self.subTest(company=company), self.assertRaises(UserError):
                 self.controller._cvi_parse_company(self.env, company)
 
+    def test_company_filter_accepts_several_companies(self):
+        """Lista o JSON con varias empresas; vacía equivale a todas."""
+        own = self.env.companies.ids
+        self.assertEqual(self.controller._cvi_company_ids(self.env, []), tuple(own))
+        self.assertEqual(
+            self.controller._cvi_company_ids(self.env, [self.company.id, self.company.id]),
+            (self.company.id,),
+        )
+        self.assertEqual(
+            self.controller._cvi_company_ids(self.env, f"[{self.company.id}]"),
+            (self.company.id,),
+        )
+        for company in ("[", ["not-a-company"], [99999999]):
+            with self.subTest(company=company), self.assertRaises(UserError):
+                self.controller._cvi_company_ids(self.env, company)
+
     def test_invalid_pagination_is_a_functional_error(self):
         for page, per_page in (
             ("not-a-page", 15), (1, "not-a-page"), (0, 15),

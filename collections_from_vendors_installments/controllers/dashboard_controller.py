@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import csv
 import io
+import json
 import logging
 
 from odoo import _, http
@@ -68,7 +69,19 @@ class CviDashboardController(http.Controller):
         return company_id
 
     def _cvi_company_ids(self, env, company):
-        """Devuelve las empresas habilitadas por el filtro, ya validado."""
+        """Devuelve las empresas habilitadas por el filtro, ya validado.
+
+        Acepta una empresa, ``"all"`` o varias (lista o JSON desde el export);
+        la lista vacía equivale a todas.
+        """
+        if isinstance(company, str) and company.startswith("["):
+            try:
+                company = json.loads(company)
+            except ValueError:
+                raise UserError(_("La empresa seleccionada no es válida.")) from None
+        if isinstance(company, (list, tuple)):
+            company_ids = [self._cvi_parse_company(env, value) for value in company]
+            return tuple(dict.fromkeys(c for c in company_ids if c)) or tuple(env.companies.ids)
         company_id = self._cvi_parse_company(env, company)
         return (company_id,) if company_id else tuple(env.companies.ids)
 

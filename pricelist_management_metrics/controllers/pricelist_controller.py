@@ -2,6 +2,7 @@
 from odoo import http
 from odoo.http import request
 from odoo.exceptions import AccessError
+import json
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -11,6 +12,20 @@ _logger = logging.getLogger(__name__)
 MAX_SANE_DIFF_PERCENT = 500.0
 # Precio base mínimo para considerar la comparación (bases de relleno tipo $0.01)
 MIN_SANE_BASE_PRICE = 1.0
+
+
+def _to_list(value):
+    """Valores de un filtro multi-selección: lista, JSON, valor suelto o "all" (= sin filtro)."""
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if v not in (None, "", "all")]
+    if not value or value in ("all", "null"):
+        return []
+    if isinstance(value, str) and value.startswith("["):
+        try:
+            return _to_list(json.loads(value))
+        except ValueError:
+            return []
+    return [str(value)]
 
 
 class PricelistMetricsController(http.Controller):
@@ -39,8 +54,9 @@ class PricelistMetricsController(http.Controller):
             ORDER BY rc.name NULLS FIRST, 2
         """, (lang, allowed_companies, lang))
         pricelists = cr.dictfetchall()
-        if pricelist and pricelist != 'all':
-            pricelists = [p for p in pricelists if p['id'] == int(pricelist)]
+        selected = _to_list(pricelist)
+        if selected:
+            pricelists = [p for p in pricelists if str(p['id']) in selected]
         return pricelists
 
     def _get_items(self, pricelist_ids, tmpl_ids=None):
@@ -104,12 +120,13 @@ class PricelistMetricsController(http.Controller):
         lang = self._get_lang()
         where_clause = "pt.active = TRUE AND pt.sale_ok = TRUE"
         params = []
-        if category and category != 'all':
-            where_clause += " AND ic.name = %s"
-            params.append(category)
-        if product and product != 'all':
-            where_clause += " AND COALESCE(pt.name->>%s, pt.name->>'en_US') = %s"
-            params.extend([lang, product])
+        categories, products = _to_list(category), _to_list(product)
+        if categories:
+            where_clause += " AND ic.name IN %s"
+            params.append(tuple(categories))
+        if products:
+            where_clause += " AND COALESCE(pt.name->>%s, pt.name->>'en_US') IN %s"
+            params.extend([lang, tuple(products)])
         if search:
             where_clause += " AND LOWER(COALESCE(pt.name->>%s, pt.name->>'en_US')) LIKE %s"
             params.extend([lang, f"%{search.lower()}%"])
