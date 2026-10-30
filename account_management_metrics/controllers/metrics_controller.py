@@ -5,6 +5,7 @@ from odoo.exceptions import AccessError
 import datetime
 import csv
 import io
+import json
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -28,6 +29,30 @@ VAT_PARTNER_SUBQUERY = """
 def _vat_digits(value):
     """Devuelve solo los dígitos de un CUIT ingresado por el usuario."""
     return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def _to_ids(value):
+    """Ids de un filtro multi-selección: lista, JSON (export), id suelto o "all" (= sin filtro)."""
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("["):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                return []
+        elif value in ("", "all"):
+            return []
+        else:
+            value = [value]
+    elif not isinstance(value, (list, tuple)):
+        value = [value] if value else []
+    ids = []
+    for item in value:
+        try:
+            ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return ids
 
 
 class AccountMetricsController(http.Controller):
@@ -70,15 +95,15 @@ class AccountMetricsController(http.Controller):
             where_clause += " AND COALESCE(am.invoice_date, am.date) <= %s"
             params.append(end_date)
 
-        if company and company != "all":
-            where_clause += " AND am.company_id = %s"
-            params.append(int(company))
+        if _to_ids(company):
+            where_clause += " AND am.company_id IN %s"
+            params.append(tuple(_to_ids(company)))
         if journal and journal != "all":
             where_clause += " AND am.journal_id = %s"
             params.append(int(journal))
-        if doc_type and doc_type != "all":
-            where_clause += " AND am.l10n_latam_document_type_id = %s"
-            params.append(int(doc_type))
+        if _to_ids(doc_type):
+            where_clause += " AND am.l10n_latam_document_type_id IN %s"
+            params.append(tuple(_to_ids(doc_type)))
         if salesperson and salesperson != "all":
             where_clause += " AND am.invoice_user_id = %s"
             params.append(int(salesperson))
@@ -315,9 +340,9 @@ class AccountMetricsController(http.Controller):
             tz = self._get_timezone()
             pos_where = "po.state IN ('paid', 'done', 'invoiced') AND po.company_id IN %s"
             pos_params = [tz, tuple(request.env.companies.ids)]
-            if company and company != "all":
-                pos_where += " AND po.company_id = %s"
-                pos_params.append(int(company))
+            if _to_ids(company):
+                pos_where += " AND po.company_id IN %s"
+                pos_params.append(tuple(_to_ids(company)))
             if start_date:
                 pos_where += " AND po.date_order >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
                 pos_params.extend([f"{start_date} 00:00:00", tz])

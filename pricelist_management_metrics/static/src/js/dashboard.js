@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, useState, onWillUnmount } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useState, onWillUnmount, useExternalListener } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 import { loadJS } from "@web/core/assets";
 
@@ -11,9 +11,11 @@ class PricelistDashboardMetrics extends Component {
     setup() {
 
         this.state = useState({
-            pricelist: "all",
-            category: "all",
-            product: "all",
+            pricelist: [],
+            category: [],
+            product: [],
+            openFilter: null,
+            filterSearch: { pricelist: "", category: "", product: "" },
             search: "",
             onlyDiff: false,
             page: 1,
@@ -53,6 +55,15 @@ class PricelistDashboardMetrics extends Component {
 
         this.charts = {};
 
+        // Click afuera cierra el desplegable abierto; adentro lo frena t-on-click.stop
+
+        useExternalListener(window, "click", () => {
+
+            this.state.openFilter = null;
+
+        });
+
+
         onWillStart(async () => {
             await loadJS("https://cdn.jsdelivr.net/npm/chart.js");
             await this.loadFiltersMetadata();
@@ -74,20 +85,19 @@ class PricelistDashboardMetrics extends Component {
 
     // --- Getters Reactivos ---
     get currentProductsList() {
-        const cat = this.state.category;
-        if (cat && cat !== "all" && this.filtersData.products_by_category[cat]) {
-            return this.filtersData.products_by_category[cat];
+        const categories = this.state.category;
+        if (!categories.length) {
+            return this.filtersData.products;
         }
-        return this.filtersData.products;
+        const byCategory = this.filtersData.products_by_category;
+        return categories.flatMap((cat) => byCategory[cat] || []);
     }
 
     // --- Manejo de Eventos y Inputs ---
     onCategoryChange() {
-        // Al cambiar de categoría, reseteamos el producto a "all" si ya no está en la lista filtrada
+        // Al cambiar de categoría, se descartan los productos que ya no están en la lista filtrada
         const currentProds = this.currentProductsList;
-        if (this.state.product !== "all" && !currentProds.includes(this.state.product)) {
-            this.state.product = "all";
-        }
+        this.state.product = this.state.product.filter((prod) => currentProds.includes(prod));
     }
 
     switchTab(tab) {
@@ -103,15 +113,74 @@ class PricelistDashboardMetrics extends Component {
         setTimeout(() => this.renderDiffChart(), 50);
     }
 
+    // --- Filtros multi-selección (mismo patrón que métricas gerenciales) ---
+    filterOptions(field) {
+        if (field === "pricelist") return this.filtersData.pricelists.map((pl) => [pl.id, pl.nombre + (pl.empresa ? ` (${pl.empresa})` : "")]);
+        if (field === "category") return this.filtersData.categories.map((c) => [c, c]);
+        if (field === "product") return this.currentProductsList.map((p) => [p, p]);
+        return [];
+    }
+
+    visibleOptions(field) {
+        const term = this.state.filterSearch[field].toLowerCase().trim();
+        const options = this.filterOptions(field);
+        return term ? options.filter(([, label]) => String(label).toLowerCase().includes(term)) : options;
+    }
+
+    multiLabel(field, emptyLabel, pluralLabel) {
+        const selection = this.state[field];
+        if (!selection.length) return emptyLabel;
+        if (selection.length === 1) {
+            const option = this.filterOptions(field).find(([value]) => value === selection[0]);
+            return option ? option[1] : selection[0];
+        }
+        return `${selection.length} ${pluralLabel}`;
+    }
+
+    toggleFilterPanel(field) {
+        this.state.openFilter = this.state.openFilter === field ? null : field;
+    }
+
+    isFilterSelected(field, value) {
+        return this.state[field].includes(value);
+    }
+
+    toggleFilterValue(field, value) {
+        const selection = this.state[field];
+        const idx = selection.indexOf(value);
+        if (idx === -1) {
+            selection.push(value);
+        } else {
+            selection.splice(idx, 1);
+        }
+        if (field === "category") {
+            this.onCategoryChange();
+        }
+    }
+
+    selectAllFilterValues(field) {
+        this.state[field] = [];
+        if (field === "category") {
+            this.onCategoryChange();
+        }
+    }
+
+    onFilterSearchInput(field, ev) {
+        this.state.filterSearch[field] = ev.target.value;
+    }
+
     async applyFilters() {
+        this.state.openFilter = null;
         this.state.page = 1;
         await this.refreshData();
     }
 
     async clearFilters() {
-        this.state.pricelist = "all";
-        this.state.category = "all";
-        this.state.product = "all";
+        this.state.pricelist = [];
+        this.state.category = [];
+        this.state.product = [];
+        this.state.filterSearch = { pricelist: "", category: "", product: "" };
+        this.state.openFilter = null;
         this.state.search = "";
         this.state.onlyDiff = false;
         this.state.page = 1;
@@ -152,9 +221,9 @@ class PricelistDashboardMetrics extends Component {
 
         try {
             const metrics = await rpc("/pricelist_management_metrics/metrics", {
-                category: this.state.category,
-                product: this.state.product,
-                pricelist: this.state.pricelist,
+                category: [...this.state.category],
+                product: [...this.state.product],
+                pricelist: [...this.state.pricelist],
                 limit: 20
             });
             Object.assign(this.metricsData, metrics);
@@ -177,10 +246,10 @@ class PricelistDashboardMetrics extends Component {
     async loadTable() {
         try {
             const data = await rpc("/pricelist_management_metrics/price_table", {
-                category: this.state.category,
-                product: this.state.product,
+                category: [...this.state.category],
+                product: [...this.state.product],
                 search: this.state.search,
-                pricelist: this.state.pricelist,
+                pricelist: [...this.state.pricelist],
                 only_diff: this.state.onlyDiff,
                 page: this.state.page,
                 per_page: this.state.perPage

@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, useState, onWillUnmount } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useState, onWillUnmount, useExternalListener } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 import { loadJS } from "@web/core/assets";
 
@@ -13,9 +13,11 @@ class PosSalesAdvisorDashboard extends Component {
             preset: "30days",
             startDate: "",
             endDate: "",
-            advisor: "all",
-            pos: "all",
-            company: "all",
+            advisor: [],
+            pos: [],
+            openFilter: null,
+            filterSearch: { advisor: "", company: "", pos: "" },
+            company: [],
             search: "",
             activeTab: "summary",
             loading: false,
@@ -60,6 +62,15 @@ class PosSalesAdvisorDashboard extends Component {
 
         this.charts = {};
 
+        // Click afuera cierra el desplegable abierto; adentro lo frena t-on-click.stop
+
+        useExternalListener(window, "click", () => {
+
+            this.state.openFilter = null;
+
+        });
+
+
         onWillStart(async () => {
             await loadJS("https://cdn.jsdelivr.net/npm/chart.js");
             this.setPresetDates(this.state.preset);
@@ -82,11 +93,12 @@ class PosSalesAdvisorDashboard extends Component {
 
     // --- Getters reactivos ---
     get currentPosList() {
-        const company = this.state.company;
-        if (company && company !== "all" && this.filtersData.pos_configs_by_company[company]) {
-            return this.filtersData.pos_configs_by_company[company];
+        const companies = this.state.company;
+        if (!companies.length) {
+            return this.filtersData.pos_configs;
         }
-        return this.filtersData.pos_configs;
+        const byCompany = this.filtersData.pos_configs_by_company;
+        return companies.flatMap((company) => byCompany[company] || []);
     }
 
     get filteredTableRows() {
@@ -118,10 +130,9 @@ class PosSalesAdvisorDashboard extends Component {
     }
 
     onCompanyChange() {
-        // Al cambiar de empresa, resetear la caja si ya no pertenece a la lista filtrada.
-        if (this.state.pos !== "all" && !this.currentPosList.includes(this.state.pos)) {
-            this.state.pos = "all";
-        }
+        // Al cambiar de empresa, descartar las cajas que ya no pertenecen a la lista filtrada.
+        const posList = this.currentPosList;
+        this.state.pos = this.state.pos.filter((pos) => posList.includes(pos));
     }
 
     switchTab(tab) {
@@ -152,7 +163,64 @@ class PosSalesAdvisorDashboard extends Component {
         setTimeout(() => this.renderAllCharts(), 50);
     }
 
+    // --- Filtros multi-selección (mismo patrón que métricas gerenciales) ---
+    filterOptions(field) {
+        if (field === "advisor") return this.filtersData.advisors.map((a) => [a, a]);
+        if (field === "company") return this.filtersData.companies.map((c) => [c, c]);
+        if (field === "pos") return this.currentPosList.map((p) => [p, p]);
+        return [];
+    }
+
+    visibleOptions(field) {
+        const term = this.state.filterSearch[field].toLowerCase().trim();
+        const options = this.filterOptions(field);
+        return term ? options.filter(([, label]) => String(label).toLowerCase().includes(term)) : options;
+    }
+
+    multiLabel(field, emptyLabel, pluralLabel) {
+        const selection = this.state[field];
+        if (!selection.length) return emptyLabel;
+        if (selection.length === 1) {
+            const option = this.filterOptions(field).find(([value]) => value === selection[0]);
+            return option ? option[1] : selection[0];
+        }
+        return `${selection.length} ${pluralLabel}`;
+    }
+
+    toggleFilterPanel(field) {
+        this.state.openFilter = this.state.openFilter === field ? null : field;
+    }
+
+    isFilterSelected(field, value) {
+        return this.state[field].includes(value);
+    }
+
+    toggleFilterValue(field, value) {
+        const selection = this.state[field];
+        const idx = selection.indexOf(value);
+        if (idx === -1) {
+            selection.push(value);
+        } else {
+            selection.splice(idx, 1);
+        }
+        if (field === "company") {
+            this.onCompanyChange();
+        }
+    }
+
+    selectAllFilterValues(field) {
+        this.state[field] = [];
+        if (field === "company") {
+            this.onCompanyChange();
+        }
+    }
+
+    onFilterSearchInput(field, ev) {
+        this.state.filterSearch[field] = ev.target.value;
+    }
+
     async applyFilters() {
+        this.state.openFilter = null;
         this.salesData.page = 1;
         await this.refreshData();
         if (this.state.activeTab === "sales") {
@@ -163,9 +231,11 @@ class PosSalesAdvisorDashboard extends Component {
     async clearFilters() {
         this.state.preset = "30days";
         this.setPresetDates("30days");
-        this.state.advisor = "all";
-        this.state.pos = "all";
-        this.state.company = "all";
+        this.state.advisor = [];
+        this.state.pos = [];
+        this.state.company = [];
+        this.state.filterSearch = { advisor: "", company: "", pos: "" };
+        this.state.openFilter = null;
         this.state.search = "";
         this.salesData.page = 1;
         await this.refreshData();
@@ -247,9 +317,9 @@ class PosSalesAdvisorDashboard extends Component {
             const metrics = await rpc("/pos_sales_advisor/metrics", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                advisor: this.state.advisor,
-                pos: this.state.pos,
-                company: this.state.company,
+                advisor: [...this.state.advisor],
+                pos: [...this.state.pos],
+                company: [...this.state.company],
             });
             Object.assign(this.metricsData, metrics);
             setTimeout(() => this.renderAllCharts(), 50);
@@ -266,9 +336,9 @@ class PosSalesAdvisorDashboard extends Component {
         const params = new URLSearchParams({
             start_date: this.state.startDate || "",
             end_date: this.state.endDate || "",
-            advisor: this.state.advisor,
-            pos: this.state.pos,
-            company: this.state.company,
+            advisor: JSON.stringify(this.state.advisor),
+            pos: JSON.stringify(this.state.pos),
+            company: JSON.stringify(this.state.company),
         });
         window.open(`/pos_sales_advisor/export?${params.toString()}`, "_blank");
     }
@@ -279,9 +349,9 @@ class PosSalesAdvisorDashboard extends Component {
             const data = await rpc("/pos_sales_advisor/sales", {
                 start_date: this.state.startDate || null,
                 end_date: this.state.endDate || null,
-                advisor: this.state.advisor,
-                pos: this.state.pos,
-                company: this.state.company,
+                advisor: [...this.state.advisor],
+                pos: [...this.state.pos],
+                company: [...this.state.company],
                 page: this.salesData.page,
                 per_page: this.salesData.perPage,
             });
@@ -297,9 +367,9 @@ class PosSalesAdvisorDashboard extends Component {
         const params = new URLSearchParams({
             start_date: this.state.startDate || "",
             end_date: this.state.endDate || "",
-            advisor: this.state.advisor,
-            pos: this.state.pos,
-            company: this.state.company,
+            advisor: JSON.stringify(this.state.advisor),
+            pos: JSON.stringify(this.state.pos),
+            company: JSON.stringify(this.state.company),
         });
         window.open(`/pos_sales_advisor/export_sales?${params.toString()}`, "_blank");
     }

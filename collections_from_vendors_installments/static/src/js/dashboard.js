@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { Component, onWillStart, onMounted, useState, onWillUnmount } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useState, onWillUnmount, useExternalListener } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 import { loadJS, loadCSS } from "@web/core/assets";
 
@@ -13,7 +13,9 @@ class CviDashboard extends Component {
             preset: "30days",
             startDate: "",
             endDate: "",
-            company: "all",
+            company: [],
+            openFilter: null,
+            filterSearch: { company: "" },
             search: "",
             page: 1,
             perPage: 15,
@@ -50,6 +52,11 @@ class CviDashboard extends Component {
 
         this.cardsData = useState({ records: [], page: 1, pages: 1, total: 0 });
         this.installmentsData = useState({ records: [], page: 1, pages: 1, total: 0 });
+
+        // Click afuera cierra el desplegable abierto; adentro lo frena t-on-click.stop
+        useExternalListener(window, "click", () => {
+            this.state.openFilter = null;
+        });
 
         this.charts = {};
         this.map = null;
@@ -115,7 +122,56 @@ class CviDashboard extends Component {
         setTimeout(() => this.renderAllCharts(), 50);
     }
 
+    // --- Filtros multi-selección (mismo patrón que métricas gerenciales) ---
+    filterOptions(field) {
+        if (field === "company") return this.filtersData.companies.map((c) => [c.id, c.name]);
+        return [];
+    }
+
+    visibleOptions(field) {
+        const term = this.state.filterSearch[field].toLowerCase().trim();
+        const options = this.filterOptions(field);
+        return term ? options.filter(([, label]) => label.toLowerCase().includes(term)) : options;
+    }
+
+    multiLabel(field, emptyLabel, pluralLabel) {
+        const selection = this.state[field];
+        if (!selection.length) return emptyLabel;
+        if (selection.length === 1) {
+            const option = this.filterOptions(field).find(([value]) => value === selection[0]);
+            return option ? option[1] : selection[0];
+        }
+        return `${selection.length} ${pluralLabel}`;
+    }
+
+    toggleFilterPanel(field) {
+        this.state.openFilter = this.state.openFilter === field ? null : field;
+    }
+
+    isFilterSelected(field, value) {
+        return this.state[field].includes(value);
+    }
+
+    toggleFilterValue(field, value) {
+        const selection = this.state[field];
+        const idx = selection.indexOf(value);
+        if (idx === -1) {
+            selection.push(value);
+        } else {
+            selection.splice(idx, 1);
+        }
+    }
+
+    selectAllFilterValues(field) {
+        this.state[field] = [];
+    }
+
+    onFilterSearchInput(field, ev) {
+        this.state.filterSearch[field] = ev.target.value;
+    }
+
     async applyFilters() {
+        this.state.openFilter = null;
         this.state.page = 1;
         await this.refreshData();
     }
@@ -123,7 +179,9 @@ class CviDashboard extends Component {
     async clearFilters() {
         this.state.preset = "30days";
         this.setPresetDates("30days");
-        this.state.company = "all";
+        this.state.company = [];
+        this.state.filterSearch = { company: "" };
+        this.state.openFilter = null;
         this.state.search = "";
         this.state.page = 1;
         await this.refreshData();
@@ -177,7 +235,7 @@ class CviDashboard extends Component {
         return {
             start_date: this.state.startDate || null,
             end_date: this.state.endDate || null,
-            company: this.state.company,
+            company: [...this.state.company],
         };
     }
 
@@ -260,7 +318,7 @@ class CviDashboard extends Component {
             model: this.state.activeTab === "installments" ? "installments" : "cards",
             start_date: this.state.startDate || "",
             end_date: this.state.endDate || "",
-            company: this.state.company,
+            company: JSON.stringify(this.state.company),
             search: this.state.search || "",
         });
         window.open(

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import csv
 import io
+import json
 import logging
 from datetime import timedelta
 
@@ -33,6 +34,30 @@ WITHDRAWAL_STATES = {
 }
 
 
+def _to_ids(value):
+    """Ids de un filtro multi-selección: lista, JSON (export), id suelto o "all" (= sin filtro)."""
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("["):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                return []
+        elif value in ("", "all"):
+            return []
+        else:
+            value = [value]
+    elif not isinstance(value, (list, tuple)):
+        value = [value] if value else []
+    ids = []
+    for item in value:
+        try:
+            ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
 class CcaDashboardController(http.Controller):
 
     def _check_access(self, env=None):
@@ -51,12 +76,12 @@ class CcaDashboardController(http.Controller):
         if end_date:
             where += f" AND {alias}.date <= %s"
             params.append(end_date)
-        if company and company != "all":
-            where += f" AND {alias}.company_id = %s"
-            params.append(int(company))
-        if partner and partner != "all":
-            where += f" AND {alias}.partner_id = %s"
-            params.append(int(partner))
+        if _to_ids(company):
+            where += f" AND {alias}.company_id IN %s"
+            params.append(tuple(_to_ids(company)))
+        if _to_ids(partner):
+            where += f" AND {alias}.partner_id IN %s"
+            params.append(tuple(_to_ids(partner)))
         return where, params
 
     def _cca_kpis(self, env, start_date, end_date, company, partner):
@@ -94,12 +119,12 @@ class CcaDashboardController(http.Controller):
         if end_date:
             credit_where += " AND p.date <= %s"
             credit_params.append(end_date)
-        if company and company != "all":
-            credit_where += " AND p.company_id = %s"
-            credit_params.append(int(company))
-        if partner and partner != "all":
-            credit_where += " AND p.partner_id = %s"
-            credit_params.append(int(partner))
+        if _to_ids(company):
+            credit_where += " AND p.company_id IN %s"
+            credit_params.append(tuple(_to_ids(company)))
+        if _to_ids(partner):
+            credit_where += " AND p.partner_id IN %s"
+            credit_params.append(tuple(_to_ids(partner)))
         env.cr.execute(f"""
             SELECT COALESCE(SUM(p.amount_unallocated), 0) AS credit_balance,
                    COALESCE(SUM(p.amount), 0) AS collected
@@ -264,12 +289,12 @@ class CcaDashboardController(http.Controller):
         if end_date:
             where += " AND p.date <= %s"
             params.append(end_date)
-        if company and company != "all":
-            where += " AND p.company_id = %s"
-            params.append(int(company))
-        if partner and partner != "all":
-            where += " AND p.partner_id = %s"
-            params.append(int(partner))
+        if _to_ids(company):
+            where += " AND p.company_id IN %s"
+            params.append(tuple(_to_ids(company)))
+        if _to_ids(partner):
+            where += " AND p.partner_id IN %s"
+            params.append(tuple(_to_ids(partner)))
         env.cr.execute(f"""
             SELECT to_char(date_trunc('month', p.date), 'YYYY-MM') AS period,
                    p.payment_method, COALESCE(SUM(p.amount), 0) AS total
@@ -342,10 +367,10 @@ class CcaDashboardController(http.Controller):
         (sin cap de página, para el CSV) para que ambos filtren exactamente igual.
         """
         domain = [("company_id", "in", env.companies.ids)]
-        if company and company != "all":
-            domain.append(("company_id", "=", int(company)))
-        if partner and partner != "all":
-            domain.append(("partner_id", "=", int(partner)))
+        if _to_ids(company):
+            domain.append(("company_id", "in", _to_ids(company)))
+        if _to_ids(partner):
+            domain.append(("partner_id", "in", _to_ids(partner)))
         if model == "installments":
             record_model = env["cca.installment"]
             date_field = "date_due"

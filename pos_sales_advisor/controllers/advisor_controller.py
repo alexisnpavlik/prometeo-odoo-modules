@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import csv
 import io
+import json
 import logging
 
 from odoo import http
@@ -10,6 +11,20 @@ from odoo.http import content_disposition, request
 _logger = logging.getLogger(__name__)
 
 POS_ORDER_STATES = ("paid", "done", "invoiced")
+
+
+def _to_list(value):
+    """Valores de un filtro multi-selección: lista, JSON (export), valor suelto o "all" (= sin filtro)."""
+    if isinstance(value, (list, tuple)):
+        return [str(v) for v in value if v not in (None, "", "all")]
+    if not value or value in ("all", "null"):
+        return []
+    if isinstance(value, str) and value.startswith("["):
+        try:
+            return _to_list(json.loads(value))
+        except ValueError:
+            return []
+    return [str(value)]
 
 
 class PosSalesAdvisorController(http.Controller):
@@ -40,15 +55,15 @@ class PosSalesAdvisorController(http.Controller):
         if end_date:
             where += " AND po.date_order <= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
             params.extend([f"{end_date} 23:59:59", tz])
-        if advisor and advisor != "all":
-            where += " AND psa.name = %s"
-            params.append(advisor)
-        if pos and pos != "all":
-            where += " AND pc.name = %s"
-            params.append(pos)
-        if company and company != "all":
-            where += " AND rc.name = %s"
-            params.append(company)
+        if _to_list(advisor):
+            where += " AND psa.name IN %s"
+            params.append(tuple(_to_list(advisor)))
+        if _to_list(pos):
+            where += " AND pc.name IN %s"
+            params.append(tuple(_to_list(pos)))
+        if _to_list(company):
+            where += " AND rc.name IN %s"
+            params.append(tuple(_to_list(company)))
         return where, params
 
     def _base_from(self):

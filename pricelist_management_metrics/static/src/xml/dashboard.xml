@@ -1,5 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+    <t t-name="pricelist_management_metrics.MultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="state[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <t t-name="pricelist_management_metrics.DashboardTemplate">
         <div t-att-class="'pricelist-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
@@ -19,41 +53,29 @@
                 <div class="sidebar-section">
                     <h3>Filtros</h3>
 
-                    <div class="input-group">
-                        <label>Sucursal (Lista de Precios)</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.pricelist">
-                                <option value="all">Todas las sucursales</option>
-                                <t t-foreach="filtersData.pricelists" t-as="pl" t-key="pl.id">
-                                    <option t-att-value="pl.id"><t t-esc="pl.nombre + (pl.empresa ? ' (' + pl.empresa + ')' : '')"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pricelist_management_metrics.MultiSelect">
+                        <t t-set="field" t-value="'pricelist'"/>
+                        <t t-set="title" t-value="'Sucursal (Lista de Precios)'"/>
+                        <t t-set="allLabel" t-value="'Todas las sucursales'"/>
+                        <t t-set="pluralLabel" t-value="'sucursales seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar sucursal...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Categoría</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.category" t-on-change="onCategoryChange">
-                                <option value="all">Todas las categorías</option>
-                                <t t-foreach="filtersData.categories" t-as="cat" t-key="cat">
-                                    <option t-att-value="cat"><t t-esc="cat"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pricelist_management_metrics.MultiSelect">
+                        <t t-set="field" t-value="'category'"/>
+                        <t t-set="title" t-value="'Categoría'"/>
+                        <t t-set="allLabel" t-value="'Todas las categorías'"/>
+                        <t t-set="pluralLabel" t-value="'categorías seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar categoría...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Producto</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.product">
-                                <option value="all">Todos los productos</option>
-                                <t t-foreach="currentProductsList" t-as="prod" t-key="prod">
-                                    <option t-att-value="prod"><t t-esc="prod"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pricelist_management_metrics.MultiSelect">
+                        <t t-set="field" t-value="'product'"/>
+                        <t t-set="title" t-value="'Producto'"/>
+                        <t t-set="allLabel" t-value="'Todos los productos'"/>
+                        <t t-set="pluralLabel" t-value="'productos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar producto...'"/>
+                    </t>
 
                     <div class="input-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">

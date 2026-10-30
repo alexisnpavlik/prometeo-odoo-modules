@@ -1,5 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+    <t t-name="pos_sales_advisor.MultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="state[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <t t-name="pos_sales_advisor.DashboardTemplate">
         <div t-att-class="'advisor-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
             <!-- Sidebar de Filtros (Glassmorphic) -->
@@ -53,41 +87,29 @@
                 <div class="sidebar-section">
                     <h3>Filtros Avanzados</h3>
 
-                    <div class="input-group">
-                        <label>Asesor de Venta</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.advisor">
-                                <option value="all">Todos los asesores</option>
-                                <t t-foreach="filtersData.advisors" t-as="adv" t-key="adv">
-                                    <option t-att-value="adv"><t t-esc="adv"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pos_sales_advisor.MultiSelect">
+                        <t t-set="field" t-value="'advisor'"/>
+                        <t t-set="title" t-value="'Asesor de Venta'"/>
+                        <t t-set="allLabel" t-value="'Todos los asesores'"/>
+                        <t t-set="pluralLabel" t-value="'asesores seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar asesor...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Empresa</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.company" t-on-change="onCompanyChange">
-                                <option value="all">Todas las empresas</option>
-                                <t t-foreach="filtersData.companies" t-as="company" t-key="company">
-                                    <option t-att-value="company"><t t-esc="company"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pos_sales_advisor.MultiSelect">
+                        <t t-set="field" t-value="'company'"/>
+                        <t t-set="title" t-value="'Empresa'"/>
+                        <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                        <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                    </t>
 
-                    <div class="input-group">
-                        <label>Punto de Venta (Caja)</label>
-                        <div class="select-wrapper">
-                            <select t-model="state.pos">
-                                <option value="all">Todas las cajas</option>
-                                <t t-foreach="currentPosList" t-as="pos" t-key="pos">
-                                    <option t-att-value="pos"><t t-esc="pos"/></option>
-                                </t>
-                            </select>
-                        </div>
-                    </div>
+                    <t t-call="pos_sales_advisor.MultiSelect">
+                        <t t-set="field" t-value="'pos'"/>
+                        <t t-set="title" t-value="'Punto de Venta (Caja)'"/>
+                        <t t-set="allLabel" t-value="'Todas las cajas'"/>
+                        <t t-set="pluralLabel" t-value="'cajas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar caja...'"/>
+                    </t>
                 </div>
 
                 <div class="sidebar-footer" style="display: flex; gap: 8px;">

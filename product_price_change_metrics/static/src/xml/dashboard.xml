@@ -1,5 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+    <t t-name="product_price_change_metrics.MultiSelect">
+        <div class="ppcm-multiselect" t-on-click.stop="() => {}">
+            <button type="button" class="ppcm-multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                <span class="ppcm-multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                <span class="ppcm-multiselect-caret">▾</span>
+            </button>
+            <div class="ppcm-multiselect-panel" t-if="state.openFilter === field">
+                <input type="text" t-att-placeholder="placeholder"
+                       t-att-value="state.filterSearch[field]"
+                       t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                <label class="ppcm-multiselect-option ppcm-multiselect-all">
+                    <input type="checkbox" t-if="state[field].length === 0" checked="checked"
+                           t-on-change="() => this.selectAllFilterValues(field)"/>
+                    <input type="checkbox" t-else=""
+                           t-on-change="() => this.selectAllFilterValues(field)"/>
+                    <span t-esc="allLabel"/>
+                </label>
+                <div class="ppcm-multiselect-list">
+                    <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                        <label class="ppcm-multiselect-option">
+                            <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                   t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                            <span t-esc="opt[1]"/>
+                        </label>
+                    </t>
+                    <div class="ppcm-multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                </div>
+            </div>
+        </div>
+    </t>
+
     <t t-name="product_price_change_metrics.Dashboard">
         <div class="ppcm-wrap">
             <div class="ppcm-header">
@@ -10,12 +41,12 @@
             </div>
 
             <div class="ppcm-filters">
-                <select t-model="state.company" t-on-change="onFilterChange">
-                    <option value="all">Todas las empresas</option>
-                    <t t-foreach="filters.companies" t-as="c" t-key="c.id">
-                        <option t-att-value="c.id"><t t-esc="c.name"/></option>
-                    </t>
-                </select>
+                <t t-call="product_price_change_metrics.MultiSelect">
+                    <t t-set="field" t-value="'company'"/>
+                    <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                    <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                    <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                </t>
                 <select t-model="state.stateFilter" t-on-change="onFilterChange">
                     <option value="pending">Pendientes</option>
                     <option value="done">Actualizados</option>
@@ -27,12 +58,12 @@
                     <option value="90">Últimos 90 días</option>
                     <option value="all">Todo</option>
                 </select>
-                <select t-model="state.category" t-on-change="onFilterChange">
-                    <option value="all">Todas las categorías</option>
-                    <t t-foreach="filters.categories" t-as="cat" t-key="cat.id">
-                        <option t-att-value="cat.id"><t t-esc="cat.name"/></option>
-                    </t>
-                </select>
+                <t t-call="product_price_change_metrics.MultiSelect">
+                    <t t-set="field" t-value="'category'"/>
+                    <t t-set="allLabel" t-value="'Todas las categorías'"/>
+                    <t t-set="pluralLabel" t-value="'categorías seleccionadas'"/>
+                    <t t-set="placeholder" t-value="'Buscar categoría...'"/>
+                </t>
                 <input type="text" placeholder="Buscar producto..."
                        t-model="state.search" t-on-keyup="onFilterChange"/>
             </div>

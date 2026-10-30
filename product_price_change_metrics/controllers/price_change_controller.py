@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
 
 from odoo import fields, http
@@ -6,6 +7,30 @@ from odoo.http import request
 from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
+
+
+def _to_ids(value):
+    """Ids de un filtro multi-selección: lista, JSON (export), id suelto o "all" (= sin filtro)."""
+    if isinstance(value, str):
+        value = value.strip()
+        if value.startswith("["):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                return []
+        elif value in ("", "all"):
+            return []
+        else:
+            value = [value]
+    elif not isinstance(value, (list, tuple)):
+        value = [value] if value else []
+    ids = []
+    for item in value:
+        try:
+            ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return ids
 
 
 class PriceChangeMetricsController(http.Controller):
@@ -33,10 +58,10 @@ class PriceChangeMetricsController(http.Controller):
         domain = self._window_domain(window)
         if company == "current":
             domain.append(("company_id", "=", request.env.company.id))
-        elif company and company != "all":
-            domain.append(("company_id", "=", int(company)))
-        if category and category != "all":
-            domain.append(("product_tmpl_id.categ_id", "=", int(category)))
+        elif _to_ids(company):
+            domain.append(("company_id", "in", _to_ids(company)))
+        if _to_ids(category):
+            domain.append(("product_tmpl_id.categ_id", "in", _to_ids(category)))
         if search:
             domain.append(("product_tmpl_id.name", "ilike", search))
         return domain
