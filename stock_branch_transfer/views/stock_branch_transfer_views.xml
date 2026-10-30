@@ -32,6 +32,9 @@
                             invisible="state == 'draft'"/>
                     <button name="action_send" type="object" string="Enviar" class="btn-primary"
                             invisible="state != 'draft'"/>
+                    <!-- En borrador va después de Enviar y sin resaltar: el doble clic en Enviar cae en el Imprimir de arriba -->
+                    <button name="%(action_report_branch_transfer)d" type="action" string="Imprimir"
+                            invisible="state != 'draft'"/>
                     <button name="action_receive" type="object" string="Recibido" class="btn-primary"
                             invisible="state != 'in_transit' or not is_dest_mine"
                             confirm="¿Confirmás que llegó todo lo enviado?"/>

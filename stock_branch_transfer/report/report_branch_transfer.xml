@@ -22,7 +22,7 @@
         <field name="report_file">stock_branch_transfer.report_branch_transfer</field>
         <field name="paperformat_id" ref="paperformat_branch_transfer"/>
         <field name="print_report_name">'Traslado %s' % object.name</field>
-        <!-- Sin binding: solo se imprime con el botón, que aparece después del envío. -->
+        <!-- Sin binding: solo se imprime con el botón del formulario. -->
         <field name="binding_model_id" eval="False"/>
     </record>
 
@@ -58,6 +58,10 @@
             </table>
             <div style="border-bottom: 3px solid #2f3e4e; margin: 8px 0 10px 0;"/>
 
+            <div t-if="o.state == 'draft'"
+                 style="margin-bottom: 10px; padding: 6px; border: 2px solid #c80; color: #c80; text-align: center; font-weight: bold; font-size: 14px;">
+                BORRADOR - TODAVÍA NO ENVIADO
+            </div>
             <div t-if="o.state == 'cancel'"
                  style="margin-bottom: 10px; padding: 6px; border: 2px solid #c00; color: #c00; text-align: center; font-weight: bold; font-size: 14px;">
                 TRASLADO ANULADO

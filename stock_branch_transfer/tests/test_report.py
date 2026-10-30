@@ -15,3 +15,12 @@ class TestReport(BranchTransferCommon):
             self.assertIn(transfer.name, html.decode())
             self.assertIn(self.company_a.name, html.decode())
             self.assertIn(self.company_b.name, html.decode())
+
+    def test_print_draft(self):
+        self.set_stock(self.product, self.company_a, 50.0)
+        transfer = self.make_transfer(self.user_a)
+        report = self.env["ir.actions.report"].with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
+        html, _type = report._render_qweb_html("stock_branch_transfer.report_branch_transfer", transfer.ids)
+        self.assertEqual(transfer.state, "draft")
+        self.assertIn("TODAVÍA NO ENVIADO", html.decode())
+        self.assertIn(self.product.display_name, html.decode())
