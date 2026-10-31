@@ -37,6 +37,8 @@ const STATUSES = {
 const PERIOD_PRESETS = ["30", "60", "90", "180", "365"];
 const RESTOCK_STATUSES = ["sin_stock", "por_agotarse"];
 const OVERSTOCK_STATUSES = ["sin_venta", "sobrestock"];
+// Debe coincidir con MAX_ROWS_PER_STATUS del controlador
+const MAX_ROWS_PER_STATUS = 3000;
 
 // Orden por columna: null va siempre al final, sin importar el sentido
 const compareBy = (key, dir) => (a, b) => {
@@ -55,6 +57,7 @@ class InventoryDashboardMetrics extends Component {
     setup() {
         this.lowCoverDays = LOW_COVER_DAYS;
         this.overstockDays = OVERSTOCK_DAYS;
+        this.maxRowsPerStatus = MAX_ROWS_PER_STATUS;
         this.periodPresets = PERIOD_PRESETS;
         this.state = useState({
             company: [],
@@ -90,11 +93,11 @@ class InventoryDashboardMetrics extends Component {
 
         this.filtersData = useState({ companies: [] });
 
+        // summary y options vienen calculados sobre todas las filas; las tablas traen un tope por estado
         this.metricsData = useState({
-            overstock_total: 0,
-            excess_value: 0,
+            summary: {},
+            options: { categories: [], vendors: [], products: [] },
             overstock: [],
-            restock_total: 0,
             restock: [],
         });
 
@@ -113,20 +116,18 @@ class InventoryDashboardMetrics extends Component {
     }
 
     // --- Listas filtradas ---
-    categoriesOf(rows) {
-        return [...new Set(rows.map((r) => r.categoria))].sort();
-    }
-
     get categories() {
-        return this.categoriesOf([...this.metricsData.overstock, ...this.metricsData.restock]);
+        return this.metricsData.options.categories;
     }
 
     // Productos para el filtro: sólo los de las categorías elegidas en el borrador, como en pos_management_metrics
     get products() {
         const { category } = this.draft;
-        const rows = [...this.metricsData.overstock, ...this.metricsData.restock, ...this.purchaseData.rows]
-            .filter((r) => !category.length || category.includes(r.categoria));
-        return [...new Set(rows.map((r) => r.producto))].sort((a, b) => a.localeCompare(b, "es"));
+        const pairs = [
+            ...this.metricsData.options.products,
+            ...this.purchaseData.rows.map((r) => [r.producto, r.categoria]),
+        ].filter(([, categoria]) => !category.length || category.includes(categoria));
+        return [...new Set(pairs.map(([producto]) => producto))].sort((a, b) => a.localeCompare(b, "es"));
     }
 
     // Filtros de producto, categoría y proveedor: sin el estado, para que las tarjetas cuenten todos
@@ -236,26 +237,46 @@ class InventoryDashboardMetrics extends Component {
         this.draft.period = ev.currentTarget.dataset.period;
     }
 
-    // Tarjetas por estado: cantidad de productos y plata (de más en stock, a comprar en compra)
+    // Tarjetas por estado: cantidad de productos y plata (de más en stock, a comprar en compra).
+    // En stock salen del resumen del servidor: cuenta cada producto en cada sucursal, sin el tope de la tabla.
     get statusCards() {
-        const isBuy = this.state.tab === "compra";
-        const rows = isBuy
-            ? this.baseFilter(this.purchaseRows)
-            : this.baseFilter([...this.metricsData.restock, ...this.metricsData.overstock]);
-        return STATUSES[this.state.tab].map(([key, label, color]) => {
-            const matched = rows.filter((r) => r.status === key);
-            const amount = matched.reduce((sum, r) => sum + (isBuy ? r.total : (r.excess_value || 0)), 0);
-            return { key, label, color, count: matched.length, amount };
+        if (this.state.tab === "compra") {
+            const rows = this.baseFilter(this.purchaseRows);
+            return STATUSES.compra.map(([key, label, color]) => {
+                const matched = rows.filter((r) => r.status === key);
+                const amount = matched.reduce((sum, r) => sum + r.total, 0);
+                return { key, label, color, count: matched.length, amount, branches: [] };
+            });
+        }
+        return STATUSES.stock.map(([key, label, color]) => {
+            const item = this.metricsData.summary[key] || { count: 0, amount: 0, branches: [] };
+            const branches = item.branches.map((b) => ({ ...b, label: b.name.replace(/^Sucursal\s+/i, "") }));
+            return { key, label, color, count: item.count, amount: item.amount, branches };
         });
     }
 
+    // Totales de una tabla de stock según el resumen, respetando el estado elegido
+    summaryOf(statuses, field) {
+        const { status } = this.state;
+        return statuses
+            .filter((s) => !status.length || status.includes(s))
+            .reduce((sum, s) => sum + ((this.metricsData.summary[s] || {})[field] || 0), 0);
+    }
+
+    get restCount() {
+        return this.summaryOf(RESTOCK_STATUSES, "count");
+    }
+
+    get overCount() {
+        return this.summaryOf(OVERSTOCK_STATUSES, "count");
+    }
+
     get overFilteredExcess() {
-        return this.filteredOverstock.reduce((sum, r) => sum + r.excess_value, 0);
+        return this.summaryOf(OVERSTOCK_STATUSES, "amount");
     }
 
     get vendors() {
-        const rows = [...this.metricsData.overstock, ...this.metricsData.restock, ...this.purchaseData.rows];
-        return [...new Set(rows.map((r) => r.vendor))].sort();
+        return [...new Set([...this.metricsData.options.vendors, ...this.purchaseData.rows.map((r) => r.vendor)])].sort();
     }
 
     get purchaseRows() {
@@ -375,6 +396,14 @@ class InventoryDashboardMetrics extends Component {
         this.onCategoryChange();
     }
 
+    // Tocar una sucursal del desglose: filtra por esa sucursal y por el estado de la tarjeta
+    async onBranchClick(ev) {
+        const { branch, status } = ev.currentTarget.dataset;
+        this.draft.company = [branch];
+        this.draft.status = [status];
+        await this.applyFilters();
+    }
+
     resetBuyPage() {
         this.state.buyPage = 1;
     }
@@ -485,6 +514,9 @@ class InventoryDashboardMetrics extends Component {
             const metrics = await rpc("/inventory_dashboard_metrics/inventory", {
                 company: JSON.stringify(this.state.company),
                 period: parseInt(this.state.period) || 90,
+                category: JSON.stringify(this.state.category),
+                vendor: JSON.stringify(this.state.vendor),
+                product: JSON.stringify(this.state.product),
             });
             Object.assign(this.metricsData, metrics);
             Object.assign(this.state, { overPage: 1, restPage: 1 });

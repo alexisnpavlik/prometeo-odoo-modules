@@ -24,7 +24,10 @@ LOW_COVER_DAYS = 15
 MIN_HISTORY_DAYS = 7
 # Decimales del promedio diario: el mismo valor redondeado se muestra y se usa en la cuenta
 DAILY_DECIMALS = 3
-MAX_TABLE_ROWS = 20000
+# Filas por estado que viajan a la tabla: con todas las sucursales son ~60 mil (20 MB). Las tarjetas
+# y los totales se calculan sobre todas en el servidor; el Excel también las lleva todas.
+MAX_ROWS_PER_STATUS = 3000
+TOP_BRANCHES = 3
 UNCATEGORIZED = "Sin categorizar"
 GENERIC_CATEGORIES = ("all", "todos", "all / saleable")
 
@@ -97,15 +100,19 @@ class InventoryMetricsController(http.Controller):
             "SELECT name FROM res_company WHERE id IN %s ORDER BY name", (allowed_companies,))
         return {"companies": [r[0] for r in request.env.cr.fetchall() if r[0]]}
 
-    def _fetch_product_rows(self, companies, period, lang):
+    def _fetch_product_rows(self, companies, period, lang, by_branch=False):
         """Una fila por producto almacenable: stock actual, valor, ventas del período y última venta.
 
         Venta = movimiento hecho de ubicación interna a cliente (incluye POS).
+        by_branch: una fila por producto y empresa. Sin él se junta todo en una fila (red como un solo
+        depósito): el stock de una sucursal tapaba el faltante de otra y el del depósito inflaba el sobrestock.
         """
         cr = request.env.cr
-        cr.execute("""
+        # Columna de agrupación: la empresa real o una constante (la primera) para el modo junto
+        sq_co, sm_co = ("sq.company_id", "sm.company_id") if by_branch else ("%(first_id)s", "%(first_id)s")
+        cr.execute(f"""
             WITH stock AS (
-                SELECT sq.product_id,
+                SELECT sq.product_id, {sq_co} AS company_id,
                        SUM(sq.quantity) AS stock,
                        SUM(sq.quantity * COALESCE(
                            (pp.standard_price->>(sq.company_id::text))::numeric,
@@ -115,29 +122,34 @@ class InventoryMetricsController(http.Controller):
                      AND sl.usage = 'internal' AND sl.active = TRUE
                 JOIN product_product pp ON pp.id = sq.product_id
                 WHERE sq.company_id IN %(companies)s
-                GROUP BY sq.product_id
+                GROUP BY 1, 2
             ),
             sales AS (
-                SELECT sm.product_id,
+                SELECT sm.product_id, {sm_co} AS company_id,
                        SUM(sm.product_qty) FILTER (
                            WHERE sm.date >= NOW() - %(period)s * INTERVAL '1 day') AS qty_period,
                        MAX(sm.date) AS last_sale
                 FROM stock_move sm
                 JOIN stock_location sls ON sls.id = sm.location_id AND sls.usage = 'internal'
                 JOIN stock_location sld ON sld.id = sm.location_dest_id AND sld.usage = 'customer'
-                JOIN product_product pp ON pp.id = sm.product_id
                 WHERE sm.state = 'done' AND sm.company_id IN %(companies)s
-                GROUP BY sm.product_id
+                GROUP BY 1, 2
             ),
             first_move AS (
-                SELECT product_id, MIN(date) AS first_move
-                FROM stock_move
-                WHERE state = 'done' AND company_id IN %(companies)s
-                GROUP BY product_id
+                SELECT sm.product_id, {sm_co} AS company_id, MIN(sm.date) AS first_move
+                FROM stock_move sm
+                WHERE sm.state = 'done' AND sm.company_id IN %(companies)s
+                GROUP BY 1, 2
+            ),
+            keys AS (
+                SELECT product_id, company_id FROM stock
+                UNION
+                SELECT product_id, company_id FROM sales
             )
             SELECT pp.id AS product_id,
                    pt.id AS tmpl_id,
-                   COALESCE((pp.standard_price->>%(first_company)s)::numeric,
+                   rc.name AS sucursal,
+                   COALESCE((pp.standard_price->>(k.company_id::text))::numeric,
                             (pp.standard_price->>'1')::numeric, 0.0) AS cost,
                    COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS producto,
                    pc.name AS categoria,
@@ -146,17 +158,17 @@ class InventoryMetricsController(http.Controller):
                    COALESCE(sa.qty_period, 0.0) AS qty_period,
                    sa.last_sale,
                    fm.first_move
-            FROM product_product pp
+            FROM keys k
+            JOIN product_product pp ON pp.id = k.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            JOIN res_company rc ON rc.id = k.company_id
             LEFT JOIN product_category pc ON pc.id = pt.categ_id
-            LEFT JOIN stock st ON st.product_id = pp.id
-            LEFT JOIN sales sa ON sa.product_id = pp.id
-            LEFT JOIN first_move fm ON fm.product_id = pp.id
+            LEFT JOIN stock st ON st.product_id = k.product_id AND st.company_id = k.company_id
+            LEFT JOIN sales sa ON sa.product_id = k.product_id AND sa.company_id = k.company_id
+            LEFT JOIN first_move fm ON fm.product_id = k.product_id AND fm.company_id = k.company_id
             WHERE pp.active = TRUE AND pt.active = TRUE
               AND pt.type = 'consu' AND pt.is_storable = TRUE
-              AND (st.product_id IS NOT NULL OR sa.product_id IS NOT NULL)
-        """, {"companies": companies, "period": period, "lang": lang,
-                    "first_company": str(companies[0])})
+        """, {"companies": companies, "period": period, "lang": lang, "first_id": companies[0]})
         return cr.dictfetchall()
 
     def _fetch_suppliers(self, companies):
@@ -262,6 +274,7 @@ class InventoryMetricsController(http.Controller):
         return len(flagged), [{
             "product_id": r["product_id"],
             "producto": r["producto"],
+            "sucursal": r["sucursal"],
             "categoria": r["categoria"],
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
@@ -274,7 +287,7 @@ class InventoryMetricsController(http.Controller):
             "value": round(r["value"], 2),
             "excess_value": round(r["excess_value"], 2),
             "status": r["status"],
-        } for r in flagged[:MAX_TABLE_ROWS]]
+        } for r in flagged]
 
     def _restock_rows(self, rows):
         """Productos con demanda que se quedaron sin stock o les quedan pocos días."""
@@ -284,6 +297,7 @@ class InventoryMetricsController(http.Controller):
         return len(urgent), [{
             "product_id": r["product_id"],
             "producto": r["producto"],
+            "sucursal": r["sucursal"],
             "categoria": r["categoria"],
             "vendor": r["vendor"],
             "stock": round(r["stock"], 2),
@@ -292,10 +306,36 @@ class InventoryMetricsController(http.Controller):
             "daily": r["daily"],
             "cover": int(round(r["cover"])) if r["cover"] is not None else 0,
             "status": "sin_stock" if r["stock"] <= 0 else "por_agotarse",
-        } for r in urgent[:MAX_TABLE_ROWS]]
+        } for r in urgent]
+
+    def _summary(self, rows):
+        """Por estado: cantidad, plata de más y las sucursales con más casos (si hay más de una)."""
+        summary = {}
+        for r in rows:
+            item = summary.setdefault(r["status"], {"count": 0, "amount": 0.0, "branches": {}})
+            item["count"] += 1
+            item["amount"] += r.get("excess_value") or 0.0
+            item["branches"][r["sucursal"]] = item["branches"].get(r["sucursal"], 0) + 1
+        for item in summary.values():
+            branches = sorted(item["branches"].items(), key=lambda b: -b[1])
+            item["branches"] = [{"name": n, "count": c} for n, c in branches[:TOP_BRANCHES]] \
+                if len(branches) > 1 else []
+            item["amount"] = round(item["amount"], 2)
+        return summary
+
+    @staticmethod
+    def _cap_per_status(rows):
+        """Primeras filas de cada estado, respetando el orden que ya traen."""
+        seen = {}
+        result = []
+        for r in rows:
+            seen[r["status"]] = seen.get(r["status"], 0) + 1
+            if seen[r["status"]] <= MAX_ROWS_PER_STATUS:
+                result.append(r)
+        return result
 
     @http.route('/inventory_dashboard_metrics/inventory', type='json', auth='user')
-    def get_inventory(self, company='all', **kwargs):
+    def get_inventory(self, company='all', category='all', vendor='all', product='all', **kwargs):
         self._check_access()
         period = _to_int(kwargs.get('period'), PERIODS, DEFAULT_PERIOD)
         target = _to_int(kwargs.get('target'), TARGET_DAYS, DEFAULT_TARGET)
@@ -303,19 +343,36 @@ class InventoryMetricsController(http.Controller):
         companies = self._resolve_companies(company)
 
         if not companies:
-            return {"overstock_total": 0, "excess_value": 0, "overstock": [], "restock_total": 0, "restock": []}
+            return {"overstock": [], "restock": [], "summary": {},
+                    "options": {"categories": [], "vendors": [], "products": []}}
 
-        rows = self._classify(self._fetch_product_rows(companies, period, lang), period, target)
+        # Una fila por producto y sucursal: juntar la red escondía faltantes y sumaba el depósito
+        rows = self._classify(self._fetch_product_rows(companies, period, lang, by_branch=True), period, target)
         self._attach_vendor(rows, self._fetch_suppliers(companies))
-        overstock_total, overstock = self._overstock_rows(rows)
-        restock_total, restock = self._restock_rows(rows)
+        _total, overstock = self._overstock_rows(rows)
+        _total, restock = self._restock_rows(rows)
 
+        # Las opciones de los filtros salen de todas las filas, antes de filtrar
+        flagged = overstock + restock
+        options = {
+            "categories": sorted({r["categoria"] for r in flagged}),
+            "vendors": sorted({r["vendor"] for r in flagged}),
+            "products": sorted({(r["producto"], r["categoria"]) for r in flagged}),
+        }
+        category, vendor, product = _to_list(category), _to_list(vendor), _to_list(product)
+
+        def keep(r):
+            return ((not category or r["categoria"] in category)
+                    and (not vendor or r["vendor"] in vendor)
+                    and (not product or r["producto"] in product))
+
+        overstock = [r for r in overstock if keep(r)]
+        restock = [r for r in restock if keep(r)]
         return {
-            "overstock_total": overstock_total,
-            "excess_value": round(sum(r["excess_value"] for r in rows if r["stock"] > 0), 2),
-            "overstock": overstock,
-            "restock_total": restock_total,
-            "restock": restock,
+            "summary": self._summary(overstock + restock),
+            "options": options,
+            "overstock": self._cap_per_status(overstock),
+            "restock": self._cap_per_status(restock),
         }
 
     @http.route('/inventory_dashboard_metrics/purchase', type='json', auth='user')
@@ -339,8 +396,9 @@ class InventoryMetricsController(http.Controller):
             period = _to_int(period, PERIODS, DEFAULT_PERIOD)
             target = _to_int(target, TARGET_DAYS, DEFAULT_TARGET)
             companies = self._resolve_companies(company)
-            rows = self._classify(
-                self._fetch_product_rows(companies, period, self._get_lang()), period, target)
+            # Stock por sucursal; el recomendador de compra sigue con la red junta
+            rows = self._classify(self._fetch_product_rows(
+                companies, period, self._get_lang(), by_branch=table != 'purchase'), period, target)
 
             suppliers = self._fetch_suppliers(companies)
             self._attach_vendor(rows, suppliers)
@@ -357,16 +415,16 @@ class InventoryMetricsController(http.Controller):
             elif table == 'restock':
                 _total, data = self._restock_rows(rows)
                 title = "Productos por reponer"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día",
+                headers = ["Producto", "Sucursal", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día",
                            "Alcanza para (días)", "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
+                keys = ["producto", "sucursal", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
             else:
                 _total, data = self._overstock_rows(rows)
                 data.sort(key=OVER_SORTS.get(sort, OVER_SORTS["excess"]))
                 title = "Mucho stock y poca venta"
-                headers = ["Producto", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día", "Alcanza para (días)",
+                headers = ["Producto", "Sucursal", "Categoría", "Proveedor", "Stock", f"Vendidas ({period} días)", "Días promediados", "Promedio de ventas por día", "Alcanza para (días)",
                            "Estado"]
-                keys = ["producto", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
+                keys = ["producto", "sucursal", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
 
             status, category, vendor, product = _to_list(status), _to_list(category), _to_list(vendor), _to_list(product)
             data = [r for r in data
@@ -389,8 +447,8 @@ class InventoryMetricsController(http.Controller):
 
             sheet = workbook.add_worksheet(title[:31])
             sheet.set_column(0, 0, 50)
-            sheet.set_column(1, 1, 24)
-            sheet.set_column(2, len(headers) - 1, 16)
+            sheet.set_column(1, 2, 24)
+            sheet.set_column(3, len(headers) - 1, 16)
             company_label = ', '.join(_to_list(company)) or 'Todas las empresas'
             sheet.write(0, 0, title, fmt_title)
             sheet.write(1, 0, f"{company_label} · ventas de los últimos {period} días · cobertura objetivo {target} días")
