@@ -14,6 +14,10 @@ class ProductTemplate(models.Model):
     promotion_pack_regular_price = fields.Float(
         "Precio normal", compute="_compute_promotion_pack_prices", digits="Product Price"
     )
+    promotion_pack_auto_price = fields.Float(
+        "Último precio sugerido", copy=False, digits="Product Price",
+        help="Suma que puso el formulario; si el precio sigue igual, se recalcula al cambiar productos.",
+    )
     promotion_pack_saving = fields.Float(
         "Ahorro", compute="_compute_promotion_pack_prices", digits="Product Price"
     )
@@ -25,6 +29,29 @@ class ProductTemplate(models.Model):
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             template.promotion_pack_regular_price = regular
             template.promotion_pack_saving = regular - template.list_price if regular else 0.0
+
+    @api.onchange("promotion_pack_line_ids")
+    def _onchange_promotion_pack_lines_price(self):
+        """Precio del pack por defecto = suma de sus productos. Se recalcula mientras siga
+        en el default de Odoo (1), en la última suma sugerida o quede más caro que los
+        productos sueltos; un precio con descuento puesto a mano se respeta."""
+        for template in self.filtered("is_promotion_pack"):
+            regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
+            price = template.list_price
+            if regular and (price <= 1 or price == template.promotion_pack_auto_price or price > regular):
+                template.list_price = template.promotion_pack_auto_price = regular
+
+    @api.constrains("is_promotion_pack", "list_price", "promotion_pack_line_ids")
+    def _check_promotion_pack_price(self):
+        """El pack no puede salir más caro que sus productos sueltos ni costar 1 o menos."""
+        for template in self.filtered("is_promotion_pack"):
+            regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
+            if template.list_price <= 1:
+                raise ValidationError(_("Poné el precio del pack (no puede ser 1 o menos)."))
+            if regular and template.list_price > regular:
+                raise ValidationError(
+                    _("El pack no puede costar más que sus productos sueltos (%s).", round(regular, 2))
+                )
 
     @api.constrains("is_promotion_pack", "promotion_pack_line_ids")
     def _check_promotion_pack_lines(self):

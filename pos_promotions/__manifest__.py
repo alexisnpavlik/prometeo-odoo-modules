@@ -1,27 +1,22 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.1.2.0",
+    "version": "18.0.2.0.0",
     "category": "Sales/Point Of Sale",
-    "summary": "App Promociones: precios promocionales por producto o categoría y packs de varios productos a un precio",
+    "summary": "App Promociones: packs de uno o varios productos a un precio",
     "description": """
-        App Promociones en el menú principal, con dos pestañas:
+        App Promociones en el menú principal: abre directo en Packs.
 
-        - Precios: las reglas de la lista de precios principal (la primera por
-          secuencia). Producto o categoría obligatorios: una regla sin ninguno
-          quedaría para todo el catálogo.
-        - Packs: varios productos juntos a un precio (p. ej. Fernet + Coca-Cola),
-          sin product_pack ni pos_product_pack. En el POS el pack se activa solo
-          cuando la orden tiene todos sus productos (cargados uno por uno, o
-          tocando o escaneando el pack, que los agrega). El ahorro se reparte como
-          descuento % en esas líneas, que siguen siendo productos normales y
-          descuentan su stock.
+        Un pack es uno o varios productos juntos a un precio (p. ej. Fernet +
+        Coca-Cola, o un solo producto en oferta), sin product_pack ni
+        pos_product_pack. En el POS el pack se activa solo cuando la orden tiene
+        todos sus productos (cargados uno por uno, o tocando o escaneando el pack,
+        que los agrega). El ahorro se reparte como descuento % en esas líneas, que
+        siguen siendo productos normales y descuentan su stock, y llevan la
+        etiqueta Promoción.
 
-        En el POS, las líneas con promoción (una regla de Precios que baja el precio
-        de venta, o un pack aplicado) llevan la
-        etiqueta Promoción y el precio original tachado, también en reglas de
-        precio fijo (Odoo solo lo tacha en descuentos %). No marca precios
-        editados a mano ni reglas que dejan el precio igual o más alto.
+        Desde 18.0.2.0.0 ya no gestiona reglas de listas de precios (la vieja
+        pestaña Precios): las reglas que existan son reglas normales de Odoo.
         Reemplaza al módulo pos_promotion_badge.
         Reemplaza a la app Promociones que vivía en web_menu_simplify.
     """,
@@ -31,7 +26,6 @@
     "depends": ["point_of_sale"],
     "data": [
         "security/ir.model.access.csv",
-        "views/promotion_price_views.xml",
         "views/promotion_pack_views.xml",
         "views/menu_views.xml",
     ],
