@@ -78,10 +78,14 @@ class CawWithdrawal(models.Model):
         comodel_name="product.pricelist",
         string="Lista de precios",
         default=lambda self: self.env.company.caw_pricelist_id,
-        readonly=True,
-        help="Lista con la que se cotizaron las líneas. Se toma de los ajustes de la "
-             "compañía y no se elige por retiro; queda guardada acá para que cambiar "
-             "la configuración no altere los retiros ya cargados.",
+        # Mismo criterio que product_pricelist_lines: las "Predeterminado" que Odoo
+        # crea en cada empresa no se usan y solo ensucian el desplegable.
+        domain="[('name', '!=', 'Predeterminado'), "
+               "('company_id', 'in', [company_id, False])]",
+        help="Lista con la que se cotizan las líneas. Se propone la de los ajustes de "
+             "la compañía y queda guardada acá para que cambiar la configuración no "
+             "altere los retiros ya cargados. Solo un Manager puede cambiarla, y solo "
+             "en borrador: al cambiarla se recotizan las líneas.",
     )
     note = fields.Text(string="Notas")
     line_ids = fields.One2many(
@@ -418,6 +422,8 @@ class CawWithdrawal(models.Model):
         excepción es la corrección de precios del Manager, que se valida y reajusta las
         cuotas en el write de la línea.
         """
+        if "pricelist_id" in vals:
+            self._caw_check_pricelist_change(vals["pricelist_id"])
         price_only = "line_ids" in vals and self._caw_is_price_only(vals["line_ids"])
         if "line_ids" in vals and not price_only:
             if any(w.is_confirmed or w.is_cancelled for w in self):
@@ -425,6 +431,26 @@ class CawWithdrawal(models.Model):
             if any(w.picking_id and w.picking_id.state == "done" for w in self):
                 raise UserError(_("No se pueden modificar las líneas de un retiro ya entregado."))
         return super().write(vals)
+
+    def _caw_check_pricelist_change(self, pricelist_id):
+        """Solo un Manager cambia la lista, y solo en borrador sin entregar.
+
+        Fuera de borrador las cuotas ya están armadas sobre el total; recotizar ahí
+        exigiría rehacerlas, así que se bloquea y queda la corrección de precio por línea.
+        """
+        changed = self.filtered(lambda w: w.pricelist_id.id != (pricelist_id or False))
+        if not changed:
+            return
+        if not self.env.user.has_group("checking_account_withdrawals.group_cc_manager"):
+            raise AccessError(_("Solo un Manager de Cuenta Corriente puede cambiar la lista de precios."))
+        if any(w.state != "draft" or (w.picking_id and w.picking_id.state == "done") for w in changed):
+            raise UserError(_("Solo se puede cambiar la lista de precios de un retiro en borrador sin entregar."))
+
+    @api.onchange("pricelist_id")
+    def _onchange_pricelist_id(self):
+        """Recotiza todas las líneas con la lista nueva."""
+        for line in self.line_ids.filtered("product_id"):
+            line.price_unit = line._caw_price_unit()
 
     def _caw_due_date(self, index, first_days, period, cutoff_day):
         """Calcula el vencimiento de la cuota `index` (base 0) del retiro."""

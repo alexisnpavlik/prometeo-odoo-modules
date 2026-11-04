@@ -119,3 +119,45 @@ class TestCawPricing(CawCommon):
         withdrawal.action_confirm()
         self.assertEqual(withdrawal.line_ids.price_unit, 500.0)
         self.assertEqual(withdrawal.amount_total, 500.0)
+
+    def test_manager_changes_pricelist_reprices_lines(self):
+        """El Manager cambia la lista en borrador y las líneas se recotizan."""
+        withdrawal = self._draft()
+        self._line(withdrawal)
+        new_list = self._pricelist("Lista Manager", [{
+            "applied_on": "1_product",
+            "product_tmpl_id": self.product.product_tmpl_id.id,
+            "compute_price": "fixed",
+            "fixed_price": 600.0,
+        }])
+        with Form(withdrawal) as form:
+            form.pricelist_id = new_list
+        self.assertEqual(withdrawal.pricelist_id, new_list)
+        self.assertEqual(withdrawal.line_ids.price_unit, 600.0)
+
+    def test_operator_cannot_change_pricelist(self):
+        """El Operador no puede cambiar la lista ni por RPC."""
+        from odoo.exceptions import AccessError
+        withdrawal = self._draft()
+        operator = self.env["res.users"].create({
+            "name": "Operador Lista",
+            "login": "caw_pricelist_operator_test",
+            "company_id": self.company.id,
+            "company_ids": [(6, 0, [self.company.id])],
+            "groups_id": [(6, 0, [
+                self.env.ref("checking_account_withdrawals.group_cc_user").id,
+                self.env.ref("base.group_user").id,
+            ])],
+        })
+        new_list = self._pricelist("Lista Operador", [])
+        with self.assertRaises(AccessError):
+            withdrawal.with_user(operator).pricelist_id = new_list
+
+    def test_pricelist_locked_after_confirm(self):
+        """Confirmado, ni el Manager cambia la lista."""
+        from odoo.exceptions import UserError
+        withdrawal = self._draft()
+        self._line(withdrawal)
+        withdrawal.action_confirm()
+        with self.assertRaises(UserError):
+            withdrawal.pricelist_id = self._pricelist("Lista Tarde", [])
