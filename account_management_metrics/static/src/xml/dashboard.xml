@@ -103,6 +103,14 @@
                         <t t-set="placeholder" t-value="'Buscar tipo...'"/>
                     </t>
 
+                    <t t-call="account_management_metrics.MultiSelect">
+                        <t t-set="field" t-value="'paymentMethod'"/>
+                        <t t-set="title" t-value="'Método de Pago'"/>
+                        <t t-set="allLabel" t-value="'Todos los métodos'"/>
+                        <t t-set="pluralLabel" t-value="'métodos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar método...'"/>
+                    </t>
+
                     <div class="input-group">
                         <label>CUIT del Cliente</label>
                         <input type="text" inputmode="numeric" placeholder="Ej: 20-12345678-9"

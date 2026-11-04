@@ -16,8 +16,9 @@ class AccountDashboardMetrics extends Component {
             endDate: "",
             company: [],
             docType: [],
+            paymentMethod: [],
             openFilter: null,
-            filterSearch: { company: "", docType: "" },
+            filterSearch: { company: "", docType: "", paymentMethod: "" },
             vat: "",
             search: "",
             page: 1,
@@ -32,6 +33,7 @@ class AccountDashboardMetrics extends Component {
         this.filtersData = useState({
             companies: [],
             doc_types: [],
+            payment_methods: [],
             min_date: "",
             max_date: ""
         });
@@ -146,6 +148,7 @@ class AccountDashboardMetrics extends Component {
     filterOptions(field) {
         if (field === "company") return this.filtersData.companies.map((c) => [c.id, c.name]);
         if (field === "docType") return this.filtersData.doc_types.map((d) => [d.id, d.name]);
+        if (field === "paymentMethod") return this.filtersData.payment_methods.map((name) => [name, name]);
         return [];
     }
 
@@ -202,7 +205,8 @@ class AccountDashboardMetrics extends Component {
         this.setPresetDates("30days");
         this.state.company = [];
         this.state.docType = [];
-        this.state.filterSearch = { company: "", docType: "" };
+        this.state.paymentMethod = [];
+        this.state.filterSearch = { company: "", docType: "", paymentMethod: "" };
         this.state.openFilter = null;
         this.state.vat = "";
         this.state.search = "";
@@ -269,6 +273,7 @@ class AccountDashboardMetrics extends Component {
             end_date: this.state.endDate || null,
             company: [...this.state.company],
             doc_type: [...this.state.docType],
+            payment_method: [...this.state.paymentMethod],
             vat: this.state.vat
         };
     }
@@ -387,6 +392,7 @@ class AccountDashboardMetrics extends Component {
             end_date: this.state.endDate || '',
             company: JSON.stringify(this.state.company),
             doc_type: JSON.stringify(this.state.docType),
+            payment_method: JSON.stringify(this.state.paymentMethod),
             vat: this.state.vat || '',
             search: this.state.search || ''
         });

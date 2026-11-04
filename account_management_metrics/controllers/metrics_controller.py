@@ -55,6 +55,21 @@ def _to_ids(value):
     return ids
 
 
+def _to_names(value):
+    """Nombres de un filtro multi-selección de texto: lista o JSON (export). Vacío = sin filtro."""
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.startswith("["):
+            return []
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(v) for v in value if v not in (None, "")]
+
+
 class AccountMetricsController(http.Controller):
 
     def _check_access(self):
@@ -77,8 +92,56 @@ class AccountMetricsController(http.Controller):
         records = request.env[model].sudo().browse(ids)
         return {rec.id: rec.display_name for rec in records}
 
+    def _payment_method_ids(self, names):
+        """Resuelve los nombres elegidos en el filtro a (ids de pos.payment.method, ids de account.journal).
+
+        El mismo nombre existe en cada sucursal ("Efectivo", "Colaboradores"): se toman todos.
+        """
+        names = set(names)
+        companies = request.env.companies.ids
+        pos_ids, journal_ids = [], []
+        if "pos.payment.method" in request.env:
+            methods = request.env["pos.payment.method"].sudo().with_context(active_test=False).search(
+                [("company_id", "in", companies)])
+            pos_ids = methods.filtered(lambda m: m.name in names).ids
+        journals = request.env["account.journal"].sudo().search(
+            [("company_id", "in", companies), ("type", "in", ("bank", "cash"))])
+        journal_ids = journals.filtered(lambda j: j.name in names).ids
+        return pos_ids, journal_ids
+
+    def _payment_method_condition(self, names):
+        """Condición SQL sobre am.id: comprobantes cobrados con alguno de los medios elegidos.
+
+        Mismo criterio que el gráfico de medios de pago: facturas del POS por el pago
+        real del ticket; el resto por el diario del cobro conciliado.
+        """
+        pos_ids, journal_ids = self._payment_method_ids(names)
+        parts, params = [], []
+        if pos_ids:
+            parts.append("""am.id IN (
+                SELECT po.account_move FROM pos_order po
+                JOIN pos_payment pay ON pay.pos_order_id = po.id
+                WHERE po.account_move IS NOT NULL AND pay.payment_method_id IN %s)""")
+            params.append(tuple(pos_ids))
+        if journal_ids:
+            pos_exclusion = ""
+            if "pos.order" in request.env:
+                pos_exclusion = "AND li.move_id NOT IN (SELECT account_move FROM pos_order WHERE account_move IS NOT NULL)"
+            parts.append(f"""am.id IN (
+                SELECT li.move_id FROM account_partial_reconcile apr
+                JOIN account_move_line li ON li.id IN (apr.debit_move_id, apr.credit_move_id)
+                JOIN account_move_line lp ON lp.id = CASE WHEN li.id = apr.debit_move_id
+                                                          THEN apr.credit_move_id ELSE apr.debit_move_id END
+                JOIN account_move pm ON pm.id = lp.move_id
+                WHERE pm.journal_id IN %s AND lp.move_id <> li.move_id {pos_exclusion})""")
+            params.append(tuple(journal_ids))
+        if not parts:
+            return "FALSE", [], pos_ids
+        return "(" + " OR ".join(parts) + ")", params, pos_ids
+
     def _build_where_clause(self, start_date=None, end_date=None, company="all", journal="all",
-                            doc_type="all", salesperson="all", search=None, state="all", vat=None):
+                            doc_type="all", salesperson="all", search=None, state="all", vat=None,
+                            payment_method=None):
         """Construye el WHERE parametrizado sobre account_move (alias am).
 
         El filtro search solo debe usarse en queries que joinean res_partner (rp)
@@ -115,6 +178,12 @@ class AccountMetricsController(http.Controller):
         if vat_digits:
             where_clause += f" AND am.partner_id IN ({VAT_PARTNER_SUBQUERY})"
             params.append(f"%{vat_digits}%")
+
+        method_names = _to_names(payment_method)
+        if method_names:
+            condition, condition_params, _pos_ids = self._payment_method_condition(method_names)
+            where_clause += f" AND {condition}"
+            params.extend(condition_params)
 
         if search:
             search_pattern = f"%{search.lower()}%"
@@ -169,9 +238,18 @@ class AccountMetricsController(http.Controller):
         min_date = row[0].strftime("%Y-%m-%d") if row and row[0] else None
         max_date = row[1].strftime("%Y-%m-%d") if row and row[1] else None
 
+        # 4. Medios de pago: métodos del POS + diarios de banco/caja, agrupados por nombre
+        names = set(request.env["account.journal"].sudo().search(
+            [("company_id", "in", list(allowed_companies)), ("type", "in", ("bank", "cash"))]).mapped("name"))
+        if "pos.payment.method" in request.env:
+            names |= set(request.env["pos.payment.method"].sudo().search(
+                [("company_id", "in", list(allowed_companies))]).mapped("name"))
+        payment_methods = sorted(names, key=str.lower)
+
         return {
             "companies": companies,
             "doc_types": doc_types,
+            "payment_methods": payment_methods,
             "min_date": min_date,
             "max_date": max_date,
         }
@@ -257,13 +335,14 @@ class AccountMetricsController(http.Controller):
 
     @http.route("/account_management_metrics/metrics", type="json", auth="user")
     def get_metrics(self, start_date=None, end_date=None, company="all", journal="all",
-                    doc_type="all", salesperson="all", vat=None, **kwargs):
+                    doc_type="all", salesperson="all", vat=None, payment_method=None, **kwargs):
         """KPIs y gráficos de facturación para el período y filtros indicados."""
         self._check_access()
         cr = request.env.cr
 
         where_clause, params = self._build_where_clause(
-            start_date, end_date, company, journal, doc_type, salesperson, vat=vat)
+            start_date, end_date, company, journal, doc_type, salesperson, vat=vat,
+            payment_method=payment_method)
 
         # 1. KPIs en una sola pasada con FILTER
         cr.execute(f"""
@@ -353,6 +432,14 @@ class AccountMetricsController(http.Controller):
             if vat_digits:
                 pos_where += f" AND po.partner_id IN ({VAT_PARTNER_SUBQUERY})"
                 pos_params.append(f"%{vat_digits}%")
+            method_names = _to_names(payment_method)
+            if method_names:
+                pos_method_ids, _journal_ids = self._payment_method_ids(method_names)
+                if pos_method_ids:
+                    pos_where += " AND po.id IN (SELECT pos_order_id FROM pos_payment WHERE payment_method_id IN %s)"
+                    pos_params.append(tuple(pos_method_ids))
+                else:
+                    pos_where += " AND FALSE"
             cr.execute(f"""
                 SELECT (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS fecha,
                        SUM(po.amount_total) AS total
@@ -496,13 +583,14 @@ class AccountMetricsController(http.Controller):
     @http.route("/account_management_metrics/raw_invoices", type="json", auth="user")
     def get_raw_invoices(self, start_date=None, end_date=None, company="all", journal="all",
                          doc_type="all", salesperson="all", search=None, state="all",
-                         vat=None, page=1, per_page=15, **kwargs):
+                         vat=None, payment_method=None, page=1, per_page=15, **kwargs):
         """Detalle paginado de comprobantes con búsqueda difusa y filtro opcional de estado."""
         self._check_access()
         cr = request.env.cr
 
         where_clause, params = self._build_where_clause(
-            start_date, end_date, company, journal, doc_type, salesperson, search, state, vat)
+            start_date, end_date, company, journal, doc_type, salesperson, search, state, vat,
+            payment_method=payment_method)
 
         cr.execute(f"""
             SELECT COUNT(*)
@@ -527,7 +615,7 @@ class AccountMetricsController(http.Controller):
 
     @http.route("/account_management_metrics/export", type="http", auth="user")
     def export_csv(self, start_date=None, end_date=None, company="all", journal="all",
-                   doc_type="all", salesperson="all", search=None, vat=None, **kwargs):
+                   doc_type="all", salesperson="all", search=None, vat=None, payment_method=None, **kwargs):
         """Exporta el detalle de comprobantes filtrado a CSV (con BOM para Excel)."""
         try:
             self._check_access()
@@ -543,7 +631,8 @@ class AccountMetricsController(http.Controller):
             vat = vat if vat and vat != "null" else None
 
             where_clause, params = self._build_where_clause(
-                start_date, end_date, company, journal, doc_type, salesperson, search, vat=vat)
+                start_date, end_date, company, journal, doc_type, salesperson, search, vat=vat,
+                payment_method=payment_method)
             rows = self._query_raw_invoices(where_clause, params)
 
             output = io.StringIO()
