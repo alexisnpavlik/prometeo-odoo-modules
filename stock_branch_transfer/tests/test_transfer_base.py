@@ -52,4 +52,4 @@ class TestTransferBase(BranchTransferCommon):
         transfer = self.make_transfer(self.user_a)
         line = transfer.line_ids[:1].with_user(self.manager)
         self.assertEqual(line.cost, 37.5)
-        self.assertNotIn("cost", transfer.line_ids.with_user(self.user_a).fields_get())
+        self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
