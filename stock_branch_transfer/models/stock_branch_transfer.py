@@ -140,6 +140,19 @@ class StockBranchTransfer(models.Model):
             raise UserError(_("Usá Anular para revertir un traslado ya enviado."))
         return super().unlink()
 
+    def _mail_track(self, tracked_fields, initial_values):
+        """El chatter lee los nombres de Origen/Destino viejo y nuevo con sudo.
+
+        Un usuario puede cambiar el Destino a una sucursal que no tiene asignada
+        (o venir de una): la regla multiempresa de res.company le bloquearía leer
+        su nombre y no podría guardar. Solo se leen nombres para el historial.
+        """
+        initial_values = {
+            fname: value.sudo() if isinstance(value, models.BaseModel) else value
+            for fname, value in initial_values.items()
+        }
+        return super(StockBranchTransfer, self.sudo())._mail_track(tracked_fields, initial_values)
+
     @api.constrains("company_id", "dest_company_id")
     def _check_dest_company(self):
         """El destino tiene que ser otra sucursal."""
