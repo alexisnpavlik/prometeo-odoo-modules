@@ -79,7 +79,8 @@
                                     <field name="qty_available_origin" column_invisible="parent.state != 'draft'"
                                            decoration-danger="qty_available_origin &lt; qty_sent"/>
                                     <field name="qty_available_dest" column_invisible="parent.state != 'draft'"/>
-                                    <field name="cost" groups="stock_branch_transfer.group_branch_transfer_manager"/>
+                                    <!-- column_invisible y no groups: el cliente cachea las vistas y no se entera del cambio de grupo -->
+                                    <field name="cost" column_invisible="not parent.is_manager"/>
                                     <field name="qty_sent"/>
                                     <field name="qty_received" column_invisible="parent.state in ('draft', 'in_transit')"/>
                                     <field name="uom_id" optional="hide"/>
