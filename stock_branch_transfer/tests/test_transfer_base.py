@@ -46,3 +46,15 @@ class TestTransferBase(BranchTransferCommon):
         Company = self.env["res.company"].with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
         ids = [r[0] for r in Company.name_search("SBT Sucursal")]
         self.assertNotIn(self.company_b.id, ids)
+
+    def test_change_dest_to_unassigned_company_tracks(self):
+        transfer = self.make_transfer(self.user_a)
+        old_dest = transfer.dest_company_id
+        as_user = transfer.with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
+        as_user.write({"dest_company_id": self.company_c.id})
+        self.env.flush_all()
+        self.env.cr.precommit.run()
+        self.assertEqual(transfer.dest_company_id, self.company_c)
+        values = transfer.message_ids.tracking_value_ids.filtered(lambda v: v.field_id.name == "dest_company_id")
+        self.assertEqual(values[:1].old_value_char, old_dest.name)
+        self.assertEqual(values[:1].new_value_char, self.company_c.name)
