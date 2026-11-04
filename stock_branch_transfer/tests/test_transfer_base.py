@@ -46,3 +46,10 @@ class TestTransferBase(BranchTransferCommon):
         Company = self.env["res.company"].with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
         ids = [r[0] for r in Company.name_search("SBT Sucursal")]
         self.assertNotIn(self.company_b.id, ids)
+
+    def test_cost_only_for_managers(self):
+        self.product.with_company(self.company_a).standard_price = 37.5
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1].with_user(self.manager)
+        self.assertEqual(line.cost, 37.5)
+        self.assertNotIn("cost", transfer.line_ids.with_user(self.user_a).fields_get())

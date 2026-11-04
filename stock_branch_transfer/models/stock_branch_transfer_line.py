@@ -32,6 +32,17 @@ class StockBranchTransferLine(models.Model):
     )
 
     sale_price = fields.Float(string="Precio de venta", compute="_compute_sale_price", digits="Product Price")
+    cost = fields.Float(
+        string="Costo", compute="_compute_cost", digits="Product Price",
+        groups="stock_branch_transfer.group_branch_transfer_manager",
+    )
+
+    @api.depends("product_id", "transfer_id.company_id")
+    def _compute_cost(self):
+        """Costo del producto en la sucursal de origen (solo managers; no sale en el remito)."""
+        for line in self:
+            company = line.transfer_id.company_id
+            line.cost = line.product_id.sudo().with_company(company).standard_price if company else 0.0
 
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
