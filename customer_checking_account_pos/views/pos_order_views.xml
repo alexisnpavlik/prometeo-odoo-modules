@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//page[@name='extra']" position="after">
                 <page string="Cuenta corriente" name="cca"
-                      invisible="not cca_withdrawal_id and not cca_payment_id and not cca_installment_count">
+                      invisible="not cca_withdrawal_id and not cca_payment_id and not cca_financing_set">
                     <group>
                         <group string="Movimiento">
                             <field name="cca_withdrawal_id"/>
@@ -15,6 +15,7 @@
                             <field name="cca_receipt_info"/>
                         </group>
                         <group string="Financiación elegida en el POS">
+                            <field name="cca_financing_set" readonly="1"/>
                             <field name="cca_surcharge_percent" readonly="1"/>
                             <field name="cca_installment_count" readonly="1"/>
                             <field name="cca_first_due_date" readonly="1"/>

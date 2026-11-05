@@ -37,7 +37,7 @@ class TestSaleToAccount(CcaPosCommon):
         before = self._available()
         data = self._cca_order_data(
             [(self.product_a, 2)], payments=[(self.pay_later_pm, 200)], customer=self.cca_partner,
-            cca_installment_count=3, cca_surcharge_percent=10,
+            cca_financing_set=True, cca_installment_count=3, cca_surcharge_percent=10,
         )
         order = self._sync(data)
         withdrawal = order.cca_withdrawal_id
@@ -57,12 +57,13 @@ class TestSaleToAccount(CcaPosCommon):
             [(self.product_a, 2)],
             payments=[(self.cash_pm1, 50), (self.pay_later_pm, 150)],
             customer=self.cca_partner,
-            cca_installment_count=1, cca_surcharge_percent=10,
+            cca_financing_set=True, cca_surcharge_percent=10,
         )
         withdrawal = self._sync(data).cca_withdrawal_id
         self.assertAlmostEqual(withdrawal.down_payment, 50.0)
         self.assertEqual(withdrawal.down_payment_method, "cash")
         self.assertAlmostEqual(withdrawal.amount_surcharge, 15.0)
+        self.assertEqual(withdrawal.installment_count, 1)
         self.assertTrue(withdrawal.down_payment_id)
 
     def test_defaults_from_company_when_empty(self):
@@ -100,16 +101,64 @@ class TestSaleToAccount(CcaPosCommon):
         data = self._cca_order_data(
             [(self.product_a, 1, {"discount": 10, "price_unit": 100.0})],
             payments=[(self.pay_later_pm, 90)], customer=self.cca_partner,
-            cca_installment_count=1,
         )
         order = self._sync(data)
         self.assertAlmostEqual(order.cca_withdrawal_id.amount_untaxed, order.amount_total)
+
+    def test_taxed_odd_quantity_matches_ticket(self):
+        """IVA 21% y cantidad 3: el retiro reproduce el total del ticket sin diferencia de centavos."""
+        tax = self.env["account.tax"].create({
+            "name": "IVA 21 CCA",
+            "amount": 21.0,
+            "amount_type": "percent",
+            "type_tax_use": "sale",
+            "company_id": self.company.id,
+        })
+        product = self.env["product.product"].create({
+            "name": "Producto con IVA",
+            "is_storable": True,
+            "available_in_pos": True,
+            "list_price": 99.99,
+            "taxes_id": [(6, 0, tax.ids)],
+        })
+        data = self._cca_order_data(
+            [(product, 3)], payments=[(self.pay_later_pm, 362.96)], customer=self.cca_partner,
+        )
+        self.assertAlmostEqual(data["amount_total"], 362.96, places=2)
+        order = self._sync(data)
+        withdrawal = order.cca_withdrawal_id
+        self.assertEqual(
+            self.currency.compare_amounts(withdrawal.amount_untaxed, order.amount_total), 0
+        )
+        self.assertIn("3 x", withdrawal.line_ids.name)
+
+    def test_cc_amount_above_total_raises(self):
+        """Pagar a cuenta más que el total (y dar vuelto en efectivo) se rechaza."""
+        data = self._cca_order_data(
+            [(self.product_a, 1)],
+            payments=[(self.pay_later_pm, 150), (self.cash_pm1, -50)],
+            customer=self.cca_partner,
+        )
+        with self.assertRaises(UserError) as error:
+            self._sync(data)
+        self.assertIn("no puede superar el total", str(error.exception))
+        self.assertFalse(self.env["pos.order"].search([("uuid", "=", data["uuid"])]))
+
+    def test_negative_line_with_cc_raises(self):
+        """Una línea negativa en una venta a cuenta se rechaza."""
+        data = self._cca_order_data(
+            [(self.product_a, 2), (self.product_a, 1, {"price_unit": -50.0})],
+            payments=[(self.pay_later_pm, 150)], customer=self.cca_partner,
+        )
+        with self.assertRaises(UserError) as error:
+            self._sync(data)
+        self.assertIn("líneas negativas", str(error.exception))
+        self.assertFalse(self.env["pos.order"].search([("uuid", "=", data["uuid"])]))
 
     def test_resync_same_uuid_creates_one_withdrawal(self):
         """Reenviar el mismo pedido no duplica el retiro."""
         data = self._cca_order_data(
             [(self.product_a, 1)], payments=[(self.pay_later_pm, 100)], customer=self.cca_partner,
-            cca_installment_count=1,
         )
         order = self._sync(dict(data))
         self._sync(dict(data))
@@ -121,7 +170,7 @@ class TestSaleToAccount(CcaPosCommon):
     def test_no_partner_raises(self):
         """Pago a cuenta sin cliente: error y el pedido no queda guardado."""
         data = self._cca_order_data(
-            [(self.product_a, 1)], payments=[(self.pay_later_pm, 100)], cca_installment_count=1,
+            [(self.product_a, 1)], payments=[(self.pay_later_pm, 100)],
         )
         with self.assertRaises(UserError) as error:  # el de Odoo abre un savepoint: simula el rollback
             self._sync(data)
@@ -133,7 +182,6 @@ class TestSaleToAccount(CcaPosCommon):
         partner = self.env["res.partner"].create({"name": "Sin DNI"})
         data = self._cca_order_data(
             [(self.product_a, 1)], payments=[(self.pay_later_pm, 100)], customer=partner,
-            cca_installment_count=1,
         )
         with self.assertRaises(UserError) as error:  # el de Odoo abre un savepoint: simula el rollback
             self._sync(data)
@@ -146,7 +194,6 @@ class TestSaleToAccount(CcaPosCommon):
         account.write({"credit_limit": 100, "limit_mode": "block"})
         data = self._cca_order_data(
             [(self.product_a, 2)], payments=[(self.pay_later_pm, 200)], customer=self.cca_partner,
-            cca_installment_count=1,
         )
         with self.assertRaises(UserError) as error:  # el de Odoo abre un savepoint: simula el rollback
             self._sync(data)
@@ -157,7 +204,7 @@ class TestSaleToAccount(CcaPosCommon):
         """El ticket recibe el número de retiro y las cuotas."""
         data = self._cca_order_data(
             [(self.product_a, 2)], payments=[(self.pay_later_pm, 200)], customer=self.cca_partner,
-            cca_installment_count=2,
+            cca_financing_set=True, cca_installment_count=2,
         )
         order = self._sync(data)
         self.assertIn(order.cca_withdrawal_id.name, order.cca_receipt_info)

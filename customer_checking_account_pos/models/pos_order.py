@@ -14,13 +14,17 @@ CCA_STATES = ("paid", "done", "invoiced")
 class PosOrder(models.Model):
     _inherit = "pos.order"
 
+    cca_financing_set = fields.Boolean(
+        string="Financiación elegida en el POS",
+        help="El cajero eligió la financiación en el POS. Si no, se usan los valores de la compañía.",
+    )
     cca_surcharge_percent = fields.Float(
         string="Recargo (%)", digits=(5, 2),
         help="Recargo de financiación elegido en el POS para la parte a cuenta corriente.",
     )
     cca_installment_count = fields.Integer(
         string="Cuotas",
-        help="Cuotas elegidas en el POS. Vacío: se usan los valores de la compañía.",
+        help="Cuotas elegidas en el POS.",
     )
     cca_first_due_date = fields.Date(string="Primer vencimiento")
     cca_frequency = fields.Selection(
@@ -104,6 +108,12 @@ class PosOrder(models.Model):
             sum(payment_lines.mapped("price_subtotal_incl")), 0.0
         ) <= 0:
             raise UserError(_("El pago de cuenta corriente debe ser mayor a cero."))
+        if cc_payments and currency.compare_amounts(
+            sum(cc_payments.mapped("amount")), self.amount_total
+        ) > 0:
+            raise UserError(_(
+                "El monto a cuenta corriente no puede superar el total del pedido."
+            ))
         if cc_payments and any(
             currency.compare_amounts(line.price_subtotal_incl, 0.0) < 0 for line in self.lines
         ):
@@ -114,19 +124,23 @@ class PosOrder(models.Model):
         return True
 
     def _cca_financing_values(self, order_date):
-        """Financiación del pedido; si no viene del POS, los valores de la compañía (saneados)."""
+        """Financiación elegida en el POS o, si no la hay, la de la compañía (siempre saneada)."""
         self.ensure_one()
         company = self.company_id
-        # Las cuotas marcan si el POS mandó financiación: así un recargo 0 elegido no cae al default.
-        from_pos = self.cca_installment_count > 0
-        surcharge = self.cca_surcharge_percent if from_pos else company.cca_pos_surcharge_percent
-        count = self.cca_installment_count if from_pos else company.cca_pos_installment_count
+        default_due = order_date + timedelta(days=max(company.cca_pos_first_due_days, 0))
+        default_frequency = company.cca_pos_frequency or "monthly"
+        if self.cca_financing_set:
+            return {
+                "surcharge_percent": max(self.cca_surcharge_percent, 0.0),
+                "installment_count": max(self.cca_installment_count, 1),
+                "first_due_date": self.cca_first_due_date or default_due,
+                "frequency": self.cca_frequency or default_frequency,
+            }
         return {
-            "surcharge_percent": max(surcharge, 0.0),
-            "installment_count": max(count, 1),
-            "first_due_date": self.cca_first_due_date
-            or order_date + timedelta(days=max(company.cca_pos_first_due_days, 0)),
-            "frequency": self.cca_frequency or company.cca_pos_frequency or "monthly",
+            "surcharge_percent": max(company.cca_pos_surcharge_percent, 0.0),
+            "installment_count": max(company.cca_pos_installment_count, 1),
+            "first_due_date": default_due,
+            "frequency": default_frequency,
         }
 
     def _cca_down_payment_method(self):
@@ -141,18 +155,31 @@ class PosOrder(models.Model):
         return "cash" if main.payment_method_id.is_cash_count else "other"
 
     def _cca_withdrawal_line_values(self):
-        """Líneas del retiro con el precio final del ticket (impuestos y descuentos incluidos)."""
+        """Líneas del retiro con el precio final del ticket (impuestos y descuentos incluidos).
+
+        Si cantidad x precio unitario no reproduce el subtotal del ticket por redondeo, la línea
+        va como 1 unidad por el subtotal y la cantidad queda en la descripción.
+        """
         self.ensure_one()
-        return [
-            fields.Command.create({
+        currency = self.currency_id
+        price_digits = self.env["decimal.precision"].precision_get("Product Price")
+        commands = []
+        for line in self.lines.filtered("qty"):
+            name = line.full_product_name or line.product_id.display_name
+            price_unit = round(line.price_subtotal_incl / line.qty, price_digits)
+            quantity = line.qty
+            if currency.compare_amounts(
+                currency.round(quantity * price_unit), currency.round(line.price_subtotal_incl)
+            ):
+                name = f"{line.qty:g} x {name}"
+                quantity, price_unit = 1.0, line.price_subtotal_incl
+            commands.append(fields.Command.create({
                 "product_id": line.product_id.id,
-                "name": line.full_product_name or line.product_id.display_name,
-                "quantity": line.qty,
-                "price_unit": line.price_subtotal_incl / line.qty,
-            })
-            for line in self.lines
-            if line.qty
-        ]
+                "name": name,
+                "quantity": quantity,
+                "price_unit": price_unit,
+            }))
+        return commands
 
     def _cca_create_withdrawal(self):
         """Crea y confirma el retiro de la parte pagada a cuenta corriente."""
@@ -160,8 +187,6 @@ class PosOrder(models.Model):
         currency = self.currency_id
         cc_amount = sum(self._cca_cc_payments().mapped("amount"))
         down_payment = currency.round(self.amount_total - cc_amount)
-        if currency.compare_amounts(down_payment, 0.0) < 0:
-            down_payment = 0.0
         order_date = fields.Date.context_today(self, timestamp=self.date_order)
         vals = {
             "partner_id": self.partner_id.id,
