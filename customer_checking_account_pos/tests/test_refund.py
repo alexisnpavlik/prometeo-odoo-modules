@@ -162,3 +162,53 @@ class TestRefund(CcaPosCommon):
         self.assertEqual(withdrawal.state, "pending")
         refund._cca_process()
         self.assertEqual(payment.state, "cancel")
+
+    def test_refund_non_cc_sale_with_cc_method_raises(self):
+        """Reembolsar una venta en efectivo con el método CC: error y nada guardado."""
+        original = self._sync(self._cca_order_data(
+            [(self.product_a, 1)], payments=[(self.cash_pm1, 100)], customer=self.cca_partner,
+        ))
+        self.assertFalse(original.cca_withdrawal_id)
+        data = self._refund_data(original, [(self.pay_later_pm, -100)])
+        with self.assertRaises(UserError) as error:
+            self._sync(data)
+        self.assertIn("no se vendió a cuenta corriente", str(error.exception))
+        self._assert_not_saved(data)
+
+    def test_exchange_with_cc_raises(self):
+        """Cambio (reembolso + producto nuevo) con cuenta corriente: error, el retiro sigue vivo."""
+        original = self._sale(2, [(self.pay_later_pm, 200)])
+        withdrawal = original.cca_withdrawal_id
+        line = original.lines
+        data = self._cca_order_data(
+            [(self.product_a, -2, {"refunded_orderline_id": line.id}), (self.product_a, 3)],
+            payments=[(self.pay_later_pm, 100)], customer=self.cca_partner,
+        )
+        with self.assertRaises(UserError) as error:
+            self._sync(data)
+        self.assertIn("productos nuevos", str(error.exception))
+        self._assert_not_saved(data)
+        self.assertEqual(withdrawal.state, "pending")
+
+    def test_exchange_on_cash_sale_paid_with_cc_raises(self):
+        """Cambio sobre una venta en efectivo pagando la diferencia a cuenta: error."""
+        original = self._sync(self._cca_order_data(
+            [(self.product_a, 1)], payments=[(self.cash_pm1, 100)], customer=self.cca_partner,
+        ))
+        data = self._cca_order_data(
+            [(self.product_a, -1, {"refunded_orderline_id": original.lines.id}), (self.product_a, 2)],
+            payments=[(self.pay_later_pm, 100)], customer=self.cca_partner,
+        )
+        with self.assertRaises(UserError):
+            self._sync(data)
+        self._assert_not_saved(data)
+
+    def test_refund_with_positive_amounts_rejected(self):
+        """Original + reembolso debe dar cero por medio: montos positivos no pasan."""
+        original = self._sale(2, [(self.pay_later_pm, 200)])
+        draft = self._sync(self._refund_data(original, [(self.pay_later_pm, 200)]) | {"state": "draft"})
+        self.assertEqual(draft.state, "draft")
+        with self.assertRaises(UserError) as error:
+            draft._cca_check_refund_payments(original)
+        self.assertIn("mismos medios", str(error.exception))
+        self.assertEqual(original.cca_withdrawal_id.state, "pending")

@@ -249,6 +249,7 @@ class PosOrder(models.Model):
         original = self.lines.mapped("refunded_orderline_id.order_id")
         if len(original) > 1:
             raise UserError(_("Un reembolso solo puede devolver productos de un mismo pedido."))
+        self._cca_check_refund_cc_method(original)
         withdrawal = original.cca_withdrawal_id.sudo()
         if withdrawal and not withdrawal.is_cancelled:
             self._cca_check_full_refund(original)
@@ -259,6 +260,30 @@ class PosOrder(models.Model):
         if payment and payment.state != "cancel":
             payment.action_cancel()
             _logger.info("Reembolso POS %s: pago %s anulado", self.name, payment.name)
+        return True
+
+    def _cca_check_refund_cc_method(self, original):
+        """Impide mover cuenta corriente en un reembolso que no anula un retiro.
+
+        Sin retiro en el original, el método CC no tiene contra qué imputarse. Un cambio
+        (líneas reembolsadas + productos nuevos) con cuenta corriente financiaría mercadería
+        sin retiro.
+        """
+        self.ensure_one()
+        own_cc = self._cca_cc_payments()
+        if own_cc and not original.cca_withdrawal_id:
+            raise UserError(_(
+                "El pedido %s no se vendió a cuenta corriente: el reembolso no puede usar %s.",
+                original.pos_reference or original.name,
+                ", ".join(own_cc.payment_method_id.mapped("name")),
+            ))
+        if (own_cc or original._cca_cc_payments()) and self.lines.filtered(
+            lambda line: not line.refunded_orderline_id
+        ):
+            raise UserError(_(
+                "Un reembolso con cuenta corriente no puede incluir productos nuevos: hacé el "
+                "reembolso y la venta nueva en pedidos separados."
+            ))
         return True
 
     def _cca_check_full_refund(self, original):
@@ -277,7 +302,8 @@ class PosOrder(models.Model):
         """Exige que el reembolso devuelva por cada medio lo mismo que se cobró en el original.
 
         Se compara el neto por medio (el vuelto resta del efectivo): es lo que el retiro tomó
-        como entrega y lo que se financió.
+        como entrega y lo que se financió. Original + reembolso debe dar cero por medio, así un
+        reembolso con montos positivos también se rechaza.
         """
         self.ensure_one()
         currency = original.currency_id
@@ -292,7 +318,7 @@ class PosOrder(models.Model):
 
         paid, refunded = net_by_method(original), net_by_method(self)
         for method in set(paid) | set(refunded):
-            if currency.compare_amounts(abs(paid.get(method, 0.0)), abs(refunded.get(method, 0.0))):
+            if not currency.is_zero(paid.get(method, 0.0) + refunded.get(method, 0.0)):
                 raise UserError(_(
                     "El reembolso de una venta a cuenta corriente debe devolverse con los mismos "
                     "medios y montos del pedido %(order)s: lo financiado con %(cc)s y la entrega "
