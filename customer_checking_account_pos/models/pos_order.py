@@ -144,7 +144,7 @@ class PosOrder(models.Model):
         }
 
     def _cca_down_payment_method(self):
-        """Medio de la entrega: efectivo si el medio no-cc de mayor monto cuenta efectivo."""
+        """Medio de la entrega o del cobro: efectivo si el medio no-cc de mayor monto cuenta efectivo."""
         self.ensure_one()
         others = self.payment_ids.filtered(
             lambda p: not p.payment_method_id.cca_is_checking_account and not p.is_change
@@ -215,8 +215,29 @@ class PosOrder(models.Model):
         return withdrawal
 
     def _cca_create_payment(self):
-        """Cobro de cuotas con el producto de pago. Lo implementa la Task 4."""
-        return False
+        """Cobro de cuotas: crea el pago por el producto de pago; el create del base lo imputa FIFO."""
+        self.ensure_one()
+        currency = self.currency_id
+        amount = currency.round(sum(self._cca_payment_product_lines().mapped("price_subtotal_incl")))
+        payment = self.env["cca.payment"].sudo().with_company(self.company_id).create({
+            "partner_id": self.partner_id.id,
+            "company_id": self.company_id.id,
+            "date": fields.Date.context_today(self, timestamp=self.date_order),
+            "amount": amount,
+            "payment_method": self._cca_down_payment_method(),
+            "ref": self.pos_reference,
+            "pos_order_id": self.id,
+        })
+        self.write({
+            "cca_payment_id": payment.id,
+            "cca_receipt_info": _(
+                "Pago %(name)s · Saldo: %(balance)s",
+                name=payment.name,
+                balance=format_amount(self.env, payment.account_id.balance, currency),
+            ),
+        })
+        _logger.info("Pedido POS %s: pago %s registrado", self.name, payment.name)
+        return payment
 
     def _cca_process_refund(self):
         """Reembolso de un pedido con cuenta corriente. Lo implementa la Task 5."""
