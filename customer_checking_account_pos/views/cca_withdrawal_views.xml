@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_withdrawal_form_pos" model="ir.ui.view">
+        <field name="name">cca.withdrawal.form.pos</field>
+        <field name="model">cca.withdrawal</field>
+        <field name="inherit_id" ref="customer_checking_account.view_cca_withdrawal_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_cancel']" position="attributes">
+                <attribute name="invisible">state in ('draft', 'cancel') or cca_has_payments or pos_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_draft']" position="attributes">
+                <attribute name="invisible">state != 'cancel' or pos_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_edit'][1]" position="attributes">
+                <attribute name="invisible">state in ('draft', 'cancel') or cca_has_payments or pos_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_edit'][2]" position="attributes">
+                <attribute name="invisible">state in ('draft', 'cancel') or (not cca_has_payments and not pos_order_id) or edit_due_dates</attribute>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_pos_order" type="object" class="oe_stat_button"
+                        icon="fa-shopping-bag" invisible="not pos_order_id">
+                    <span>Pedido POS</span>
+                </button>
+                <field name="pos_order_id" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
