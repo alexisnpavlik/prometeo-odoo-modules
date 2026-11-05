@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Producto que el cajero agrega al pedido para cobrar cuotas de cuenta corriente. -->
+    <record id="product_cca_pos_payment" model="product.product">
+        <field name="name">Pago Cuenta Corriente</field>
+        <field name="type">service</field>
+        <field name="available_in_pos" eval="True"/>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="taxes_id" eval="[(5, 0, 0)]"/>
+    </record>
+</odoo>

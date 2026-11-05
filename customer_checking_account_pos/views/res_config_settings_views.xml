@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cca_pos_res_config_settings_form" model="ir.ui.view">
+        <field name="name">res.config.settings.form.cca.pos</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="customer_checking_account.view_cca_res_config_settings_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='customer_checking_account']" position="inside">
+                <block title="Punto de venta" name="cca_pos_container">
+                    <setting string="Recargo por financiación"
+                             help="Porcentaje que se suma a las ventas a cuenta corriente desde el POS.">
+                        <field name="cca_pos_surcharge_percent"/>
+                    </setting>
+                    <setting string="Cantidad de cuotas"
+                             help="Cuotas por defecto de la venta a cuenta corriente.">
+                        <field name="cca_pos_installment_count"/>
+                    </setting>
+                    <setting string="Días a la primera cuota"
+                             help="Días desde la venta hasta el primer vencimiento.">
+                        <field name="cca_pos_first_due_days"/>
+                    </setting>
+                    <setting string="Frecuencia de cuotas">
+                        <field name="cca_pos_frequency"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
