@@ -6,3 +6,4 @@ from . import pos_config
 from . import cca_withdrawal
 from . import cca_payment
 from . import pos_order
+from . import res_partner
