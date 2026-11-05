@@ -27,7 +27,10 @@ class CcaPosCommon(TestPoSCommon):
             "login": "cajero_cca",
             "company_id": cls.company.id,
             "company_ids": [Command.set(cls.company.ids)],
-            "groups_id": [Command.set([cls.env.ref("point_of_sale.group_pos_user").id])],
+            "groups_id": [Command.set([
+                cls.env.ref("base.group_user").id,
+                cls.env.ref("point_of_sale.group_pos_user").id,
+            ])],
         })
 
     def _cca_order_data(self, lines, payments, customer=None, **order_extra):

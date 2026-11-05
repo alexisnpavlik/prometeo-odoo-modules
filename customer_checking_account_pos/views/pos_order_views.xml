@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_order_form_cca" model="ir.ui.view">
+        <field name="name">pos.order.form.cca</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='extra']" position="after">
+                <page string="Cuenta corriente" name="cca"
+                      invisible="not cca_withdrawal_id and not cca_payment_id and not cca_installment_count">
+                    <group>
+                        <group string="Movimiento">
+                            <field name="cca_withdrawal_id"/>
+                            <field name="cca_payment_id"/>
+                            <field name="cca_receipt_info"/>
+                        </group>
+                        <group string="Financiación elegida en el POS">
+                            <field name="cca_surcharge_percent" readonly="1"/>
+                            <field name="cca_installment_count" readonly="1"/>
+                            <field name="cca_first_due_date" readonly="1"/>
+                            <field name="cca_frequency" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
