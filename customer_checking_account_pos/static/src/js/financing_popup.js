@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillDestroy, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
@@ -35,9 +35,14 @@ export class CcaFinancingPopup extends Component {
             summary: null,
             summaryLoaded: false,
         });
-        onWillStart(async () => {
-            this.state.summary = await fetchCcaPartnerSummary(this.pos, this.partner);
-            this.state.summaryLoaded = true;
+        // Sin await: el popup abre al instante con "Consultando cuenta…" y el saldo llega después.
+        this.alive = true;
+        onWillDestroy(() => (this.alive = false));
+        fetchCcaPartnerSummary(this.pos, this.partner).then((summary) => {
+            if (this.alive) {
+                this.state.summary = summary;
+                this.state.summaryLoaded = true;
+            }
         });
     }
 

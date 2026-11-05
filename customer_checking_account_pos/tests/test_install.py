@@ -44,3 +44,12 @@ class TestCcaPosInstall(CcaPosCommon):
         for name in ("cca_pos_surcharge_percent", "cca_pos_installment_count",
                      "cca_pos_first_due_days", "cca_pos_frequency"):
             self.assertIn(name, company_fields)
+
+    def test_cc_flag_editable_with_open_session(self):
+        """La marca de cuenta corriente se puede cambiar con una sesión abierta."""
+        self.open_new_session()
+        self.assertTrue(self.pay_later_pm.open_session_ids)
+        self.pay_later_pm.write({"cca_is_checking_account": False})
+        self.assertFalse(self.pay_later_pm.cca_is_checking_account)
+        self.pay_later_pm.write({"cca_is_checking_account": True})
+        self.assertTrue(self.pay_later_pm.cca_is_checking_account)

@@ -87,23 +87,27 @@ patch(PaymentScreen.prototype, {
         return true;
     },
 
-    /** Anticipa las reglas del servidor y el límite de crédito antes de validar. */
+    /** Anticipa las reglas de cuenta corriente del servidor antes de validar. */
     async validateOrder(isForceValidate) {
         this.numberBuffer.capture();
-        const order = this.currentOrder;
-        const error = order.getCcaValidationError();
+        const error = this.currentOrder.getCcaValidationError();
         if (error) {
             this.dialog.add(AlertDialog, { title: _t("Cuenta corriente"), body: error });
             return;
         }
-        if (
-            order.getCcaPaymentLines().length &&
-            !order.getHasRefundLines() &&
-            !(await this.checkCcaCreditLimit(order))
-        ) {
-            return;
-        }
         return super.validateOrder(...arguments);
+    },
+
+    /** Después de las validaciones del core, el límite de crédito de la venta a cuenta. */
+    async _isOrderValid(isForceValidate) {
+        if (!(await super._isOrderValid(...arguments))) {
+            return false;
+        }
+        const order = this.currentOrder;
+        if (order.getCcaPaymentLines().length && !order.getHasRefundLines()) {
+            return await this.checkCcaCreditLimit(order);
+        }
+        return true;
     },
 
     /** Saldo + total + recargo contra el límite (igual que el retiro). True si se puede seguir. */

@@ -26,6 +26,13 @@ class PosPaymentMethod(models.Model):
         """Revalida las cajas del método: no puede haber dos de cuenta corriente."""
         self.filtered("cca_is_checking_account").config_ids._check_single_cca_payment_method()
 
+    def _is_write_forbidden(self, fields):
+        """Permite cambiar la marca de cuenta corriente con sesiones abiertas.
+
+        La marca no mueve plata ni diarios: el POS la toma al recargar la caja.
+        """
+        return super()._is_write_forbidden(set(fields) - {"cca_is_checking_account"})
+
     @api.model
     def _load_pos_data_fields(self, config_id):
         """Agrega al POS la marca de cuenta corriente."""

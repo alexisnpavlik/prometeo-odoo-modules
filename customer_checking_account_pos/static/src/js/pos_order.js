@@ -14,16 +14,6 @@ export function getCcaPaymentProductId(config) {
     return product || config?.raw?.cca_payment_product_id || false;
 }
 
-/** Neto pagado por id de medio de pago (el vuelto, si está como línea, resta). */
-function netByMethod(payments) {
-    const totals = {};
-    for (const payment of payments) {
-        const methodId = payment.payment_method_id?.id;
-        totals[methodId] = (totals[methodId] || 0) + payment.get_amount();
-    }
-    return totals;
-}
-
 patch(PosOrder.prototype, {
     /** Líneas de pago con monto hechas con el medio de cuenta corriente. */
     getCcaPaymentLines() {
@@ -136,30 +126,9 @@ patch(PosOrder.prototype, {
                     "reembolso y la venta nueva en pedidos separados."
             );
         }
-        for (const originalLine of original.lines) {
-            if (!originalLine.qty) {
-                continue;
-            }
-            const refunded = -this.lines
-                .filter((line) => line.refunded_orderline_id?.id === originalLine.id)
-                .reduce((sum, line) => sum + line.get_quantity(), 0);
-            if (Math.abs(refunded - originalLine.qty) > 1e-6) {
-                return _t("Reembolso parcial de una venta a cuenta corriente: resolvelo desde el backend.");
-            }
-        }
-        const paid = netByMethod(original.payment_ids);
-        const refunded = netByMethod(this.payment_ids);
-        for (const methodId of new Set([...Object.keys(paid), ...Object.keys(refunded)])) {
-            if (roundCurrency((paid[methodId] || 0) + (refunded[methodId] || 0), this.currency)) {
-                const names = [...new Set(originalCc.map((p) => p.payment_method_id.name))].join(", ");
-                return _t(
-                    "El reembolso de una venta a cuenta corriente debe devolverse con los mismos " +
-                        "medios y montos del pedido %(order)s: lo financiado con %(cc)s y la entrega " +
-                        "con su medio original.",
-                    { order: reference, cc: names }
-                );
-            }
-        }
+        // Reembolso completo y mismos medios/montos: el servidor los exige solo si el retiro
+        // del original sigue activo, y el POS no carga cca.withdrawal (no sabe si está anulado).
+        // Los valida el servidor; su error vuelve el pedido a borrador.
         return null;
     },
 
