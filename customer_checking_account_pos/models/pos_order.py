@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
-from odoo.tools import format_amount
+from odoo.tools import float_compare, format_amount
 
 _logger = logging.getLogger(__name__)
 
@@ -240,5 +240,64 @@ class PosOrder(models.Model):
         return payment
 
     def _cca_process_refund(self):
-        """Reembolso de un pedido con cuenta corriente. Lo implementa la Task 5."""
-        return False
+        """Reembolso: anula el retiro o el pago de cuenta corriente del pedido original.
+
+        Nunca crea retiro ni pago. Un retiro o pago ya anulado se saltea, así el reembolso
+        reprocesado no falla. Todo error es UserError para que el sync deshaga el reembolso.
+        """
+        self.ensure_one()
+        original = self.lines.mapped("refunded_orderline_id.order_id")
+        if len(original) > 1:
+            raise UserError(_("Un reembolso solo puede devolver productos de un mismo pedido."))
+        withdrawal = original.cca_withdrawal_id.sudo()
+        if withdrawal and not withdrawal.is_cancelled:
+            self._cca_check_full_refund(original)
+            self._cca_check_refund_payments(original)
+            withdrawal.with_context(cca_pos_refund=True).action_cancel()
+            _logger.info("Reembolso POS %s: retiro %s cancelado", self.name, withdrawal.name)
+        payment = original.cca_payment_id.sudo()
+        if payment and payment.state != "cancel":
+            payment.action_cancel()
+            _logger.info("Reembolso POS %s: pago %s anulado", self.name, payment.name)
+        return True
+
+    def _cca_check_full_refund(self, original):
+        """Exige que el reembolso devuelva cada línea del pedido original por su cantidad completa."""
+        self.ensure_one()
+        digits = self.env["decimal.precision"].precision_get("Product Unit of Measure")
+        for line in original.lines.filtered("qty"):
+            refunded = -sum(self.lines.filtered(lambda r: r.refunded_orderline_id == line).mapped("qty"))
+            if float_compare(refunded, line.qty, precision_digits=digits):
+                raise UserError(_(
+                    "Reembolso parcial de una venta a cuenta corriente: resolvelo desde el backend."
+                ))
+        return True
+
+    def _cca_check_refund_payments(self, original):
+        """Exige que el reembolso devuelva por cada medio lo mismo que se cobró en el original.
+
+        Se compara el neto por medio (el vuelto resta del efectivo): es lo que el retiro tomó
+        como entrega y lo que se financió.
+        """
+        self.ensure_one()
+        currency = original.currency_id
+
+        def net_by_method(order):
+            """Neto pagado por medio de pago del pedido."""
+            totals = {}
+            for payment in order.payment_ids:
+                method = payment.payment_method_id
+                totals[method] = totals.get(method, 0.0) + payment.amount
+            return totals
+
+        paid, refunded = net_by_method(original), net_by_method(self)
+        for method in set(paid) | set(refunded):
+            if currency.compare_amounts(abs(paid.get(method, 0.0)), abs(refunded.get(method, 0.0))):
+                raise UserError(_(
+                    "El reembolso de una venta a cuenta corriente debe devolverse con los mismos "
+                    "medios y montos del pedido %(order)s: lo financiado con %(cc)s y la entrega "
+                    "con su medio original.",
+                    order=original.pos_reference or original.name,
+                    cc=", ".join(original._cca_cc_payments().payment_method_id.mapped("name")),
+                ))
+        return True
