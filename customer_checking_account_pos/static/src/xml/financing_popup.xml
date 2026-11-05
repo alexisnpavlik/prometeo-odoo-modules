@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="customer_checking_account_pos.CcaFinancingPopup">
+        <Dialog title="'Venta a cuenta corriente'" size="'md'">
+            <div class="cca-financing-popup">
+                <div class="mb-3 p-2 rounded bg-light border">
+                    <t t-if="!partner">
+                        <div class="text-danger fw-bold">Elegí un cliente antes de validar.</div>
+                    </t>
+                    <t t-else="">
+                        <div class="fw-bold" t-esc="partner.name"/>
+                        <div t-if="!partner.vat" class="text-danger">El cliente no tiene DNI cargado.</div>
+                        <div t-if="!state.summaryLoaded" class="text-muted">Consultando cuenta…</div>
+                        <div t-elif="!state.summary" class="text-muted">No se pudo consultar la cuenta corriente.</div>
+                        <div t-elif="!state.summary.has_account" class="text-muted">Sin cuenta corriente: se crea con esta venta.</div>
+                        <t t-else="">
+                            <div class="d-flex justify-content-between">
+                                <span>Saldo</span>
+                                <span class="cca-balance" t-esc="format(state.summary.balance)"/>
+                            </div>
+                            <div class="d-flex justify-content-between" t-att-class="{'text-danger fw-bold': state.summary.overdue > 0}">
+                                <span>Vencido</span>
+                                <span class="cca-overdue" t-esc="format(state.summary.overdue)"/>
+                            </div>
+                            <div t-if="state.summary.limit_mode !== 'none' and state.summary.credit_limit" class="d-flex justify-content-between">
+                                <span>Límite</span>
+                                <span t-esc="format(state.summary.credit_limit)"/>
+                            </div>
+                        </t>
+                    </t>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Monto a cuenta</label>
+                        <input type="number" step="0.01" min="0" class="form-control cca-amount" t-model="state.amount"/>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Recargo (%)</label>
+                        <input type="number" step="0.01" min="0" class="form-control cca-surcharge" t-model="state.surcharge_percent"/>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Cuotas</label>
+                        <input type="number" step="1" min="1" class="form-control cca-installments" t-model="state.installment_count"/>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Frecuencia</label>
+                        <select class="form-select cca-frequency" t-model="state.frequency">
+                            <option value="monthly">Mensual</option>
+                            <option value="weekly">Semanal</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Primer vencimiento</label>
+                        <input type="date" class="form-control cca-first-due" t-model="state.first_due_date"/>
+                    </div>
+                </div>
+
+                <div class="mt-3 p-2 rounded border">
+                    <div class="d-flex justify-content-between">
+                        <span>Recargo</span>
+                        <span class="cca-preview-surcharge" t-esc="format(surcharge)"/>
+                    </div>
+                    <div class="d-flex justify-content-between fw-bold">
+                        <span>Total financiado</span>
+                        <span class="cca-preview-financed" t-esc="format(financed)"/>
+                    </div>
+                    <div class="d-flex justify-content-between fs-5 fw-bold">
+                        <span><t t-esc="installments"/> cuota(s) de</span>
+                        <span class="cca-preview-installment" t-esc="format(installmentValue)"/>
+                    </div>
+                </div>
+                <div t-if="error" class="mt-2 text-danger cca-error" t-esc="error"/>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-lg btn-primary cca-confirm" t-att-disabled="!!error" t-on-click="confirm">Confirmar</button>
+                <button class="btn btn-lg btn-secondary cca-cancel" t-on-click="cancel">Cancelar</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

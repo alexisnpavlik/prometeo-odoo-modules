@@ -22,6 +22,16 @@
         "views/cca_withdrawal_views.xml",
         "views/pos_order_views.xml",
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "customer_checking_account_pos/static/src/js/pos_order.js",
+            "customer_checking_account_pos/static/src/js/partner_summary.js",
+            "customer_checking_account_pos/static/src/js/financing_popup.js",
+            "customer_checking_account_pos/static/src/js/payment_screen.js",
+            "customer_checking_account_pos/static/src/xml/financing_popup.xml",
+            "customer_checking_account_pos/static/src/xml/order_receipt.xml",
+        ],
+    },
     "installable": True,
     "auto_install": True,
     "application": False,

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- Línea de cuenta corriente (retiro y cuotas, o pago y saldo) debajo de los pagos. -->
+    <t t-name="customer_checking_account_pos.OrderReceipt" t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('paymentlines')]" position="after">
+            <div t-if="props.data.cca_receipt_info" class="cca-receipt-info text-start mt-1 fw-bold">
+                <t t-esc="props.data.cca_receipt_info"/>
+            </div>
+        </xpath>
+    </t>
+</templates>
