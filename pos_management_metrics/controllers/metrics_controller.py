@@ -143,6 +143,17 @@ class PosMetricsController(http.Controller):
             return "(SELECT discount_product_id FROM pos_config WHERE discount_product_id IS NOT NULL)"
         return "(SELECT NULL::integer WHERE FALSE)"
 
+    def _cca_payment_products_sql(self):
+        """Subconsulta con el producto de pago de cuenta corriente del POS (customer_checking_account_pos).
+
+        Esas líneas son cobranza de cuotas (plata que entra, no venta): se excluyen de las ventas.
+        El módulo puente no es dependencia: sin el xmlid la subconsulta queda vacía y no filtra nada.
+        """
+        return (
+            "(SELECT res_id FROM ir_model_data WHERE module = 'customer_checking_account_pos'"
+            " AND name = 'product_cca_pos_payment' AND model = 'product.product')"
+        )
+
     def _non_merchandise_sql(self):
         """Subconsulta con los productos que no son mercadería: descuento global y recargo.
 
@@ -308,7 +319,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
 
         lang = self._get_lang()
@@ -394,7 +405,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE{extra}
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}{extra}
         """
         query_params = [tz, start_dt, end_dt, tz] + list(params)
         line_clauses, line_params = self._build_line_filters(category, product, lang)
@@ -590,6 +601,10 @@ class PosMetricsController(http.Controller):
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
             WHERE {where_clause}
+              AND EXISTS (
+                  SELECT 1 FROM pos_order_line pol3
+                  WHERE pol3.order_id = po.id AND pol3.product_id NOT IN {self._cca_payment_products_sql()}
+              )
         """
         cr.execute(query_orders, params)
         order_ids = [r[0] for r in cr.fetchall()]
@@ -650,7 +665,7 @@ class PosMetricsController(http.Controller):
         non_merch = self._non_merchandise_sql()
 
         # 1. KPIs principales de líneas
-        kpi_query = """
+        kpi_query = f"""
             SELECT
                 SUM(pol.price_subtotal_incl) AS total_revenue,
                 SUM(pol.price_subtotal) AS total_revenue_net,
@@ -662,7 +677,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         kpi_params = [order_ids_tuple]
         kpi_query += "".join(f" AND {c}" for c in line_clauses)
@@ -748,7 +763,7 @@ class PosMetricsController(http.Controller):
                 is_small_range = True
 
         if is_small_range:
-            trend_query = """
+            trend_query = f"""
                 SELECT
                     EXTRACT(hour FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::integer AS hora,
                     rc.name AS empresa,
@@ -761,7 +776,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -778,7 +793,7 @@ class PosMetricsController(http.Controller):
             trend_labels = [f"{h}:00" for h in unique_times]
             timeframe = "Horario"
         else:
-            trend_query = """
+            trend_query = f"""
                 SELECT
                     (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)::date AS fecha,
                     rc.name AS empresa,
@@ -791,7 +806,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -846,7 +861,7 @@ class PosMetricsController(http.Controller):
         }
 
         # 4. Ventas por Caja
-        pos_query = """
+        pos_query = f"""
             SELECT
                 pc.name AS punto_venta,
                 SUM(pol.price_subtotal_incl) AS subtotal
@@ -856,7 +871,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         pos_params = [order_ids_tuple]
         pos_query += "".join(f" AND {c}" for c in line_clauses)
@@ -904,7 +919,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         prod_params = [lang, order_ids_tuple]
         prod_query += "".join(f" AND {c}" for c in line_clauses)
@@ -934,7 +949,7 @@ class PosMetricsController(http.Controller):
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE pol.order_id IN %s
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+              AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         cat_params = [order_ids_tuple]
         cat_query += "".join(f" AND {c}" for c in line_clauses)
@@ -954,7 +969,7 @@ class PosMetricsController(http.Controller):
 
         # 8. Ventas por Día de la Semana
         order_days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-        dow_query = """
+        dow_query = f"""
             SELECT
                 EXTRACT(dow FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::integer AS dow,
                 SUM(pol.price_subtotal_incl) AS subtotal
@@ -963,7 +978,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         dow_params = [tz, order_ids_tuple]
         dow_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1006,7 +1021,7 @@ class PosMetricsController(http.Controller):
         }
 
         # 9. Distribución Horaria
-        hour_query = """
+        hour_query = f"""
             SELECT
                 EXTRACT(hour FROM (po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s))::integer AS hora,
                 SUM(pol.price_subtotal_incl) AS subtotal
@@ -1015,7 +1030,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE
+            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         hour_params = [tz, order_ids_tuple]
         hour_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1129,7 +1144,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         prod_margin_params = [lang] + list(params)
@@ -1171,7 +1186,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
@@ -1213,7 +1228,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         coverage_params = list(params)
         coverage_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1304,6 +1319,7 @@ class PosMetricsController(http.Controller):
             session_filters += " AND COALESCE(emp_open.name, ru_o.login) = %s"
             extra_params.append(cashier)
 
+        cca_sql = self._cca_payment_products_sql()
         query = f"""
             SELECT
                 ps.id                               AS sesion_id,
@@ -1323,9 +1339,15 @@ class PosMetricsController(http.Controller):
                  - ps.cash_register_balance_start
                  - COALESCE(cash.cobrado_efectivo, 0)
                  - ps.cash_real_transaction)        AS diferencia_caja,
-                COUNT(DISTINCT po.id)               AS cant_ordenes,
+                COUNT(DISTINCT po.id) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM pos_order_line pol3
+                    WHERE pol3.order_id = po.id AND pol3.product_id NOT IN {cca_sql}
+                ))                                  AS cant_ordenes,
                 COALESCE(cash.cobrado_efectivo, 0)  AS total_efectivo_cobrado,
-                COALESCE(SUM(po.amount_total), 0)   AS total_vendido,
+                COALESCE(SUM(po.amount_total), 0) - COALESCE(SUM((
+                    SELECT SUM(pol4.price_subtotal_incl) FROM pos_order_line pol4
+                    WHERE pol4.order_id = po.id AND pol4.product_id IN {cca_sql}
+                )), 0)                              AS total_vendido,
                 ps.state                            AS estado_sesion,
                 rc.name                             AS empresa
             FROM pos_session              ps
@@ -1402,7 +1424,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         params_list = [lang] + list(params)
 
