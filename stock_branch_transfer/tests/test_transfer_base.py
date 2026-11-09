@@ -56,6 +56,9 @@ class TestTransferBase(BranchTransferCommon):
 
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
+        # Odoo no trackea cambios de un registro creado en la misma transacción: se cierra la creación antes.
+        self.env.flush_all()
+        self.env.cr.precommit.run()
         old_dest = transfer.dest_company_id
         as_user = transfer.with_user(self.user_a).with_context(allowed_company_ids=[self.company_a.id])
         as_user.write({"dest_company_id": self.company_c.id})
