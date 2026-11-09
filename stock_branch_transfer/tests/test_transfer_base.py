@@ -47,13 +47,6 @@ class TestTransferBase(BranchTransferCommon):
         ids = [r[0] for r in Company.name_search("SBT Sucursal")]
         self.assertNotIn(self.company_b.id, ids)
 
-    def test_cost_only_for_managers(self):
-        self.product.with_company(self.company_a).standard_price = 37.5
-        transfer = self.make_transfer(self.user_a)
-        line = transfer.line_ids[:1].with_user(self.manager)
-        self.assertEqual(line.cost, 37.5)
-        self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
-
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
         old_dest = transfer.dest_company_id

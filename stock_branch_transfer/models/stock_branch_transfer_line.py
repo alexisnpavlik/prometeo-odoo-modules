@@ -32,21 +32,6 @@ class StockBranchTransferLine(models.Model):
     )
 
     sale_price = fields.Float(string="Precio de venta", compute="_compute_sale_price", digits="Product Price")
-    cost = fields.Float(
-        string="Costo", compute="_compute_cost", digits="Product Price",
-    )
-
-    @api.depends("product_id", "transfer_id.company_id")
-    def _compute_cost(self):
-        """Costo del producto en la sucursal de origen (solo managers; no sale en el remito)."""
-        # Sin groups= en el campo: con groups, cualquier lectura de la línea (vista, remito) que lo
-        # incluya tira AccessError a quien no es manager. La columna se oculta en la vista.
-        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
-        for line in self:
-            company = line.transfer_id.company_id
-            line.cost = (
-                line.product_id.sudo().with_company(company).standard_price if company and is_manager else 0.0
-            )
 
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
