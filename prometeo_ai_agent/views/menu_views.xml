@@ -3,6 +3,7 @@
     <menuitem id="menu_ai_agent_root" name="Agente IA" sequence="80"
               web_icon="prometeo_ai_agent,static/description/icon.png"
               groups="prometeo_ai_agent.group_user"/>
+    <menuitem id="menu_ai_alerts" name="Alertas" parent="menu_ai_agent_root" action="action_alert_inbox" sequence="1"/>
     <menuitem id="menu_ai_config" name="Configuración" parent="menu_ai_agent_root" sequence="90"
               groups="prometeo_ai_agent.group_admin"/>
     <menuitem id="menu_ai_settings" name="Ajustes" parent="menu_ai_config" action="action_ai_settings" sequence="1"/>

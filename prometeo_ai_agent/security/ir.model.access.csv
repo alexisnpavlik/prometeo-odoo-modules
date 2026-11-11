@@ -4,3 +4,5 @@ access_ai_model_admin,ai.model admin,model_prometeo_ai_model,group_admin,1,1,1,1
 access_ai_run_admin,ai.run admin,model_prometeo_ai_run,group_admin,1,0,0,0
 access_ai_routine_admin,ai.routine admin,model_prometeo_ai_routine,group_admin,1,1,1,1
 access_ai_routine_user,ai.routine user,model_prometeo_ai_routine,group_user,1,0,0,0
+access_ai_alert_admin,ai.alert admin,model_prometeo_ai_alert,group_admin,1,1,1,1
+access_ai_alert_user,ai.alert user,model_prometeo_ai_alert,group_user,1,0,0,0

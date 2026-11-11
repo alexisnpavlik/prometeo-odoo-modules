@@ -186,3 +186,6 @@ def execute_tool(env, ctx, name, arguments):
     if len(text) > max_chars:
         text = text[:max_chars] + TRUNCATED
     return text
+
+
+from .alert_tools import ALERT_TOOLS, alert_tool_handlers  # noqa: E402,F401
