@@ -1,0 +1,22 @@
+{
+    "name": "Agente IA",
+    "version": "18.0.1.0.0",
+    "category": "Productivity",
+    "summary": "Agente de IA de solo lectura: rutinas, alertas y chat sobre los datos de Odoo",
+    "description": """ (se completa al cerrar) """,
+    "author": "Alexis Medina",
+    "website": "alexis.medn@gmail.com",
+    "license": "LGPL-3",
+    "depends": ["base", "web", "mail"],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/prometeo_ai_provider_data.xml",
+        "views/provider_views.xml",
+        "views/res_config_settings_views.xml",
+        "views/menu_views.xml",
+    ],
+    "installable": True,
+    "auto_install": False,
+    "application": True,
+}

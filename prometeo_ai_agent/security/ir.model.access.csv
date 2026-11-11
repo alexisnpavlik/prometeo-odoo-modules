@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_provider_admin,ai.provider admin,model_prometeo_ai_provider,group_admin,1,1,1,1
+access_ai_model_admin,ai.model admin,model_prometeo_ai_model,group_admin,1,1,1,1

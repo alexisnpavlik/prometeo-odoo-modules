@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_ai_agent" model="ir.module.category">
+        <field name="name">Agente IA</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="group_user" model="res.groups">
+        <field name="name">Usuario del agente</field>
+        <field name="category_id" ref="module_category_ai_agent"/>
+        <field name="comment">Ve sus alertas, usa el chat y ve las rutinas visibles para él.</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_admin" model="res.groups">
+        <field name="name">Administrador del agente</field>
+        <field name="category_id" ref="module_category_ai_agent"/>
+        <field name="comment">Crea rutinas, configura proveedores, modelos y límites, ve consumo y todas las alertas.</field>
+        <field name="implied_ids" eval="[(4, ref('group_user'))]"/>
+        <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+    </record>
+</odoo>

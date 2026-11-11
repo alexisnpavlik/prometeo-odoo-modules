@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_ai_agent" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.prometeo_ai_agent</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Agente IA" string="Agente IA" name="prometeo_ai_agent"
+                     groups="prometeo_ai_agent.group_admin">
+                    <block title="Modelo por defecto" name="ai_model_block">
+                        <setting string="Modelo por defecto" help="Se usa en el chat y en las rutinas sin modelo propio.">
+                            <field name="ai_default_model_id" options="{'no_create': True}"/>
+                        </setting>
+                    </block>
+                    <block title="Límites" name="ai_limits_block">
+                        <setting string="Consultas" help="Máximo de registros por consulta y tamaño del resultado que recibe el modelo.">
+                            <div class="content-group">
+                                <div class="row mt8"><label for="ai_max_records" class="col-lg-6"/><field name="ai_max_records"/></div>
+                                <div class="row"><label for="ai_max_result_chars" class="col-lg-6"/><field name="ai_max_result_chars"/></div>
+                            </div>
+                        </setting>
+                        <setting string="Chat" help="Cada turno ocupa un worker de Odoo mientras espera al proveedor.">
+                            <div class="content-group">
+                                <div class="row mt8"><label for="ai_chat_max_tool_calls" class="col-lg-6"/><field name="ai_chat_max_tool_calls"/></div>
+                                <div class="row"><label for="ai_chat_max_seconds" class="col-lg-6"/><field name="ai_chat_max_seconds"/></div>
+                                <div class="row"><label for="ai_chat_max_concurrent" class="col-lg-6"/><field name="ai_chat_max_concurrent"/></div>
+                            </div>
+                        </setting>
+                        <setting string="Rutinas" help="Al llegar al límite la corrida queda incompleta y conserva sus alertas.">
+                            <div class="content-group">
+                                <div class="row mt8"><label for="ai_routine_max_tool_calls" class="col-lg-6"/><field name="ai_routine_max_tool_calls"/></div>
+                                <div class="row"><label for="ai_routine_max_seconds" class="col-lg-6"/><field name="ai_routine_max_seconds"/></div>
+                            </div>
+                        </setting>
+                    </block>
+                    <block title="Tope de gasto" name="ai_cap_block">
+                        <setting string="Tope mensual (USD)" help="0 = sin tope. Al alcanzarlo se pausan rutinas y chat hasta el mes siguiente.">
+                            <field name="ai_monthly_cap_usd"/>
+                        </setting>
+                    </block>
+                    <block title="Alertas" name="ai_alerts_block">
+                        <setting string="Resumen diario" help="Hora local en que se envía el resumen de las últimas 24 horas.">
+                            <field name="ai_digest_hour"/>
+                        </setting>
+                        <setting string="Silencio al descartar" help="Días en que una alerta descartada no se vuelve a crear.">
+                            <field name="ai_dismiss_silence_days"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_ai_settings" model="ir.actions.act_window">
+        <field name="name">Ajustes</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'prometeo_ai_agent', 'bin_size': False}</field>
+    </record>
+</odoo>
