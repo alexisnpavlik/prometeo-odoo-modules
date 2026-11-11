@@ -96,7 +96,7 @@ class PrometeoAiConversation(models.Model):
             _logger.info("Chat %s: error del proveedor: %s", self.id, e)
             Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error", error=str(e),
                      duration=time.monotonic() - started)
-            return {"status": "error", "message": _("El proveedor de IA no respondió. Probá de nuevo.")}
+            return {"status": "error", "message": _("No se pudo completar la respuesta: %s", str(e)[:300])}
         except Exception as e:  # noqa: BLE001
             _logger.exception("Chat %s: error inesperado", self.id)
             Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error",

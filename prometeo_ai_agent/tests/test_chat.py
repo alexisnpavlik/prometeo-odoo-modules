@@ -59,6 +59,7 @@ class TestChat(AiAgentCase):
         with self.fake_llm(llm.LlmError("caído", 500)):
             r = self.conv.send_message("hola")
         self.assertEqual(r["status"], "error")
+        self.assertIn("caído", r["message"])
         self.assertFalse(self.conv.message_ids)
         self.assertEqual(self.Run.search([("kind", "=", "chat")]).status, "error")
 
