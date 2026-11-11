@@ -190,7 +190,8 @@ class PrometeoAiRoutine(models.Model):
                 result = loop.run_agent(
                     env_u, ai_model, prompts.build_system_prompt(env_u, "routine"), [routine._first_message()],
                     tools.READ_TOOLS + tools.ALERT_TOOLS, ctx, get_param(self.env, "routine_max_tool_calls"),
-                    get_param(self.env, "routine_max_seconds"), extra_tools=tools.alert_tool_handlers())
+                    get_param(self.env, "routine_max_seconds"), extra_tools=tools.alert_tool_handlers(),
+                    max_input_tokens=get_param(self.env, "routine_max_input_tokens"))
         except (llm.LlmError, UserError) as e:
             return routine._register_failure(vals, ai_model, str(e), time.monotonic() - started,
                                              getattr(e, "usage", None))

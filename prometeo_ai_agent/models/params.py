@@ -2,7 +2,9 @@
 
 DEFAULTS = {
     "max_records": 200,
-    "max_result_chars": 20000,
+    "max_result_chars": 8000,
+    "chat_max_input_tokens": 120000,
+    "routine_max_input_tokens": 250000,
     "chat_max_tool_calls": 15,
     "chat_max_seconds": 90,
     "chat_max_concurrent": 2,

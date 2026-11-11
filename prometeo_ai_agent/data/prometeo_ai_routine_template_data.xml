@@ -7,10 +7,11 @@
         <field name="required_module">stock</field>
         <field name="interval_type">days</field>
         <field name="run_hour">8.0</field>
-        <field name="prompt">Revisá faltantes de stock en las ubicaciones internas.
-1. Con read_group sobre stock.quant (dominio [["location_id.usage", "=", "internal"]], agrupado por product_id y location_id.warehouse_id, sumando quantity) detectá productos almacenables con cantidad total menor o igual a cero.
-2. Si existe stock.warehouse.orderpoint, buscá reglas de reabastecimiento cuyo qty_forecast esté por debajo de product_min_qty.
-Dejá una sola alerta por hallazgo ("productos en cero", "productos bajo mínimo") con todos los productos involucrados y cuántos son. Si hay más de 50, nombrá los 10 de mayor rotación que puedas identificar y respaldá la alerta con el dominio que ejecutaste.</field>
+        <field name="prompt">Revisá el stock de las ubicaciones internas. Hacé como máximo 6 consultas.
+1. Stock negativo: read_group sobre stock.quant con dominio [["location_id.usage", "=", "internal"]], groupby ["product_id"], aggregates ["quantity:sum"], having [["quantity:sum", "&lt;", 0]], order "quantity:sum asc" y limit 10. total_groups es cuántos productos tienen stock negativo; los 10 que trae son los peores. El stock negativo indica ventas o salidas sin el ingreso cargado.
+2. Agotados: la misma consulta con having [["quantity:sum", "=", 0]] y limit 10.
+3. Bajo el mínimo: si hay reglas de reabastecimiento, leé de stock.warehouse.orderpoint product_id y product_min_qty (limit 200). Con un read_group de stock.quant filtrado a esos productos y a ubicaciones internas, agrupado por product_id, compará el stock con el mínimo.
+Dejá como máximo 3 alertas (stock negativo, agotados, bajo el mínimo), cada una con el total y los 10 más críticos, respaldada con el dominio que ejecutaste. No traigas listas largas de productos.</field>
     </record>
 
     <record id="template_pending_transfers" model="prometeo.ai.routine.template">

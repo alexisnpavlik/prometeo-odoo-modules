@@ -99,7 +99,7 @@ class PrometeoAiConversation(models.Model):
                     env_all, ai_model, prompts.build_system_prompt(env_all, "chat"),
                     self._history() + [user_message], tools.READ_TOOLS, tools.new_context(),
                     get_param(self.env, "chat_max_tool_calls"), get_param(self.env, "chat_max_seconds"),
-                    on_step=self._publish_step)
+                    on_step=self._publish_step, max_input_tokens=get_param(self.env, "chat_max_input_tokens"))
                 self._store([user_message] + result["new_messages"])
                 if not self.name:
                     self.name = text[:NAME_LENGTH]

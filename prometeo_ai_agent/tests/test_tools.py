@@ -121,3 +121,16 @@ class TestTools(AiAgentCase):
         self.assertIn("error", self.call("search_count", model="res.partner", domain=domain))
         domain = json.dumps([["message_follower_ids", "any", [["partner_id.user_ids.password", "=", "x"]]]])
         self.assertIn("error", self.call("search_count", model="res.partner", domain=domain))
+
+    def test_read_group_having_order_limit_and_total(self):
+        out = self.call("read_group", model="res.partner", domain=self.ids_domain(self.partners),
+                        groupby=["id"], aggregates=["color:sum"], having=json.dumps([["color:sum", ">=", 2]]),
+                        order="color:sum desc", limit=1)
+        self.assertEqual(out["total_groups"], 2)
+        self.assertEqual(len(out["groups"]), 1)
+        self.assertEqual(out["groups"][0]["color:sum"], 3)
+
+    def test_read_group_having_rejects_unknown_aggregate(self):
+        out = self.call("read_group", model="res.partner", domain="[]", groupby=["id"], aggregates=["color:sum"],
+                        having=json.dumps([["password:sum", ">", 0]]))
+        self.assertIn("error", out)
