@@ -34,12 +34,18 @@ READ_TOOLS = [
     {"name": "read_group",
      "description": "Agrega registros (suma, promedio, mínimo, máximo, conteo) agrupando por campos. "
                     "Usalo para todo número total en vez de sumar a mano. aggregates: ['campo:sum', 'id:count']. "
-                    "groupby admite 'fecha:month' (day, week, month, quarter, year).",
+                    "groupby admite 'fecha:month' (day, week, month, quarter, year) y solo campos directos. "
+                    "having filtra por los totales (ej. '[[\"quantity:sum\", \"<=\", 0]]'); order ordena "
+                    "(ej. 'quantity:sum asc'); limit corta (por defecto 50). total_groups dice cuántos grupos hay "
+                    "en total: usalo para contar sin traer todos.",
      "parameters": {"type": "object", "properties": {
          "model": {"type": "string"},
          "domain": {"type": "string"},
          "groupby": {"type": "array", "items": {"type": "string"}},
-         "aggregates": {"type": "array", "items": {"type": "string"}}},
+         "aggregates": {"type": "array", "items": {"type": "string"}},
+         "having": {"type": "string", "description": "Filtro sobre agregados en JSON"},
+         "order": {"type": "string"},
+         "limit": {"type": "integer"}},
          "required": ["model", "domain", "groupby", "aggregates"]}},
     {"name": "calculate",
      "description": "Calcula cuentas exactas: sumas, restas, multiplicaciones, divisiones, porcentajes y "
@@ -138,8 +144,12 @@ def _search_read(env, ctx, model, domain, fields, order=None, limit=None, offset
     return {"records": rows, "count": len(rows), "limit": limit}
 
 
-def _read_group(env, ctx, model, domain, groupby, aggregates):
-    """Agrega con el ORM (aplica permisos y reglas)."""
+HAVING_OPERATORS = ("=", "!=", "<", "<=", ">", ">=")
+GROUP_LIMIT = 50
+
+
+def _read_group(env, ctx, model, domain, groupby, aggregates, having=None, order=None, limit=None):
+    """Agrega con el ORM (aplica permisos y reglas). Admite filtro sobre los totales, orden y límite."""
     Model = check_model(env, model)
     domain = parse_domain(env, model, domain)
     groupby = list(groupby or [])
@@ -153,11 +163,29 @@ def _read_group(env, ctx, model, domain, groupby, aggregates):
         check_field(env, model, name)
     if not aggregates:
         aggregates = ["__count"]
-    rows = Model._read_group(domain, groupby, aggregates, limit=get_param(env, "max_records"))
+    having_list = []
+    if having:
+        try:
+            having_list = json.loads(having) if isinstance(having, str) else having
+        except ValueError:
+            raise ToolError("having no es JSON válido.")
+        for leaf in having_list:
+            if (not isinstance(leaf, list) or len(leaf) != 3 or leaf[0] not in aggregates
+                    or leaf[1] not in HAVING_OPERATORS or isinstance(leaf[2], (list, dict))):
+                raise ToolError("having admite [agregado, operador, número] con un agregado pedido en aggregates.")
+    order_spec = None
+    if order:
+        parts = str(order).split()
+        if len(parts) > 2 or parts[0] not in groupby + aggregates or (len(parts) == 2 and parts[1].lower() not in ("asc", "desc")):
+            raise ToolError("order debe ser un groupby o un agregado pedido, con asc o desc.")
+        order_spec = " ".join(parts)
+    limit = min(int(limit or GROUP_LIMIT), get_param(env, "max_records"))
+    rows = Model._read_group(domain, groupby, aggregates, having=having_list, order=order_spec, limit=limit)
+    total = len(Model._read_group(domain, groupby, [], having=having_list)) if groupby else len(rows)
     keys = groupby + aggregates
     groups = [{key: _plain(value) for key, value in zip(keys, row)} for row in rows]
     _remember_domain(ctx, model, domain)
-    return {"groups": groups}
+    return {"groups": groups, "total_groups": total, "shown": len(groups)}
 
 
 def _search_count(env, ctx, model, domain):

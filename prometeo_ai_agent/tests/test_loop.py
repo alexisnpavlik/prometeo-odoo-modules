@@ -89,3 +89,16 @@ class TestLoop(AiAgentCase):
         self.assertIn(self.env.company.name, p)
         self.assertNotIn("create_alert", p)
         self.assertIn("create_alert", prompts.build_system_prompt(self.env(user=self.agent_user), "routine"))
+
+
+@tagged("post_install", "-at_install")
+class TestTokenBudget(AiAgentCase):
+
+    def test_stops_when_input_token_budget_is_spent(self):
+        big = llm_tool(*COUNT, input_tokens=200_000)
+        with self.fake_llm(big, big, llm_text("cierro")) as mock:
+            r = loop.run_agent(self.env(user=self.agent_user), self.ai_model, "s", [{"role": "user", "content": "h"}],
+                               tools.READ_TOOLS, tools.new_context(), 25, 60, max_input_tokens=300_000)
+        self.assertEqual(r["status"], "incomplete")
+        self.assertEqual(mock.call_count, 3)
+        self.assertEqual(mock.call_args.args[3][-1]["content"], loop.LIMIT_NOTICE)

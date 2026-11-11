@@ -56,7 +56,7 @@ def describe_step(env, name, arguments, content):
 
 
 def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, max_seconds, extra_tools=None,
-              on_step=None):
+              on_step=None, max_input_tokens=None):
     """Corre el agente hasta que responde sin pedir herramientas o choca con un límite.
 
     `llm.chat` se llama por el atributo del módulo para que los tests lo puedan parchear.
@@ -132,7 +132,8 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
                             "content": content}
             history.append(tool_message)
             new_messages.append(tool_message)
-        if calls_done >= max_tool_calls:
+        over_budget = bool(max_input_tokens) and totals["input_tokens"] >= max_input_tokens
+        if calls_done >= max_tool_calls or over_budget:
             if deadline - time.monotonic() <= MIN_SECONDS_LEFT:
                 return result("", "incomplete")
             final = call([{"role": "user", "content": LIMIT_NOTICE}])

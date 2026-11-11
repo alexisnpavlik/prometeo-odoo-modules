@@ -12,7 +12,7 @@ class ResConfigSettings(models.TransientModel):
         "prometeo.ai.model", "Modelo por defecto", domain=[("active", "=", True)],
         config_parameter=PREFIX + "default_model_id")
     ai_max_records = fields.Integer("Registros por consulta", default=200, config_parameter=PREFIX + "max_records")
-    ai_max_result_chars = fields.Integer("Caracteres por resultado", default=20000,
+    ai_max_result_chars = fields.Integer("Caracteres por resultado", default=8000,
                                          config_parameter=PREFIX + "max_result_chars")
     ai_chat_max_tool_calls = fields.Integer("Llamadas por turno de chat", default=15,
                                             config_parameter=PREFIX + "chat_max_tool_calls")
