@@ -8,3 +8,4 @@ from . import test_routine
 from . import test_digest
 from . import test_chat
 from . import test_review_fixes
+from . import test_live_steps

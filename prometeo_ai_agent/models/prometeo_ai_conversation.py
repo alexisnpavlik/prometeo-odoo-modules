@@ -1,7 +1,8 @@
 import logging
 import time
 
-from odoo import _, api, fields, models
+from odoo import SUPERUSER_ID, _, api, fields, models
+from odoo.tools import config as tools_config
 from odoo.exceptions import UserError
 
 from .. import llm
@@ -86,7 +87,8 @@ class PrometeoAiConversation(models.Model):
                 result = loop.run_agent(
                     self.env, ai_model, prompts.build_system_prompt(self.env, "chat"),
                     self._history() + [user_message], tools.READ_TOOLS, tools.new_context(),
-                    get_param(self.env, "chat_max_tool_calls"), get_param(self.env, "chat_max_seconds"))
+                    get_param(self.env, "chat_max_tool_calls"), get_param(self.env, "chat_max_seconds"),
+                    on_step=self._publish_step)
                 self._store([user_message] + result["new_messages"])
                 if not self.name:
                     self.name = text[:NAME_LENGTH]
@@ -105,6 +107,17 @@ class PrometeoAiConversation(models.Model):
         Run._log("chat", ai_model, result, user=self.env.user, status=result["status"],
                  duration=time.monotonic() - started)
         return {"status": "ok", "reply": result["text"]}
+
+    def _publish_step(self, text):
+        """Manda un paso al navegador por el bus, con un cursor propio para que llegue antes de terminar."""
+        payload = {"conversation_id": self.id, "text": text}
+        partner = self.env.user.partner_id
+        if tools_config["test_enable"]:
+            self.env["bus.bus"]._sendone(partner, "prometeo_ai_agent/step", payload)
+            return
+        with self.env.registry.cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env["bus.bus"]._sendone(env["res.partner"].browse(partner.id), "prometeo_ai_agent/step", payload)
 
     def _store(self, messages):
         """Guarda mensajes normalizados."""

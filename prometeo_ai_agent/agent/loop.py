@@ -1,4 +1,5 @@
 """Bucle del agente: alterna llamadas al modelo y herramientas con topes de llamadas y tiempo."""
+import json
 import time
 
 from .. import llm
@@ -18,7 +19,40 @@ def _assistant_message(response):
             "raw": response["raw"], "raw_provider": response["raw_provider"]}
 
 
-def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, max_seconds, extra_tools=None):
+STEP_VERBS = {
+    "list_models": "Buscando dónde están los datos",
+    "get_fields": "Revisando los campos de",
+    "search_read": "Leyendo",
+    "read_group": "Calculando totales en",
+    "search_count": "Contando en",
+    "create_alert": "Dejando una alerta",
+    "resolve_alert": "Cerrando una alerta",
+}
+
+
+def describe_step(env, name, arguments, content):
+    """Texto corto de un paso para mostrar en vivo: qué consultó y cuánto encontró."""
+    verb = STEP_VERBS.get(name, name)
+    model = (arguments or {}).get("model") if isinstance(arguments, dict) else None
+    if model and name not in ("create_alert",):
+        label = env["ir.model"].sudo()._get(model).name if model in env else model
+        verb = "%s %s (%s)" % (verb, label, model)
+    try:
+        data = json.loads(content)
+    except (TypeError, ValueError):
+        return verb
+    if "error" in data:
+        return "%s: no se pudo, lo intento de otra forma" % verb
+    for key in ("records", "groups", "models", "fields"):
+        if key in data:
+            return "%s: %s resultados" % (verb, len(data[key]))
+    if "count" in data:
+        return "%s: %s registros" % (verb, data["count"])
+    return verb
+
+
+def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, max_seconds, extra_tools=None,
+              on_step=None):
     """Corre el agente hasta que responde sin pedir herramientas o choca con un límite.
 
     `llm.chat` se llama por el atributo del módulo para que los tests lo puedan parchear.
@@ -68,6 +102,11 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
                 else:
                     content = tools.execute_tool(env, ctx, tool_call["name"], tool_call["arguments"])
                 calls_done += 1
+                if on_step:
+                    try:
+                        on_step(describe_step(env, tool_call["name"], tool_call["arguments"], content))
+                    except Exception:  # noqa: BLE001 - el aviso en vivo nunca corta la corrida
+                        pass
             tool_message = {"role": "tool", "tool_call_id": tool_call["id"], "name": tool_call["name"],
                             "content": content}
             history.append(tool_message)

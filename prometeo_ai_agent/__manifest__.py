@@ -36,7 +36,7 @@
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["base", "web", "mail"],
+    "depends": ["base", "web", "mail", "bus"],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",

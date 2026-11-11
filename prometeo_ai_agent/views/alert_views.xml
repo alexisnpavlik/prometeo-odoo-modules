@@ -17,6 +17,39 @@
         </field>
     </record>
 
+    <record id="view_ai_alert_kanban" model="ir.ui.view">
+        <field name="name">prometeo.ai.alert.kanban</field>
+        <field name="model">prometeo.ai.alert</field>
+        <field name="arch" type="xml">
+            <kanban create="0" class="o_kanban_small_column" can_open="1">
+                <field name="severity"/>
+                <field name="state"/>
+                <field name="res_model"/>
+                <templates>
+                    <t t-name="card" class="o_ai_alert_card flex-row gap-3 p-3">
+                        <div t-attf-class="o_ai_sev_icon o_ai_sev_{{ record.severity.raw_value }}"
+                             t-att-title="record.severity.value" role="img" t-att-aria-label="'Gravedad ' + record.severity.value">
+                            <i t-attf-class="fa fa-lg {{ record.severity.raw_value === 'high' ? 'fa-exclamation-triangle' : (record.severity.raw_value === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle') }}"/>
+                        </div>
+                        <div class="flex-grow-1 min-w-0 d-flex flex-column gap-1">
+                            <span t-attf-class="fs-6 {{ record.state.raw_value === 'new' ? 'fw-bold' : 'fw-normal' }}"><field name="name"/></span>
+                            <field name="summary" class="o_ai_alert_summary small"/>
+                            <span class="small text-muted">
+                                <field name="routine_id"/> · <field name="last_seen" widget="date"/>
+                                <t t-if="record.state.raw_value !== 'new'"> · <field name="state"/></t>
+                            </span>
+                            <div class="d-flex flex-wrap gap-2 mt-2" t-if="record.state.raw_value === 'new'">
+                                <button t-if="record.res_model.raw_value" name="action_view_records" type="object" class="btn btn-sm btn-primary">Ver registros</button>
+                                <button name="action_resolve" type="object" class="btn btn-sm btn-secondary">Resolver</button>
+                                <button name="action_dismiss" type="object" class="btn btn-sm btn-secondary">Descartar</button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="view_ai_alert_form" model="ir.ui.view">
         <field name="name">prometeo.ai.alert.form</field>
         <field name="model">prometeo.ai.alert</field>
@@ -82,7 +115,7 @@
     <record id="action_alert_inbox" model="ir.actions.act_window">
         <field name="name">Alertas</field>
         <field name="res_model">prometeo.ai.alert</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="context">{'search_default_open': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Sin alertas abiertas</p>

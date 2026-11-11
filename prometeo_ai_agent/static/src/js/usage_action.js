@@ -37,6 +37,16 @@ export class AiUsage extends Component {
         return `${MONTHS[this.state.month - 1]} ${this.state.year}`;
     }
 
+    get usagePercent() {
+        const data = this.state.data;
+        return data && data.cap ? Math.round((data.cost / data.cap) * 100) : 0;
+    }
+
+    get usageClass() {
+        const pct = this.usagePercent;
+        return pct >= 100 ? "o_ai_usage_over" : pct >= 80 ? "o_ai_usage_warn" : "";
+    }
+
     money(value) {
         return `USD ${(value || 0).toFixed(2)}`;
     }

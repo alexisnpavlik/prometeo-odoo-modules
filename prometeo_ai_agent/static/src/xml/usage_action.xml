@@ -38,6 +38,10 @@
                     <t t-if="state.data.cap"> de <t t-out="money(state.data.cap)"/></t>
                     <t t-else=""> (sin tope)</t>
                 </p>
+                <div t-if="state.data.cap" t-attf-class="o_ai_usage_bar mb-3 {{ usageClass }}" role="progressbar"
+                     t-att-aria-valuenow="usagePercent" aria-valuemin="0" aria-valuemax="100">
+                    <div t-attf-style="width: {{ Math.min(usagePercent, 100) }}%"/>
+                </div>
                 <div t-if="state.data.unpriced_runs" class="alert alert-warning">
                     <t t-out="state.data.unpriced_runs"/> corridas con modelos sin precio cargado: el costo real es mayor.
                     Cargá el precio en Agente IA &gt; Configuración &gt; Modelos.
