@@ -1,5 +1,8 @@
 """Herramientas de lectura del agente. Corren como el usuario de `env`: nunca sudo."""
+import ast
 import json
+import math
+import operator
 
 from ..models.params import get_param
 from .guard import BLOCKED_MODELS, SECRET_FIELD_RE, USER_FIELDS, ToolError, check_field, check_model, \
@@ -38,6 +41,14 @@ READ_TOOLS = [
          "groupby": {"type": "array", "items": {"type": "string"}},
          "aggregates": {"type": "array", "items": {"type": "string"}}},
          "required": ["model", "domain", "groupby", "aggregates"]}},
+    {"name": "calculate",
+     "description": "Calcula cuentas exactas: sumas, restas, multiplicaciones, divisiones, porcentajes y "
+                    "variaciones. Usala SIEMPRE en vez de hacer cuentas de cabeza. Mandá varias cuentas juntas. "
+                    "Admite + - * / ( ), round(x, decimales), abs, min, max.",
+     "parameters": {"type": "object", "properties": {
+         "expressions": {"type": "array", "items": {"type": "string"},
+                         "description": "Ej. ['1532.5 * 12', '(18390 - 15000) / 15000 * 100']"}},
+         "required": ["expressions"]}},
     {"name": "search_count",
      "description": "Cuenta los registros que cumplen un dominio.",
      "parameters": {"type": "object", "properties": {"model": {"type": "string"}, "domain": {"type": "string"}},
@@ -47,7 +58,7 @@ READ_TOOLS = [
 
 def new_context(routine=None):
     """Estado de una corrida: ids y dominios leídos, para validar el respaldo de las alertas."""
-    return {"seen": {}, "domains": {}, "routine": routine, "alerts_touched": set()}
+    return {"seen": {}, "domains": {}, "routine": routine, "alerts_touched": set(), "numbers": set()}
 
 
 def _remember_domain(ctx, model, domain):
@@ -158,7 +169,54 @@ def _search_count(env, ctx, model, domain):
     return {"count": count}
 
 
+_BINOPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
+           ast.FloorDiv: operator.floordiv, ast.Mod: operator.mod, ast.Pow: operator.pow}
+_FUNCS = {"round": round, "abs": abs, "min": min, "max": max}
+MAX_VALUE = 1e18
+
+
+def _eval_node(node):
+    """Evalúa un árbol aritmético seguro: solo números, operadores y round/abs/min/max."""
+    if isinstance(node, ast.Expression):
+        return _eval_node(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return node.value
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        value = _eval_node(node.operand)
+        return -value if isinstance(node.op, ast.USub) else value
+    if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
+        left, right = _eval_node(node.left), _eval_node(node.right)
+        if isinstance(node.op, ast.Pow) and (abs(right) > 100 or abs(left) > 1e6):
+            raise ToolError("Potencia demasiado grande.")
+        return _BINOPS[type(node.op)](left, right)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FUNCS
+            and not node.keywords):
+        return _FUNCS[node.func.id](*[_eval_node(arg) for arg in node.args])
+    raise ToolError("Solo se admiten números, + - * / ( ) y round, abs, min, max.")
+
+
+def _calculate(env, ctx, expressions):
+    """Cuentas exactas; cada resultado queda registrado para el verificador."""
+    if isinstance(expressions, str):
+        expressions = [expressions]
+    results = []
+    for expr in list(expressions)[:50]:
+        try:
+            value = _eval_node(ast.parse(str(expr), mode="eval"))
+            if not math.isfinite(value) or abs(value) > MAX_VALUE:
+                raise ToolError("Resultado fuera de rango.")
+            value = round(float(value), 10)
+            ctx.setdefault("numbers", set()).add(value)
+            results.append({"expr": expr, "value": value})
+        except ZeroDivisionError:
+            results.append({"expr": expr, "error": "División por cero."})
+        except (ToolError, SyntaxError, TypeError, ValueError) as e:
+            results.append({"expr": expr, "error": str(e) or "Expresión inválida."})
+    return {"results": results}
+
+
 _HANDLERS = {
+    "calculate": _calculate,
     "list_models": _list_models,
     "get_fields": _get_fields,
     "search_read": _search_read,

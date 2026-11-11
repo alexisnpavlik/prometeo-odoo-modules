@@ -3,11 +3,15 @@ import json
 import time
 
 from .. import llm
-from . import tools
+from . import numbers, tools
 
 INCOMPLETE_TEXT = "No llegué a terminar el análisis dentro del límite configurado."
 LIMIT_NOTICE = ("Llegaste al límite de consultas de esta corrida. No uses más herramientas: "
                 "respondé ahora con lo que ya sabés.")
+VERIFY_NOTICE = ("Estos números de tu respuesta no salen de ninguna consulta ni cuenta: %s. "
+                 "Verificalos con las herramientas (usá calculate para las cuentas) o sacalos. "
+                 "No inventes números. Respondé de nuevo completo.")
+UNVERIFIED_NOTE = "\n\n(Algunos números no se pudieron verificar con los datos consultados: %s)"
 LIMIT_ERROR = '{"error": "límite de llamadas alcanzado"}'
 MIN_SECONDS_LEFT = 5
 CALL_TIMEOUT = 60
@@ -59,6 +63,9 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
     Los errores del proveedor (llm.LlmError) se propagan.
     """
     extra_tools = extra_tools or {}
+    known = ctx.setdefault("numbers", set())
+    numbers.source_numbers([system] + [m.get("content") for m in messages], known)
+    verified_once = False
     provider = ai_model.sudo().provider_id._get_credentials()
     model_name = ai_model.sudo().name
     history = list(messages)
@@ -91,7 +98,17 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
         history.append(message)
         new_messages.append(message)
         if not response["tool_calls"]:
-            return result(response["text"], "done")
+            missing = numbers.unsupported(response["text"], known)
+            if missing and not verified_once and deadline - time.monotonic() > MIN_SECONDS_LEFT:
+                verified_once = True
+                new_messages.pop()
+                history.append({"role": "user", "content": VERIFY_NOTICE % ", ".join(missing)})
+                continue
+            text = response["text"]
+            if missing:
+                text += UNVERIFIED_NOTE % ", ".join(missing)
+                new_messages[-1] = dict(new_messages[-1], content=text)
+            return result(text, "done")
         for tool_call in response["tool_calls"]:
             if calls_done >= max_tool_calls:
                 content = LIMIT_ERROR
@@ -107,6 +124,10 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
                         on_step(describe_step(env, tool_call["name"], tool_call["arguments"], content))
                     except Exception:  # noqa: BLE001 - el aviso en vivo nunca corta la corrida
                         pass
+            try:
+                numbers.source_numbers(json.loads(content), known)
+            except (TypeError, ValueError):
+                pass
             tool_message = {"role": "tool", "tool_call_id": tool_call["id"], "name": tool_call["name"],
                             "content": content}
             history.append(tool_message)
