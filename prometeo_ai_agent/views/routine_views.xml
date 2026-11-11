@@ -58,7 +58,6 @@
                         </group>
                         <group string="Quién">
                             <field name="recipient_ids" widget="many2many_tags"/>
-                            <field name="run_as_user_id"/>
                             <field name="company_ids" widget="many2many_tags" groups="base.group_multi_company"/>
                             <field name="ai_model_id" options="{'no_create': True}" placeholder="Modelo por defecto"/>
                             <field name="is_public"/>

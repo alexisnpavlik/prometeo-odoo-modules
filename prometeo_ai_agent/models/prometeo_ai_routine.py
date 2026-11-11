@@ -7,7 +7,7 @@ import pytz
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import config as tools_config
 
 from .. import llm
@@ -60,15 +60,6 @@ class PrometeoAiRoutine(models.Model):
     run_ids = fields.One2many("prometeo.ai.run", "routine_id", "Corridas")
     open_alert_count = fields.Integer("Alertas abiertas", compute="_compute_open_alert_count")
 
-    @api.constrains("run_as_user_id")
-    def _check_run_as(self):
-        """Solo un administrador del sistema puede elegir otro usuario en 'Ejecutar como'."""
-        if self.env.su or self.env.user.has_group("base.group_system"):
-            return
-        for rec in self:
-            if rec.run_as_user_id != self.env.user:
-                raise ValidationError(_("Solo un administrador del sistema puede ejecutar rutinas como otro usuario."))
-
     def _check_admin(self):
         """Las acciones de ejecución son solo para administradores del agente."""
         if not self.env.su and not self.env.user.has_group("prometeo_ai_agent.group_admin"):
@@ -120,7 +111,10 @@ class PrometeoAiRoutine(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Calcula la primera ejecución si no viene dada."""
+        """La rutina lee siempre con los permisos de quien la programa; calcula la primera ejecución."""
+        if not self.env.su:
+            for vals in vals_list:
+                vals["run_as_user_id"] = self.env.uid
         records = super().create(vals_list)
         for rec, vals in zip(records, vals_list):
             if not vals.get("next_run"):
@@ -128,7 +122,9 @@ class PrometeoAiRoutine(models.Model):
         return records
 
     def write(self, vals):
-        """Si cambia la frecuencia, recalcula la próxima ejecución."""
+        """'Ejecutar como' no se cambia después de crear; si cambia la frecuencia, recalcula la próxima ejecución."""
+        if not self.env.su:
+            vals = {k: v for k, v in vals.items() if k != "run_as_user_id"}
         res = super().write(vals)
         if FREQUENCY_FIELDS & set(vals) and "next_run" not in vals:
             for rec in self:

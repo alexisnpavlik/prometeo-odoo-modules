@@ -41,10 +41,16 @@ class TestReviewFixes(AiAgentCase):
             self.assertTrue(guard.SECRET_FIELD_RE.search(name), name)
 
     # 3
-    def test_agent_admin_cannot_run_as_other_user(self):
-        with self.assertRaises(ValidationError):
-            self.env["prometeo.ai.routine"].with_user(self.admin_user).create(
-                {"name": "x", "run_as_user_id": self.env.ref("base.user_admin").id})
+    def test_run_as_is_always_the_creator(self):
+        Routine = self.env["prometeo.ai.routine"].with_user(self.admin_user)
+        routine = Routine.create({"name": "x", "run_as_user_id": self.env.ref("base.user_admin").id})
+        self.assertEqual(routine.run_as_user_id, self.admin_user)
+        routine.write({"run_as_user_id": self.env.ref("base.user_admin").id})
+        self.assertEqual(routine.run_as_user_id, self.admin_user)
+
+    def test_run_as_hidden_in_form(self):
+        arch = self.env["prometeo.ai.routine"].get_view(view_type="form")["arch"]
+        self.assertNotIn('name="run_as_user_id"', arch)
 
     # 4
     def test_only_one_open_alert_per_key(self):
