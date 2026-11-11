@@ -86,6 +86,28 @@ $o-ai-accent-soft: rgba(11, 110, 103, 0.1);
     .o_ai_chat_messages { min-height: 0; padding: 8px 16px 16px; }
     .o_ai_chat_column { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
     .o_ai_chat_empty { padding: 48px 0 16px; h3 { font-weight: 700; } }
+    .o_ai_activation {
+        max-width: 560px;
+        margin: 48px auto 16px;
+        padding: 32px 28px;
+        border: 1px solid $border-color;
+        border-radius: 16px;
+        background-color: $o-view-background-color;
+        h3 { font-weight: 700; }
+        .o_ai_activation_text { font-size: 15px; line-height: 1.6; color: $body-color; margin: 0; }
+    }
+    .o_ai_examples {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        text-align: left;
+        display: inline-flex;
+        flex-direction: column;
+        gap: 6px;
+        color: $text-muted;
+        li { display: flex; gap: 10px; align-items: baseline; }
+        .fa { color: $o-ai-accent; }
+    }
     .o_ai_suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .o_ai_suggestion {
         text-align: left;
