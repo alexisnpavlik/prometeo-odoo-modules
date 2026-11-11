@@ -164,7 +164,7 @@ Los inmovilizados son los del punto 2 que no aparecen en el punto 1. Dejá una a
         <field name="name">Facturas con problemas o en borrador</field>
         <field name="description">Facturas de cliente que quedaron en borrador, y facturas rechazadas u observadas por AFIP.</field>
         <field name="required_module">account</field>
-        <field name="interval_type">days</field>
+        <field name="interval_type">weeks</field>
         <field name="run_hour">8.0</field>
         <field name="prompt">Revisá las facturas de cliente con problemas en account.move (move_type in (out_invoice, out_refund)).
 1. Quedaron en borrador: state = draft y create_date de hace más de 1 día. Separá las que vienen del punto de venta (pos_order_ids no vacío) de las manuales. Agrupá con read_group por journal_id contando y sumando amount_total.
@@ -175,9 +175,9 @@ Dejá una alerta por grupo con casos: cuántas son, el monto total, la más viej
     <record id="template_negative_margin" model="prometeo.ai.routine.template">
         <field name="sequence">57</field>
         <field name="name">Productos con margen negativo</field>
-        <field name="description">Productos que se vendieron por debajo del costo en la última semana, y precios de lista menores al costo.</field>
+        <field name="description">Productos que se vendieron por debajo del costo en la última semana, y precios de lista menores al costo. Semanal.</field>
         <field name="required_module">point_of_sale</field>
-        <field name="interval_type">days</field>
+        <field name="interval_type">weeks</field>
         <field name="run_hour">8.0</field>
         <field name="prompt">Buscá productos con margen negativo.
 1. Vendidos por debajo del costo: con read_group sobre pos.order.line, filtrando order_id.state in (paid, done, invoiced), order_id.date_order en los últimos 7 días y total_cost mayor a 0 (las líneas sin costo cargado no cuentan), agrupá por product_id sumando price_subtotal, total_cost y qty. Quedate con los productos donde total_cost supera a price_subtotal y calculá la pérdida (total_cost menos price_subtotal).
