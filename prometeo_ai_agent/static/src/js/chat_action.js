@@ -91,6 +91,7 @@ export class AiChat extends Component {
             alerts: [],
             showAlerts: false,
             isAdmin: false,
+            activationMessage: "",
         });
         this.onStep = (payload) => {
             if (this.state.sending && payload.conversation_id === this.state.currentId) {
@@ -105,6 +106,9 @@ export class AiChat extends Component {
         onWillStart(async () => {
             this.state.isAdmin = await user.hasGroup("prometeo_ai_agent.group_admin");
             this.state.models = await this.orm.call("prometeo.ai.conversation", "get_available_models", []);
+            if (!this.state.models.length) {
+                this.state.activationMessage = await this.orm.call("prometeo.ai.conversation", "get_activation_message", []);
+            }
             const def = this.state.models.find((m) => m.is_default) || this.state.models[0];
             this.state.modelId = def ? def.id : null;
             await this.loadConversations();
