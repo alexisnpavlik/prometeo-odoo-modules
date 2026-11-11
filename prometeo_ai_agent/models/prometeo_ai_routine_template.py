@@ -44,6 +44,6 @@ class PrometeoAiRoutineTemplate(models.Model):
             "name": self.name, "prompt": self.prompt, "template_id": self.id,
             "interval_number": self.interval_number, "interval_type": self.interval_type,
             "run_hour": self.run_hour, "run_as_user_id": self.env.uid,
-            "recipient_ids": [(6, 0, [self.env.uid])], "company_ids": [(6, 0, [self.env.company.id])]})
+            "recipient_ids": [(6, 0, [self.env.uid])], "company_ids": [(6, 0, self.env.user.company_ids.ids)]})
         return {"type": "ir.actions.act_window", "name": _("Rutina"), "res_model": "prometeo.ai.routine",
                 "res_id": routine.id, "view_mode": "form", "views": [(False, "form")], "target": "current"}

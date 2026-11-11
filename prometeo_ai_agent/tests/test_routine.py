@@ -186,3 +186,17 @@ class TestRoutine(AiAgentCase):
         self.agent_user.groups_id = [(4, group.id)]
         visible = self.Routine.with_user(self.agent_user).search([("id", "in", (public | private | by_group | mine).ids)])
         self.assertEqual(visible, public | by_group | mine)
+
+
+@tagged("post_install", "-at_install")
+class TestRoutineDefaultCompanies(AiAgentCase):
+
+    def test_new_routine_and_template_use_all_user_companies(self):
+        company_b = self.env["res.company"].create({"name": "AI Rutina Empresa B"})
+        self.admin_user.write({"company_ids": [(4, company_b.id)]})
+        expected = self.admin_user.company_ids
+        Routine = self.env["prometeo.ai.routine"].with_user(self.admin_user)
+        self.assertEqual(Routine.create({"name": "x"}).company_ids, expected)
+        tpl = self.env["prometeo.ai.routine.template"].create({"name": "T", "prompt": "x", "required_module": "base"})
+        action = tpl.with_user(self.admin_user).action_use()
+        self.assertEqual(Routine.browse(action["res_id"]).company_ids, expected)

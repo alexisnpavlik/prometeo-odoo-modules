@@ -45,7 +45,7 @@ class PrometeoAiRoutine(models.Model):
                                      default=lambda self: self.env.user, context={"active_test": False},
                                      help="El agente lee con los permisos de este usuario.")
     company_ids = fields.Many2many("res.company", "prometeo_ai_routine_company_rel", "routine_id", "company_id",
-                                   "Empresas", default=lambda self: self.env.company)
+                                   "Empresas", default=lambda self: self.env.user.company_ids)
     recipient_ids = fields.Many2many("res.users", "prometeo_ai_routine_recipient_rel", "routine_id", "user_id",
                                      "Destinatarios")
     is_public = fields.Boolean("Pública", default=True, help="La ven todos los usuarios del agente.")
