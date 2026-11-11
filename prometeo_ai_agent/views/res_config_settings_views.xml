@@ -71,8 +71,10 @@
                         </setting>
                     </block>
                     <block title="Tope de gasto" name="ai_cap_block">
-                        <setting string="Tope mensual (USD)" help="0 = sin tope. Al alcanzarlo se pausan rutinas y chat hasta el mes siguiente.">
+                        <setting string="Tope mensual (USD)" help="Al alcanzarlo se pausan rutinas y chat hasta el mes siguiente. Los usuarios solo ven el porcentaje usado, nunca montos.">
                             <field name="ai_monthly_cap_usd"/>
+                            <div class="mt8 small text-muted">Gastado este mes: USD <field name="ai_month_cost" class="d-inline" readonly="1"/></div>
+                            <button name="action_ai_open_usage" type="object" string="Ver consumo" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                     </block>
                     <block title="Alertas" name="ai_alerts_block">

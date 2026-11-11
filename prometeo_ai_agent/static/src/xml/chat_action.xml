@@ -15,9 +15,6 @@
                     <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_routine_template')">
                         <i class="fa fa-clone"/>Plantillas
                     </button>
-                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_usage')">
-                        <i class="fa fa-line-chart"/>Consumo
-                    </button>
                 </nav>
                 <div class="flex-grow-1 overflow-auto px-2 pb-3">
                     <div class="o_ai_chat_group">Recientes</div>
@@ -33,6 +30,18 @@
                             </button>
                         </div>
                     </t>
+                </div>
+                <div t-if="state.quota" class="o_ai_quota px-3 py-3 border-top">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Uso del mes</span>
+                        <span t-attf-class="fw-semibold o_ai_quota_text_{{ state.quota.level }}"><t t-out="state.quota.percent"/>%</span>
+                    </div>
+                    <div t-attf-class="o_ai_usage_bar o_ai_usage_{{ state.quota.level }}" role="progressbar"
+                         t-att-aria-valuenow="state.quota.percent" aria-valuemin="0" aria-valuemax="100"
+                         aria-label="Uso del límite mensual">
+                        <div t-attf-style="width: {{ state.quota.percent }}%"/>
+                    </div>
+                    <div t-if="state.quota.level === 'over'" class="small text-danger mt-1">Se alcanzó el límite del mes.</div>
                 </div>
             </aside>
             <section class="o_ai_chat_main d-flex flex-column flex-grow-1">

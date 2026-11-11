@@ -37,7 +37,7 @@ class TestRun(AiAgentCase):
         self.assertFalse(self.Run._cap_reached())
         self.Run._log("chat", self.ai_model, RESULT, user=self.agent_user, status="done")
         self.assertTrue(self.Run._cap_reached())
-        self._set_cap(0)
+        self._set_cap(100)
         self.assertFalse(self.Run._cap_reached())
 
     def test_month_cost_ignores_previous_month(self):
@@ -91,3 +91,34 @@ class TestUsageSummary(AiAgentCase):
     def test_usage_summary_other_month_empty(self):
         s = self.env["prometeo.ai.run"].with_user(self.admin_user).get_usage_summary(self.year - 1, self.month)
         self.assertEqual((s["cost"], s["by_routine"], s["by_model"], s["unpriced_runs"]), (0.0, [], [], 0))
+
+
+
+@tagged("post_install", "-at_install")
+class TestQuota(AiAgentCase):
+
+    def setUp(self):
+        super().setUp()
+        self.Run = self.env["prometeo.ai.run"].sudo()
+        self.Run.search([]).unlink()
+        self.env["ir.config_parameter"].sudo().search([("key", "=", "prometeo_ai_agent.monthly_cap_usd")]).unlink()
+
+    def test_default_cap_is_5_usd(self):
+        self.Run._log("chat", self.ai_model, {"input_tokens": 4_000_000, "output_tokens": 0}, status="done")
+        self.assertFalse(self.Run._cap_reached())
+        self.Run._log("chat", self.ai_model, {"input_tokens": 1_000_000, "output_tokens": 0}, status="done")
+        self.assertTrue(self.Run._cap_reached())
+
+    def test_quota_status_shows_percent_without_money(self):
+        self.Run._log("chat", self.ai_model, {"input_tokens": 1_750_000, "output_tokens": 0}, status="done")
+        status = self.env["prometeo.ai.run"].with_user(self.agent_user).get_quota_status()
+        self.assertEqual(status, {"percent": 35, "level": "ok"})
+
+    def test_chat_has_no_usage_entry_and_settings_has_it(self):
+        import os
+        base = os.path.dirname(os.path.dirname(__file__))
+        with open(os.path.join(base, "static/src/xml/chat_action.xml")) as f:
+            chat = f.read()
+        self.assertNotIn("action_ai_usage", chat)
+        self.assertIn("get_quota_status", open(os.path.join(base, "static/src/js/chat_action.js")).read())
+        self.assertIn("action_ai_open_usage", self.env["res.config.settings"].get_view(view_type="form")["arch"])

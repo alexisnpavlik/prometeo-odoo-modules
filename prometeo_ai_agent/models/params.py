@@ -8,7 +8,7 @@ DEFAULTS = {
     "chat_max_concurrent": 2,
     "routine_max_tool_calls": 25,
     "routine_max_seconds": 180,
-    "monthly_cap_usd": 0.0,
+    "monthly_cap_usd": 5.0,
     "digest_hour": 8,
     "dismiss_silence_days": 30,
     "support_contact": "",

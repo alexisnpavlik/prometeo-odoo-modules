@@ -24,7 +24,7 @@ class ResConfigSettings(models.TransientModel):
                                                config_parameter=PREFIX + "routine_max_tool_calls")
     ai_routine_max_seconds = fields.Integer("Segundos por corrida de rutina", default=180,
                                             config_parameter=PREFIX + "routine_max_seconds")
-    ai_monthly_cap_usd = fields.Float("Tope mensual (USD)", default=0.0, config_parameter=PREFIX + "monthly_cap_usd")
+    ai_monthly_cap_usd = fields.Float("Tope mensual (USD)", default=5.0, config_parameter=PREFIX + "monthly_cap_usd")
     ai_digest_hour = fields.Integer("Hora del resumen diario", default=8, config_parameter=PREFIX + "digest_hour")
     ai_support_contact = fields.Char("Contacto de soporte", config_parameter=PREFIX + "support_contact",
                                      help="Se muestra cuando el servicio de IA falla. Ej.: Alexis, 11 5555-5555")
@@ -40,6 +40,7 @@ class ResConfigSettings(models.TransientModel):
     ai_google_key = fields.Char("Clave de Google Gemini", compute="_compute_ai_keys",
                                 inverse="_inverse_ai_google_key", groups="prometeo_ai_agent.group_admin")
     ai_active_model_count = fields.Integer("Modelos activos", compute="_compute_ai_keys")
+    ai_month_cost = fields.Float("Gasto del mes (USD)", compute="_compute_ai_keys", digits=(12, 2))
     ai_anthropic_status = fields.Char(compute="_compute_ai_keys")
     ai_anthropic_ok = fields.Boolean(compute="_compute_ai_keys")
     ai_openai_status = fields.Char(compute="_compute_ai_keys")
@@ -67,6 +68,7 @@ class ResConfigSettings(models.TransientModel):
             rec.ai_openai_base_url = openai.base_url
             rec.ai_google_key = rec._ai_provider("google").api_key
             rec.ai_active_model_count = self.env["prometeo.ai.model"].sudo().search_count([("active", "=", True)])
+            rec.ai_month_cost = self.env["prometeo.ai.run"].sudo()._month_cost()
             for ptype in ("anthropic", "openai", "google"):
                 provider = rec._ai_provider(ptype)
                 rec["ai_%s_status" % ptype] = provider.check_message or (
@@ -110,6 +112,10 @@ class ResConfigSettings(models.TransientModel):
 
     def action_ai_fetch_models_google(self):
         return self._ai_fetch("google")
+
+    def action_ai_open_usage(self):
+        """Pantalla de consumo mensual."""
+        return self.env["ir.actions.actions"]._for_xml_id("prometeo_ai_agent.action_ai_usage")
 
     def action_ai_open_models(self):
         """Lista de modelos para activar y cargar precios."""

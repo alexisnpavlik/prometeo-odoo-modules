@@ -92,6 +92,7 @@ export class AiChat extends Component {
             showAlerts: false,
             isAdmin: false,
             activationMessage: "",
+            quota: null,
         });
         this.onStep = (payload) => {
             if (this.state.sending && payload.conversation_id === this.state.currentId) {
@@ -113,6 +114,7 @@ export class AiChat extends Component {
             this.state.modelId = def ? def.id : null;
             await this.loadConversations();
             await this.loadAlerts();
+            await this.loadQuota();
             this.pendingPrompt = this.props.action?.params?.prompt;
             if (this.pendingPrompt) {
                 return;
@@ -145,6 +147,10 @@ export class AiChat extends Component {
             group.items.push(conv);
         }
         return groups;
+    }
+
+    async loadQuota() {
+        this.state.quota = await this.orm.call("prometeo.ai.run", "get_quota_status", []);
     }
 
     async loadAlerts() {
@@ -283,6 +289,7 @@ export class AiChat extends Component {
         } finally {
             clearInterval(this.timer);
             this.state.sending = false;
+            this.loadQuota();
         }
     }
 

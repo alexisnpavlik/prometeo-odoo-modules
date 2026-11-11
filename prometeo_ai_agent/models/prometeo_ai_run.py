@@ -70,8 +70,18 @@ class PrometeoAiRun(models.Model):
     @api.model
     def _cap_reached(self):
         """True si hay tope mensual y el gasto del mes lo alcanzó."""
-        cap = get_param(self.env, "monthly_cap_usd")
-        return bool(cap) and self._month_cost() >= cap
+        cap = get_param(self.env, "monthly_cap_usd") or 5.0
+        return self._month_cost() >= cap
+
+    @api.model
+    def get_quota_status(self):
+        """Porcentaje usado del tope del mes, sin montos (lo ve cualquier usuario del agente)."""
+        if not self.env.user.has_group("prometeo_ai_agent.group_user"):
+            raise AccessError(_("Sin acceso al Agente IA."))
+        cap = get_param(self.env, "monthly_cap_usd") or 5.0
+        percent = min(100, int(round(self.sudo()._month_cost() / cap * 100)))
+        level = "over" if percent >= 100 else ("warn" if percent >= 80 else "ok")
+        return {"percent": percent, "level": level}
 
     @api.model
     def get_usage_summary(self, year, month):
