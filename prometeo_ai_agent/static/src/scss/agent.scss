@@ -54,6 +54,22 @@ $o-ai-accent-soft: rgba(11, 110, 103, 0.1);
         letter-spacing: .04em;
         color: $text-muted;
     }
+    .o_ai_nav_item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 40px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: $body-color;
+        text-align: left;
+        font-size: 14px;
+        .fa { width: 16px; text-align: center; color: $text-muted; }
+        &:hover { background-color: $o-ai-accent-soft; }
+    }
+    .o_ai_nav_new { font-weight: 600; .fa { color: $o-ai-accent; } }
     .o_ai_chat_item {
         min-height: 40px;
         padding: 6px 6px 6px 12px;

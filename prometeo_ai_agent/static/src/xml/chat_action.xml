@@ -3,15 +3,27 @@
     <t t-name="prometeo_ai_agent.Chat">
         <div class="o_ai_chat d-flex h-100">
             <aside t-attf-class="o_ai_chat_list d-flex flex-column {{ state.showList ? 'o_ai_chat_list_open' : '' }}">
-                <div class="p-3">
-                    <button class="btn o_ai_btn_primary w-100" t-on-click="newConversation">
-                        <i class="fa fa-plus me-2"/>Nueva conversación
+                <nav class="p-2 d-flex flex-column gap-1" aria-label="Agente IA">
+                    <button class="o_ai_nav_item o_ai_nav_new" t-on-click="newConversation">
+                        <i class="fa fa-plus"/>Nueva conversación
                     </button>
-                </div>
+                </nav>
+                <nav class="px-2 pb-2 d-flex flex-column gap-1 border-bottom" aria-label="Secciones">
+                    <button class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_routine')">
+                        <i class="fa fa-clock-o"/>Rutinas
+                    </button>
+                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_routine_template')">
+                        <i class="fa fa-clone"/>Plantillas
+                    </button>
+                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_usage')">
+                        <i class="fa fa-line-chart"/>Consumo
+                    </button>
+                </nav>
                 <div class="flex-grow-1 overflow-auto px-2 pb-3">
-                    <t t-foreach="groupedConversations" t-as="group" t-key="group.label">
-                        <div class="o_ai_chat_group" t-out="group.label"/>
-                        <div t-foreach="group.items" t-as="conv" t-key="conv.id"
+                    <div class="o_ai_chat_group">Recientes</div>
+                    <div t-if="!state.conversations.length" class="text-muted small px-2">Todavía no hay conversaciones.</div>
+                    <t t-foreach="[1]" t-as="_g" t-key="_g">
+                        <div t-foreach="state.conversations" t-as="conv" t-key="conv.id"
                              t-attf-class="o_ai_chat_item d-flex align-items-center {{ conv.id === state.currentId ? 'o_ai_chat_item_active' : '' }}"
                              t-on-click="() => this.openConversation(conv.id)">
                             <span class="flex-grow-1 text-truncate" t-out="conv.name or 'Conversación nueva'"/>

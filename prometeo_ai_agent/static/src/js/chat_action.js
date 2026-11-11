@@ -3,6 +3,7 @@ import { Component, markup, onPatched, onWillStart, onWillUnmount, useRef, useSt
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { escape } from "@web/core/utils/strings";
+import { user } from "@web/core/user";
 
 const STEP_EVENT = "prometeo_ai_agent/step";
 const MESSAGES = {
@@ -89,6 +90,7 @@ export class AiChat extends Component {
             showList: false,
             alerts: [],
             showAlerts: false,
+            isAdmin: false,
         });
         this.onStep = (payload) => {
             if (this.state.sending && payload.conversation_id === this.state.currentId) {
@@ -101,6 +103,7 @@ export class AiChat extends Component {
             clearInterval(this.timer);
         });
         onWillStart(async () => {
+            this.state.isAdmin = await user.hasGroup("prometeo_ai_agent.group_admin");
             this.state.models = await this.orm.call("prometeo.ai.conversation", "get_available_models", []);
             const def = this.state.models.find((m) => m.is_default) || this.state.models[0];
             this.state.modelId = def ? def.id : null;
@@ -151,6 +154,11 @@ export class AiChat extends Component {
         this.newConversation();
         this.state.draft = `Explicame esta alerta y qué conviene hacer: "${alert.name}"`;
         this.orm.call("prometeo.ai.alert", "action_mark_seen", [[alert.id]]);
+    }
+
+    openAction(xmlid) {
+        this.state.showList = false;
+        this.action.doAction(xmlid);
     }
 
     openAllAlerts() {
