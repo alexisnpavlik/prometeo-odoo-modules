@@ -6,3 +6,4 @@ from . import test_loop
 from . import test_alert
 from . import test_routine
 from . import test_digest
+from . import test_chat

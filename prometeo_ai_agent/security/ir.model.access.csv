@@ -7,3 +7,5 @@ access_ai_routine_user,ai.routine user,model_prometeo_ai_routine,group_user,1,0,
 access_ai_alert_admin,ai.alert admin,model_prometeo_ai_alert,group_admin,1,1,1,1
 access_ai_alert_user,ai.alert user,model_prometeo_ai_alert,group_user,1,0,0,0
 access_ai_routine_template_admin,ai.routine.template admin,model_prometeo_ai_routine_template,group_admin,1,1,1,1
+access_ai_conversation_user,ai.conversation user,model_prometeo_ai_conversation,group_user,1,1,1,1
+access_ai_message_user,ai.message user,model_prometeo_ai_message,group_user,1,1,1,1

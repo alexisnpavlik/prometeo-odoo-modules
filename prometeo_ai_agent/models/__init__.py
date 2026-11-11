@@ -4,4 +4,6 @@ from . import prometeo_ai_routine
 from . import prometeo_ai_routine_template
 from . import prometeo_ai_run
 from . import prometeo_ai_alert
+from . import prometeo_ai_conversation
+from . import prometeo_ai_message
 from . import res_config_settings
