@@ -78,3 +78,13 @@ class TestVerifierInLoop(AiAgentCase):
         call, n = self.count_call()
         r, _mock = self.run_with(call, llm_text("Hay %s contactos." % (n + 1234)), llm_text("Hay %s contactos." % (n + 999)))
         self.assertIn("no se pudieron verificar", r["text"])
+
+
+@tagged("post_install", "-at_install")
+class TestScopeRule(AiAgentCase):
+
+    def test_prompt_restricts_to_business_questions(self):
+        from odoo.addons.prometeo_ai_agent.agent import prompts
+        p = prompts.build_system_prompt(self.env(user=self.agent_user), "chat")
+        self.assertIn(prompts.OFF_TOPIC_REPLY, p)
+        self.assertIn("Python", p)
