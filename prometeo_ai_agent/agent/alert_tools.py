@@ -79,6 +79,7 @@ def _resolve_alert(env, ctx, arguments):
     if not routine or not alert or alert.routine_id != routine or alert.state != "new":
         raise ToolError("No hay una alerta abierta %s de esta rutina." % alert_id)
     alert.write({"state": "resolved", "resolved_note": str(arguments.get("reason") or "")})
+    alert.message_post(body="Cerrada por el Agente IA: %s" % (arguments.get("reason") or ""))
     ctx["alerts_touched"].add(alert.id)
     return {"result": "resolved", "alert_id": alert.id}
 

@@ -1,4 +1,6 @@
 """Adaptador de generateContent de Google Gemini."""
+import uuid
+
 from . import LlmError
 from .http import request_json
 
@@ -63,7 +65,7 @@ def chat(provider, model_name, system, messages, tools, timeout):
     candidates = data.get("candidates") or []
     parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
     text = "".join(p.get("text", "") for p in parts if "text" in p and not p.get("thought"))
-    calls = [{"id": "call_%s" % i, "name": p["functionCall"]["name"], "arguments": p["functionCall"].get("args") or {}}
+    calls = [{"id": "call_%s" % uuid.uuid4().hex[:12], "name": p["functionCall"]["name"], "arguments": p["functionCall"].get("args") or {}}
              for i, p in enumerate(p for p in parts if "functionCall" in p)]
     if not text and not calls:
         raise LlmError("El proveedor devolvió una respuesta vacía.")

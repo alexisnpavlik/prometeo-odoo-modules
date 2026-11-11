@@ -37,7 +37,13 @@ def _adapter(provider):
 
 def chat(provider, model_name, system, messages, tools, timeout):
     """Envía la conversación al proveedor y devuelve la respuesta normalizada."""
-    return _adapter(provider).chat(provider, model_name, system, messages, tools, timeout)
+    adapter = _adapter(provider)
+    try:
+        return adapter.chat(provider, model_name, system, messages, tools, timeout)
+    except LlmError:
+        raise
+    except (KeyError, AttributeError, TypeError, IndexError, ValueError) as e:
+        raise LlmError("Respuesta inesperada del proveedor: %s" % e.__class__.__name__)
 
 
 def list_models(provider, timeout=20):

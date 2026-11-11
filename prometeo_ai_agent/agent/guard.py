@@ -5,10 +5,11 @@ import re
 BLOCKED_MODELS = frozenset({
     "prometeo.ai.provider", "prometeo.ai.conversation", "prometeo.ai.message",
     "ir.config_parameter", "res.users.apikeys", "ir.cron", "ir.attachment", "mail.message",
-    "ir.model.access", "ir.rule",
+    "ir.model.access", "ir.rule", "mail.mail", "mail.tracking.value", "payment.provider",
 })
 USER_FIELDS = frozenset({"id", "name", "login", "company_id", "display_name"})
-SECRET_FIELD_RE = re.compile(r"(password|passwd|secret|token|api_?key|private_?key|_pass$)", re.I)
+SECRET_FIELD_RE = re.compile(
+    r"(password|passwd|secret|token|api_?key|private_?key|_pass$|(^|_)key$|hmac|signature|credential)", re.I)
 LOGIC_OPERATORS = ("&", "|", "!")
 SUBDOMAIN_OPERATORS = ("any", "not any")
 ORDER_RE = re.compile(r"^\s*([\w.]+)(\s+(asc|desc))?(\s+nulls\s+(first|last))?\s*$", re.I)
@@ -23,7 +24,7 @@ def check_model(env, model):
     if not isinstance(model, str) or model not in env:
         raise ToolError("El modelo %r no existe." % (model,))
     Model = env[model]
-    if model in BLOCKED_MODELS:
+    if model in BLOCKED_MODELS or set(Model._inherits) & BLOCKED_MODELS:
         raise ToolError("El modelo %s no está disponible para el agente." % model)
     if Model._abstract or Model._transient:
         raise ToolError("El modelo %s no guarda datos." % model)

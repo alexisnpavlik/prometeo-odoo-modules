@@ -7,7 +7,7 @@ import pytz
 from dateutil.relativedelta import relativedelta
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tools import config as tools_config
 
 from .. import llm
@@ -59,6 +59,20 @@ class PrometeoAiRoutine(models.Model):
     alert_ids = fields.One2many("prometeo.ai.alert", "routine_id", "Alertas")
     run_ids = fields.One2many("prometeo.ai.run", "routine_id", "Corridas")
     open_alert_count = fields.Integer("Alertas abiertas", compute="_compute_open_alert_count")
+
+    @api.constrains("run_as_user_id")
+    def _check_run_as(self):
+        """Solo un administrador del sistema puede elegir otro usuario en 'Ejecutar como'."""
+        if self.env.su or self.env.user.has_group("base.group_system"):
+            return
+        for rec in self:
+            if rec.run_as_user_id != self.env.user:
+                raise ValidationError(_("Solo un administrador del sistema puede ejecutar rutinas como otro usuario."))
+
+    def _check_admin(self):
+        """Las acciones de ejecución son solo para administradores del agente."""
+        if not self.env.su and not self.env.user.has_group("prometeo_ai_agent.group_admin"):
+            raise AccessError(_("Solo los administradores del agente pueden hacer esto."))
 
     def _compute_open_alert_count(self):
         """Cantidad de alertas abiertas por rutina."""
@@ -164,7 +178,7 @@ class PrometeoAiRoutine(models.Model):
             Alert._create_system_alert(
                 "tope-%s" % now.strftime("%Y-%m"), _("Se alcanzó el tope de gasto mensual"),
                 _("Las rutinas y el chat quedan en pausa hasta el mes próximo o hasta subir el tope en Ajustes."),
-                "high")
+                "high", once=True)
             routine.write(dict(vals, last_status="skipped_cap"))
             return run
         ai_model = None
@@ -172,7 +186,9 @@ class PrometeoAiRoutine(models.Model):
             if not routine.recipient_ids:
                 raise UserError(_("La rutina no tiene destinatarios."))
             ai_model = routine._resolve_model()
+            notify_queue = []
             env_u = routine._user_env()
+            env_u = env_u(context=dict(env_u.context, prometeo_ai_notify_queue=notify_queue))
             ctx = tools.new_context(routine=routine)
             with self.env.cr.savepoint():
                 result = loop.run_agent(
@@ -180,11 +196,13 @@ class PrometeoAiRoutine(models.Model):
                     tools.READ_TOOLS + tools.ALERT_TOOLS, ctx, get_param(self.env, "routine_max_tool_calls"),
                     get_param(self.env, "routine_max_seconds"), extra_tools=tools.alert_tool_handlers())
         except (llm.LlmError, UserError) as e:
-            return routine._register_failure(vals, ai_model, str(e), time.monotonic() - started)
+            return routine._register_failure(vals, ai_model, str(e), time.monotonic() - started,
+                                             getattr(e, "usage", None))
         except Exception as e:  # noqa: BLE001 - una rutina rota no debe tirar el despachador
             _logger.exception("Rutina %s falló", routine.id)
             return routine._register_failure(vals, ai_model, str(e) or e.__class__.__name__,
-                                             time.monotonic() - started)
+                                             time.monotonic() - started, getattr(e, "usage", None))
+        Alert.browse(notify_queue).exists()._notify_high()
         status = result["status"]
         run = Run._log("routine", ai_model, result, routine=routine, status=status,
                        duration=time.monotonic() - started)
@@ -198,9 +216,9 @@ class PrometeoAiRoutine(models.Model):
                   "Simplificá la instrucción o subí los límites en Ajustes."))
         return run
 
-    def _register_failure(self, vals, ai_model, message, duration):
-        """Registra una corrida con error, suma la falla y pausa a la tercera."""
-        run = self.env["prometeo.ai.run"]._log("routine", ai_model, {}, routine=self, status="error",
+    def _register_failure(self, vals, ai_model, message, duration, usage=None):
+        """Registra una corrida con error (con los tokens ya gastados), suma la falla y pausa a la tercera."""
+        run = self.env["prometeo.ai.run"]._log("routine", ai_model, usage or {}, routine=self, status="error",
                                                error=message, duration=duration)
         failures = self.failure_count + 1
         vals.update(last_status="error", failure_count=failures)
@@ -216,6 +234,7 @@ class PrometeoAiRoutine(models.Model):
     def action_run_now(self):
         """Ejecuta la rutina ya, sin esperar al cron."""
         self.ensure_one()
+        self._check_admin()
         run = self._run_once()
         labels = dict(run._fields["status"].selection)
         return {"type": "ir.actions.client", "tag": "display_notification", "params": {
@@ -225,6 +244,7 @@ class PrometeoAiRoutine(models.Model):
 
     def action_resume(self):
         """Reanuda una rutina pausada por errores."""
+        self._check_admin()
         self.sudo().write({"paused": False, "failure_count": 0})
         return True
 

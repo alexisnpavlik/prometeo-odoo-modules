@@ -94,9 +94,14 @@ class PrometeoAiConversation(models.Model):
                     self.ai_model_id = ai_model
         except (llm.LlmError, UserError) as e:
             _logger.info("Chat %s: error del proveedor: %s", self.id, e)
-            Run._log("chat", ai_model, {}, user=self.env.user, status="error", error=str(e),
+            Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error", error=str(e),
                      duration=time.monotonic() - started)
             return {"status": "error", "message": _("El proveedor de IA no respondió. Probá de nuevo.")}
+        except Exception as e:  # noqa: BLE001
+            _logger.exception("Chat %s: error inesperado", self.id)
+            Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error",
+                     error=str(e), duration=time.monotonic() - started)
+            return {"status": "error", "message": _("Ocurrió un error inesperado. Probá de nuevo.")}
         Run._log("chat", ai_model, result, user=self.env.user, status=result["status"],
                  duration=time.monotonic() - started)
         return {"status": "ok", "reply": result["text"]}

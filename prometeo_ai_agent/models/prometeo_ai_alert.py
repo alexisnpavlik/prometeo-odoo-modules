@@ -39,6 +39,12 @@ class PrometeoAiAlert(models.Model):
     silenced_until = fields.Datetime("Silenciada hasta")
     resolved_note = fields.Text("Motivo de cierre")
 
+    def init(self):
+        """Una sola alerta abierta por rutina y clave (también entre transacciones concurrentes)."""
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS prometeo_ai_alert_open_key_uniq
+            ON prometeo_ai_alert (COALESCE(routine_id, 0), dedup_key) WHERE state = 'new'""")
+
     @api.depends("severity", "state")
     def _compute_sequences(self):
         """Orden de la bandeja: abiertas primero, alta gravedad primero."""
@@ -66,7 +72,7 @@ class PrometeoAiAlert(models.Model):
             was_high = alert.severity == "high"
             alert.write(dict(vals, last_seen=now))
             if alert.severity == "high" and not was_high:
-                alert._notify_high()
+                alert._queue_notify()
             return alert, "updated"
         silenced = Alert.search([("routine_id", "=", routine_id), ("dedup_key", "=", key),
                                  ("state", "=", "dismissed"), ("silenced_until", ">", now)], limit=1)
@@ -75,16 +81,30 @@ class PrometeoAiAlert(models.Model):
         alert = Alert.create(dict(vals, routine_id=routine_id, recipient_ids=[(6, 0, recipients.ids)],
                                   kind="routine" if routine else "system", first_seen=now, last_seen=now))
         if alert.severity == "high":
-            alert._notify_high()
+            alert._queue_notify()
         return alert, "created"
 
     @api.model
-    def _create_system_alert(self, key, title, summary, severity="medium"):
-        """Alerta de sistema para los administradores del agente, deduplicada por clave."""
+    def _create_system_alert(self, key, title, summary, severity="medium", once=False):
+        """Alerta de sistema para los administradores del agente, deduplicada por clave.
+
+        once=True: si la clave ya existió en cualquier estado, no se vuelve a crear."""
+        if once:
+            existing = self.sudo().search([("routine_id", "=", False), ("dedup_key", "=", key)], limit=1)
+            if existing:
+                return existing
         admins = self.env.ref("prometeo_ai_agent.group_admin").sudo().users.filtered(lambda u: not u.share)
         alert, _status = self._upsert(self.env["prometeo.ai.routine"], admins, {
             "dedup_key": key, "name": title, "summary": summary, "severity": severity})
         return alert
+
+    def _queue_notify(self):
+        """En una corrida, la notificación espera a que termine bien; fuera de ella sale ya."""
+        queue = self.env.context.get("prometeo_ai_notify_queue")
+        if queue is not None:
+            queue.extend(self.ids)
+        else:
+            self._notify_high()
 
     def _notify_high(self):
         """Notificación de Odoo a los destinatarios (bandeja de Conversaciones o correo según su preferencia)."""
@@ -93,8 +113,9 @@ class PrometeoAiAlert(models.Model):
             if partners:
                 alert.message_notify(
                     partner_ids=partners.ids,
-                    subject=_("Alerta: %s", alert.name),
-                    body=alert.summary or alert.name,
+                    subject=_("[IA] Alerta: %s", alert.name),
+                    body=_("%(text)s\n\nGenerado por el Agente IA. Verificá en Odoo antes de actuar.",
+                           text=alert.summary or alert.name),
                 )
 
     # ------------------------------------------------------------------ acciones
@@ -131,6 +152,11 @@ class PrometeoAiAlert(models.Model):
     def action_reopen(self):
         """Vuelve a abrir una alerta resuelta o descartada."""
         self._check_recipient()
+        for alert in self.sudo():
+            if alert.state != "new" and alert.search_count([
+                    ("routine_id", "=", alert.routine_id.id), ("dedup_key", "=", alert.dedup_key),
+                    ("state", "=", "new")]):
+                raise UserError(_("Ya hay una alerta abierta para este hallazgo."))
         self.sudo().write({"state": "new", "silenced_until": False})
         return True
 

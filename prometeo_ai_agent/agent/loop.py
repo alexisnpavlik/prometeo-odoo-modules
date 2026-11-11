@@ -35,8 +35,12 @@ def run_agent(env, ai_model, system, messages, tool_defs, ctx, max_tool_calls, m
 
     def call(extra=None):
         remaining = deadline - time.monotonic()
-        response = llm.chat(provider, model_name, system, history + (extra or []), tool_defs,
-                            max(1, int(min(CALL_TIMEOUT, remaining))))
+        try:
+            response = llm.chat(provider, model_name, system, history + (extra or []), tool_defs,
+                                max(1, int(min(CALL_TIMEOUT, remaining))))
+        except Exception as e:
+            e.usage = dict(totals, tool_calls=calls_done)
+            raise
         totals["input_tokens"] += response["input_tokens"]
         totals["output_tokens"] += response["output_tokens"]
         return response

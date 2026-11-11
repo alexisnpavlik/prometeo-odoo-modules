@@ -1,5 +1,6 @@
 """Adaptador de Chat Completions de OpenAI (y servicios compatibles)."""
 import json
+import uuid
 
 from . import LlmError
 from .http import request_json
@@ -50,7 +51,7 @@ def chat(provider, model_name, system, messages, tools, timeout):
     choices = data.get("choices") or []
     message = (choices[0].get("message") or {}) if choices else {}
     text = message.get("content") or ""
-    calls = [{"id": c.get("id") or "call_%s" % i, "name": c["function"]["name"],
+    calls = [{"id": c.get("id") or "call_%s" % uuid.uuid4().hex[:12], "name": c["function"]["name"],
               "arguments": _parse_args(c["function"].get("arguments"))}
              for i, c in enumerate(message.get("tool_calls") or [])]
     if not text and not calls:
