@@ -61,4 +61,102 @@ Usá read_group para sumar amount_residual_signed por proveedor (partner_id). De
 2. Sesiones cerradas (closed) en las últimas 24 horas con cash_register_difference distinta de cero.
 Dejá una alerta por cada grupo con la caja (config_id), el responsable (user_id) y la diferencia.</field>
     </record>
+    <record id="template_branch_transfers" model="prometeo.ai.routine.template">
+        <field name="sequence">15</field>
+        <field name="name">Traslados entre sucursales pendientes</field>
+        <field name="description">Traslados de la app Traslados en camino sin recibir, con diferencias sin cerrar o armados y nunca enviados.</field>
+        <field name="required_module">stock_branch_transfer</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Revisá el modelo stock.branch.transfer (app Traslados entre sucursales).
+1. En camino sin recibir: state = in_transit y date_sent de hace más de 2 días. Agrupá por dest_company_id (sucursal que tiene que recibir) con read_group y contá.
+2. Recibidos con diferencias sin cerrar: state = with_diff. Para esos, leé sus líneas en stock.branch.transfer.line (transfer_id) y calculá cuántas unidades faltan (qty_sent menos qty_received) y su valor con el costo de cada producto (standard_price de product.product).
+3. Armados y nunca enviados: state = draft y create_date de hace más de 3 días, agrupado por company_id (sucursal que envía).
+Dejá una alerta por cada grupo que tenga casos. En el resumen nombrá la sucursal que debe actuar y el traslado más viejo. Severity high si hay traslados en camino hace más de 5 días o diferencias que suman más de 10 unidades.</field>
+    </record>
+
+    <record id="template_transfer_differences" model="prometeo.ai.routine.template">
+        <field name="sequence">16</field>
+        <field name="name">Faltantes en traslados de la semana</field>
+        <field name="description">Mercadería que salió de una sucursal y no llegó completa a la otra en los últimos 7 días.</field>
+        <field name="required_module">stock_branch_transfer</field>
+        <field name="interval_type">weeks</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Analizá los traslados entre sucursales recibidos en los últimos 7 días: stock.branch.transfer con date_received en ese período y state in (received, with_diff, closed).
+Leé sus líneas (stock.branch.transfer.line) y quedate con las que tienen qty_received menor que qty_sent. Calculá por par de sucursales (company_id → dest_company_id) cuántas unidades faltaron y cuánto valen con el costo de cada producto (standard_price de product.product).
+Avisá solo si faltó algo: una alerta con el total de unidades y valor, el par de sucursales con más faltante y los 5 productos que más faltaron. Severity high si un mismo par de sucursales repite faltantes en 3 o más traslados.</field>
+    </record>
+
+    <record id="template_purchase_not_received" model="prometeo.ai.routine.template">
+        <field name="sequence">25</field>
+        <field name="name">Compras confirmadas sin recibir</field>
+        <field name="description">Órdenes de compra confirmadas cuya fecha prevista pasó y la mercadería no llegó completa.</field>
+        <field name="required_module">purchase_stock</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Buscá en purchase.order las órdenes con state = purchase, receipt_status in (pending, partial) y date_planned de hace más de 3 días.
+Agrupá con read_group por partner_id (proveedor) contando órdenes y sumando amount_total. Dejá una alerta con cuántas órdenes están atrasadas, el monto total, los proveedores más atrasados y la orden más vieja. Severity high si alguna lleva más de 15 días de atraso.</field>
+    </record>
+
+    <record id="template_pos_control" model="prometeo.ai.routine.template">
+        <field name="sequence">55</field>
+        <field name="name">Control de cajeros: eliminaciones y descuentos</field>
+        <field name="description">Cajeros con muchas líneas eliminadas, descuentos altos o cambios de precio en las últimas 24 horas.</field>
+        <field name="required_module">pos_deletion_reason_log</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Revisá pos.control.log de las últimas 24 horas (event_datetime).
+Con read_group agrupá por user_id (cajero) y event_type, contando eventos y sumando amount_removed. Los tipos son: order (orden eliminada), line (línea eliminada), qty_reduction, high_discount, price_reduction, price_increase y refund.
+Compará cada cajero contra el promedio del resto. Dejá una alerta solo si algún cajero tiene más del doble de eventos que el promedio o si el importe afectado total supera lo habitual; nombrá al cajero, el punto de venta (pos_config_id), los tipos de evento y el importe. Severity high si hay órdenes enteras eliminadas o reembolsos sin motivo (reason_id vacío).</field>
+    </record>
+
+    <record id="template_pos_sales_drop" model="prometeo.ai.routine.template">
+        <field name="sequence">56</field>
+        <field name="name">Caída de ventas por caja</field>
+        <field name="description">Cajas que ayer vendieron mucho menos que el mismo día de las semanas anteriores.</field>
+        <field name="required_module">point_of_sale</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Compará las ventas de ayer de cada punto de venta contra el promedio del mismo día de la semana en las 4 semanas anteriores.
+Usá read_group sobre pos.order con state in (paid, done, invoiced), agrupando por config_id y sumando amount_total, una consulta para ayer y otra para cada uno de los 4 días de comparación (mismo día de la semana). Usá la zona horaria de la instrucción de sistema para definir el día.
+Dejá una alerta solo para las cajas que vendieron 30% menos que su promedio, con el monto de ayer, el promedio y la diferencia. No alertes por cajas sin ventas en las 4 semanas anteriores.</field>
+    </record>
+
+    <record id="template_checking_account_overdue" model="prometeo.ai.routine.template">
+        <field name="sequence">60</field>
+        <field name="name">Cuenta corriente: clientes con deuda vencida</field>
+        <field name="description">Clientes con cuotas de cuenta corriente vencidas y cuentas que superan su límite de crédito.</field>
+        <field name="required_module">customer_checking_account</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Revisá la cuenta corriente de clientes.
+1. Cuotas vencidas: en cca.installment filtrá date_due anterior a hoy y amount_residual mayor a 0 (no uses el campo state para esto). Agrupá con read_group por partner_id sumando amount_residual.
+2. Límite superado: en cca.account buscá las cuentas activas con balance mayor que credit_limit.
+Dejá una alerta con el total vencido, cuántos clientes deben y los 5 que más deben con su monto; y otra alerta, si corresponde, con las cuentas que superan su límite. Severity high si algún cliente tiene cuotas vencidas hace más de 30 días.</field>
+    </record>
+
+    <record id="template_mercadopago_manual" model="prometeo.ai.routine.template">
+        <field name="sequence">65</field>
+        <field name="name">Pagos de Mercado Pago aprobados a mano</field>
+        <field name="description">Cobros con Mercado Pago que un usuario aprobó manualmente porque no se validaron solos.</field>
+        <field name="required_module">pos_mercadopago_validator</field>
+        <field name="interval_type">days</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Buscá en mercadopago.manual.approval los registros con manual_approved_at en las últimas 24 horas.
+Agrupá por manual_approved_by_user_id contando y sumando amount. Revisá también los que no tienen mercadopago_payment_id (aprobados sin un pago de Mercado Pago asociado).
+Dejá una alerta si hubo aprobaciones manuales, con cuántas, el monto total y quién las aprobó. Severity high si hay aprobaciones sin pago asociado o si un mismo usuario aprobó más de 5.</field>
+    </record>
+
+    <record id="template_dead_stock" model="prometeo.ai.routine.template">
+        <field name="sequence">35</field>
+        <field name="name">Mercadería inmovilizada</field>
+        <field name="description">Productos con stock que no tuvieron salidas en los últimos 60 días.</field>
+        <field name="required_module">stock</field>
+        <field name="interval_type">weeks</field>
+        <field name="run_hour">8.0</field>
+        <field name="prompt">Encontrá mercadería inmovilizada.
+1. Con read_group sobre stock.move (state = done, location_dest_id.usage in (customer, production), date en los últimos 60 días) agrupando por product_id, obtené los productos que sí tuvieron salidas.
+2. Con read_group sobre stock.quant (location_id.usage = internal, quantity mayor a 0) agrupando por product_id y sumando quantity y value, obtené los productos con stock.
+Los inmovilizados son los del punto 2 que no aparecen en el punto 1. Dejá una alerta con cuántos son, el valor total inmovilizado y los 10 de mayor valor. Si son muchos, respaldá la alerta con el dominio de stock.quant que ejecutaste.</field>
+    </record>
 </odoo>
