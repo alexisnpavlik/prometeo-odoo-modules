@@ -54,16 +54,22 @@
                 </header>
                 <div class="o_ai_chat_messages flex-grow-1 overflow-auto" t-ref="messages">
                     <div class="o_ai_chat_column">
-                        <div t-if="!state.messages.length" class="o_ai_chat_empty text-center">
+                        <div t-if="!state.messages.length and !state.models.length" class="o_ai_activation text-center">
+                            <div class="o_ai_avatar o_ai_avatar_lg mx-auto mb-3"><i class="fa fa-magic"/></div>
+                            <h3>Activá el Asistente IA</h3>
+                            <p class="o_ai_activation_text" t-out="state.activationMessage"/>
+                            <p class="small text-muted mb-2 mt-4">Cuando esté activo vas a poder preguntar cosas como:</p>
+                            <ul class="o_ai_examples">
+                                <li t-foreach="suggestions" t-as="s" t-key="s_index"><i class="fa fa-comment-o"/><t t-out="s"/></li>
+                            </ul>
+                        </div>
+                        <div t-elif="!state.messages.length" class="o_ai_chat_empty text-center">
                             <div class="o_ai_avatar o_ai_avatar_lg mx-auto mb-3">IA</div>
                             <h3>¿Qué querés saber de tu negocio?</h3>
                             <p class="text-muted">Consulto los datos del sistema con tus permisos. No modifico nada.</p>
-                            <span t-if="!state.models.length" class="text-warning d-block mb-3">
-                                Activá un modelo en Agente IA &gt; Configuración &gt; Modelos.
-                            </span>
                             <div class="o_ai_suggestions">
                                 <button t-foreach="suggestions" t-as="s" t-key="s_index" class="o_ai_suggestion"
-                                        t-att-disabled="!state.models.length" t-on-click="() => this.useSuggestion(s)" t-out="s"/>
+                                        t-on-click="() => this.useSuggestion(s)" t-out="s"/>
                             </div>
                         </div>
                         <t t-foreach="state.messages" t-as="msg" t-key="msg.id">
@@ -101,7 +107,7 @@
                     <form class="o_ai_composer d-flex align-items-end gap-2" t-on-submit.prevent="send">
                         <label for="o_ai_input" class="visually-hidden">Mensaje</label>
                         <textarea id="o_ai_input" class="flex-grow-1" rows="2" t-ref="input" t-model="state.draft"
-                                  t-att-disabled="state.sending" t-on-keydown="onKeydown"
+                                  t-att-disabled="state.sending or !state.models.length" t-on-keydown="onKeydown"
                                   placeholder="Preguntale algo sobre tus datos. Enter envía, Shift+Enter salto de línea."/>
                         <button type="submit" class="btn o_ai_btn_primary o_ai_send" aria-label="Enviar"
                                 t-att-disabled="state.sending or !state.draft.trim()">
