@@ -66,3 +66,20 @@ class TestFetchModels(AiAgentCase):
             self.assertEqual(prices.lookup_price("anthropic", "claude-opus-5-5-20261001"), (4.0, 20.0))
             self.assertEqual(prices.lookup_price("anthropic", "claude-opus-5-20260101"), (5.0, 25.0))
             self.assertIsNone(prices.lookup_price("openai", "claude-opus-5"))
+
+
+@tagged("post_install", "-at_install")
+class TestSettingsProviders(AiAgentCase):
+
+    def test_keys_are_set_from_settings(self):
+        settings = self.env["res.config.settings"].create({"ai_google_key": "AIza-test", "ai_anthropic_key": "sk-ant"})
+        settings.execute()
+        google = self.env["prometeo.ai.provider"].search([("provider_type", "=", "google")], limit=1)
+        self.assertEqual(google.api_key, "AIza-test")
+        self.assertEqual(self.env["res.config.settings"].create({}).ai_google_key, "AIza-test")
+
+    def test_fetch_models_button_from_settings(self):
+        from unittest.mock import patch
+        with patch("odoo.addons.prometeo_ai_agent.llm.list_models", return_value=[{"name": "gpt-z", "label": "Z"}]):
+            self.env["res.config.settings"].create({}).action_ai_fetch_models_openai()
+        self.assertTrue(self.env["prometeo.ai.model"].with_context(active_test=False).search_count([("name", "=", "gpt-z")]))

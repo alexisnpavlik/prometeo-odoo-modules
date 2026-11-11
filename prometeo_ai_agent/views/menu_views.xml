@@ -19,10 +19,6 @@
               action="action_ai_routine_template" sequence="2" groups="prometeo_ai_agent.group_admin"/>
     <menuitem id="menu_ai_usage" name="Consumo" parent="menu_ai_agent_root" action="action_ai_usage" sequence="30"
               groups="prometeo_ai_agent.group_admin"/>
-    <menuitem id="menu_ai_config" name="Configuración" parent="menu_ai_agent_root" sequence="90"
+    <menuitem id="menu_ai_settings" name="Ajustes" parent="menu_ai_agent_root" action="action_ai_settings" sequence="90"
               groups="prometeo_ai_agent.group_admin"/>
-    <menuitem id="menu_ai_settings" name="Ajustes" parent="menu_ai_config" action="action_ai_settings" sequence="1"/>
-    <menuitem id="menu_ai_provider" name="Proveedores" parent="menu_ai_config" action="action_ai_provider" sequence="10"/>
-    <menuitem id="menu_ai_model" name="Modelos" parent="menu_ai_config" action="action_ai_model" sequence="20"/>
-    <menuitem id="menu_ai_runs" name="Corridas" parent="menu_ai_config" action="action_ai_run" sequence="30"/>
 </odoo>

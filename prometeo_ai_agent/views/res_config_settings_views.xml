@@ -8,9 +8,27 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Agente IA" string="Agente IA" name="prometeo_ai_agent"
                      groups="prometeo_ai_agent.group_admin">
+                    <block title="Proveedores" name="ai_providers_block">
+                        <setting string="Claude (Anthropic)" help="Clave de API de console.anthropic.com.">
+                            <field name="ai_anthropic_key" password="True" placeholder="sk-ant-..."/>
+                            <button name="action_ai_fetch_models_anthropic" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                        </setting>
+                        <setting string="OpenAI o compatible" help="Cambiando la URL sirve para cualquier API compatible con OpenAI.">
+                            <field name="ai_openai_key" password="True" placeholder="sk-..."/>
+                            <div class="content-group mt8"><label for="ai_openai_base_url" string="URL" class="me-2"/><field name="ai_openai_base_url"/></div>
+                            <button name="action_ai_fetch_models_openai" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                        </setting>
+                        <setting string="Google Gemini" help="Clave de API de aistudio.google.com.">
+                            <field name="ai_google_key" password="True" placeholder="AIza..."/>
+                            <button name="action_ai_fetch_models_google" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                        </setting>
+                    </block>
                     <block title="Modelo por defecto" name="ai_model_block">
                         <setting string="Modelo por defecto" help="Se usa en el chat y en las rutinas sin modelo propio.">
                             <field name="ai_default_model_id" options="{'no_create': True}"/>
+                            <div class="text-muted mt8"><field name="ai_active_model_count" class="d-inline"/> modelos activos.
+                                Los modelos nuevos entran inactivos: activalos y revisá su precio.</div>
+                            <button name="action_ai_open_models" type="object" string="Activar modelos y precios" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                     </block>
                     <block title="Límites" name="ai_limits_block">
