@@ -11,15 +11,33 @@
                     <block title="Proveedores" name="ai_providers_block">
                         <setting string="Claude (Anthropic)" help="Clave de API de console.anthropic.com.">
                             <field name="ai_anthropic_key" password="True" placeholder="sk-ant-..."/>
+                            <div class="mt8 small">
+                                <field name="ai_anthropic_ok" invisible="1"/>
+                                <span invisible="not ai_anthropic_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
+                                <span invisible="ai_anthropic_ok" class="text-warning"><i class="fa fa-exclamation-circle me-1"/></span>
+                                <field name="ai_anthropic_status" class="d-inline" readonly="1"/>
+                            </div>
                             <button name="action_ai_fetch_models_anthropic" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                         <setting string="OpenAI o compatible" help="Cambiando la URL sirve para cualquier API compatible con OpenAI.">
                             <field name="ai_openai_key" password="True" placeholder="sk-..."/>
+                            <div class="mt8 small">
+                                <field name="ai_openai_ok" invisible="1"/>
+                                <span invisible="not ai_openai_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
+                                <span invisible="ai_openai_ok" class="text-warning"><i class="fa fa-exclamation-circle me-1"/></span>
+                                <field name="ai_openai_status" class="d-inline" readonly="1"/>
+                            </div>
                             <div class="content-group mt8"><label for="ai_openai_base_url" string="URL" class="me-2"/><field name="ai_openai_base_url"/></div>
                             <button name="action_ai_fetch_models_openai" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                         <setting string="Google Gemini" help="Clave de API de aistudio.google.com.">
                             <field name="ai_google_key" password="True" placeholder="AIza..."/>
+                            <div class="mt8 small">
+                                <field name="ai_google_ok" invisible="1"/>
+                                <span invisible="not ai_google_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
+                                <span invisible="ai_google_ok" class="text-warning"><i class="fa fa-exclamation-circle me-1"/></span>
+                                <field name="ai_google_status" class="d-inline" readonly="1"/>
+                            </div>
                             <button name="action_ai_fetch_models_google" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                     </block>
