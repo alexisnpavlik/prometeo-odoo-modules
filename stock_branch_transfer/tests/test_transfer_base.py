@@ -47,12 +47,21 @@ class TestTransferBase(BranchTransferCommon):
         ids = [r[0] for r in Company.name_search("SBT Sucursal")]
         self.assertNotIn(self.company_b.id, ids)
 
-    def test_cost_only_for_managers(self):
-        self.product.with_company(self.company_a).standard_price = 37.5
+    def test_sale_price_visible_for_normal_user(self):
+        self.product.lst_price = 50.0
+        self.env["product.pricelist"].create({
+            "name": "SBT Lista destino",
+            "company_id": self.company_b.id,
+            "item_ids": [(0, 0, {
+                "applied_on": "1_product",
+                "product_tmpl_id": self.product.product_tmpl_id.id,
+                "fixed_price": 80.0,
+            })],
+        })
         transfer = self.make_transfer(self.user_a)
-        line = transfer.line_ids[:1].with_user(self.manager)
-        self.assertEqual(line.cost, 37.5)
-        self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
+        line = transfer.line_ids[:1].with_user(self.user_a)
+        self.assertFalse(self.user_a.has_group("stock_branch_transfer.group_branch_transfer_manager"))
+        self.assertEqual(line.read(["sale_price"])[0]["sale_price"], 80.0)
 
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)

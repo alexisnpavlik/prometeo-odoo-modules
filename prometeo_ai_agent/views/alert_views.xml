@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_alert_list" model="ir.ui.view">
+        <field name="name">prometeo.ai.alert.list</field>
+        <field name="model">prometeo.ai.alert</field>
+        <field name="arch" type="xml">
+            <list create="0" decoration-bf="state == 'new'" decoration-muted="state != 'new'">
+                <field name="severity" widget="badge" decoration-danger="severity == 'high'"
+                       decoration-warning="severity == 'medium'" decoration-info="severity == 'low'"/>
+                <field name="name"/>
+                <field name="routine_id"/>
+                <field name="record_count" optional="hide"/>
+                <field name="first_seen" optional="hide"/>
+                <field name="last_seen"/>
+                <field name="state" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_alert_kanban" model="ir.ui.view">
+        <field name="name">prometeo.ai.alert.kanban</field>
+        <field name="model">prometeo.ai.alert</field>
+        <field name="arch" type="xml">
+            <kanban create="0" class="o_kanban_small_column" can_open="1">
+                <field name="severity"/>
+                <field name="state"/>
+                <field name="res_model"/>
+                <templates>
+                    <t t-name="card" class="o_ai_alert_card flex-row gap-3 p-3">
+                        <div t-attf-class="o_ai_sev_icon o_ai_sev_{{ record.severity.raw_value }}"
+                             t-att-title="record.severity.value" role="img" t-att-aria-label="'Gravedad ' + record.severity.value">
+                            <i t-attf-class="fa fa-lg {{ record.severity.raw_value === 'high' ? 'fa-exclamation-triangle' : (record.severity.raw_value === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle') }}"/>
+                        </div>
+                        <div class="flex-grow-1 min-w-0 d-flex flex-column gap-1">
+                            <span t-attf-class="fs-6 {{ record.state.raw_value === 'new' ? 'fw-bold' : 'fw-normal' }}"><field name="name"/></span>
+                            <field name="summary" class="o_ai_alert_summary small"/>
+                            <span class="small text-muted">
+                                <field name="routine_id"/> · <field name="last_seen" widget="date"/>
+                                <t t-if="record.state.raw_value !== 'new'"> · <field name="state"/></t>
+                            </span>
+                            <div class="d-flex flex-wrap gap-2 mt-2" t-if="record.state.raw_value === 'new'">
+                                <button t-if="record.res_model.raw_value" name="action_view_records" type="object" class="btn btn-sm btn-primary">Ver registros</button>
+                                <button name="action_resolve" type="object" class="btn btn-sm btn-secondary">Resolver</button>
+                                <button name="action_dismiss" type="object" class="btn btn-sm btn-secondary">Descartar</button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_ai_alert_form" model="ir.ui.view">
+        <field name="name">prometeo.ai.alert.form</field>
+        <field name="model">prometeo.ai.alert</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <header>
+                    <button name="action_view_records" type="object" string="Ver registros" class="btn-primary"
+                            invisible="not res_model"/>
+                    <button name="action_resolve" type="object" string="Resolver" invisible="state != 'new'"/>
+                    <button name="action_dismiss" type="object" string="Descartar" invisible="state != 'new'"/>
+                    <button name="action_reopen" type="object" string="Reabrir" invisible="state == 'new'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <field name="severity" widget="badge" decoration-danger="severity == 'high'"
+                               decoration-warning="severity == 'medium'" decoration-info="severity == 'low'"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <field name="summary" nolabel="1"/>
+                    <group>
+                        <group>
+                            <field name="routine_id"/>
+                            <field name="kind" invisible="kind == 'routine'"/>
+                            <field name="res_model" invisible="1"/>
+                            <field name="record_count" invisible="not record_count"/>
+                        </group>
+                        <group>
+                            <field name="first_seen"/>
+                            <field name="last_seen"/>
+                            <field name="silenced_until" invisible="state != 'dismissed'"/>
+                            <field name="resolved_note" invisible="not resolved_note"/>
+                        </group>
+                    </group>
+                    <group groups="prometeo_ai_agent.group_admin">
+                        <field name="recipient_ids" widget="many2many_tags"/>
+                        <field name="dedup_key"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ai_alert_search" model="ir.ui.view">
+        <field name="name">prometeo.ai.alert.search</field>
+        <field name="model">prometeo.ai.alert</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="routine_id"/>
+                <filter name="open" string="Abiertas" domain="[('state', '=', 'new')]"/>
+                <filter name="high" string="Gravedad alta" domain="[('severity', '=', 'high')]"/>
+                <filter name="closed" string="Resueltas o descartadas" domain="[('state', '!=', 'new')]"/>
+                <filter name="system" string="De sistema" domain="[('kind', '=', 'system')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_severity" string="Gravedad" context="{'group_by': 'severity'}"/>
+                    <filter name="group_routine" string="Rutina" context="{'group_by': 'routine_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_alert_inbox" model="ir.actions.act_window">
+        <field name="name">Alertas</field>
+        <field name="res_model">prometeo.ai.alert</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'search_default_open': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin alertas abiertas</p>
+            <p>Las rutinas del agente dejan acá lo que encuentran.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="prometeo_ai_agent.AlertSystray">
+        <div t-if="state.allowed" class="o_ai_alert_systray o-dropdown dropdown">
+            <button class="o-dropdown--toggle dropdown-toggle o_nav_entry border-0 bg-transparent"
+                    title="Alertas del Agente IA" t-on-click="onClick">
+                <i class="fa fa-bell-o fa-lg" role="img" aria-label="Alertas"/>
+                <span t-if="state.count" class="o_ai_alert_badge badge rounded-pill" t-out="state.count"/>
+            </button>
+        </div>
+    </t>
+</templates>

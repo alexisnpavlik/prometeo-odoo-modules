@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="digest_body">
+        <div>
+            <t t-foreach="[('high', 'Gravedad alta'), ('medium', 'Gravedad media'), ('low', 'Gravedad baja')]" t-as="level">
+                <t t-set="alerts" t-value="digest[level[0]]"/>
+                <t t-if="alerts">
+                    <p><strong t-out="level[1]"/></p>
+                    <ul>
+                        <li t-foreach="alerts" t-as="alert">
+                            <strong t-out="alert.name"/><t t-if="alert.summary">: <t t-out="alert.summary"/></t>
+                        </li>
+                    </ul>
+                </t>
+            </t>
+            <p>Tenés <t t-out="digest['open_total']"/> alertas abiertas en total.</p>
+        </div>
+    </template>
+</odoo>

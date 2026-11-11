@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="prometeo_ai_agent.UsageTable">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th t-out="title"/>
+                    <th class="text-end">Corridas</th>
+                    <th class="text-end">Tokens entrada</th>
+                    <th class="text-end">Tokens salida</th>
+                    <th class="text-end">Costo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr t-if="!rows.length"><td colspan="5" class="text-muted">Sin consumo en este mes.</td></tr>
+                <tr t-foreach="rows" t-as="row" t-key="row_index">
+                    <td t-out="row.name"/>
+                    <td class="text-end" t-out="number(row.runs)"/>
+                    <td class="text-end" t-out="number(row.input_tokens)"/>
+                    <td class="text-end" t-out="number(row.output_tokens)"/>
+                    <td class="text-end" t-out="money(row.cost)"/>
+                </tr>
+            </tbody>
+        </table>
+    </t>
+
+    <t t-name="prometeo_ai_agent.Usage">
+        <div class="o_ai_usage h-100 overflow-auto bg-view p-3">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <button class="btn btn-secondary" t-on-click="() => this.shift(-1)"><i class="fa fa-chevron-left"/></button>
+                <h3 class="m-0 text-capitalize" t-out="monthLabel"/>
+                <button class="btn btn-secondary" t-on-click="() => this.shift(1)"><i class="fa fa-chevron-right"/></button>
+                <button class="btn btn-link ms-auto" t-on-click="openDetail">Ver detalle</button>
+            </div>
+            <t t-if="state.data">
+                <p class="fs-4">
+                    Gasto: <strong t-out="money(state.data.cost)"/>
+                    <t t-if="state.data.cap"> de <t t-out="money(state.data.cap)"/></t>
+                    <t t-else=""> (sin tope)</t>
+                </p>
+                <div t-if="state.data.cap" t-attf-class="o_ai_usage_bar mb-3 {{ usageClass }}" role="progressbar"
+                     t-att-aria-valuenow="usagePercent" aria-valuemin="0" aria-valuemax="100">
+                    <div t-attf-style="width: {{ Math.min(usagePercent, 100) }}%"/>
+                </div>
+                <div t-if="state.data.unpriced_runs" class="alert alert-warning">
+                    <t t-out="state.data.unpriced_runs"/> corridas con modelos sin precio cargado: el costo real es mayor.
+                    Cargá el precio en Agente IA &gt; Configuración &gt; Modelos.
+                </div>
+                <h5 class="mt-4">Por rutina</h5>
+                <t t-call="prometeo_ai_agent.UsageTable"><t t-set="rows" t-value="state.data.by_routine"/><t t-set="title" t-value="'Rutina'"/></t>
+                <h5 class="mt-4">Por modelo</h5>
+                <t t-call="prometeo_ai_agent.UsageTable"><t t-set="rows" t-value="state.data.by_model"/><t t-set="title" t-value="'Modelo'"/></t>
+            </t>
+        </div>
+    </t>
+</templates>
