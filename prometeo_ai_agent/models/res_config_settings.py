@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import _, fields, models
 
 from .. import llm
 
@@ -40,6 +40,12 @@ class ResConfigSettings(models.TransientModel):
     ai_google_key = fields.Char("Clave de Google Gemini", compute="_compute_ai_keys",
                                 inverse="_inverse_ai_google_key", groups="prometeo_ai_agent.group_admin")
     ai_active_model_count = fields.Integer("Modelos activos", compute="_compute_ai_keys")
+    ai_anthropic_status = fields.Char(compute="_compute_ai_keys")
+    ai_anthropic_ok = fields.Boolean(compute="_compute_ai_keys")
+    ai_openai_status = fields.Char(compute="_compute_ai_keys")
+    ai_openai_ok = fields.Boolean(compute="_compute_ai_keys")
+    ai_google_status = fields.Char(compute="_compute_ai_keys")
+    ai_google_ok = fields.Boolean(compute="_compute_ai_keys")
 
     def _ai_provider(self, provider_type):
         """Proveedor de ese tipo (el que tenga clave primero); lo crea si no existe."""
@@ -61,23 +67,35 @@ class ResConfigSettings(models.TransientModel):
             rec.ai_openai_base_url = openai.base_url
             rec.ai_google_key = rec._ai_provider("google").api_key
             rec.ai_active_model_count = self.env["prometeo.ai.model"].sudo().search_count([("active", "=", True)])
+            for ptype in ("anthropic", "openai", "google"):
+                provider = rec._ai_provider(ptype)
+                rec["ai_%s_status" % ptype] = provider.check_message or (
+                    _("Sin clave cargada.") if not provider.api_key else _("Clave sin probar."))
+                rec["ai_%s_ok" % ptype] = provider.check_state == "ok"
 
     def _inverse_ai_anthropic_key(self):
         for rec in self:
-            rec._ai_provider("anthropic").api_key = rec.ai_anthropic_key
+            provider = rec._ai_provider("anthropic")
+            if (provider.api_key or False) != (rec.ai_anthropic_key or False):
+                provider.api_key = rec.ai_anthropic_key
 
     def _inverse_ai_openai_key(self):
         for rec in self:
-            rec._ai_provider("openai").api_key = rec.ai_openai_key
+            provider = rec._ai_provider("openai")
+            if (provider.api_key or False) != (rec.ai_openai_key or False):
+                provider.api_key = rec.ai_openai_key
 
     def _inverse_ai_openai_base_url(self):
         for rec in self:
-            if rec.ai_openai_base_url:
-                rec._ai_provider("openai").base_url = rec.ai_openai_base_url
+            provider = rec._ai_provider("openai")
+            if rec.ai_openai_base_url and rec.ai_openai_base_url != provider.base_url:
+                provider.base_url = rec.ai_openai_base_url
 
     def _inverse_ai_google_key(self):
         for rec in self:
-            rec._ai_provider("google").api_key = rec.ai_google_key
+            provider = rec._ai_provider("google")
+            if (provider.api_key or False) != (rec.ai_google_key or False):
+                provider.api_key = rec.ai_google_key
 
     def _ai_fetch(self, provider_type):
         """Guarda los ajustes y trae los modelos del proveedor."""

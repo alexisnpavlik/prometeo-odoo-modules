@@ -72,8 +72,10 @@ class TestFetchModels(AiAgentCase):
 class TestSettingsProviders(AiAgentCase):
 
     def test_keys_are_set_from_settings(self):
-        settings = self.env["res.config.settings"].create({"ai_google_key": "AIza-test", "ai_anthropic_key": "sk-ant"})
-        settings.execute()
+        from unittest.mock import patch
+        with patch("odoo.addons.prometeo_ai_agent.llm.list_models", return_value=[]):
+            settings = self.env["res.config.settings"].create({"ai_google_key": "AIza-test", "ai_anthropic_key": "sk-ant"})
+            settings.execute()
         google = self.env["prometeo.ai.provider"].search([("provider_type", "=", "google")], limit=1)
         self.assertEqual(google.api_key, "AIza-test")
         self.assertEqual(self.env["res.config.settings"].create({}).ai_google_key, "AIza-test")
@@ -83,3 +85,39 @@ class TestSettingsProviders(AiAgentCase):
         with patch("odoo.addons.prometeo_ai_agent.llm.list_models", return_value=[{"name": "gpt-z", "label": "Z"}]):
             self.env["res.config.settings"].create({}).action_ai_fetch_models_openai()
         self.assertTrue(self.env["prometeo.ai.model"].with_context(active_test=False).search_count([("name", "=", "gpt-z")]))
+
+
+@tagged("post_install", "-at_install")
+class TestKeyFeedback(AiAgentCase):
+
+    def google(self):
+        return self.env["prometeo.ai.provider"].search([("provider_type", "=", "google")], limit=1)
+
+    def test_valid_key_checks_syncs_and_activates(self):
+        from unittest.mock import patch
+        self.env["ir.config_parameter"].sudo().set_param("prometeo_ai_agent.default_model_id", "")
+        listed = [{"name": "gemini-3.8-flash", "label": "Gemini 3.8 Flash"}, {"name": "raro-9", "label": "Raro"}]
+        with patch("odoo.addons.prometeo_ai_agent.llm.list_models", return_value=listed):
+            self.google().api_key = "AIza-ok"
+        g = self.google()
+        self.assertEqual(g.check_state, "ok")
+        self.assertIn("2 modelos", g.check_message)
+        models = g.with_context(active_test=False).model_ids
+        self.assertTrue(models.filtered(lambda m: m.name == "gemini-3.8-flash").active)
+        self.assertFalse(models.filtered(lambda m: m.name == "raro-9").active)
+        self.assertEqual(self.env["prometeo.ai.model"]._get_default().name, "gemini-3.8-flash")
+
+    def test_invalid_key_reports_error(self):
+        from unittest.mock import patch
+        from odoo.addons.prometeo_ai_agent import llm
+        with patch("odoo.addons.prometeo_ai_agent.llm.list_models",
+                   side_effect=llm.LlmError("La clave de API no es válida (401). Detalle: x", status=401)):
+            self.google().api_key = "malo"
+        self.assertEqual(self.google().check_state, "error")
+        self.assertIn("no es válida", self.google().check_message)
+
+    def test_settings_show_status(self):
+        from unittest.mock import patch
+        with patch("odoo.addons.prometeo_ai_agent.llm.list_models", return_value=[{"name": "gemini-x", "label": "X"}]):
+            self.google().api_key = "AIza-ok"
+        self.assertIn("Clave válida", self.env["res.config.settings"].create({}).ai_google_status)
