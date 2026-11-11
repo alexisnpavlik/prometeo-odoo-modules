@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <menuitem id="menu_ai_agent_root" name="Agente IA" sequence="2"
+    <menuitem id="menu_ai_agent_root" name="Agente IA" sequence="5"
               web_icon="prometeo_ai_agent,static/description/icon.png"
               groups="prometeo_ai_agent.group_user"/>
     <record id="action_ai_chat" model="ir.actions.client">
