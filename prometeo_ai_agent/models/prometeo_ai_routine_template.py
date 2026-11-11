@@ -37,6 +37,12 @@ class PrometeoAiRoutineTemplate(models.Model):
         positive = (operator in ("=", "==") and value) or (operator == "!=" and not value)
         return [("id", "in" if positive else "not in", ids)]
 
+    def action_run_in_chat(self):
+        """Corre la instrucción ahora en el chat, con los permisos de quien la ejecuta. No crea rutina."""
+        self.ensure_one()
+        return {"type": "ir.actions.client", "tag": "prometeo_ai_agent.chat", "name": _("Chat"),
+                "params": {"prompt": self.prompt, "title": self.name}}
+
     def action_use(self):
         """Crea una rutina activa a partir de la plantilla y abre su formulario."""
         self.ensure_one()

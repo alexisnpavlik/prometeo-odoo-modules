@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, markup, onPatched, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
+import { Component, markup, onMounted, onPatched, onWillStart, onWillUnmount, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { escape } from "@web/core/utils/strings";
@@ -109,11 +109,24 @@ export class AiChat extends Component {
             this.state.modelId = def ? def.id : null;
             await this.loadConversations();
             await this.loadAlerts();
+            this.pendingPrompt = this.props.action?.params?.prompt;
+            if (this.pendingPrompt) {
+                return;
+            }
             if (this.state.conversations.length) {
                 await this.openConversation(this.state.conversations[0].id);
             }
         });
         onPatched(() => this.scrollToBottom());
+        onMounted(() => {
+            if (this.pendingPrompt && this.state.models.length) {
+                this.state.draft = this.pendingPrompt;
+                this.pendingPrompt = null;
+                this.send();
+            } else if (this.pendingPrompt) {
+                this.state.draft = this.pendingPrompt;
+            }
+        });
     }
 
     get groupedConversations() {

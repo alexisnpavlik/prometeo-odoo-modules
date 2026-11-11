@@ -200,3 +200,14 @@ class TestRoutineDefaultCompanies(AiAgentCase):
         tpl = self.env["prometeo.ai.routine.template"].create({"name": "T", "prompt": "x", "required_module": "base"})
         action = tpl.with_user(self.admin_user).action_use()
         self.assertEqual(Routine.browse(action["res_id"]).company_ids, expected)
+
+
+@tagged("post_install", "-at_install")
+class TestTemplateRunInChat(AiAgentCase):
+
+    def test_run_now_opens_chat_with_prompt(self):
+        tpl = self.env["prometeo.ai.routine.template"].create({"name": "T", "prompt": "Revisá X", "required_module": "base"})
+        action = tpl.with_user(self.admin_user).action_run_in_chat()
+        self.assertEqual(action["tag"], "prometeo_ai_agent.chat")
+        self.assertEqual(action["params"]["prompt"], "Revisá X")
+        self.assertFalse(self.env["prometeo.ai.routine"].search_count([("template_id", "=", tpl.id)]))

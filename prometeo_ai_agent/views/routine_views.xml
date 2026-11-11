@@ -127,7 +127,8 @@
                 <field name="name"/>
                 <field name="description"/>
                 <field name="interval_type" string="Frecuencia"/>
-                <button name="action_use" type="object" string="Usar" class="btn-primary" icon="fa-plus"/>
+                <button name="action_run_in_chat" type="object" string="Ejecutar ahora" class="btn-primary" icon="fa-play"/>
+                <button name="action_use" type="object" string="Programar" class="btn-secondary" icon="fa-clock-o"/>
             </list>
         </field>
     </record>
@@ -138,7 +139,8 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_use" type="object" string="Usar esta plantilla" class="btn-primary"/>
+                    <button name="action_run_in_chat" type="object" string="Ejecutar ahora" class="btn-primary"/>
+                    <button name="action_use" type="object" string="Programar como rutina" class="btn-secondary"/>
                 </header>
                 <sheet>
                     <h1><field name="name"/></h1>
