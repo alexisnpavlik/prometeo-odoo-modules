@@ -12,7 +12,7 @@ class PrometeoAiRoutineTemplate(models.Model):
     name = fields.Char("Nombre", required=True)
     description = fields.Text("Descripción")
     prompt = fields.Text("Instrucción", required=True)
-    required_module = fields.Char("Módulo requerido", help="Nombre técnico del módulo de Odoo que necesita.")
+    required_module = fields.Char("Módulo requerido", help="Nombre técnico del módulo que necesita.")
     interval_number = fields.Integer("Cada", default=1)
     interval_type = fields.Selection(INTERVALS, "Unidad", default="days")
     run_hour = fields.Float("Hora", default=8.0)

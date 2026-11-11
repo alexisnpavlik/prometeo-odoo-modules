@@ -114,7 +114,7 @@ class PrometeoAiAlert(models.Model):
                 alert.message_notify(
                     partner_ids=partners.ids,
                     subject=_("[IA] Alerta: %s", alert.name),
-                    body=_("%(text)s\n\nGenerado por el Agente IA. Verificá en Odoo antes de actuar.",
+                    body=_("%(text)s\n\nGenerado por el Agente IA. Verificá en el sistema antes de actuar.",
                            text=alert.summary or alert.name),
                 )
 

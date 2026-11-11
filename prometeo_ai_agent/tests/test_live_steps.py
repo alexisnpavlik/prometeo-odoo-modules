@@ -19,7 +19,7 @@ class TestLiveSteps(AiAgentCase):
                            tools.new_context(), 5, 60, on_step=steps.append)
         self.assertEqual(len(steps), 1)
         self.assertIn("registros", steps[0])
-        self.assertIn("res.partner", steps[0])
+        self.assertNotIn("res.partner", steps[0])
 
     def test_chat_publishes_steps_to_user(self):
         conv = self.env["prometeo.ai.conversation"].with_user(self.agent_user).create({})

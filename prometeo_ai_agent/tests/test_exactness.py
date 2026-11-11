@@ -88,3 +88,18 @@ class TestScopeRule(AiAgentCase):
         p = prompts.build_system_prompt(self.env(user=self.agent_user), "chat")
         self.assertIn(prompts.OFF_TOPIC_REPLY, p)
         self.assertIn("Python", p)
+
+
+@tagged("post_install", "-at_install")
+class TestNoBrand(AiAgentCase):
+
+    def test_user_facing_texts_do_not_name_odoo(self):
+        import os
+        from odoo.addons.prometeo_ai_agent.agent import prompts
+        self.assertNotIn("Odoo", prompts.OFF_TOPIC_REPLY)
+        p = prompts.build_system_prompt(self.env(user=self.agent_user), "chat")
+        self.assertIn("Nunca nombres Odoo", p)
+        base = os.path.dirname(os.path.dirname(__file__))
+        for rel in ("static/src/xml/chat_action.xml", "views/res_config_settings_views.xml"):
+            with open(os.path.join(base, rel)) as f:
+                self.assertNotIn("Odoo", f.read(), rel)

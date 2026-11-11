@@ -40,7 +40,7 @@ def describe_step(env, name, arguments, content):
     model = (arguments or {}).get("model") if isinstance(arguments, dict) else None
     if model and name not in ("create_alert",):
         label = env["ir.model"].sudo()._get(model).name if model in env else model
-        verb = "%s %s (%s)" % (verb, label, model)
+        verb = "%s %s" % (verb, label)
     try:
         data = json.loads(content)
     except (TypeError, ValueError):
