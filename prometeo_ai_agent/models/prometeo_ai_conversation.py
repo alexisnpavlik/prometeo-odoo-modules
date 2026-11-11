@@ -83,9 +83,11 @@ class PrometeoAiConversation(models.Model):
         user_message = {"role": "user", "content": text}
         started = time.monotonic()
         try:
+            # Todas las empresas a las que el usuario tiene acceso, no solo las elegidas en el selector.
+            env_all = self.env(context=dict(self.env.context, allowed_company_ids=self.env.user.company_ids.ids))
             with self.env.cr.savepoint():
                 result = loop.run_agent(
-                    self.env, ai_model, prompts.build_system_prompt(self.env, "chat"),
+                    env_all, ai_model, prompts.build_system_prompt(env_all, "chat"),
                     self._history() + [user_message], tools.READ_TOOLS, tools.new_context(),
                     get_param(self.env, "chat_max_tool_calls"), get_param(self.env, "chat_max_seconds"),
                     on_step=self._publish_step)
