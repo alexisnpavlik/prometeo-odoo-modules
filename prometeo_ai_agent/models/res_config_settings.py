@@ -26,6 +26,8 @@ class ResConfigSettings(models.TransientModel):
                                             config_parameter=PREFIX + "routine_max_seconds")
     ai_monthly_cap_usd = fields.Float("Tope mensual (USD)", default=0.0, config_parameter=PREFIX + "monthly_cap_usd")
     ai_digest_hour = fields.Integer("Hora del resumen diario", default=8, config_parameter=PREFIX + "digest_hour")
+    ai_support_contact = fields.Char("Contacto de soporte", config_parameter=PREFIX + "support_contact",
+                                     help="Se muestra cuando el servicio de IA falla. Ej.: Alexis, 11 5555-5555")
     ai_dismiss_silence_days = fields.Integer("Días de silencio al descartar", default=30,
                                              config_parameter=PREFIX + "dismiss_silence_days")
 

@@ -100,7 +100,7 @@ class PrometeoAiConversation(models.Model):
             _logger.info("Chat %s: error del proveedor: %s", self.id, e)
             Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error", error=str(e),
                      duration=time.monotonic() - started)
-            return {"status": "error", "message": _("No se pudo completar la respuesta: %s", str(e)[:300])}
+            return {"status": "error", "message": self._friendly_error(e)}
         except Exception as e:  # noqa: BLE001
             _logger.exception("Chat %s: error inesperado", self.id)
             Run._log("chat", ai_model, getattr(e, "usage", None) or {}, user=self.env.user, status="error",
@@ -109,6 +109,26 @@ class PrometeoAiConversation(models.Model):
         Run._log("chat", ai_model, result, user=self.env.user, status=result["status"],
                  duration=time.monotonic() - started)
         return {"status": "ok", "reply": result["text"]}
+
+    def _friendly_error(self, error):
+        """Mensaje para el usuario: qué pasó en simple y a quién avisar. El detalle técnico, solo al admin."""
+        status = getattr(error, "status", None)
+        contact = get_param(self.env, "support_contact")
+        support = (_("Contactá a soporte: %s.", contact) if contact
+                   else _("Avisale al administrador del sistema."))
+        if status == 402:
+            text = _("Se acabaron los créditos del servicio de IA. %s", support)
+        elif status in (401, 403):
+            text = _("La clave del servicio de IA no es válida o venció. %s", support)
+        elif status == 429:
+            text = _("El servicio de IA está saturado. Probá de nuevo en unos minutos.")
+        elif isinstance(error, UserError):
+            text = _("%(error)s %(support)s", error=str(error), support=support)
+        else:
+            text = _("El servicio de IA no respondió. Probá de nuevo; si sigue fallando: %s", support)
+        if self.env.user.has_group("prometeo_ai_agent.group_admin") and not isinstance(error, UserError):
+            text += "\n\n" + _("Detalle técnico: %s", str(error)[:300])
+        return text
 
     def _publish_step(self, text):
         """Manda un paso al navegador por el bus, con un cursor propio para que llegue antes de terminar."""

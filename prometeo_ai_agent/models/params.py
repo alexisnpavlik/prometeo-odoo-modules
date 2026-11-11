@@ -11,6 +11,7 @@ DEFAULTS = {
     "monthly_cap_usd": 0.0,
     "digest_hour": 8,
     "dismiss_silence_days": 30,
+    "support_contact": "",
 }
 
 

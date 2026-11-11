@@ -61,6 +61,9 @@
                         <setting string="Resumen diario" help="Hora local en que se envía el resumen de las últimas 24 horas.">
                             <field name="ai_digest_hour"/>
                         </setting>
+                        <setting string="Contacto de soporte" help="Se muestra a los usuarios cuando el servicio de IA falla (sin crédito, clave vencida).">
+                            <field name="ai_support_contact" placeholder="Ej.: Alexis, 11 5555-5555"/>
+                        </setting>
                         <setting string="Silencio al descartar" help="Días en que una alerta descartada no se vuelve a crear.">
                             <field name="ai_dismiss_silence_days"/>
                         </setting>

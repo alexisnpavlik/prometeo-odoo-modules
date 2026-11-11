@@ -59,7 +59,7 @@ class TestChat(AiAgentCase):
         with self.fake_llm(llm.LlmError("caído", 500)):
             r = self.conv.send_message("hola")
         self.assertEqual(r["status"], "error")
-        self.assertIn("caído", r["message"])
+        self.assertIn("administrador", r["message"])
         self.assertFalse(self.conv.message_ids)
         self.assertEqual(self.Run.search([("kind", "=", "chat")]).status, "error")
 
@@ -135,3 +135,29 @@ class TestChatAllCompanies(AiAgentCase):
             conv.send_message("buscá")
         self.assertEqual(json.loads(mock.call_args.args[3][-1]["content"])["count"], 1)
         self.assertIn("AI Empresa B", mock.call_args.args[2])
+
+
+@tagged("post_install", "-at_install")
+class TestChatSupportMessage(AiAgentCase):
+
+    def send(self, error):
+        conv = self.env["prometeo.ai.conversation"].with_user(self.agent_user).create({})
+        with self.fake_llm(error):
+            return conv.send_message("hola")["message"]
+
+    def test_no_credit_tells_to_contact_support(self):
+        self.env["ir.config_parameter"].sudo().set_param("prometeo_ai_agent.support_contact", "Alexis, 11 5555-5555")
+        msg = self.send(llm.LlmError("detalle técnico", status=402))
+        self.assertIn("créditos", msg)
+        self.assertIn("Alexis, 11 5555-5555", msg)
+        self.assertNotIn("detalle técnico", msg)
+
+    def test_invalid_key_and_no_contact_configured(self):
+        msg = self.send(llm.LlmError("x", status=401))
+        self.assertIn("clave", msg)
+        self.assertIn("administrador", msg)
+
+    def test_rate_limit_does_not_send_to_support(self):
+        msg = self.send(llm.LlmError("x", status=429))
+        self.assertIn("minutos", msg)
+        self.assertNotIn("soporte", msg)
