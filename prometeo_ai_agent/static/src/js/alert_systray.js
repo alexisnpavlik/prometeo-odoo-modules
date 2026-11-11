@@ -49,7 +49,7 @@ export class AiAlertSystray extends Component {
     }
 
     async onClick() {
-        await this.action.doAction("prometeo_ai_agent.action_alert_inbox", { clearBreadcrumbs: true });
+        await this.action.doAction("prometeo_ai_agent.action_ai_chat", { clearBreadcrumbs: true });
         this.refresh();
     }
 }

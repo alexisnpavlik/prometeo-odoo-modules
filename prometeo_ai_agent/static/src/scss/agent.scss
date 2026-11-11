@@ -146,6 +146,63 @@ $o-ai-accent-soft: rgba(11, 110, 103, 0.1);
     }
     .o_ai_send { width: 44px; height: 44px; border-radius: 12px; }
 
+    .o_ai_alerts_toggle { display: none; }
+    .o_ai_alerts_panel {
+        width: 320px;
+        min-width: 320px;
+        min-height: 0;
+        background-color: $o-view-background-color;
+        border-left: 1px solid $border-color;
+    }
+    .o_ai_alert_item {
+        padding: 10px;
+        border: 1px solid $border-color;
+        border-radius: 10px;
+    }
+    .o_ai_alert_text {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .o_ai_sev_icon_sm {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .o_ai_sev_high { background-color: rgba(165, 40, 27, .1); color: #a5281b; }
+    .o_ai_sev_medium { background-color: rgba(138, 83, 0, .1); color: #8a5300; }
+    .o_ai_sev_low { background-color: rgba(31, 90, 150, .1); color: #1f5a96; }
+    .o_ai_ok { color: $o-ai-accent; }
+    .o_ai_alerts_toggle .o_ai_alert_badge {
+        position: absolute;
+        top: -4px;
+        right: -6px;
+        font-size: .7em;
+        background-color: $danger;
+        color: $white;
+    }
+
+    @media (max-width: 1199.98px) {
+        position: relative;
+        .o_ai_alerts_toggle { display: inline-block; }
+        .o_ai_alerts_panel {
+            display: none !important;
+            position: absolute;
+            z-index: 10;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            max-width: 100%;
+            box-shadow: 0 0 16px rgba(0, 0, 0, .15);
+        }
+        .o_ai_alerts_open { display: flex !important; }
+    }
+
     @include media-breakpoint-down(md) {
         position: relative;
         .o_ai_chat_toggle { display: inline-block; }

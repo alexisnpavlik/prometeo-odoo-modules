@@ -11,8 +11,7 @@
         <field name="name">Consumo</field>
         <field name="tag">prometeo_ai_agent.usage</field>
     </record>
-    <menuitem id="menu_ai_alerts" name="Alertas" parent="menu_ai_agent_root" action="action_alert_inbox" sequence="1"/>
-    <menuitem id="menu_ai_chat" name="Chat" parent="menu_ai_agent_root" action="action_ai_chat" sequence="10"/>
+    <menuitem id="menu_ai_chat" name="Chat y alertas" parent="menu_ai_agent_root" action="action_ai_chat" sequence="1"/>
     <menuitem id="menu_ai_routines_root" name="Rutinas" parent="menu_ai_agent_root" sequence="20"/>
     <menuitem id="menu_ai_routines" name="Rutinas" parent="menu_ai_routines_root" action="action_ai_routine" sequence="1"/>
     <menuitem id="menu_ai_routine_templates" name="Plantillas" parent="menu_ai_routines_root"

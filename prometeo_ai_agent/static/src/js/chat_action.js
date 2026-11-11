@@ -72,6 +72,7 @@ export class AiChat extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.busService = useService("bus_service");
+        this.action = useService("action");
         this.messagesRef = useRef("messages");
         this.inputRef = useRef("input");
         this.suggestions = SUGGESTIONS;
@@ -86,6 +87,8 @@ export class AiChat extends Component {
             steps: [],
             elapsed: 0,
             showList: false,
+            alerts: [],
+            showAlerts: false,
         });
         this.onStep = (payload) => {
             if (this.state.sending && payload.conversation_id === this.state.currentId) {
@@ -102,6 +105,7 @@ export class AiChat extends Component {
             const def = this.state.models.find((m) => m.is_default) || this.state.models[0];
             this.state.modelId = def ? def.id : null;
             await this.loadConversations();
+            await this.loadAlerts();
             if (this.state.conversations.length) {
                 await this.openConversation(this.state.conversations[0].id);
             }
@@ -121,6 +125,36 @@ export class AiChat extends Component {
             group.items.push(conv);
         }
         return groups;
+    }
+
+    async loadAlerts() {
+        const alerts = await this.orm.searchRead(
+            "prometeo.ai.alert",
+            [["state", "=", "new"]],
+            ["name", "summary", "severity", "res_model", "last_seen", "routine_id"],
+            { limit: 50, order: "severity_sequence, last_seen desc" }
+        );
+        this.state.alerts = alerts;
+    }
+
+    async alertAction(alert, method) {
+        const result = await this.orm.call("prometeo.ai.alert", method, [[alert.id]]);
+        if (result && result.type) {
+            await this.action.doAction(result);
+            return;
+        }
+        await this.loadAlerts();
+    }
+
+    askAbout(alert) {
+        this.state.showAlerts = false;
+        this.newConversation();
+        this.state.draft = `Explicame esta alerta y qué conviene hacer: "${alert.name}"`;
+        this.orm.call("prometeo.ai.alert", "action_mark_seen", [[alert.id]]);
+    }
+
+    openAllAlerts() {
+        this.action.doAction("prometeo_ai_agent.action_alert_inbox");
     }
 
     async loadConversations() {
