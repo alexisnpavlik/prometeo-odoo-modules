@@ -1,5 +1,7 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+import pytz
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
@@ -163,3 +165,40 @@ class PrometeoAiAlert(models.Model):
         """Alertas abiertas del usuario que todavía no vio."""
         return self.search_count([("state", "=", "new"), ("recipient_ids", "in", self.env.uid),
                                   ("seen_by_ids", "not in", self.env.uid)])
+
+    # ------------------------------------------------------------------ resumen diario
+
+    @api.model
+    def _digest_for(self, user):
+        """Alertas del usuario detectadas en las últimas 24 h, por gravedad. None si no hay."""
+        Alert = self.sudo()
+        since = fields.Datetime.now() - timedelta(hours=24)
+        recent = Alert.search([("recipient_ids", "in", user.id), ("first_seen", ">=", since)])
+        if not recent:
+            return None
+        open_total = Alert.search_count([("recipient_ids", "in", user.id), ("state", "=", "new")])
+        return {"high": recent.filtered(lambda a: a.severity == "high"),
+                "medium": recent.filtered(lambda a: a.severity == "medium"),
+                "low": recent.filtered(lambda a: a.severity == "low"),
+                "open_total": open_total}
+
+    @api.model
+    def _cron_send_daily_digest(self):
+        """Cron horario: a la hora configurada envía el resumen una vez por día."""
+        tz = pytz.timezone(self.env.company.partner_id.tz or "America/Argentina/Buenos_Aires")
+        local_now = datetime.now(pytz.utc).astimezone(tz)
+        params = self.env["ir.config_parameter"].sudo()
+        today = local_now.date().isoformat()
+        if local_now.hour != get_param(self.env, "digest_hour") or params.get_param(
+                "prometeo_ai_agent.digest_last_date") == today:
+            return
+        params.set_param("prometeo_ai_agent.digest_last_date", today)
+        since = fields.Datetime.now() - timedelta(hours=24)
+        users = self.sudo().search([("first_seen", ">=", since)]).recipient_ids.filtered("active")
+        for user in users:
+            digest = self._digest_for(user)
+            if not digest:
+                continue
+            body = self.env["ir.qweb"]._render("prometeo_ai_agent.digest_body", {"digest": digest})
+            self.sudo().message_notify(partner_ids=user.partner_id.ids,
+                                       subject=_("Resumen diario del Agente IA"), body=body)

@@ -12,6 +12,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "data/prometeo_ai_provider_data.xml",
+        "data/digest_template.xml",
         "data/ir_cron.xml",
         "data/prometeo_ai_routine_template_data.xml",
         "views/provider_views.xml",
@@ -21,6 +22,13 @@
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "prometeo_ai_agent/static/src/scss/agent.scss",
+            "prometeo_ai_agent/static/src/js/alert_systray.js",
+            "prometeo_ai_agent/static/src/xml/alert_systray.xml",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": True,

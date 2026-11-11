@@ -5,3 +5,4 @@ from . import test_tools
 from . import test_loop
 from . import test_alert
 from . import test_routine
+from . import test_digest

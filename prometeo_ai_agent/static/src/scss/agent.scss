@@ -1,0 +1,10 @@
+.o_ai_alert_systray {
+    .o_ai_alert_badge {
+        position: relative;
+        top: -8px;
+        margin-left: -6px;
+        font-size: 0.7em;
+        background-color: $danger;
+        color: $white;
+    }
+}
