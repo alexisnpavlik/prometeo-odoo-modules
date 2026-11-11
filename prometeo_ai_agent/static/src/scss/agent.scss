@@ -8,3 +8,50 @@
         color: $white;
     }
 }
+
+.o_ai_chat {
+    overflow: hidden;
+
+    .o_ai_chat_list {
+        width: 280px;
+        min-width: 280px;
+        min-height: 0;
+    }
+    .o_ai_chat_item {
+        cursor: pointer;
+        &:hover { background-color: $gray-100; }
+    }
+    .o_ai_chat_item_active { background-color: $gray-200; }
+    .o_ai_chat_main { min-width: 0; min-height: 0; }
+    .o_ai_chat_messages { min-height: 0; }
+    .o_ai_chat_toggle { display: none; }
+    .o_ai_chat_bubble {
+        max-width: 80%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.75rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .o_ai_chat_bubble_user {
+        background-color: $o-brand-primary;
+        color: $white;
+    }
+    .o_ai_chat_bubble_agent { background-color: $gray-200; }
+    textarea { resize: none; }
+
+    @include media-breakpoint-down(md) {
+        position: relative;
+        .o_ai_chat_toggle { display: inline-block; }
+        .o_ai_chat_list {
+            display: none !important;
+            position: absolute;
+            z-index: 10;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            background-color: $o-view-background-color;
+        }
+        .o_ai_chat_list_open { display: flex !important; }
+        .o_ai_chat_bubble { max-width: 92%; }
+    }
+}

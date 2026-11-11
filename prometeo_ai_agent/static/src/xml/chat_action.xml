@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="prometeo_ai_agent.Chat">
+        <div class="o_ai_chat d-flex h-100 bg-view">
+            <aside t-attf-class="o_ai_chat_list border-end d-flex flex-column {{ state.showList ? 'o_ai_chat_list_open' : '' }}">
+                <div class="p-2 border-bottom">
+                    <button class="btn btn-primary w-100" t-on-click="newConversation">
+                        <i class="fa fa-plus me-1"/>Nueva conversación
+                    </button>
+                </div>
+                <div class="flex-grow-1 overflow-auto">
+                    <div t-foreach="state.conversations" t-as="conv" t-key="conv.id"
+                         t-attf-class="o_ai_chat_item d-flex align-items-center px-3 py-2 border-bottom {{ conv.id === state.currentId ? 'o_ai_chat_item_active' : '' }}"
+                         t-on-click="() => this.openConversation(conv.id)">
+                        <div class="flex-grow-1 text-truncate">
+                            <div class="text-truncate" t-out="conv.name or 'Conversación nueva'"/>
+                            <small class="text-muted" t-out="formatDate(conv.write_date)"/>
+                        </div>
+                        <button class="btn btn-link text-muted p-1" title="Borrar"
+                                t-on-click="(ev) => this.deleteConversation(conv.id, ev)">
+                            <i class="fa fa-trash-o"/>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+            <section class="o_ai_chat_main d-flex flex-column flex-grow-1">
+                <header class="d-flex align-items-center gap-2 p-2 border-bottom">
+                    <button class="btn btn-secondary o_ai_chat_toggle" t-on-click="() => this.state.showList = !this.state.showList">
+                        <i class="fa fa-bars"/>
+                    </button>
+                    <select class="form-select w-auto" t-model.number="state.modelId" t-att-disabled="state.sending">
+                        <option t-foreach="state.models" t-as="m" t-key="m.id" t-att-value="m.id" t-out="m.label"/>
+                    </select>
+                    <span t-if="!state.models.length" class="text-warning">Configurá un proveedor y un modelo en Agente IA &gt; Configuración.</span>
+                </header>
+                <div class="o_ai_chat_messages flex-grow-1 overflow-auto p-3" t-ref="messages">
+                    <div t-if="!state.messages.length" class="text-center text-muted mt-5">
+                        <p class="fs-4">Preguntale algo sobre tus datos de Odoo</p>
+                        <p>Ej.: ¿Qué traslados quedaron pendientes esta semana? ¿Qué productos están sin stock?</p>
+                    </div>
+                    <div t-foreach="state.messages" t-as="msg" t-key="msg.id"
+                         t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}">
+                        <div t-attf-class="o_ai_chat_bubble {{ msg.role === 'user' ? 'o_ai_chat_bubble_user' : 'o_ai_chat_bubble_agent' }}"
+                             t-out="msg.content"/>
+                    </div>
+                    <div t-if="state.sending" class="d-flex mb-2">
+                        <div class="o_ai_chat_bubble o_ai_chat_bubble_agent text-muted">
+                            <i class="fa fa-circle-o-notch fa-spin me-1"/>Analizando…
+                        </div>
+                    </div>
+                </div>
+                <footer class="d-flex gap-2 p-2 border-top">
+                    <textarea class="form-control" rows="2" t-ref="input" t-model="state.draft"
+                              t-att-disabled="state.sending" t-on-keydown="onKeydown"
+                              placeholder="Escribí tu pregunta. Enter envía, Shift+Enter hace salto de línea."/>
+                    <button class="btn btn-primary" t-on-click="send" t-att-disabled="state.sending or !state.draft.trim()">
+                        <i class="fa fa-paper-plane"/>
+                    </button>
+                </footer>
+            </section>
+        </div>
+    </t>
+</templates>
