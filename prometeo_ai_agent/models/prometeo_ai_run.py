@@ -2,7 +2,8 @@ from datetime import datetime
 
 import pytz
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 from .params import get_param
 
@@ -71,3 +72,33 @@ class PrometeoAiRun(models.Model):
         """True si hay tope mensual y el gasto del mes lo alcanzó."""
         cap = get_param(self.env, "monthly_cap_usd")
         return bool(cap) and self._month_cost() >= cap
+
+    @api.model
+    def get_usage_summary(self, year, month):
+        """Resumen del mes para la pantalla Consumo (solo administradores del agente)."""
+        if not self.env.user.has_group("prometeo_ai_agent.group_admin"):
+            raise AccessError(_("Solo los administradores del agente ven el consumo."))
+        start, end = self._month_bounds(int(year), int(month))
+        runs = self.sudo().search([("create_date", ">=", start), ("create_date", "<", end)])
+
+        def rows(key_func):
+            table = {}
+            for run in runs:
+                name = key_func(run)
+                row = table.setdefault(name, {"name": name, "runs": 0, "input_tokens": 0, "output_tokens": 0,
+                                              "cost": 0.0})
+                row["runs"] += 1
+                row["input_tokens"] += run.input_tokens
+                row["output_tokens"] += run.output_tokens
+                row["cost"] += run.cost
+            return sorted(table.values(), key=lambda r: (-r["cost"], r["name"]))
+
+        return {
+            "cost": sum(runs.mapped("cost")),
+            "cap": get_param(self.env, "monthly_cap_usd"),
+            "unpriced_runs": len(runs.filtered(lambda r: not r.price_known and r.status != "skipped_cap"
+                                               and (r.input_tokens or r.output_tokens))),
+            "by_routine": rows(lambda r: _("Chat") if r.kind == "chat" else (r.routine_id.name or _("Rutina borrada"))),
+            "by_model": rows(lambda r: r.ai_model_id.display_name or r.model_name or _("Sin modelo")),
+            "start": fields.Datetime.to_string(start),
+        }

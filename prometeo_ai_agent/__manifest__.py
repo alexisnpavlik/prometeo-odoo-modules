@@ -29,6 +29,8 @@
             "prometeo_ai_agent/static/src/xml/alert_systray.xml",
             "prometeo_ai_agent/static/src/js/chat_action.js",
             "prometeo_ai_agent/static/src/xml/chat_action.xml",
+            "prometeo_ai_agent/static/src/js/usage_action.js",
+            "prometeo_ai_agent/static/src/xml/usage_action.xml",
         ],
     },
     "installable": True,

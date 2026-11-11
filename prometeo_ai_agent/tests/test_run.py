@@ -54,3 +54,40 @@ class TestRun(AiAgentCase):
         run = self.Run._log("chat", self.ai_model, RESULT, user=self.agent_user, status="done")
         with self.assertRaises(AccessError):
             run.with_user(self.agent_user).read(["cost"])
+
+
+@tagged("post_install", "-at_install")
+class TestUsageSummary(AiAgentCase):
+
+    def setUp(self):
+        super().setUp()
+        self.Run = self.env["prometeo.ai.run"].sudo()
+        self.Run.search([]).unlink()
+        self.routine = self.env["prometeo.ai.routine"].create({"name": "Rutina A", "prompt": "x"})
+        now = fields.Datetime.now()
+        self.year, self.month = now.year, now.month
+        tokens = lambda inp: {"input_tokens": inp, "output_tokens": 0, "tool_calls": 0}  # noqa: E731
+        self.Run._log("routine", self.ai_model, tokens(500_000), routine=self.routine, status="done")
+        self.Run._log("routine", self.ai_model, tokens(1_500_000), routine=self.routine, status="done")
+        self.Run._log("chat", self.ai_model, tokens(200_000), user=self.agent_user, status="done")
+        unpriced = self.env["prometeo.ai.model"].create({"provider_id": self.provider.id, "name": "sin-precio",
+                                                         "active": True})
+        self.Run._log("chat", unpriced, tokens(100), user=self.agent_user, status="done")
+
+    def test_usage_summary_groups_and_sorts(self):
+        s = self.env["prometeo.ai.run"].with_user(self.admin_user).get_usage_summary(self.year, self.month)
+        self.assertAlmostEqual(s["cost"], 2.2)
+        self.assertEqual([r["name"] for r in s["by_routine"]][:2], ["Rutina A", "Chat"])
+        self.assertEqual(s["by_routine"][0]["runs"], 2)
+        self.assertEqual(s["by_routine"][0]["input_tokens"], 2_000_000)
+        self.assertEqual(s["unpriced_runs"], 1)
+        self.assertEqual(s["by_model"][0]["name"], self.ai_model.display_name)
+
+    def test_usage_summary_admin_only(self):
+        from odoo.exceptions import AccessError
+        with self.assertRaises(AccessError):
+            self.env["prometeo.ai.run"].with_user(self.agent_user).get_usage_summary(self.year, self.month)
+
+    def test_usage_summary_other_month_empty(self):
+        s = self.env["prometeo.ai.run"].with_user(self.admin_user).get_usage_summary(self.year - 1, self.month)
+        self.assertEqual((s["cost"], s["by_routine"], s["by_model"], s["unpriced_runs"]), (0.0, [], [], 0))
