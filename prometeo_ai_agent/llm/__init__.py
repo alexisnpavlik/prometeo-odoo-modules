@@ -22,7 +22,7 @@ class LlmError(Exception):
         self.status = status
 
 
-from . import anthropic_api, google_api, openai_api  # noqa: E402
+from . import anthropic_api, google_api, openai_api, prices  # noqa: E402
 
 _ADAPTERS = {"anthropic": anthropic_api, "openai": openai_api, "google": google_api}
 

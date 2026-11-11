@@ -17,7 +17,9 @@
         <field name="model">prometeo.ai.provider</field>
         <field name="arch" type="xml">
             <form>
-                <header/>
+                <header>
+                    <button name="action_fetch_models" type="object" string="Actualizar modelos" class="btn-primary"/>
+                </header>
                 <sheet>
                     <widget name="web_ribbon" title="Archivado" bg_color="text-bg-danger" invisible="active"/>
                     <group>

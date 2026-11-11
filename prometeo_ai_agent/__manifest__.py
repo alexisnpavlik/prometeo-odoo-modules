@@ -13,6 +13,7 @@
         "security/ir.model.access.csv",
         "data/prometeo_ai_provider_data.xml",
         "views/provider_views.xml",
+        "views/run_views.xml",
         "views/res_config_settings_views.xml",
         "views/menu_views.xml",
     ],
