@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_provider_list" model="ir.ui.view">
+        <field name="name">prometeo.ai.provider.list</field>
+        <field name="model">prometeo.ai.provider</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="provider_type"/>
+                <field name="base_url"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_provider_form" model="ir.ui.view">
+        <field name="name">prometeo.ai.provider.form</field>
+        <field name="model">prometeo.ai.provider</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_fetch_models" type="object" string="Actualizar modelos" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archivado" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="provider_type"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="api_key" password="True"/>
+                            <field name="base_url"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Modelos" name="models">
+                            <field name="model_ids">
+                                <list editable="bottom">
+                                    <field name="active" widget="boolean_toggle"/>
+                                    <field name="label"/>
+                                    <field name="name"/>
+                                    <field name="price_input"/>
+                                    <field name="price_output"/>
+                                    <field name="price_known"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_provider" model="ir.actions.act_window">
+        <field name="name">Proveedores de IA</field>
+        <field name="res_model">prometeo.ai.provider</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_ai_model_list" model="ir.ui.view">
+        <field name="name">prometeo.ai.model.list</field>
+        <field name="model">prometeo.ai.model</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="active" widget="boolean_toggle"/>
+                <field name="provider_id"/>
+                <field name="label"/>
+                <field name="name"/>
+                <field name="price_input"/>
+                <field name="price_output"/>
+                <field name="price_known"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_model_search" model="ir.ui.view">
+        <field name="name">prometeo.ai.model.search</field>
+        <field name="model">prometeo.ai.model</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="label"/>
+                <field name="provider_id"/>
+                <filter name="inactive" string="Inactivos" domain="[('active', '=', False)]"/>
+                <filter name="no_price" string="Sin precio" domain="[('price_known', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_provider" string="Proveedor" context="{'group_by': 'provider_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_model" model="ir.actions.act_window">
+        <field name="name">Modelos de IA</field>
+        <field name="res_model">prometeo.ai.model</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'active_test': False}</field>
+    </record>
+</odoo>

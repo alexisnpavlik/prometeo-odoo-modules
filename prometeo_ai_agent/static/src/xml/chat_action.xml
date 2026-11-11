@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="prometeo_ai_agent.Chat">
+        <div class="o_ai_chat d-flex h-100">
+            <aside t-attf-class="o_ai_chat_list d-flex flex-column {{ state.showList ? 'o_ai_chat_list_open' : '' }}">
+                <nav class="p-2 d-flex flex-column gap-1" aria-label="Agente IA">
+                    <button class="o_ai_nav_item o_ai_nav_new" t-on-click="newConversation">
+                        <i class="fa fa-plus"/>Nueva conversación
+                    </button>
+                </nav>
+                <nav class="px-2 pb-2 d-flex flex-column gap-1 border-bottom" aria-label="Secciones">
+                    <button class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_routine')">
+                        <i class="fa fa-clock-o"/>Rutinas
+                    </button>
+                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_routine_template')">
+                        <i class="fa fa-clone"/>Plantillas
+                    </button>
+                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_usage')">
+                        <i class="fa fa-line-chart"/>Consumo
+                    </button>
+                </nav>
+                <div class="flex-grow-1 overflow-auto px-2 pb-3">
+                    <div class="o_ai_chat_group">Recientes</div>
+                    <div t-if="!state.conversations.length" class="text-muted small px-2">Todavía no hay conversaciones.</div>
+                    <t t-foreach="[1]" t-as="_g" t-key="_g">
+                        <div t-foreach="state.conversations" t-as="conv" t-key="conv.id"
+                             t-attf-class="o_ai_chat_item d-flex align-items-center {{ conv.id === state.currentId ? 'o_ai_chat_item_active' : '' }}"
+                             t-on-click="() => this.openConversation(conv.id)">
+                            <span class="flex-grow-1 text-truncate" t-out="conv.name or 'Conversación nueva'"/>
+                            <button class="btn btn-link o_ai_chat_delete p-1" aria-label="Borrar conversación"
+                                    t-on-click="(ev) => this.deleteConversation(conv.id, ev)">
+                                <i class="fa fa-trash-o"/>
+                            </button>
+                        </div>
+                    </t>
+                </div>
+            </aside>
+            <section class="o_ai_chat_main d-flex flex-column flex-grow-1">
+                <header class="o_ai_chat_header d-flex align-items-center gap-2">
+                    <button class="btn btn-light o_ai_chat_toggle" aria-label="Conversaciones"
+                            t-on-click="() => this.state.showList = !this.state.showList">
+                        <i class="fa fa-bars"/>
+                    </button>
+                    <button class="btn btn-light o_ai_alerts_toggle position-relative" aria-label="Alertas"
+                            t-on-click="() => this.state.showAlerts = !this.state.showAlerts">
+                        <i class="fa fa-bell-o"/>
+                        <span t-if="state.alerts.length" class="o_ai_alert_badge badge rounded-pill" t-out="state.alerts.length"/>
+                    </button>
+                    <label class="ms-auto d-flex align-items-center gap-2 text-muted small mb-0">Modelo
+                        <select class="form-select form-select-sm w-auto" t-model.number="state.modelId" t-att-disabled="state.sending">
+                            <option t-foreach="state.models" t-as="m" t-key="m.id" t-att-value="m.id" t-out="m.label"/>
+                        </select>
+                    </label>
+                </header>
+                <div class="o_ai_chat_messages flex-grow-1 overflow-auto" t-ref="messages">
+                    <div class="o_ai_chat_column">
+                        <div t-if="!state.messages.length" class="o_ai_chat_empty text-center">
+                            <div class="o_ai_avatar o_ai_avatar_lg mx-auto mb-3">IA</div>
+                            <h3>¿Qué querés saber de tu negocio?</h3>
+                            <p class="text-muted">Consulto los datos del sistema con tus permisos. No modifico nada.</p>
+                            <span t-if="!state.models.length" class="text-warning d-block mb-3">
+                                Activá un modelo en Agente IA &gt; Configuración &gt; Modelos.
+                            </span>
+                            <div class="o_ai_suggestions">
+                                <button t-foreach="suggestions" t-as="s" t-key="s_index" class="o_ai_suggestion"
+                                        t-att-disabled="!state.models.length" t-on-click="() => this.useSuggestion(s)" t-out="s"/>
+                            </div>
+                        </div>
+                        <t t-foreach="state.messages" t-as="msg" t-key="msg.id">
+                            <div t-if="msg.role === 'user'" class="o_ai_msg_user" t-out="msg.content"/>
+                            <div t-else="" class="o_ai_msg_agent d-flex gap-3">
+                                <div class="o_ai_avatar">IA</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <button t-if="msg.steps and msg.steps.length" class="o_ai_steps_summary"
+                                            t-on-click="() => this.toggleSteps(msg)">
+                                        <i t-attf-class="fa fa-chevron-{{ msg.showSteps ? 'down' : 'right' }} me-2"/>
+                                        Revisé <t t-out="msg.steps.length"/> consultas<t t-if="msg.seconds"> en <t t-out="msg.seconds"/> s</t>
+                                    </button>
+                                    <ul t-if="msg.showSteps" class="o_ai_steps">
+                                        <li t-foreach="msg.steps" t-as="step" t-key="step_index"><i class="fa fa-check"/><t t-out="step"/></li>
+                                    </ul>
+                                    <div class="o_ai_reply" t-out="msg.html"/>
+                                </div>
+                            </div>
+                        </t>
+                        <div t-if="state.sending" class="o_ai_msg_agent d-flex gap-3">
+                            <div class="o_ai_avatar">IA</div>
+                            <div class="o_ai_live flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 fw-semibold">
+                                    <span class="o_ai_dots" aria-hidden="true"><span/><span/><span/></span>
+                                    Analizando… <span class="ms-auto text-muted fw-normal"><t t-out="state.elapsed"/> s</span>
+                                </div>
+                                <ul class="o_ai_steps mb-0">
+                                    <li t-foreach="state.steps" t-as="step" t-key="step_index"><i class="fa fa-check"/><t t-out="step"/></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="o_ai_chat_column w-100">
+                    <form class="o_ai_composer d-flex align-items-end gap-2" t-on-submit.prevent="send">
+                        <label for="o_ai_input" class="visually-hidden">Mensaje</label>
+                        <textarea id="o_ai_input" class="flex-grow-1" rows="2" t-ref="input" t-model="state.draft"
+                                  t-att-disabled="state.sending" t-on-keydown="onKeydown"
+                                  placeholder="Preguntale algo sobre tus datos. Enter envía, Shift+Enter salto de línea."/>
+                        <button type="submit" class="btn o_ai_btn_primary o_ai_send" aria-label="Enviar"
+                                t-att-disabled="state.sending or !state.draft.trim()">
+                            <i class="fa fa-arrow-right"/>
+                        </button>
+                    </form>
+                </div>
+            </section>
+            <aside t-attf-class="o_ai_alerts_panel d-flex flex-column {{ state.showAlerts ? 'o_ai_alerts_open' : '' }}">
+                <div class="d-flex align-items-center p-3 pb-2">
+                    <h5 class="mb-0 fw-bold">Alertas</h5>
+                    <span class="ms-2 text-muted small" t-out="state.alerts.length"/>
+                    <button class="btn btn-link btn-sm ms-auto" t-on-click="openAllAlerts">Ver todas</button>
+                </div>
+                <div class="flex-grow-1 overflow-auto px-3 pb-3 d-flex flex-column gap-2">
+                    <div t-if="!state.alerts.length" class="text-muted small text-center py-4">
+                        <i class="fa fa-check-circle fa-2x d-block mb-2 o_ai_ok"/>Sin alertas abiertas
+                    </div>
+                    <div t-foreach="state.alerts" t-as="alert" t-key="alert.id" class="o_ai_alert_item">
+                        <div class="d-flex gap-2 align-items-start">
+                            <span t-attf-class="o_ai_sev_icon_sm o_ai_sev_{{ alert.severity }}" role="img"
+                                  t-att-aria-label="'Gravedad ' + alert.severity">
+                                <i t-attf-class="fa {{ alert.severity === 'high' ? 'fa-exclamation-triangle' : (alert.severity === 'medium' ? 'fa-exclamation-circle' : 'fa-info-circle') }}"/>
+                            </span>
+                            <div class="min-w-0">
+                                <div class="fw-semibold small" t-out="alert.name"/>
+                                <div t-if="alert.summary" class="text-muted small o_ai_alert_text" t-out="alert.summary"/>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 mt-2">
+                            <button class="btn btn-sm o_ai_btn_primary" t-on-click="() => this.askAbout(alert)">Preguntar</button>
+                            <button t-if="alert.res_model" class="btn btn-sm btn-light" t-on-click="() => this.alertAction(alert, 'action_view_records')">Ver registros</button>
+                            <button class="btn btn-sm btn-light" t-on-click="() => this.alertAction(alert, 'action_resolve')">Resolver</button>
+                            <button class="btn btn-sm btn-light" t-on-click="() => this.alertAction(alert, 'action_dismiss')">Descartar</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </t>
+</templates>

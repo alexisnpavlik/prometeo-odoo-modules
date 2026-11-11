@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_routine_list" model="ir.ui.view">
+        <field name="name">prometeo.ai.routine.list</field>
+        <field name="model">prometeo.ai.routine</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="not active or paused">
+                <field name="name"/>
+                <field name="interval_number" string="Cada"/>
+                <field name="interval_type" string=""/>
+                <field name="next_run"/>
+                <field name="last_run" optional="show"/>
+                <field name="last_status" widget="badge" decoration-danger="last_status == 'error'"
+                       decoration-warning="last_status in ('incomplete', 'skipped_cap')" decoration-success="last_status == 'done'"/>
+                <field name="open_alert_count"/>
+                <field name="paused" optional="show"/>
+                <field name="active" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_routine_form" model="ir.ui.view">
+        <field name="name">prometeo.ai.routine.form</field>
+        <field name="model">prometeo.ai.routine</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_run_now" type="object" string="Ejecutar ahora" class="btn-primary"
+                            groups="prometeo_ai_agent.group_admin"/>
+                    <button name="action_resume" type="object" string="Reanudar" invisible="not paused"
+                            groups="prometeo_ai_agent.group_admin"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_alerts" type="object" class="oe_stat_button" icon="fa-bell">
+                            <field name="open_alert_count" widget="statinfo" string="Alertas abiertas"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Pausada" bg_color="text-bg-danger" invisible="not paused"/>
+                    <widget name="web_ribbon" title="Archivada" bg_color="text-bg-secondary" invisible="active"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Ej. Faltantes de stock"/></h1>
+                    </div>
+                    <field name="prompt" nolabel="1" placeholder="Qué tiene que revisar el agente. Ej.: buscá traslados internos pendientes hace más de 3 días y avisame cuáles son."/>
+                    <group>
+                        <group string="Frecuencia">
+                            <label for="interval_number" string="Cada"/>
+                            <div class="o_row">
+                                <field name="interval_number"/>
+                                <field name="interval_type"/>
+                            </div>
+                            <field name="run_hour" widget="float_time" invisible="interval_type not in ('days', 'weeks')"/>
+                            <field name="next_run"/>
+                            <field name="last_run"/>
+                            <field name="last_status"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="paused" invisible="1"/>
+                        </group>
+                        <group string="Quién">
+                            <field name="recipient_ids" widget="many2many_tags"/>
+                            <field name="company_ids" widget="many2many_tags" groups="base.group_multi_company"/>
+                            <field name="ai_model_id" options="{'no_create': True}" placeholder="Modelo por defecto"/>
+                            <field name="is_public"/>
+                            <field name="group_ids" widget="many2many_tags" invisible="is_public"/>
+                            <field name="template_id" invisible="not template_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Alertas" name="alerts">
+                            <field name="alert_ids" readonly="1">
+                                <list>
+                                    <field name="severity" widget="badge"/>
+                                    <field name="name"/>
+                                    <field name="last_seen"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Corridas" name="runs" groups="prometeo_ai_agent.group_admin">
+                            <field name="run_ids" readonly="1">
+                                <list limit="20">
+                                    <field name="create_date" string="Fecha"/>
+                                    <field name="status"/>
+                                    <field name="tool_calls"/>
+                                    <field name="duration"/>
+                                    <field name="cost"/>
+                                    <field name="error"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ai_routine_search" model="ir.ui.view">
+        <field name="name">prometeo.ai.routine.search</field>
+        <field name="model">prometeo.ai.routine</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="paused" string="Pausadas" domain="[('paused', '=', True)]"/>
+                <filter name="errors" string="Con error" domain="[('last_status', '=', 'error')]"/>
+                <filter name="archived" string="Archivadas" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_routine" model="ir.actions.act_window">
+        <field name="name">Rutinas</field>
+        <field name="res_model">prometeo.ai.routine</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Creá tu primera rutina</p>
+            <p>O activá una de las plantillas en Rutinas &gt; Plantillas.</p>
+        </field>
+    </record>
+
+    <record id="view_ai_routine_template_list" model="ir.ui.view">
+        <field name="name">prometeo.ai.routine.template.list</field>
+        <field name="model">prometeo.ai.routine.template</field>
+        <field name="arch" type="xml">
+            <list create="0">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="description"/>
+                <field name="interval_type" string="Frecuencia"/>
+                <button name="action_run_in_chat" type="object" string="Ejecutar ahora" class="btn-primary" icon="fa-play"/>
+                <button name="action_use" type="object" string="Programar" class="btn-secondary" icon="fa-clock-o"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_routine_template_form" model="ir.ui.view">
+        <field name="name">prometeo.ai.routine.template.form</field>
+        <field name="model">prometeo.ai.routine.template</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_run_in_chat" type="object" string="Ejecutar ahora" class="btn-primary"/>
+                    <button name="action_use" type="object" string="Programar como rutina" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <h1><field name="name"/></h1>
+                    <field name="description"/>
+                    <group>
+                        <field name="prompt"/>
+                        <field name="required_module"/>
+                        <field name="interval_number"/>
+                        <field name="interval_type"/>
+                        <field name="run_hour" widget="float_time"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_routine_template" model="ir.actions.act_window">
+        <field name="name">Plantillas de rutinas</field>
+        <field name="res_model">prometeo.ai.routine.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_available', '=', True)]</field>
+    </record>
+</odoo>
