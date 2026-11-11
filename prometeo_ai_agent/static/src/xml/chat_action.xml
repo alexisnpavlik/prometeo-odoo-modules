@@ -18,6 +18,9 @@
                     <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_usage')">
                         <i class="fa fa-line-chart"/>Consumo
                     </button>
+                    <button t-if="state.isAdmin" class="o_ai_nav_item" t-on-click="() => this.openAction('prometeo_ai_agent.action_ai_settings')">
+                        <i class="fa fa-cog"/>Ajustes
+                    </button>
                 </nav>
                 <div class="flex-grow-1 overflow-auto px-2 pb-3">
                     <div class="o_ai_chat_group">Recientes</div>
