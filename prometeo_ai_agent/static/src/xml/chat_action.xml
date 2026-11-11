@@ -58,9 +58,7 @@
                             <div class="o_ai_avatar o_ai_avatar_lg mx-auto mb-3">IA</div>
                             <h3>¿Qué querés saber de tu negocio?</h3>
                             <p class="text-muted">Consulto los datos del sistema con tus permisos. No modifico nada.</p>
-                            <span t-if="!state.models.length" class="text-warning d-block mb-3">
-                                Activá un modelo en Agente IA &gt; Configuración &gt; Modelos.
-                            </span>
+                            <div t-if="!state.models.length" class="alert alert-info text-start mb-3" role="status" t-out="state.activationMessage"/>
                             <div class="o_ai_suggestions">
                                 <button t-foreach="suggestions" t-as="s" t-key="s_index" class="o_ai_suggestion"
                                         t-att-disabled="!state.models.length" t-on-click="() => this.useSuggestion(s)" t-out="s"/>

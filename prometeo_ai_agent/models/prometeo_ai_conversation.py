@@ -34,6 +34,15 @@ class PrometeoAiConversation(models.Model):
         models_ = self.env["prometeo.ai.model"].sudo().search([("active", "=", True)])
         return [{"id": m.id, "label": m.display_name, "is_default": m == default} for m in models_]
 
+    @api.model
+    def get_activation_message(self):
+        """Mensaje cuando el asistente no está activado: invita a contactar a soporte."""
+        contact = get_param(self.env, "support_contact")
+        who = _("a soporte (%s)", contact) if contact else _("a soporte")
+        return _("El Asistente IA todavía no está activado en tu cuenta. Contactá %s para sumarlo: "
+                 "vas a poder preguntarle a tus datos en lenguaje natural y recibir alertas automáticas "
+                 "sobre stock, ventas, caja y más.", who)
+
     def get_messages(self):
         """Mensajes visibles (usuario y respuestas con texto)."""
         self.ensure_one()
@@ -79,7 +88,7 @@ class PrometeoAiConversation(models.Model):
             return {"status": "busy"}
         ai_model = self._resolve_model(model_id)
         if not ai_model:
-            return {"status": "error", "message": _("Configurá un modelo por defecto en Ajustes > Agente IA.")}
+            return {"status": "error", "message": self.get_activation_message()}
         user_message = {"role": "user", "content": text}
         started = time.monotonic()
         try:

@@ -161,3 +161,15 @@ class TestChatSupportMessage(AiAgentCase):
         msg = self.send(llm.LlmError("x", status=429))
         self.assertIn("minutos", msg)
         self.assertNotIn("soporte", msg)
+
+
+@tagged("post_install", "-at_install")
+class TestNotActivatedMessage(AiAgentCase):
+
+    def test_no_model_invites_to_contact_support(self):
+        self.env["ir.config_parameter"].sudo().set_param("prometeo_ai_agent.default_model_id", "")
+        conv = self.env["prometeo.ai.conversation"].with_user(self.agent_user).create({})
+        msg = conv.send_message("hola")["message"]
+        self.assertIn("soporte", msg)
+        self.assertNotIn("Ajustes", msg)
+        self.assertEqual(conv.get_activation_message(), msg)
