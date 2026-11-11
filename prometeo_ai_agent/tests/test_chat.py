@@ -119,3 +119,19 @@ class TestChat(AiAgentCase):
         with self.fake_llm(llm_text("hola")) as mock:
             self.conv.send_message("hola")
         self.assertNotIn("create_alert", [t["name"] for t in mock.call_args.args[4]])
+
+
+@tagged("post_install", "-at_install")
+class TestChatAllCompanies(AiAgentCase):
+
+    def test_chat_reads_all_allowed_companies_not_only_selected(self):
+        company_b = self.env["res.company"].create({"name": "AI Empresa B"})
+        self.agent_user.write({"company_ids": [(4, company_b.id)]})
+        partner_b = self.env["res.partner"].create({"name": "AI Partner B", "company_id": company_b.id})
+        conv = self.env["prometeo.ai.conversation"].with_user(self.agent_user).with_context(
+            allowed_company_ids=[self.agent_user.company_id.id]).create({})
+        tool = llm_tool("search_count", {"model": "res.partner", "domain": json.dumps([["id", "=", partner_b.id]])})
+        with self.fake_llm(tool, llm_text("ok")) as mock:
+            conv.send_message("buscá")
+        self.assertEqual(json.loads(mock.call_args.args[3][-1]["content"])["count"], 1)
+        self.assertIn("AI Empresa B", mock.call_args.args[2])
