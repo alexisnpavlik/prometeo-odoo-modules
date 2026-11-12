@@ -148,28 +148,9 @@ class CcaDashboardController(http.Controller):
         }
 
     def _cca_charts(self, env, start_date, end_date, company, partner):
-        """Arma las series de los cinco gráficos del dashboard."""
+        """Arma las series de los gráficos del dashboard."""
         env.flush_all()
         where, params = self._cca_where(env, start_date, end_date, company, partner)
-
-        env.cr.execute(f"""
-            SELECT to_char(date_trunc('month', w.date), 'YYYY-MM') AS period,
-                   w.company_id,
-                   COALESCE(SUM(i.amount_residual), 0) AS residual
-            FROM cca_installment i
-            JOIN cca_withdrawal w ON w.id = i.withdrawal_id
-            WHERE {where}
-            GROUP BY period, w.company_id
-            ORDER BY period
-        """, params)
-        trend_rows = env.cr.dictfetchall()
-        company_names = self._resolve_names(env, "res.company", [r["company_id"] for r in trend_rows])
-        labels = sorted({r["period"] for r in trend_rows})
-        companies_series = {}
-        for row in trend_rows:
-            name = company_names.get(row["company_id"], "N/D")
-            series = companies_series.setdefault(name, [0.0] * len(labels))
-            series[labels.index(row["period"])] = float(row["residual"])
 
         env.cr.execute(f"""
             SELECT to_char(date_trunc('month', i.date_due), 'YYYY-MM') AS period,
@@ -221,7 +202,6 @@ class CcaDashboardController(http.Controller):
             "upcoming": upcoming,
             "aging": aging,
             "by_method": by_method,
-            "balance_trend": {"labels": labels, "companies": companies_series},
             "collected_vs_overdue": {
                 "labels": [r["period"] for r in vs_rows],
                 "collected": [float(r["collected"]) for r in vs_rows],

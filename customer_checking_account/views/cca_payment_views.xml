@@ -35,12 +35,12 @@
                     <div class="oe_title" invisible="id"><h1>Registrar pago</h1></div>
                     <group>
                         <group>
-                            <field name="partner_id" readonly="id"
+                            <field name="partner_id" readonly="state == 'cancel' or is_down_payment"
                                    context="{'show_vat': True}"
                                    options="{'no_create': True}"
                                    placeholder="Nombre o DNI del cliente"/>
-                            <field name="date" readonly="id"/>
-                            <field name="payment_method" readonly="id"/>
+                            <field name="date" readonly="state == 'cancel'"/>
+                            <field name="payment_method" readonly="state == 'cancel'"/>
                             <field name="ref" placeholder="Opcional: Nº de transferencia, nota..."/>
                         </group>
                         <group invisible="id or not partner_id" string="Situación del cliente">
@@ -56,12 +56,18 @@
                         </group>
                     </group>
                     <group>
-                        <field name="amount" readonly="id" class="fs-3 fw-bold"
+                        <field name="amount" readonly="state == 'cancel' or is_down_payment" class="fs-3 fw-bold"
                                string="Monto"/>
                     </group>
+                    <field name="multi_installment_warning" nolabel="1" readonly="1"
+                           invisible="id or not multi_installment_warning"/>
                     <field name="account_id" invisible="1" force_save="1"/>
                     <field name="company_id" invisible="1" force_save="1"/>
                     <field name="currency_id" invisible="1"/>
+                    <field name="is_down_payment" invisible="1"/>
+                    <div class="alert alert-info" role="alert" invisible="not is_down_payment">
+                        Es la entrega inicial de un retiro: el monto y el cliente se cambian editando el retiro.
+                    </div>
                     <separator string="Qué cubre este pago" invisible="id or not partner_id"/>
                     <field name="allocation_preview" nolabel="1" readonly="1"
                            invisible="id or not partner_id"/>

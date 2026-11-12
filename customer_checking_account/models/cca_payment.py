@@ -42,8 +42,10 @@ class CcaPayment(models.Model):
         index=True,
     )
     currency_id = fields.Many2one(related="company_id.currency_id", readonly=True)
-    date = fields.Date(string="Fecha", required=True, default=fields.Date.context_today, index=True)
-    amount = fields.Monetary(string="Monto", required=True, currency_field="currency_id")
+    date = fields.Date(
+        string="Fecha", required=True, default=fields.Date.context_today, index=True, tracking=True
+    )
+    amount = fields.Monetary(string="Monto", required=True, currency_field="currency_id", tracking=True)
     payment_method = fields.Selection(
         selection=[
             ("cash", "Efectivo"),
@@ -54,8 +56,9 @@ class CcaPayment(models.Model):
         string="Medio de pago",
         default="cash",
         required=True,
+        tracking=True,
     )
-    ref = fields.Char(string="Referencia")
+    ref = fields.Char(string="Referencia", tracking=True)
     state = fields.Selection(
         selection=[("posted", "Registrado"), ("cancel", "Anulado")],
         string="Estado",
@@ -64,6 +67,11 @@ class CcaPayment(models.Model):
         copy=False,
         index=True,
         tracking=True,
+    )
+    is_down_payment = fields.Boolean(
+        string="Es entrega inicial",
+        compute="_compute_is_down_payment",
+        help="El monto y el cliente de la entrega se cambian editando el retiro.",
     )
     allocation_ids = fields.One2many("cca.allocation", "payment_id", string="Imputaciones")
     account_balance = fields.Monetary(
@@ -77,6 +85,11 @@ class CcaPayment(models.Model):
     )
     allocation_preview = fields.Html(
         string="Qué cubre este pago",
+        compute="_compute_allocation_preview",
+        sanitize=False,
+    )
+    multi_installment_warning = fields.Html(
+        string="Advertencia de varias cuotas",
         compute="_compute_allocation_preview",
         sanitize=False,
     )
@@ -97,6 +110,14 @@ class CcaPayment(models.Model):
                 max(payment.amount - allocated, 0.0) if payment.state == "posted" else 0.0
             )
 
+    def _compute_is_down_payment(self):
+        """Marca los pagos que son la entrega inicial de algún retiro."""
+        down_ids = set(self.env["cca.withdrawal"].sudo().search(
+            [("down_payment_id", "in", self.ids)]
+        ).mapped("down_payment_id").ids)
+        for payment in self:
+            payment.is_down_payment = payment.id in down_ids
+
     @api.onchange("partner_id", "company_id")
     def _onchange_partner_id(self):
         """Resuelve la cuenta del cliente para mostrar su deuda antes de guardar."""
@@ -111,10 +132,29 @@ class CcaPayment(models.Model):
     def _compute_allocation_preview(self):
         """Tabla con las cuotas que cubriría el pago. Solo para pagos sin guardar."""
         for payment in self:
+            payment.multi_installment_warning = False
             if payment._origin.id or not payment.account_id:
                 payment.allocation_preview = False
                 continue
             payment.allocation_preview = payment._cca_render_preview()
+            payment.multi_installment_warning = payment._cca_render_multi_warning()
+
+    def _cca_render_multi_warning(self):
+        """Aviso cuando el monto cubre más de una cuota: evita cobrar el total por error."""
+        self.ensure_one()
+        account = self.account_id._origin or self.account_id
+        plan, _rest = account._cca_fifo_plan(self.amount)
+        if len(plan) <= 1:
+            return False
+        money = lambda value: escape(formatLang(self.env, value, currency_obj=self.currency_id))
+        first = plan[0][0]
+        return Markup(
+            "<div class='alert alert-warning mb-0' role='alert'><strong>%s</strong> %s</div>"
+        ) % (
+            _("Este pago cubre %s cuotas.", len(plan)),
+            _("Si el cliente quiere pagar solo la próxima cuota (%(label)s), el monto es %(amount)s.",
+              label=first.label, amount=money(first.amount_residual)),
+        )
 
     def _cca_render_preview(self):
         """Arma el HTML de la vista previa a partir del mismo reparto FIFO que se imputa."""
@@ -184,7 +224,113 @@ class CcaPayment(models.Model):
         payments = super().create(vals_list)
         if not self.env.context.get("cca_no_auto_allocate"):
             payments._cca_allocate_fifo()
+            for payment in payments:
+                payment._cca_log_on_withdrawals(
+                    payment.allocation_ids.mapped("withdrawal_id"),
+                    _("Pago %(name)s registrado por %(user)s: %(amount)s.",
+                      name=payment.name, user=self.env.user.display_name,
+                      amount=payment._cca_money(payment.amount)),
+                )
         return payments
+
+    def _cca_money(self, value):
+        """Monto formateado en la moneda del pago."""
+        self.ensure_one()
+        return formatLang(self.env, value, currency_obj=self.currency_id)
+
+    def _cca_display_value(self, field, value):
+        """Valor legible de un campo editable, para el historial."""
+        if field == "amount":
+            return self._cca_money(value or 0.0)
+        if field == "partner_id":
+            return self.env["res.partner"].browse(value).display_name if isinstance(value, int) else value.display_name
+        if field == "date":
+            return fields.Date.to_date(value).strftime("%d/%m/%Y") if value else ""
+        if field == "payment_method":
+            return dict(self._fields["payment_method"].selection).get(value, value or "")
+        return value or "—"
+
+    def _cca_changes(self, vals):
+        """Lista 'Campo: antes → después' de los campos editables que cambian."""
+        self.ensure_one()
+        changes = []
+        for field in ("partner_id", "date", "payment_method", "amount", "ref"):
+            if field not in vals:
+                continue
+            old = self[field]
+            new = vals[field]
+            if field == "partner_id":
+                old = old.id
+            elif field == "date":
+                new = fields.Date.to_date(new)
+            elif field == "ref":
+                old, new = old or False, new or False
+            if old == new or (field == "amount" and self.currency_id.compare_amounts(old, new or 0.0) == 0):
+                continue
+            changes.append("%s: %s → %s" % (
+                self._fields[field].string,
+                self._cca_display_value(field, self[field]),
+                self._cca_display_value(field, vals[field]),
+            ))
+        return changes
+
+    def _cca_log_on_withdrawals(self, withdrawals, body):
+        """Deja constancia del movimiento del pago en el historial de cada retiro afectado."""
+        for withdrawal in withdrawals.sudo():
+            withdrawal._message_log(body=body)
+
+    def write(self, vals):
+        """Permite corregir un pago registrado.
+
+        Si cambia el monto o el cliente, se deshacen sus imputaciones y se vuelven a hacer
+        por FIFO; lo que quede liberado lo cubre el saldo a favor de otros pagos.
+        """
+        realloc_fields = {"amount", "partner_id"}
+        edit_fields = realloc_fields | {"date", "payment_method", "ref"}
+        if self.env.context.get("cca_payment_internal_write") or not edit_fields & set(vals):
+            return super().write(vals)
+        if (edit_fields - {"ref"}) & set(vals) and any(p.state == "cancel" for p in self):
+            raise UserError(_("Un pago anulado no se puede editar."))
+        changes = {payment.id: payment._cca_changes(vals) for payment in self}
+        withdrawals_before = {payment.id: payment.allocation_ids.mapped("withdrawal_id") for payment in self}
+        realloc = self.filtered(
+            lambda p: any(
+                (p[field].id if field == "partner_id" else p[field]) != vals[field]
+                for field in realloc_fields & set(vals)
+            )
+        ) if realloc_fields & set(vals) else self.browse()
+        if realloc.filtered("is_down_payment"):
+            raise UserError(_(
+                "El monto y el cliente de una entrega inicial se cambian editando el retiro."
+            ))
+        old_accounts = realloc.mapped("account_id")
+        realloc.allocation_ids.sudo().unlink()
+        if vals.get("partner_id"):
+            partner = self.env["res.partner"].browse(vals["partner_id"])
+            accounts = {
+                company: self.env["cca.account"].sudo()._get_or_create(partner, company)
+                for company in self.mapped("company_id")
+            }
+            for payment in self:
+                super(CcaPayment, payment).write(dict(vals, account_id=accounts[payment.company_id].id))
+        else:
+            super().write(vals)
+        if realloc:
+            (old_accounts | realloc.mapped("account_id"))._cca_apply_credit()
+            for payment in realloc:
+                payment._message_log(body=_(
+                    "Pago editado por %s: imputaciones recalculadas.", self.env.user.display_name
+                ))
+        for payment in self:
+            if not changes[payment.id]:
+                continue
+            payment._cca_log_on_withdrawals(
+                withdrawals_before[payment.id] | payment.allocation_ids.mapped("withdrawal_id"),
+                _("Pago %(name)s editado por %(user)s. %(changes)s.",
+                  name=payment.name, user=self.env.user.display_name,
+                  changes="; ".join(changes[payment.id])),
+            )
+        return True
 
     def _cca_allocate_fifo(self):
         """Imputa el remanente de cada pago vigente según el reparto FIFO de la cuenta."""
@@ -216,12 +362,35 @@ class CcaPayment(models.Model):
         for payment in self:
             if payment.state == "cancel":
                 raise UserError(_("El pago %s ya está anulado.", payment.name))
+            if payment.is_down_payment:
+                raise UserError(_(
+                    "El pago %s es la entrega inicial: se deshace devolviendo o editando el retiro.",
+                    payment.name,
+                ))
+            withdrawals = payment.allocation_ids.mapped("withdrawal_id")
             payment.allocation_ids.sudo().unlink()
             payment.state = "cancel"
             payment._message_log(body=_("Pago anulado por %s.", self.env.user.display_name))
+            payment._cca_log_on_withdrawals(withdrawals, _(
+                "Pago %(name)s de %(amount)s anulado por %(user)s: las cuotas que cubría vuelven a quedar pendientes.",
+                name=payment.name, amount=payment._cca_money(payment.amount),
+                user=self.env.user.display_name,
+            ))
         # Las cuotas que liberó la anulación las cubre el saldo a favor de otros pagos.
         self.mapped("account_id")._cca_apply_credit()
         return True
+
+    def action_open(self):
+        """Abre el pago en un diálogo para corregirlo."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.name,
+            "res_model": "cca.payment",
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
 
     def action_print_receipt(self):
         """Comprobante de pago en PDF para entregar al cliente.

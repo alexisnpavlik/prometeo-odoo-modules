@@ -214,7 +214,22 @@ class CcaInstallment(models.Model):
             raise UserError(_(
                 "En un retiro confirmado solo se pueden cambiar los vencimientos de las cuotas."
             ))
-        return super().write(vals)
+        moved = []
+        if "date_due" in vals:
+            new_due = fields.Date.to_date(vals["date_due"])
+            moved = [
+                (installment, installment.date_due) for installment in self
+                if installment.withdrawal_id.is_confirmed and installment.date_due != new_due
+            ]
+        result = super().write(vals)
+        for installment, old_due in moved:
+            installment.withdrawal_id.sudo()._message_log(body=_(
+                "Vencimiento de la cuota %(label)s cambiado por %(user)s: %(old)s → %(new)s.",
+                label=installment.label, user=self.env.user.display_name,
+                old=old_due.strftime("%d/%m/%Y") if old_due else "—",
+                new=installment.date_due.strftime("%d/%m/%Y"),
+            ))
+        return result
 
     @api.model
     def _cca_to_collect_domain(self, days=7):
