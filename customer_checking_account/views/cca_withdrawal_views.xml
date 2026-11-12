@@ -144,13 +144,12 @@
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
                             </field>
-                        </page>
-                        <page string="Pagos" name="payments" invisible="state == 'draft'">
-                            <div class="text-muted mb-2">
+                            <separator string="Pagos" invisible="state == 'draft' or not payment_ids"/>
+                            <div class="text-muted mb-2" invisible="state == 'draft' or not payment_ids">
                                 Si un pago se cargó mal, corregí el monto con "Editar" o deshacelo con "Anular":
                                 las cuotas vuelven a quedar pendientes.
                             </div>
-                            <field name="payment_ids" readonly="1" nolabel="1">
+                            <field name="payment_ids" readonly="1" nolabel="1" invisible="state == 'draft' or not payment_ids">
                                 <list create="0" delete="0" no_open="1">
                                     <field name="name"/>
                                     <field name="date"/>
