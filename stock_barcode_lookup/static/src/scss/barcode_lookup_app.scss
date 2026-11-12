@@ -142,26 +142,25 @@
     }
 }
 
-// "Editar cantidad": campo y botones dentro de la grilla de acciones, a todo el ancho.
-.o_barcode_lookup_edit_qty {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: left;
-
-    .form-label {
-        margin: 0;
-        font-weight: 600;
-    }
-
-    .form-control {
-        font-size: 1.4rem;
-        text-align: center;
-    }
+// "Editar cantidad": lápiz al lado del stock; al tocarlo, campo chico en la misma línea.
+.o_barcode_lookup_stock .btn {
+    margin-left: 0.35rem;
+    font-size: 1rem;
+    vertical-align: baseline;
 }
 
-.o_barcode_lookup_edit_qty_buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
+.o_barcode_lookup_edit_qty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+
+    .form-control {
+        width: 6rem;
+        text-align: center;
+    }
+
+    .btn {
+        font-size: 1.3rem;
+    }
 }
