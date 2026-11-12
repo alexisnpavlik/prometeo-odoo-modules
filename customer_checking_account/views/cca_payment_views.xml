@@ -59,6 +59,8 @@
                         <field name="amount" readonly="state == 'cancel' or is_down_payment" class="fs-3 fw-bold"
                                string="Monto"/>
                     </group>
+                    <field name="multi_installment_warning" nolabel="1" readonly="1"
+                           invisible="id or not multi_installment_warning"/>
                     <field name="account_id" invisible="1" force_save="1"/>
                     <field name="company_id" invisible="1" force_save="1"/>
                     <field name="currency_id" invisible="1"/>

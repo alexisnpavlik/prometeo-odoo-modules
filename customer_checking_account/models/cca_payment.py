@@ -88,6 +88,11 @@ class CcaPayment(models.Model):
         compute="_compute_allocation_preview",
         sanitize=False,
     )
+    multi_installment_warning = fields.Html(
+        string="Advertencia de varias cuotas",
+        compute="_compute_allocation_preview",
+        sanitize=False,
+    )
     amount_allocated = fields.Monetary(
         string="Imputado", compute="_compute_allocated", store=True, currency_field="currency_id"
     )
@@ -127,10 +132,29 @@ class CcaPayment(models.Model):
     def _compute_allocation_preview(self):
         """Tabla con las cuotas que cubriría el pago. Solo para pagos sin guardar."""
         for payment in self:
+            payment.multi_installment_warning = False
             if payment._origin.id or not payment.account_id:
                 payment.allocation_preview = False
                 continue
             payment.allocation_preview = payment._cca_render_preview()
+            payment.multi_installment_warning = payment._cca_render_multi_warning()
+
+    def _cca_render_multi_warning(self):
+        """Aviso cuando el monto cubre más de una cuota: evita cobrar el total por error."""
+        self.ensure_one()
+        account = self.account_id._origin or self.account_id
+        plan, _rest = account._cca_fifo_plan(self.amount)
+        if len(plan) <= 1:
+            return False
+        money = lambda value: escape(formatLang(self.env, value, currency_obj=self.currency_id))
+        first = plan[0][0]
+        return Markup(
+            "<div class='alert alert-warning mb-0' role='alert'><strong>%s</strong> %s</div>"
+        ) % (
+            _("Este pago cubre %s cuotas.", len(plan)),
+            _("Si el cliente quiere pagar solo la próxima cuota (%(label)s), el monto es %(amount)s.",
+              label=first.label, amount=money(first.amount_residual)),
+        )
 
     def _cca_render_preview(self):
         """Arma el HTML de la vista previa a partir del mismo reparto FIFO que se imputa."""
@@ -274,12 +298,29 @@ class CcaPayment(models.Model):
         for payment in self:
             if payment.state == "cancel":
                 raise UserError(_("El pago %s ya está anulado.", payment.name))
+            if payment.is_down_payment:
+                raise UserError(_(
+                    "El pago %s es la entrega inicial: se deshace devolviendo o editando el retiro.",
+                    payment.name,
+                ))
             payment.allocation_ids.sudo().unlink()
             payment.state = "cancel"
             payment._message_log(body=_("Pago anulado por %s.", self.env.user.display_name))
         # Las cuotas que liberó la anulación las cubre el saldo a favor de otros pagos.
         self.mapped("account_id")._cca_apply_credit()
         return True
+
+    def action_open(self):
+        """Abre el pago en un diálogo para corregirlo."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": self.name,
+            "res_model": "cca.payment",
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
 
     def action_print_receipt(self):
         """Comprobante de pago en PDF para entregar al cliente.

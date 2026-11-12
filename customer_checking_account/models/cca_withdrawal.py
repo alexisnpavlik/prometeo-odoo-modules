@@ -119,6 +119,12 @@ class CcaWithdrawal(models.Model):
         string="A financiar", compute="_compute_amounts", store=True, currency_field="currency_id",
         help="Lo que se paga en cuotas: subtotal menos entrega, más recargo.",
     )
+    payment_ids = fields.Many2many(
+        "cca.payment",
+        string="Pagos",
+        compute="_compute_payment_ids",
+        help="Pagos vigentes imputados a las cuotas de este retiro.",
+    )
     cca_has_payments = fields.Boolean(
         string="Tiene pagos",
         compute="_compute_cca_has_payments",
@@ -180,6 +186,12 @@ class CcaWithdrawal(models.Model):
             withdrawal.amount_surcharge = surcharge
             withdrawal.amount_financed = base + surcharge
             withdrawal.amount_total = untaxed + surcharge
+
+    @api.depends("installment_ids.allocation_ids.payment_id.state")
+    def _compute_payment_ids(self):
+        """Pagos vigentes que tocan alguna cuota del retiro."""
+        for withdrawal in self:
+            withdrawal.payment_ids = withdrawal._cca_posted_allocations().mapped("payment_id")
 
     @api.depends("installment_ids.allocation_ids.payment_id.state", "down_payment_id")
     def _compute_cca_has_payments(self):

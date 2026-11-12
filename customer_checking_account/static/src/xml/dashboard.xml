@@ -339,26 +339,6 @@
 
                         <!-- Charts Grid -->
                         <div class="charts-grid">
-                            <!-- Evolución del Saldo -->
-                            <div class="chart-container span-two-cols glass-panel">
-                                <div class="chart-header" style="position: relative;">
-                                    <h3>Evolución del Saldo</h3>
-                                    <div class="info-tooltip-wrapper tooltip-right">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                                        </svg>
-                                        <div class="info-tooltip-text">
-                                            Muestra el saldo pendiente de cobro por mes de cada empresa durante el período seleccionado.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="chart-body">
-                                    <canvas id="chart-balance-trend"></canvas>
-                                </div>
-                            </div>
-
                             <!-- Cobrado vs Vencido -->
                             <div class="chart-container span-two-cols glass-panel">
                                 <div class="chart-header" style="position: relative;">

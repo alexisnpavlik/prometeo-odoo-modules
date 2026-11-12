@@ -47,7 +47,6 @@ class CcaDashboard extends Component {
                 collected: 0
             },
             charts: {
-                balance_trend: { labels: [], companies: {} },
                 collected_vs_overdue: { labels: [], collected: [], overdue: [] },
                 installment_status: { keys: [], labels: [], values: [] },
                 upcoming: { labels: [], values: [] },
@@ -362,42 +361,6 @@ class CcaDashboard extends Component {
             borderColor: "transparent",
             drawBorder: false
         };
-
-        // 1. Evolución del saldo (line, una serie por compañía)
-        const trendData = this.metricsData.charts.balance_trend;
-        const companies = trendData.companies || {};
-        const companyColors = [
-            { border: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)" },
-            { border: "#a855f7", bg: "rgba(168, 85, 247, 0.08)" },
-            { border: "#10b981", bg: "rgba(16, 185, 129, 0.08)" },
-            { border: "#f59e0b", bg: "rgba(245, 158, 11, 0.08)" },
-            { border: "#ec4899", bg: "rgba(236, 72, 153, 0.08)" },
-            { border: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)" }
-        ];
-        const datasets = Object.keys(companies).map((name, idx) => {
-            const color = companyColors[idx % companyColors.length];
-            return {
-                label: name,
-                data: companies[name],
-                borderColor: color.border,
-                backgroundColor: color.bg,
-                fill: true,
-                tension: 0.4,
-                borderWidth: 3,
-                pointBackgroundColor: color.border,
-                pointHoverRadius: 6
-            };
-        });
-        this.createOrUpdateChart("chart-balance-trend", "line", {
-            labels: trendData.labels,
-            datasets: datasets.length ? datasets : [{ label: "Saldo", data: [], borderColor: "#3b82f6" }]
-        }, {
-            plugins: { legend: { display: true, position: "top", labels: { usePointStyle: true, pointStyle: "circle", padding: 15 } } },
-            scales: {
-                x: { grid: gridConfig },
-                y: { grid: gridConfig, ticks: { callback: (v) => this.formatCurrency(v).split(",")[0] } }
-            }
-        });
 
         // 2. Cobrado vs. vencido
         const vs = this.metricsData.charts.collected_vs_overdue;

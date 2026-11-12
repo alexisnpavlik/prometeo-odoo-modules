@@ -101,3 +101,35 @@ class TestPaymentEdit(CcaCommon):
             payment.amount = 60
         payment.payment_method = "card"
         self.assertEqual(payment.payment_method, "card")
+
+    def test_warns_when_paying_several_installments(self):
+        """Avisa si el monto cubre más de una cuota; con una sola no avisa."""
+        self._confirmed(qty=2, count=2)
+        account = self.env["cca.account"]._get_or_create(self.partner, self.env.company)
+        new = self.env["cca.payment"].new({"partner_id": self.partner.id, "account_id": account.id, "amount": 150})
+        self.assertIn("cubre 2 cuotas", new.multi_installment_warning)
+        new.amount = 100
+        self.assertFalse(new.multi_installment_warning)
+
+    def test_withdrawal_lists_payments_and_undo(self):
+        """El retiro lista sus pagos; anular uno devuelve la deuda."""
+        withdrawal = self._confirmed(qty=2, count=2)
+        payment = self._pay(200)
+        self.assertEqual(withdrawal.payment_ids, payment)
+        payment.action_cancel()
+        self.assertFalse(withdrawal.payment_ids)
+        self.assertEqual(withdrawal.amount_residual, 200.0)
+
+    def test_down_payment_cannot_be_cancelled_alone(self):
+        """La entrega inicial no se anula suelta."""
+        withdrawal = self.env["cca.withdrawal"].create({
+            "partner_id": self.partner.id,
+            "date": date(2026, 1, 15),
+            "first_due_date": date(2027, 2, 15),
+            "installment_count": 2,
+            "down_payment": 40.0,
+            "line_ids": [(0, 0, {"product_id": self.service.id, "quantity": 4})],
+        })
+        withdrawal.action_confirm()
+        with self.assertRaises(UserError):
+            withdrawal.down_payment_id.action_cancel()
