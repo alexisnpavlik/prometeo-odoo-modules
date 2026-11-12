@@ -141,3 +141,30 @@
         grid-column: 1 / -1;
     }
 }
+
+// "Editar cantidad": lápiz al lado del stock; al tocarlo, campo chico en la misma línea.
+.o_barcode_lookup_stock .btn {
+    margin-left: 0.5rem;
+    padding: 0 0.25rem !important;
+    font-size: 1.6rem;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.o_barcode_lookup_edit_qty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+
+    .form-control {
+        width: 6rem;
+        text-align: center;
+    }
+
+    .btn {
+        font-size: 1.8rem;
+        line-height: 1;
+        padding: 0 0.25rem !important;
+    }
+}

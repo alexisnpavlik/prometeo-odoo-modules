@@ -41,7 +41,27 @@
                         <div class="o_barcode_lookup_info">
                             <h2 t-esc="state.result.name"/>
                             <div class="o_barcode_lookup_price" t-esc="state.result.price"/>
-                            <div>Stock: <strong t-esc="state.result.qty_available"/> <t t-esc="state.result.uom"/></div>
+                            <div t-if="state.editQty === null" class="o_barcode_lookup_stock">
+                                Stock: <strong t-esc="state.result.qty_available"/> <t t-esc="state.result.uom"/>
+                                <button t-if="state.result.can_edit_qty" type="button" class="btn btn-link p-0"
+                                        title="Editar cantidad" t-on-click="onEditQty">
+                                    <i class="fa fa-pencil"/>
+                                </button>
+                            </div>
+                            <form t-else="" class="o_barcode_lookup_edit_qty" t-on-submit="onSubmitQty"
+                                  t-att-title="state.editTarget.location">
+                                <input type="number" inputmode="decimal" min="0" step="any" class="form-control"
+                                       t-ref="qtyInput" t-att-value="state.editQty"
+                                       t-on-input="(ev) => state.editQty = ev.target.value"/>
+                                <span t-esc="state.result.uom"/>
+                                <button type="submit" class="btn btn-link p-0 text-success" title="Guardar">
+                                    <i class="fa fa-check"/>
+                                </button>
+                                <button type="button" class="btn btn-link p-0 text-muted" title="Cancelar"
+                                        t-on-click="cancelEditQty">
+                                    <i class="fa fa-times"/>
+                                </button>
+                            </form>
                             <div t-if="state.result.vendor">Proveedor: <t t-esc="state.result.vendor"/></div>
                             <div class="text-muted">Código: <t t-esc="state.result.code"/></div>
                         </div>
