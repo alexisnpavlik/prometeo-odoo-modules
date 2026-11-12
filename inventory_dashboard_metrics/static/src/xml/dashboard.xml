@@ -238,6 +238,15 @@
                                             <t t-else="">productos</t>
                                         </span>
                                     </div>
+                                    <div t-if="card.branches.length" class="kpi-branches">
+                                        <t t-foreach="card.branches" t-as="b" t-key="b.name">
+                                            <span class="kpi-branch" role="button" t-on-click.stop="onBranchClick"
+                                                  t-att-data-branch="b.name" t-att-data-status="card.key"
+                                                  t-att-title="'Ver solo ' + b.name">
+                                                <t t-esc="b.label"/> <strong><t t-esc="formatNumber(b.count)"/></strong>
+                                            </span>
+                                        </t>
+                                    </div>
                                 </div>
                             </button>
                         </t>
@@ -250,8 +259,9 @@
                                 <div>
                                     <h3>Productos por reponer</h3>
                                     <p class="section-sub">
-                                        <t t-esc="formatNumber(filteredRestock.length)"/> productos que se venden y no tienen stock
+                                        <t t-esc="formatNumber(restCount)"/> productos que se venden y no tienen stock
                                         o les quedan <t t-esc="lowCoverDays"/> días o menos
+                                        <span t-if="restCount &gt; filteredRestock.length" class="cell-note muted">· la tabla muestra los primeros <t t-esc="formatNumber(maxRowsPerStatus)"/> por estado (el Excel los trae todos)</span>
                                     </p>
                                 </div>
                                 <t t-call="inventory_dashboard_metrics.InfoTip">
@@ -266,6 +276,7 @@
                                     <thead>
                                         <tr>
                                             <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('rest', 'producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="sucursal">Sucursal<span class="sort-mark" t-esc="sortMark('rest', 'sucursal')"/></th>
                                             <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="categoria">Categoría<span class="sort-mark" t-esc="sortMark('rest', 'categoria')"/></th>
                                             <th class="sortable" t-on-click="onSortClick" data-table="rest" data-key="vendor">Proveedor<span class="sort-mark" t-esc="sortMark('rest', 'vendor')"/></th>
                                             <th class="sortable num" t-on-click="onSortClick" data-table="rest" data-key="stock">Stock<span class="sort-mark" t-esc="sortMark('rest', 'stock')"/></th>
@@ -277,11 +288,12 @@
                                     </thead>
                                     <tbody>
                                         <tr t-if="restPage.rows.length === 0">
-                                            <td colspan="8" class="text-center text-muted empty-row">No hay productos para reponer con estos filtros.</td>
+                                            <td colspan="9" class="text-center text-muted empty-row">No hay productos para reponer con estos filtros.</td>
                                         </tr>
-                                        <t t-foreach="restPage.rows" t-as="r" t-key="r.product_id">
+                                        <t t-foreach="restPage.rows" t-as="r" t-key="r.product_id + '-' + r.sucursal">
                                             <tr>
                                                 <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.sucursal"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.categoria"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
                                                 <td class="num">
@@ -315,9 +327,10 @@
                                 <div>
                                     <h3>Productos con mucho stock y poca venta</h3>
                                     <p class="section-sub">
-                                        <t t-esc="formatNumber(filteredOverstock.length)"/> productos ·
+                                        <t t-esc="formatNumber(overCount)"/> productos ·
                                         <b><t t-esc="formatCurrency(overFilteredExcess)"/></b> de plata de más
                                         (stock para más de <t t-esc="overstockDays"/> días de venta)
+                                        <span t-if="overCount &gt; filteredOverstock.length" class="cell-note muted">· la tabla muestra los primeros <t t-esc="formatNumber(maxRowsPerStatus)"/> por estado (el Excel los trae todos)</span>
                                     </p>
                                 </div>
                                 <t t-call="inventory_dashboard_metrics.InfoTip">
@@ -332,6 +345,7 @@
                                     <thead>
                                         <tr>
                                             <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('over', 'producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="sucursal">Sucursal<span class="sort-mark" t-esc="sortMark('over', 'sucursal')"/></th>
                                             <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="categoria">Categoría<span class="sort-mark" t-esc="sortMark('over', 'categoria')"/></th>
                                             <th class="sortable" t-on-click="onSortClick" data-table="over" data-key="vendor">Proveedor<span class="sort-mark" t-esc="sortMark('over', 'vendor')"/></th>
                                             <th class="sortable num" t-on-click="onSortClick" data-table="over" data-key="stock">Stock<span class="sort-mark" t-esc="sortMark('over', 'stock')"/></th>
@@ -343,11 +357,12 @@
                                     </thead>
                                     <tbody>
                                         <tr t-if="overPage.rows.length === 0">
-                                            <td colspan="8" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
+                                            <td colspan="9" class="text-center text-muted empty-row">No hay productos con estos filtros.</td>
                                         </tr>
-                                        <t t-foreach="overPage.rows" t-as="r" t-key="r.product_id">
+                                        <t t-foreach="overPage.rows" t-as="r" t-key="r.product_id + '-' + r.sucursal">
                                             <tr>
                                                 <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.sucursal"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.categoria"/></td>
                                                 <td class="cell-secondary"><t t-esc="r.vendor"/></td>
                                                 <td class="num">
