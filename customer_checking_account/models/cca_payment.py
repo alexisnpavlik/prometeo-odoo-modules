@@ -42,8 +42,10 @@ class CcaPayment(models.Model):
         index=True,
     )
     currency_id = fields.Many2one(related="company_id.currency_id", readonly=True)
-    date = fields.Date(string="Fecha", required=True, default=fields.Date.context_today, index=True)
-    amount = fields.Monetary(string="Monto", required=True, currency_field="currency_id")
+    date = fields.Date(
+        string="Fecha", required=True, default=fields.Date.context_today, index=True, tracking=True
+    )
+    amount = fields.Monetary(string="Monto", required=True, currency_field="currency_id", tracking=True)
     payment_method = fields.Selection(
         selection=[
             ("cash", "Efectivo"),
@@ -54,8 +56,9 @@ class CcaPayment(models.Model):
         string="Medio de pago",
         default="cash",
         required=True,
+        tracking=True,
     )
-    ref = fields.Char(string="Referencia")
+    ref = fields.Char(string="Referencia", tracking=True)
     state = fields.Selection(
         selection=[("posted", "Registrado"), ("cancel", "Anulado")],
         string="Estado",
@@ -64,6 +67,11 @@ class CcaPayment(models.Model):
         copy=False,
         index=True,
         tracking=True,
+    )
+    is_down_payment = fields.Boolean(
+        string="Es entrega inicial",
+        compute="_compute_is_down_payment",
+        help="El monto y el cliente de la entrega se cambian editando el retiro.",
     )
     allocation_ids = fields.One2many("cca.allocation", "payment_id", string="Imputaciones")
     account_balance = fields.Monetary(
@@ -96,6 +104,14 @@ class CcaPayment(models.Model):
             payment.amount_unallocated = (
                 max(payment.amount - allocated, 0.0) if payment.state == "posted" else 0.0
             )
+
+    def _compute_is_down_payment(self):
+        """Marca los pagos que son la entrega inicial de algún retiro."""
+        down_ids = set(self.env["cca.withdrawal"].sudo().search(
+            [("down_payment_id", "in", self.ids)]
+        ).mapped("down_payment_id").ids)
+        for payment in self:
+            payment.is_down_payment = payment.id in down_ids
 
     @api.onchange("partner_id", "company_id")
     def _onchange_partner_id(self):
@@ -185,6 +201,48 @@ class CcaPayment(models.Model):
         if not self.env.context.get("cca_no_auto_allocate"):
             payments._cca_allocate_fifo()
         return payments
+
+    def write(self, vals):
+        """Permite corregir un pago registrado.
+
+        Si cambia el monto o el cliente, se deshacen sus imputaciones y se vuelven a hacer
+        por FIFO; lo que quede liberado lo cubre el saldo a favor de otros pagos.
+        """
+        realloc_fields = {"amount", "partner_id"}
+        edit_fields = realloc_fields | {"date", "payment_method"}
+        if self.env.context.get("cca_payment_internal_write") or not edit_fields & set(vals):
+            return super().write(vals)
+        if any(payment.state == "cancel" for payment in self):
+            raise UserError(_("Un pago anulado no se puede editar."))
+        realloc = self.filtered(
+            lambda p: any(
+                (p[field].id if field == "partner_id" else p[field]) != vals[field]
+                for field in realloc_fields & set(vals)
+            )
+        ) if realloc_fields & set(vals) else self.browse()
+        if realloc.filtered("is_down_payment"):
+            raise UserError(_(
+                "El monto y el cliente de una entrega inicial se cambian editando el retiro."
+            ))
+        old_accounts = realloc.mapped("account_id")
+        realloc.allocation_ids.sudo().unlink()
+        if vals.get("partner_id"):
+            partner = self.env["res.partner"].browse(vals["partner_id"])
+            accounts = {
+                company: self.env["cca.account"].sudo()._get_or_create(partner, company)
+                for company in self.mapped("company_id")
+            }
+            for payment in self:
+                super(CcaPayment, payment).write(dict(vals, account_id=accounts[payment.company_id].id))
+        else:
+            super().write(vals)
+        if realloc:
+            (old_accounts | realloc.mapped("account_id"))._cca_apply_credit()
+            for payment in realloc:
+                payment._message_log(body=_(
+                    "Pago editado por %s: imputaciones recalculadas.", self.env.user.display_name
+                ))
+        return True
 
     def _cca_allocate_fifo(self):
         """Imputa el remanente de cada pago vigente según el reparto FIFO de la cuenta."""

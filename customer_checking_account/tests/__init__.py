@@ -14,3 +14,4 @@ from . import test_down_payment
 from . import test_late_fee
 from . import test_withdrawal_report
 from . import test_sale_order
+from . import test_payment_edit

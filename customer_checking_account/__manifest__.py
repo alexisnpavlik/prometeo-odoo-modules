@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Cuenta Corriente de Clientes",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.1.0",
     "category": "Accounting/Accounting",
     "summary": "Retiros de clientes con recargo, cuotas en vivo y pagos con imputación FIFO",
     "description": """
