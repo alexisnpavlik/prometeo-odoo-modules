@@ -133,3 +133,39 @@ class TestPaymentEdit(CcaCommon):
         withdrawal.action_confirm()
         with self.assertRaises(UserError):
             withdrawal.down_payment_id.action_cancel()
+
+    def _last_log(self, withdrawal):
+        """Último mensaje del historial del retiro."""
+        return withdrawal.message_ids.sorted("id")[-1:].body or ""
+
+    def test_history_logs_create_edit_cancel(self):
+        """Registrar, editar y anular un pago queda en el historial del retiro."""
+        withdrawal = self._confirmed(qty=2, count=2)
+        payment = self._pay(150)
+        self.assertIn(payment.name, self._last_log(withdrawal))
+        self.assertIn("registrado", self._last_log(withdrawal))
+        payment.write({"amount": 80, "payment_method": "transfer", "ref": "corrección"})
+        log = self._last_log(withdrawal)
+        self.assertIn("editado", log)
+        self.assertIn("Monto", log)
+        self.assertIn("Transferencia", log)
+        self.assertIn("corrección", log)
+        payment.action_cancel()
+        self.assertIn("anulado", self._last_log(withdrawal))
+
+    def test_history_logs_partner_change_on_both_withdrawals(self):
+        """Cambiar el cliente deja constancia en el retiro viejo y en el nuevo."""
+        other = self.env["res.partner"].create({"name": "Otro cliente", "vat": "30999777"})
+        mine = self._confirmed()
+        theirs = self._confirmed(partner=other)
+        payment = self._pay(100)
+        payment.partner_id = other
+        self.assertIn("Otro cliente", self._last_log(mine))
+        self.assertIn("Otro cliente", self._last_log(theirs))
+
+    def test_history_logs_due_date_change(self):
+        """Mover un vencimiento de un retiro confirmado queda en el historial."""
+        withdrawal = self._confirmed(qty=2, count=2)
+        installment = withdrawal.installment_ids.sorted("sequence")[0]
+        installment.date_due = date(2027, 3, 1)
+        self.assertIn("01/03/2027", self._last_log(withdrawal))

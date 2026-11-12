@@ -224,7 +224,60 @@ class CcaPayment(models.Model):
         payments = super().create(vals_list)
         if not self.env.context.get("cca_no_auto_allocate"):
             payments._cca_allocate_fifo()
+            for payment in payments:
+                payment._cca_log_on_withdrawals(
+                    payment.allocation_ids.mapped("withdrawal_id"),
+                    _("Pago %(name)s registrado por %(user)s: %(amount)s.",
+                      name=payment.name, user=self.env.user.display_name,
+                      amount=payment._cca_money(payment.amount)),
+                )
         return payments
+
+    def _cca_money(self, value):
+        """Monto formateado en la moneda del pago."""
+        self.ensure_one()
+        return formatLang(self.env, value, currency_obj=self.currency_id)
+
+    def _cca_display_value(self, field, value):
+        """Valor legible de un campo editable, para el historial."""
+        if field == "amount":
+            return self._cca_money(value or 0.0)
+        if field == "partner_id":
+            return self.env["res.partner"].browse(value).display_name if isinstance(value, int) else value.display_name
+        if field == "date":
+            return fields.Date.to_date(value).strftime("%d/%m/%Y") if value else ""
+        if field == "payment_method":
+            return dict(self._fields["payment_method"].selection).get(value, value or "")
+        return value or "—"
+
+    def _cca_changes(self, vals):
+        """Lista 'Campo: antes → después' de los campos editables que cambian."""
+        self.ensure_one()
+        changes = []
+        for field in ("partner_id", "date", "payment_method", "amount", "ref"):
+            if field not in vals:
+                continue
+            old = self[field]
+            new = vals[field]
+            if field == "partner_id":
+                old = old.id
+            elif field == "date":
+                new = fields.Date.to_date(new)
+            elif field == "ref":
+                old, new = old or False, new or False
+            if old == new or (field == "amount" and self.currency_id.compare_amounts(old, new or 0.0) == 0):
+                continue
+            changes.append("%s: %s → %s" % (
+                self._fields[field].string,
+                self._cca_display_value(field, self[field]),
+                self._cca_display_value(field, vals[field]),
+            ))
+        return changes
+
+    def _cca_log_on_withdrawals(self, withdrawals, body):
+        """Deja constancia del movimiento del pago en el historial de cada retiro afectado."""
+        for withdrawal in withdrawals.sudo():
+            withdrawal._message_log(body=body)
 
     def write(self, vals):
         """Permite corregir un pago registrado.
@@ -233,11 +286,13 @@ class CcaPayment(models.Model):
         por FIFO; lo que quede liberado lo cubre el saldo a favor de otros pagos.
         """
         realloc_fields = {"amount", "partner_id"}
-        edit_fields = realloc_fields | {"date", "payment_method"}
+        edit_fields = realloc_fields | {"date", "payment_method", "ref"}
         if self.env.context.get("cca_payment_internal_write") or not edit_fields & set(vals):
             return super().write(vals)
-        if any(payment.state == "cancel" for payment in self):
+        if (edit_fields - {"ref"}) & set(vals) and any(p.state == "cancel" for p in self):
             raise UserError(_("Un pago anulado no se puede editar."))
+        changes = {payment.id: payment._cca_changes(vals) for payment in self}
+        withdrawals_before = {payment.id: payment.allocation_ids.mapped("withdrawal_id") for payment in self}
         realloc = self.filtered(
             lambda p: any(
                 (p[field].id if field == "partner_id" else p[field]) != vals[field]
@@ -266,6 +321,15 @@ class CcaPayment(models.Model):
                 payment._message_log(body=_(
                     "Pago editado por %s: imputaciones recalculadas.", self.env.user.display_name
                 ))
+        for payment in self:
+            if not changes[payment.id]:
+                continue
+            payment._cca_log_on_withdrawals(
+                withdrawals_before[payment.id] | payment.allocation_ids.mapped("withdrawal_id"),
+                _("Pago %(name)s editado por %(user)s. %(changes)s.",
+                  name=payment.name, user=self.env.user.display_name,
+                  changes="; ".join(changes[payment.id])),
+            )
         return True
 
     def _cca_allocate_fifo(self):
@@ -303,9 +367,15 @@ class CcaPayment(models.Model):
                     "El pago %s es la entrega inicial: se deshace devolviendo o editando el retiro.",
                     payment.name,
                 ))
+            withdrawals = payment.allocation_ids.mapped("withdrawal_id")
             payment.allocation_ids.sudo().unlink()
             payment.state = "cancel"
             payment._message_log(body=_("Pago anulado por %s.", self.env.user.display_name))
+            payment._cca_log_on_withdrawals(withdrawals, _(
+                "Pago %(name)s de %(amount)s anulado por %(user)s: las cuotas que cubría vuelven a quedar pendientes.",
+                name=payment.name, amount=payment._cca_money(payment.amount),
+                user=self.env.user.display_name,
+            ))
         # Las cuotas que liberó la anulación las cubre el saldo a favor de otros pagos.
         self.mapped("account_id")._cca_apply_credit()
         return True
