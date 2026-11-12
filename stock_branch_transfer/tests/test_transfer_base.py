@@ -63,6 +63,13 @@ class TestTransferBase(BranchTransferCommon):
         self.assertFalse(self.user_a.has_group("stock_branch_transfer.group_branch_transfer_manager"))
         self.assertEqual(line.read(["sale_price"])[0]["sale_price"], 80.0)
 
+    def test_sale_price_empty_line_onchange(self):
+        """Agregar una línea sin producto en el formulario no rompe el cálculo del precio."""
+        self.env["product.pricelist"].create({"name": "SBT Lista destino", "company_id": self.company_b.id})
+        transfer = self.make_transfer(self.user_a)
+        line = self.env["stock.branch.transfer.line"].new({"transfer_id": transfer.id})
+        self.assertEqual(line.sale_price, 0.0)
+
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
         # Odoo no trackea cambios de un registro creado en la misma transacción: se cierra la creación antes.

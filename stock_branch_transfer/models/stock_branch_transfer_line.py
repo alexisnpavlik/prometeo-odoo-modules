@@ -39,6 +39,9 @@ class StockBranchTransferLine(models.Model):
         Pricelist = self.env["product.pricelist"].sudo()
         for line in self:
             product = line.product_id
+            if not product:
+                line.sale_price = 0.0
+                continue
             price = product.lst_price
             pricelists = Pricelist.search([("company_id", "=", line.transfer_id.dest_company_id.id)])
             for pricelist in pricelists:
