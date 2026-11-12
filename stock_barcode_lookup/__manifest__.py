@@ -1,6 +1,6 @@
 {
     "name": "Escáner de productos",
-    "version": "18.0.1.2.0",
+    "version": "18.0.1.3.0",
     "category": "Inventory/Inventory",
     "summary": "App para buscar un producto escaneando su código de barras con la cámara",
     "description": """
@@ -9,6 +9,11 @@
         accesos a Abrir ficha, Reabastecer, Sacar foto (abre la cámara trasera
         y guarda la foto como imagen del producto) o Escanear otro. Si el código no
         existe, ofrece crear el producto con ese código.
+
+        Editar cantidad (solo responsables de Inventario): fija el stock
+        contado y, tras confirmar, lo aplica como ajuste de inventario en la
+        ubicación donde está el stock (o en el almacén principal si no hay).
+        Si está repartido en varias ubicaciones o lleva lote/serie, se rechaza.
 
         Cámara: con HTTPS (o localhost) abre el video en vivo de Odoo; por
         HTTP, como al entrar desde el teléfono por la IP local, saca una foto

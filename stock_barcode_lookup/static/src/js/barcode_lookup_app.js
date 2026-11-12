@@ -1,7 +1,8 @@
 /** @odoo-module **/
-import { Component, useRef, useState } from "@odoo/owl";
+import { Component, useEffect, useRef, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { loadJS } from "@web/core/assets";
+import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { useDebounced } from "@web/core/utils/timing";
@@ -21,9 +22,16 @@ export class BarcodeLookupApp extends Component {
         this.orm = useService("orm");
         this.action = useService("action");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
+        this.qtyInput = useRef("qtyInput");
         this.photoInput = useRef("photoInput");
         this.productPhotoInput = useRef("productPhotoInput");
-        this.state = useState({ code: "", result: null, results: [], loading: false });
+        this.state = useState({ code: "", result: null, results: [], loading: false, editQty: null, editTarget: null });
+        // Al abrir "Editar cantidad" el foco va al campo para tipear directo
+        useEffect(
+            (input) => input?.select(),
+            () => [this.qtyInput.el]
+        );
         this.searchDebounced = useDebounced(() => this.search(), 300);
     }
 
@@ -113,6 +121,7 @@ export class BarcodeLookupApp extends Component {
     onSearchInput(ev) {
         this.state.code = ev.target.value;
         this.state.result = null;
+        this.state.editQty = null;
         this.searchDebounced();
     }
 
@@ -163,6 +172,7 @@ export class BarcodeLookupApp extends Component {
         this.state.loading = true;
         try {
             this.state.results = [];
+            this.state.editQty = null;
             this.state.result = await this.orm.call("product.product", "barcode_lookup_product", [productId]);
         } finally {
             this.state.loading = false;
@@ -177,6 +187,7 @@ export class BarcodeLookupApp extends Component {
         this.searchDebounced.cancel();
         this.state.code = code;
         this.state.results = [];
+        this.state.editQty = null;
         this.state.loading = true;
         try {
             this.state.result = await this.orm.call("product.product", "barcode_lookup", [code]);
@@ -237,7 +248,62 @@ export class BarcodeLookupApp extends Component {
         });
     }
 
+    /** Trae la ubicación de la sucursal activa y su cantidad: la tarjeta suma todas las sucursales. */
+    async onEditQty() {
+        const target = await this.orm.call("product.product", "barcode_lookup_quantity_target", [
+            this.state.result.product_id,
+        ]);
+        this.state.editTarget = target;
+        this.state.editQty = String(target.quantity);
+    }
+
+    cancelEditQty() {
+        this.state.editQty = null;
+    }
+
+    /** Valida la cantidad y pide confirmación antes de ajustar el stock. */
+    onSubmitQty(ev) {
+        ev.preventDefault();
+        const raw = String(this.state.editQty ?? "").replace(",", ".").trim();
+        const quantity = Number(raw);
+        if (raw === "" || !Number.isFinite(quantity) || quantity < 0) {
+            this.notification.add(_t("Ingresá una cantidad válida (0 o más)."), { type: "warning" });
+            return;
+        }
+        const { product_id, name, uom } = this.state.result;
+        const { location, quantity: current } = this.state.editTarget;
+        this.dialog.add(ConfirmationDialog, {
+            title: _t("Confirmar cambio de stock"),
+            body: _t("¿Cambiar el stock de «%(name)s» en %(location)s de %(from)s a %(to)s %(uom)s?", {
+                name,
+                location,
+                from: current,
+                to: quantity,
+                uom,
+            }),
+            confirmLabel: _t("Sí, cambiar"),
+            cancelLabel: _t("Cancelar"),
+            confirm: () => this.saveQty(product_id, quantity),
+            cancel: () => {},
+        });
+    }
+
+    async saveQty(productId, quantity) {
+        this.state.loading = true;
+        try {
+            this.state.result = await this.orm.call("product.product", "barcode_lookup_set_quantity", [
+                productId,
+                quantity,
+            ]);
+            this.state.editQty = null;
+            this.notification.add(_t("Stock actualizado."), { type: "success" });
+        } finally {
+            this.state.loading = false;
+        }
+    }
+
     reset() {
+        this.state.editQty = null;
         this.state.result = null;
         this.state.results = [];
         this.state.code = "";

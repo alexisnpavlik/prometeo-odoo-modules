@@ -59,6 +59,27 @@
                             <button class="btn btn-outline-secondary o_wide" t-on-click="reset">
                                 <i class="fa fa-barcode"/> Escanear otro
                             </button>
+                            <button t-if="state.result.can_edit_qty and state.editQty === null"
+                                    class="btn btn-outline-warning o_wide" t-on-click="onEditQty">
+                                <i class="fa fa-pencil"/> Editar cantidad
+                            </button>
+                            <form t-if="state.editQty !== null" class="o_barcode_lookup_edit_qty o_wide"
+                                  t-on-submit="onSubmitQty">
+                                <label class="form-label" for="o_barcode_lookup_qty">
+                                    Nueva cantidad (<t t-esc="state.result.uom"/>)
+                                </label>
+                                <div class="text-muted small">
+                                    En <t t-esc="state.editTarget.location"/>: hoy hay
+                                    <strong t-esc="state.editTarget.quantity"/>
+                                </div>
+                                <input id="o_barcode_lookup_qty" type="number" inputmode="decimal" min="0" step="any"
+                                       class="form-control" t-ref="qtyInput"
+                                       t-att-value="state.editQty" t-on-input="(ev) => state.editQty = ev.target.value"/>
+                                <div class="o_barcode_lookup_edit_qty_buttons">
+                                    <button type="button" class="btn btn-outline-secondary" t-on-click="cancelEditQty">Cancelar</button>
+                                    <button type="submit" class="btn btn-warning">Guardar</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                     <div t-else="" class="o_barcode_lookup_card o_barcode_lookup_missing">
