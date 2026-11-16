@@ -35,6 +35,7 @@ patch(PosOrder.prototype, {
                 if (lineI.original_price) {
                     delete lineI.original_price;
                 }
+                delete lineI.installment_unit_price;
             });
 
             // Si se elimina la línea base de la tarjeta (la que no es de recargo),

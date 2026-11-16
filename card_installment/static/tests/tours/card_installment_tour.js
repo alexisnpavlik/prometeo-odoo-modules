@@ -62,9 +62,18 @@ function chooseInstallment(planName) {
             run: "click",
         },
         {
+            // Coincidencia exacta del nombre: ":contains('Plan 1')" también matchea "Plan 12".
             content: `select ${planName}`,
-            trigger: `.modal-body div.border:has(strong:contains("${planName}")) input[name=installment_option]`,
-            run: "click",
+            trigger: ".modal-body input[name=installment_option]",
+            run: () => {
+                const option = [...document.querySelectorAll(".modal-body div.border")].find(
+                    (div) => div.querySelector("strong")?.textContent.trim() === planName
+                );
+                if (!option) {
+                    fail(`no está el plan ${planName} en el popup`);
+                }
+                option.querySelector("input[name=installment_option]").click();
+            },
         },
         {
             content: "confirm installment popup",
@@ -232,5 +241,48 @@ registry.category("web_tour.tours").add("card_installment_validate_order", {
             checkOrder({ prices: [29700, 21670, -15411], total: 87329 }),
             PaymentScreen.clickValidate(),
             ReceiptScreen.isShown(),
+        ].flat(),
+});
+
+// 8. Cambio directo entre dos planes con recargo (6 -> 12), sin pasar por uno sin recargo.
+registry.category("web_tour.tours").add("card_installment_surcharge_to_surcharge", {
+    steps: () =>
+        [
+            openAndAdd("Mochila A", "Mochila B"),
+            ProductScreen.clickPayButton(),
+            PaymentScreen.clickPaymentMethod(CARD),
+            chooseInstallment("Plan 6"),
+            checkOrder({ prices: [29700, 21670], total: 51370 }),
+            chooseInstallment("Plan 12"),
+            checkOrder({ prices: [37800, 27580], total: 65380 }),
+        ].flat(),
+});
+
+// 9. El cajero elige cuotas, vuelve, corrige un precio y vuelve a elegir cuotas:
+//    se respeta el precio corregido (no se revierte al de la primera vez).
+registry.category("web_tour.tours").add("card_installment_price_edited_between", {
+    steps: () =>
+        [
+            openAndAdd("Mochila A", "Mochila B"),
+            ProductScreen.clickPayButton(),
+            PaymentScreen.clickPaymentMethod(CARD),
+            chooseInstallment("Plan 1"),
+            checkOrder({ prices: [27000, 19700], total: 46700 }),
+            PaymentScreen.clickBack(),
+            ProductScreen.clickOrderline("Mochila A"),
+            {
+                content: "cashier types a new price on Mochila A",
+                trigger: ".product-screen",
+                run: () => {
+                    const line = order().get_selected_orderline();
+                    line.price_type = "manual";
+                    line.set_unit_price(25000);
+                },
+            },
+            ProductScreen.clickPayButton(),
+            checkOrder({ prices: [25000, 19700], total: 44700 }),
+            PaymentScreen.clickPaymentline(CARD, "46,700.00"),
+            chooseInstallment("Plan 1"),
+            checkOrder({ prices: [25000, 19700], total: 44700 }),
         ].flat(),
 });

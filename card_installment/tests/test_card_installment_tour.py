@@ -49,6 +49,7 @@ class TestCardInstallmentTour(TestPointOfSaleHttpCommon):
         env["account.card.installment"].create([
             {"card_id": card.id, "name": "Plan 1", "installment": 1, "surcharge_coefficient": 1.0},
             {"card_id": card.id, "name": "Plan 6", "installment": 6, "surcharge_coefficient": 1.10},
+            {"card_id": card.id, "name": "Plan 12", "installment": 12, "surcharge_coefficient": 1.40},
         ])
         card_journal = env["account.journal"].create({
             "name": "Card Test",
@@ -72,6 +73,10 @@ class TestCardInstallmentTour(TestPointOfSaleHttpCommon):
             "discount_product_id": env.ref("pos_discount.product_product_consumable").id,
             "discount_pc": 15,
         })
+        # En prod todas las cajas tienen pos_pricelist_enforce activo (re-aplica la
+        # lista al tocar Pagar): si está instalado, probar junto con él.
+        if "pricelist_enforce" in cls.main_pos_config._fields:
+            cls.main_pos_config.pricelist_enforce = True
 
     def test_pricelist_with_discount_last(self):
         self.start_pos_tour("card_installment_pricelist_discount_last")
@@ -90,6 +95,12 @@ class TestCardInstallmentTour(TestPointOfSaleHttpCommon):
 
     def test_split_payment(self):
         self.start_pos_tour("card_installment_split_payment")
+
+    def test_surcharge_to_surcharge(self):
+        self.start_pos_tour("card_installment_surcharge_to_surcharge")
+
+    def test_price_edited_between(self):
+        self.start_pos_tour("card_installment_price_edited_between")
 
     def test_validate_order(self):
         """Venta validada: lo grabado en pos.order (lo que se factura) respeta la lista."""
