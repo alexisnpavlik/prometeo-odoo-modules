@@ -171,6 +171,12 @@ export class InfoPopup extends Component {
             console.log(`🔧 Ajuste por redondeo completado en ${iterations} iteraciones. Total final:`, order.get_total_with_tax());
         }
 
+        // Recordar el precio que dejó el plan: si al re-elegir cuotas la línea tiene
+        // otro precio, el cajero lo editó y ese pasa a ser la base (ver onClickInstallments).
+        lines.forEach(lineI => {
+            lineI.installment_unit_price = lineI.get_unit_price();
+        });
+
         // 🔹 Ajustar diferencia final en la línea de pago de recargo/cuotas para coincidir perfectamente
         if (installmentPaymentLine) {
             const allPaymentLines = order.payment_ids || [];
