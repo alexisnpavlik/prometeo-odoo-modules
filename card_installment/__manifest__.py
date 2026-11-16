@@ -3,7 +3,7 @@
     "author": "ADHOC SA",
     "website": "https://www.adhoc.com.ar",
     "category": "Technical",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.1.1",
     "depends": ["product", "account", "point_of_sale"],
     "license": "LGPL-3",
     "images": [],
@@ -28,6 +28,9 @@
             "card_installment/static/src/overrides/components/popup.xml",
             "card_installment/static/src/css/*.css",
             "card_installment/static/src/xml/*.xml",
+        ],
+        "web.assets_tests": [
+            "card_installment/static/tests/tours/*.js",
         ],
     },
 }

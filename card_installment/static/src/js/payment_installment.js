@@ -102,16 +102,11 @@ patch(PaymentScreen.prototype, {
         console.log("🔑 payment_method.id:", paymentMethod.card_id);
 
         const order = this.env.services.pos.get_order();
-        const line = order.get_selected_orderline();
 
-        let originalPriceForInstallments = paymentline.amount;
-
-        if (line) {
-            console.log("line ", line)
-            if (line.original_unit_price) {
-                originalPriceForInstallments = line.original_unit_price * line.qty;
-            }
-        }
+        // Base del plan = lo que cubre la tarjeta (la línea base; el recargo va en
+        // una línea de pago aparte). Antes, al re-elegir cuotas se usaba el precio de
+        // la línea de producto seleccionada y el recargo salía sobre un solo producto.
+        const originalPriceForInstallments = paymentline.amount;
 
         //const installments = await this.env.services.pos.getInstallments(paymentMethod.card_id, line.price_unit);
         const installments = await this.env.services.pos.getInstallments(paymentMethod.card_id, originalPriceForInstallments);
@@ -125,7 +120,12 @@ patch(PaymentScreen.prototype, {
 
         for (const line of lines) {
 
-            const originalPrice = line.get_product().get_price(order.pricelist, 1);
+            // Base del recargo = precio unitario que la línea tenía ANTES de aplicar
+            // cuotas (original_unit_price si ya se aplicó un plan). No recalcular desde
+            // el producto: eso pierde la lista de precios, el descuento global, los
+            // precios manuales y los atributos, y el ajuste de redondeo termina cargando
+            // la diferencia en la última línea (factura con precios de público).
+            const originalPrice = line.original_unit_price ?? line.get_unit_price();
 
             allInstallments[line.id] = await this.env.services.pos.getInstallments(
                 paymentMethod.card_id,
