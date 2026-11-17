@@ -36,19 +36,27 @@ class StockBranchTransferLine(models.Model):
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
         """Precio en la lista de la sucursal destino; sin regla para el producto, el precio de venta de la ficha."""
-        Pricelist = self.env["product.pricelist"].sudo()
+        cache = {}
         for line in self:
-            product = line.product_id
-            if not product:
-                line.sale_price = 0.0
-                continue
-            price = product.lst_price
-            pricelists = Pricelist.search([("company_id", "=", line.transfer_id.dest_company_id.id)])
-            for pricelist in pricelists:
-                if pricelist._get_product_rule(product, 1.0):
-                    price = pricelist._get_product_price(product, 1.0)
-                    break
-            line.sale_price = price
+            line.sale_price = (
+                self._sale_price_for(line.product_id, line.transfer_id.dest_company_id, cache)
+                if line.product_id else 0.0
+            )
+
+    @api.model
+    def _sale_price_for(self, product, company, cache=None):
+        """Precio de venta en la sucursal: primera lista de la empresa con regla para el producto, si no la ficha.
+
+        Lo usan la columna Precio de venta y las métricas; `cache` guarda las listas por empresa.
+        """
+        cache = {} if cache is None else cache
+        if company.id not in cache:
+            cache[company.id] = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id)])
+        product = product.sudo()
+        for pricelist in cache[company.id]:
+            if pricelist._get_product_rule(product, 1.0):
+                return pricelist._get_product_price(product, 1.0)
+        return product.lst_price
 
     def _company_stock(self, company):
         """Stock actual del producto de la línea en la ubicación de stock de la empresa."""

@@ -24,4 +24,17 @@
               action="action_branch_transfer_all"
               groups="group_branch_transfer_manager"
               sequence="30"/>
+
+    <record id="action_branch_transfer_metrics" model="ir.actions.client">
+        <field name="name">Métricas de traslados</field>
+        <field name="tag">stock_branch_transfer.metrics_dashboard</field>
+    </record>
+
+    <!-- Muestra costos: sólo managers (el controlador vuelve a chequear el grupo) -->
+    <menuitem id="menu_branch_transfer_metrics"
+              name="Métricas"
+              parent="menu_branch_transfer_root"
+              action="action_branch_transfer_metrics"
+              groups="group_branch_transfer_manager"
+              sequence="40"/>
 </odoo>
