@@ -86,6 +86,25 @@ class TestTransferBase(BranchTransferCommon):
         })
         self.assertFalse(transfer.dest_company_id)
         self.assertGreater(transfer.line_ids.sale_price, 0.0)
+        self.assertTrue(transfer.line_ids.sale_price_source)
+
+    def test_sale_price_source_names_pricelist(self):
+        """La columna Lista de precios dice qué lista dio el precio, o la ficha si ninguna tiene regla."""
+        self.product.list_price = 50.0
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1]
+        self.assertEqual(line.sale_price_source, "Precio de la ficha")
+        self.env["product.pricelist"].create({
+            "name": "Lista SBT destino",
+            "company_id": self.company_b.id,
+            "item_ids": [(0, 0, {
+                "applied_on": "0_product_variant", "product_id": self.product.id,
+                "compute_price": "fixed", "fixed_price": 77.0,
+            })],
+        })
+        line.invalidate_recordset(["sale_price", "sale_price_source"])
+        self.assertEqual(line.sale_price, 77.0)
+        self.assertEqual(line.sale_price_source, "Lista SBT destino")
 
     def test_is_manager_on_new_record(self):
         """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""

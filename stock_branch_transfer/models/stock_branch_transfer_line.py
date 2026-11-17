@@ -1,6 +1,9 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+# Origen del precio cuando ninguna lista de la sucursal tiene regla para el producto
+PRODUCT_PRICE_SOURCE = "Precio de la ficha"
+
 
 class StockBranchTransferLine(models.Model):
     _name = "stock.branch.transfer.line"
@@ -32,6 +35,8 @@ class StockBranchTransferLine(models.Model):
     )
 
     sale_price = fields.Float(string="Precio de venta", compute="_compute_sale_price", digits="Product Price")
+    # Texto y no Many2one: la lista es de la empresa destino y el usuario de origen puede no tener acceso
+    sale_price_source = fields.Char(string="Lista de precios", compute="_compute_sale_price")
     cost = fields.Float(string="Costo", compute="_compute_cost", digits="Product Price")
 
     @api.depends("product_id", "transfer_id.company_id")
@@ -62,11 +67,11 @@ class StockBranchTransferLine(models.Model):
             prices[company_id] = self._sale_prices_for(lines.product_id, company[:1])
         for line in self:
             company_prices = prices[line.transfer_id.dest_company_id.id]
-            line.sale_price = company_prices.get(line.product_id.id, 0.0)
+            line.sale_price, line.sale_price_source = company_prices.get(line.product_id.id, (0.0, False))
 
     @api.model
     def _sale_prices_for(self, products, company):
-        """Precios de venta en la sucursal: {product_id: precio}, en lote.
+        """Precios de venta en la sucursal: {product_id: (precio, lista usada)}, en lote.
 
         Primera lista de la empresa con regla para el producto; sin regla, el precio de la ficha.
         Lo usan la columna Precio de venta y las métricas. En lote porque producto por producto
@@ -82,9 +87,9 @@ class StockBranchTransferLine(models.Model):
             # Mismo cálculo que _get_product_rule/_get_product_price: (precio, id de regla) por producto
             results = pricelist._compute_price_rule(remaining, 1.0)
             matched = remaining.filtered(lambda p: results[p.id][1])
-            prices.update({p.id: results[p.id][0] for p in matched})
+            prices.update({p.id: (results[p.id][0], pricelist.name) for p in matched})
             remaining -= matched
-        prices.update({p.id: p.lst_price for p in remaining})
+        prices.update({p.id: (p.lst_price, PRODUCT_PRICE_SOURCE) for p in remaining})
         return prices
 
     def _company_stock(self, company):

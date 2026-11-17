@@ -109,7 +109,7 @@ class BranchTransferMetricsController(http.Controller):
         prices = {}
         for company_id, product_ids in by_company.items():
             company_prices = Line._sale_prices_for(Product.browse(list(product_ids)), Company.browse(company_id))
-            prices.update({(pid, company_id): price for pid, price in company_prices.items()})
+            prices.update({(pid, company_id): price for pid, (price, _source) in company_prices.items()})
         now = datetime.now()
         lines = []
         for r in rows:
