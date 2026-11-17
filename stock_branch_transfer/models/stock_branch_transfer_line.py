@@ -102,17 +102,23 @@ class StockBranchTransferLine(models.Model):
         )
         return sum(quants.mapped("quantity"))
 
+    # Stock en origen/destino: solo managers, igual que Costo. Sin groups= en el campo (rompería la
+    # lectura de la línea a los demás): el compute da 0 y la vista oculta la columna.
     @api.depends("product_id", "transfer_id.company_id")
+    @api.depends_context("uid")
     def _compute_qty_available_origin(self):
         """Stock actual del producto en la sucursal de origen (aviso, no bloquea)."""
+        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
         for line in self:
-            line.qty_available_origin = line._company_stock(line.transfer_id.company_id)
+            line.qty_available_origin = line._company_stock(line.transfer_id.company_id) if is_manager else 0.0
 
     @api.depends("product_id", "transfer_id.dest_company_id")
+    @api.depends_context("uid")
     def _compute_qty_available_dest(self):
         """Stock actual del producto en la sucursal de destino (referencia para decidir el envío)."""
+        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
         for line in self:
-            line.qty_available_dest = line._company_stock(line.transfer_id.dest_company_id)
+            line.qty_available_dest = line._company_stock(line.transfer_id.dest_company_id) if is_manager else 0.0
 
     @api.constrains("product_id")
     def _check_product(self):

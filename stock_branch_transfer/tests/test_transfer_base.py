@@ -108,6 +108,17 @@ class TestTransferBase(BranchTransferCommon):
         transfer.invalidate_recordset(["sale_pricelist_info"])
         self.assertEqual(transfer.sale_pricelist_info, "Lista SBT destino")
 
+    def test_stock_columns_only_for_managers(self):
+        """Stock en origen y destino: el manager ve el número, el resto 0 (la columna se oculta)."""
+        self.set_stock(self.product, self.company_a, 25.0)
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1]
+        self.assertEqual(transfer.company_id, self.company_a)
+        self.assertEqual(line.with_user(self.manager).qty_available_origin, self.qty(self.product, self.company_a))
+        self.assertGreater(line.with_user(self.manager).qty_available_origin, 0.0)
+        self.assertEqual(line.with_user(self.user_a).qty_available_origin, 0.0)
+        self.assertEqual(line.with_user(self.user_a).qty_available_dest, 0.0)
+
     def test_is_manager_on_new_record(self):
         """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""
         spec = {"is_manager": {}}
