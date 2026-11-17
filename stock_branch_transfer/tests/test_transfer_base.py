@@ -105,6 +105,8 @@ class TestTransferBase(BranchTransferCommon):
         line.invalidate_recordset(["sale_price", "sale_price_source"])
         self.assertEqual(line.sale_price, 77.0)
         self.assertEqual(line.sale_price_source, "Lista SBT destino")
+        transfer.invalidate_recordset(["sale_pricelist_info"])
+        self.assertEqual(transfer.sale_pricelist_info, "Lista SBT destino")
 
     def test_is_manager_on_new_record(self):
         """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""

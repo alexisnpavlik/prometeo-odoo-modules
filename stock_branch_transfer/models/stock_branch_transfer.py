@@ -55,6 +55,10 @@ class StockBranchTransfer(models.Model):
         "stock.picking", string="Recepción vieja (intercompany)", readonly=True, copy=False,
         help="Recepción pendiente de stock_intercompany de la que se migró este traslado.",
     )
+    sale_pricelist_info = fields.Char(
+        string="Lista de precios", compute="_compute_sale_pricelist_info",
+        help="Lista de la sucursal destino que da el Precio de venta de los productos.",
+    )
     # default: un compute sin dependencias no corre en un registro nuevo (onchange) y la columna Costo
     # quedaba oculta mientras se cargaba el traslado
     is_manager = fields.Boolean(
@@ -67,6 +71,13 @@ class StockBranchTransfer(models.Model):
     is_dest_mine = fields.Boolean(
         string="Entrada a mi empresa", compute="_compute_is_mine", search="_search_is_dest_mine"
     )
+
+    @api.depends("line_ids.sale_price_source")
+    def _compute_sale_pricelist_info(self):
+        """Listas usadas por las líneas, sin repetir, en el orden en que aparecen."""
+        for transfer in self:
+            sources = transfer.line_ids.filtered("product_id").mapped("sale_price_source")
+            transfer.sale_pricelist_info = ", ".join(dict.fromkeys(s for s in sources if s)) or False
 
     @api.depends_context("uid")
     def _compute_is_manager(self):

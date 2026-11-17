@@ -64,6 +64,7 @@
                                    context="{'branch_transfer_dest': True}"
                                    readonly="state == 'cancel' or (state != 'draft' and not is_manager)"
                                    options="{'no_create': True, 'no_open': True}"/>
+                            <field name="sale_pricelist_info" invisible="not sale_pricelist_info"/>
                         </group>
                         <group>
                             <field name="user_id"/>
@@ -82,7 +83,7 @@
                                     <!-- column_invisible y no groups: el cliente cachea las vistas y no se entera del cambio de grupo -->
                                     <field name="cost" column_invisible="not parent.is_manager"/>
                                     <field name="sale_price"/>
-                                    <field name="sale_price_source" optional="show"/>
+                                    <field name="sale_price_source" optional="hide"/>
                                     <field name="qty_sent"/>
                                     <field name="qty_received" column_invisible="parent.state in ('draft', 'in_transit')"/>
                                     <field name="uom_id" optional="hide"/>
