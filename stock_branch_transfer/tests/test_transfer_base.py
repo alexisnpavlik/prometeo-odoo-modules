@@ -77,6 +77,16 @@ class TestTransferBase(BranchTransferCommon):
         self.assertEqual(line.cost, 37.5)
         self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
 
+    def test_sale_price_without_destination(self):
+        """Sin destino todavía (traslado nuevo) el precio sale de la ficha, no queda en 0."""
+        self.product.list_price = 123.0
+        transfer = self.env["stock.branch.transfer"].with_user(self.user_a).new({
+            "dest_company_id": False,
+            "line_ids": [(0, 0, {"product_id": self.product.id, "qty_sent": 1})],
+        })
+        self.assertFalse(transfer.dest_company_id)
+        self.assertGreater(transfer.line_ids.sale_price, 0.0)
+
     def test_is_manager_on_new_record(self):
         """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""
         spec = {"is_manager": {}}

@@ -50,12 +50,18 @@ class StockBranchTransferLine(models.Model):
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
         """Precio en la lista de la sucursal destino; sin regla para el producto, el precio de venta de la ficha."""
-        prices = {}
-        for company in self.transfer_id.dest_company_id:
-            lines = self.filtered(lambda ln: ln.transfer_id.dest_company_id == company)
-            prices[company.id] = self._sale_prices_for(lines.product_id, company)
+        # Agrupado por destino incluyendo "sin destino" (traslado nuevo): ahí valen las listas sin empresa
+        # o el precio de la ficha, como antes del cálculo en lote
+        by_company = {}
         for line in self:
-            company_prices = prices.get(line.transfer_id.dest_company_id.id, {})
+            by_company.setdefault(line.transfer_id.dest_company_id.id, self.env["res.company"])
+            by_company[line.transfer_id.dest_company_id.id] |= line.transfer_id.dest_company_id
+        prices = {}
+        for company_id, company in by_company.items():
+            lines = self.filtered(lambda ln: ln.transfer_id.dest_company_id.id == company_id)
+            prices[company_id] = self._sale_prices_for(lines.product_id, company[:1])
+        for line in self:
+            company_prices = prices[line.transfer_id.dest_company_id.id]
             line.sale_price = company_prices.get(line.product_id.id, 0.0)
 
     @api.model
@@ -68,7 +74,8 @@ class StockBranchTransferLine(models.Model):
         """
         prices = {}
         remaining = products.sudo()
-        pricelists = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id)])
+        # company vacía = listas sin empresa (traslado sin destino todavía)
+        pricelists = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id or False)])
         for pricelist in pricelists:
             if not remaining:
                 break
