@@ -1,6 +1,6 @@
 {
     "name": "Traslados entre sucursales",
-    "version": "18.0.1.2.0",
+    "version": "18.0.1.4.0",
     "category": "Inventory/Inventory",
     "summary": "Envío y recepción de mercadería entre sucursales (empresas) con aviso de pendientes",
     "description": """
@@ -15,6 +15,8 @@
         - Un manager puede editar o anular cualquier traslado: el stock de las dos
           sucursales se corrige con movimientos nuevos, nunca tocando los hechos.
         - Contador de pendientes sobre el ícono de la app.
+        - Métricas (solo managers): pendientes, rutas, diferencias valorizadas,
+          productos más trasladados y plata movida a costo y a precio de venta.
 
         Convive con stock_intercompany: los pickings del módulo no llevan contacto,
         así no se genera la recepción automática del flujo viejo.
@@ -37,6 +39,9 @@
         "web.assets_backend": [
             "stock_branch_transfer/static/src/js/transfer_badge_service.js",
             "stock_branch_transfer/static/src/scss/transfer_badge.scss",
+            "stock_branch_transfer/static/src/metrics/dashboard.css",
+            "stock_branch_transfer/static/src/metrics/dashboard.js",
+            "stock_branch_transfer/static/src/metrics/dashboard.xml",
         ],
     },
     "installable": True,

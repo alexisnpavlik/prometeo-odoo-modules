@@ -1,0 +1,524 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+    <!-- Ícono de ayuda con tooltip. Parámetros: tip, align (opcional) -->
+    <t t-name="stock_branch_transfer.MetricsInfoTip">
+        <div t-att-class="'info-tooltip-wrapper ' + (align or 'tooltip-right')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="info-icon">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div class="info-tooltip-text"><t t-esc="tip"/></div>
+        </div>
+    </t>
+
+    <!-- Filtro multi-selección con búsqueda. Parámetros: field, title, allLabel, pluralLabel, placeholder -->
+    <t t-name="stock_branch_transfer.MetricsMultiSelect">
+        <div class="input-group">
+            <label><t t-esc="title"/></label>
+            <div class="multiselect" t-on-click.stop="() => {}">
+                <button type="button" class="multiselect-toggle" t-on-click="() => this.toggleFilterPanel(field)">
+                    <span class="multiselect-label" t-esc="multiLabel(field, allLabel, pluralLabel)"/>
+                    <span class="multiselect-caret">▾</span>
+                </button>
+                <div class="multiselect-panel" t-if="state.openFilter === field">
+                    <input type="text" class="multiselect-search" t-att-placeholder="placeholder"
+                           t-att-value="state.filterSearch[field]"
+                           t-on-input="(ev) => this.onFilterSearchInput(field, ev)"/>
+                    <label class="multiselect-option multiselect-all">
+                        <input type="checkbox" t-if="draft[field].length === 0" checked="checked"
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <input type="checkbox" t-else=""
+                               t-on-change="() => this.selectAllFilterValues(field)"/>
+                        <span t-esc="allLabel"/>
+                    </label>
+                    <div class="multiselect-list">
+                        <t t-foreach="visibleOptions(field)" t-as="opt" t-key="opt[0] + '|' + isFilterSelected(field, opt[0])">
+                            <label class="multiselect-option">
+                                <input type="checkbox" t-att-checked="isFilterSelected(field, opt[0])"
+                                       t-on-change="() => this.toggleFilterValue(field, opt[0])"/>
+                                <span t-esc="opt[1]"/>
+                            </label>
+                        </t>
+                        <div class="multiselect-empty" t-if="visibleOptions(field).length === 0">Sin resultados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="stock_branch_transfer.MetricsDashboard">
+        <div t-att-class="'btm-dashboard-wrap ' + (state.theme === 'light' ? 'theme-light' : '')">
+
+            <!-- ============ BARRA LATERAL DE FILTROS ============ -->
+            <aside t-att-class="'sidebar' + (state.showFilters ? ' open' : '')">
+                <button class="sidebar-close" t-on-click="toggleFilters" title="Cerrar filtros">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Cerrar filtros</span>
+                </button>
+
+                <div class="sidebar-brand">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <div class="brand-text">
+                        <h2>Traslados</h2>
+                        <span>Métricas</span>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>Período (fecha de envío)</h3>
+                    <div class="preset-dates">
+                        <t t-foreach="periodPresets" t-as="days" t-key="days">
+                            <button t-att-class="'btn-preset ' + (draft.period === days ? 'active' : '')"
+                                    t-on-click="onPresetClick" t-att-data-period="days">Últimos <t t-esc="days"/> días</button>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Orden común a todos los dashboards: empresa, estado, ruta, categoría, producto -->
+                <div class="sidebar-section">
+                    <h3>Filtros Avanzados</h3>
+
+                    <t t-call="stock_branch_transfer.MetricsMultiSelect">
+                        <t t-set="field" t-value="'company'"/>
+                        <t t-set="title" t-value="'Empresa'"/>
+                        <t t-set="allLabel" t-value="'Todas las empresas'"/>
+                        <t t-set="pluralLabel" t-value="'empresas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar empresa...'"/>
+                    </t>
+
+                    <t t-call="stock_branch_transfer.MetricsMultiSelect">
+                        <t t-set="field" t-value="'status'"/>
+                        <t t-set="title" t-value="'Estado'"/>
+                        <t t-set="allLabel" t-value="'Todos los estados'"/>
+                        <t t-set="pluralLabel" t-value="'estados seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar estado...'"/>
+                    </t>
+
+                    <t t-call="stock_branch_transfer.MetricsMultiSelect">
+                        <t t-set="field" t-value="'route'"/>
+                        <t t-set="title" t-value="'Ruta'"/>
+                        <t t-set="allLabel" t-value="'Todas las rutas'"/>
+                        <t t-set="pluralLabel" t-value="'rutas seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar ruta...'"/>
+                    </t>
+
+                    <t t-call="stock_branch_transfer.MetricsMultiSelect">
+                        <t t-set="field" t-value="'category'"/>
+                        <t t-set="title" t-value="'Categoría'"/>
+                        <t t-set="allLabel" t-value="'Todas las categorías'"/>
+                        <t t-set="pluralLabel" t-value="'categorías seleccionadas'"/>
+                        <t t-set="placeholder" t-value="'Buscar categoría...'"/>
+                    </t>
+
+                    <t t-call="stock_branch_transfer.MetricsMultiSelect">
+                        <t t-set="field" t-value="'product'"/>
+                        <t t-set="title" t-value="'Producto'"/>
+                        <t t-set="allLabel" t-value="'Todos los productos'"/>
+                        <t t-set="pluralLabel" t-value="'productos seleccionados'"/>
+                        <t t-set="placeholder" t-value="'Buscar producto...'"/>
+                    </t>
+                </div>
+
+                <div class="sidebar-footer">
+                    <button class="btn btn-primary" t-on-click="applyFilters"><span>Aplicar</span></button>
+                    <button class="btn btn-secondary" t-on-click="clearFilters"><span>Limpiar</span></button>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <!-- ============ CABECERA ============ -->
+                <header class="main-header">
+                    <div class="header-left">
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="toggleTheme" t-att-title="state.theme === 'light' ? 'Modo Noche' : 'Modo Día'">
+                            <t t-if="state.theme === 'light'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                </svg>
+                            </t>
+                            <t t-else="">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="5"></circle>
+                                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                </svg>
+                            </t>
+                        </button>
+                        <h1>Métricas de traslados</h1>
+                    </div>
+
+                    <div class="header-right">
+                        <button class="sidebar-toggle" t-on-click="toggleFilters" title="Filtros">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="10" y1="18" x2="14" y2="18"></line>
+                            </svg>
+                        </button>
+                        <div class="sync-status">
+                            <span t-att-class="'status-dot ' + (state.loading ? 'anim-spin' : 'green')"></span>
+                            <span class="status-text" t-esc="state.syncTime"/>
+                        </div>
+                        <button class="btn btn-secondary btn-icon-only" t-on-click="refreshData" title="Sincronizar ahora">
+                            <svg t-att-class="state.loading ? 'icon-spin-target spinning' : 'icon-spin-target'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </header>
+
+                <nav class="nav-tabs">
+                    <t t-foreach="tabs" t-as="tab" t-key="tab[0]">
+                        <button t-att-class="'nav-tab ' + (state.tab === tab[0] ? 'active' : '')" t-on-click="onTabClick" t-att-data-tab="tab[0]"><t t-esc="tab[1]"/></button>
+                    </t>
+                </nav>
+
+                <div class="tab-content">
+
+                    <!-- ============ TARJETAS POR ESTADO (botones que filtran) ============ -->
+                    <div class="kpi-grid status-cards">
+                        <t t-foreach="statusCards" t-as="card" t-key="card.key">
+                            <button type="button" t-att-class="'kpi-card shadow-glow status-card ' + card.color + (state.status.includes(card.key) ? ' selected' : '') + (state.status.length and !state.status.includes(card.key) ? ' dimmed' : '')"
+                                    t-on-click="onStatusCardClick" t-att-data-status="card.key"
+                                    t-att-title="state.status.length === 1 and state.status[0] === card.key ? 'Quitar filtro' : 'Filtrar por ' + card.label">
+                                <div class="kpi-card-inner">
+                                    <div class="kpi-meta">
+                                        <span class="kpi-title"><t t-esc="card.label"/></span>
+                                        <div class="kpi-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <t t-if="card.key === 'draft'">
+                                                    <path d="M12 20h9"></path>
+                                                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path>
+                                                </t>
+                                                <t t-elif="card.key === 'in_transit'">
+                                                    <rect x="1" y="3" width="15" height="13"></rect>
+                                                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                                </t>
+                                                <t t-elif="card.key === 'with_diff'">
+                                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </t>
+                                                <t t-elif="card.key === 'received'">
+                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                                </t>
+                                                <t t-else="">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                                </t>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="kpi-value"><t t-esc="formatNumber(card.count)"/></div>
+                                    <div class="kpi-footer">
+                                        <span class="kpi-subtext"><t t-esc="formatCurrency(card.cost)"/> a costo</span>
+                                    </div>
+                                </div>
+                            </button>
+                        </t>
+                    </div>
+
+                    <!-- ============ TOTALES DE PLATA (no filtran) ============ -->
+                    <div class="kpi-grid totals-cards">
+                        <div class="kpi-card shadow-glow totals-card blue">
+                            <div class="kpi-card-inner">
+                                <div class="kpi-meta"><span class="kpi-title">Movido a costo</span></div>
+                                <div class="kpi-value"><t t-esc="formatCurrency(data.totals.cost)"/></div>
+                                <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="formatNumber(data.totals.transfers)"/> traslados · <t t-esc="formatNumber(data.totals.units)"/> u.</span></div>
+                            </div>
+                        </div>
+                        <div class="kpi-card shadow-glow totals-card green">
+                            <div class="kpi-card-inner">
+                                <div class="kpi-meta"><span class="kpi-title">Movido a precio de venta</span></div>
+                                <div class="kpi-value"><t t-esc="formatCurrency(data.totals.sale)"/></div>
+                                <div class="kpi-footer"><span class="kpi-subtext">Lista de la sucursal destino</span></div>
+                            </div>
+                        </div>
+                        <div class="kpi-card shadow-glow totals-card red">
+                            <div class="kpi-card-inner">
+                                <div class="kpi-meta"><span class="kpi-title">Faltantes a costo</span></div>
+                                <div class="kpi-value"><t t-esc="formatCurrency(data.totals.missing_cost)"/></div>
+                                <div class="kpi-footer"><span class="kpi-subtext"><t t-esc="formatCurrency(data.totals.extra_cost)"/> de sobrantes</span></div>
+                            </div>
+                        </div>
+                        <div class="kpi-card shadow-glow totals-card purple">
+                            <div class="kpi-card-inner">
+                                <div class="kpi-meta"><span class="kpi-title">Demora promedio</span></div>
+                                <div class="kpi-value"><t t-esc="formatHours(data.totals.avg_hours)"/></div>
+                                <div class="kpi-footer"><span class="kpi-subtext">Del envío a la recepción</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============ PENDIENTES ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'pending'">
+                        <t t-set="pd" t-value="pageData('pending')"/>
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Traslados abiertos</h3>
+                                    <p class="section-sub">
+                                        <t t-esc="formatNumber(pd.total)"/> abiertos ·
+                                        <b><t t-esc="formatNumber(pendingLate)"/></b> en camino hace 3 días o más
+                                    </p>
+                                </div>
+                                <t t-call="stock_branch_transfer.MetricsInfoTip">
+                                    <t t-set="tip" t-value="'Borradores, en camino y con diferencias, aunque se hayan creado antes del período. Demorado: 3 días o más en camino. Tocá una fila para abrir el traslado.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="name">Número<span class="sort-mark" t-esc="sortMark('name')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="status">Estado<span class="sort-mark" t-esc="sortMark('status')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="origen">Origen<span class="sort-mark" t-esc="sortMark('origen')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="destino">Destino<span class="sort-mark" t-esc="sortMark('destino')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="fecha_sort">Fecha<span class="sort-mark" t-esc="sortMark('fecha_sort')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-key="days">Días en camino<span class="sort-mark" t-esc="sortMark('days')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="units">Unidades<span class="sort-mark" t-esc="sortMark('units')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="cost">Costo<span class="sort-mark" t-esc="sortMark('cost')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="sale">Venta<span class="sort-mark" t-esc="sortMark('sale')"/></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="state.loading and !pd.total">
+                                            <td colspan="9" class="text-center text-muted empty-row">Cargando...</td>
+                                        </tr>
+                                        <tr t-elif="pd.total === 0">
+                                            <td colspan="9" class="text-center text-muted empty-row">No hay traslados abiertos con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="pd.rows" t-as="r" t-key="r.transfer_id">
+                                            <tr class="clickable-row" t-on-click="openTransfer" t-att-data-id="r.transfer_id">
+                                                <td class="cell-strong"><t t-esc="r.name"/></td>
+                                                <td><span t-att-class="'stock-badge ' + r.status"><t t-esc="statusLabel(r.status)"/></span></td>
+                                                <td class="cell-secondary"><t t-esc="r.origen"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.destino"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.fecha"/></td>
+                                                <td class="num">
+                                                    <t t-esc="r.days === null ? '—' : formatNumber(r.days)"/>
+                                                    <span class="review-tag" t-if="r.late">demorado</span>
+                                                </td>
+                                                <td class="num"><t t-esc="formatNumber(r.units)"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.cost)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(r.sale)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="stock_branch_transfer.MetricsPager"/>
+                        </div>
+                    </section>
+
+                    <!-- ============ RUTAS ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'routes'">
+                        <t t-set="pd" t-value="pageData('routes')"/>
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Rutas origen → destino</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(pd.total)"/> rutas con movimiento</p>
+                                </div>
+                                <t t-call="stock_branch_transfer.MetricsInfoTip">
+                                    <t t-set="tip" t-value="'Lo enviado en el período por cada par de sucursales (sin borradores). Diferencia = recibido − enviado: negativo es faltante. Demora = horas del envío a la recepción, por traslado.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="origen">Origen<span class="sort-mark" t-esc="sortMark('origen')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="destino">Destino<span class="sort-mark" t-esc="sortMark('destino')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="transfers">Traslados<span class="sort-mark" t-esc="sortMark('transfers')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="units">Unidades<span class="sort-mark" t-esc="sortMark('units')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-key="cost">Costo<span class="sort-mark" t-esc="sortMark('cost')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="sale">Venta<span class="sort-mark" t-esc="sortMark('sale')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="diff_cost">Diferencia<span class="sort-mark" t-esc="sortMark('diff_cost')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="avg_hours">Demora prom.<span class="sort-mark" t-esc="sortMark('avg_hours')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="max_hours">Demora máx.<span class="sort-mark" t-esc="sortMark('max_hours')"/></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="state.loading and !pd.total">
+                                            <td colspan="9" class="text-center text-muted empty-row">Cargando...</td>
+                                        </tr>
+                                        <tr t-elif="pd.total === 0">
+                                            <td colspan="9" class="text-center text-muted empty-row">No hay traslados enviados con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="pd.rows" t-as="r" t-key="r.route">
+                                            <tr>
+                                                <td class="cell-strong"><t t-esc="r.origen"/></td>
+                                                <td class="cell-strong"><t t-esc="r.destino"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.transfers)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.units)"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatCurrency(r.cost)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(r.sale)"/></td>
+                                                <td t-att-class="'num ' + (r.diff_cost &lt; 0 ? 'diff-neg' : r.diff_cost &gt; 0 ? 'diff-pos' : '')">
+                                                    <t t-esc="formatCurrency(r.diff_cost)"/>
+                                                    <div class="cell-note" t-if="r.diff"><t t-esc="formatNumber(r.diff)"/> u.</div>
+                                                </td>
+                                                <td class="num"><t t-esc="formatHours(r.avg_hours)"/></td>
+                                                <td class="num"><t t-esc="formatHours(r.max_hours)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="stock_branch_transfer.MetricsPager"/>
+                        </div>
+                    </section>
+
+                    <!-- ============ DIFERENCIAS ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'diffs'">
+                        <t t-set="pd" t-value="pageData('diffs')"/>
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Faltantes y sobrantes</h3>
+                                    <p class="section-sub">
+                                        <t t-esc="formatNumber(pd.total)"/> líneas ·
+                                        <b><t t-esc="formatCurrency(diffTotals.missing)"/></b> faltante ·
+                                        <t t-esc="formatCurrency(diffTotals.extra)"/> sobrante
+                                    </p>
+                                </div>
+                                <t t-call="stock_branch_transfer.MetricsInfoTip">
+                                    <t t-set="tip" t-value="'Líneas recibidas donde lo recibido no coincide con lo enviado. Valorizado al costo actual del producto en la sucursal de origen. Tocá una fila para abrir el traslado.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="name">Número<span class="sort-mark" t-esc="sortMark('name')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="fecha_sort">Fecha<span class="sort-mark" t-esc="sortMark('fecha_sort')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="route">Ruta<span class="sort-mark" t-esc="sortMark('route')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('producto')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="sent">Enviado<span class="sort-mark" t-esc="sortMark('sent')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="received">Recibido<span class="sort-mark" t-esc="sortMark('received')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="diff">Diferencia<span class="sort-mark" t-esc="sortMark('diff')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-key="diff_cost">A costo<span class="sort-mark" t-esc="sortMark('diff_cost')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="status">Estado<span class="sort-mark" t-esc="sortMark('status')"/></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="state.loading and !pd.total">
+                                            <td colspan="9" class="text-center text-muted empty-row">Cargando...</td>
+                                        </tr>
+                                        <tr t-elif="pd.total === 0">
+                                            <td colspan="9" class="text-center text-muted empty-row">No hay diferencias con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="pd.rows" t-as="r" t-key="r.key">
+                                            <tr class="clickable-row" t-on-click="openTransfer" t-att-data-id="r.transfer_id">
+                                                <td class="cell-strong"><t t-esc="r.name"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.fecha"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.route"/></td>
+                                                <td class="cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.sent)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.received)"/></td>
+                                                <td t-att-class="'num ' + (r.diff &lt; 0 ? 'diff-neg' : 'diff-pos')"><t t-esc="formatNumber(r.diff)"/></td>
+                                                <td t-att-class="'num ' + (r.diff_cost &lt; 0 ? 'diff-neg' : 'diff-pos')"><t t-esc="formatCurrency(r.diff_cost)"/></td>
+                                                <td><span t-att-class="'stock-badge ' + r.status"><t t-esc="statusLabel(r.status)"/></span></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="stock_branch_transfer.MetricsPager"/>
+                        </div>
+                    </section>
+
+                    <!-- ============ PRODUCTOS ============ -->
+                    <section class="tab-pane active" t-if="state.tab === 'products'">
+                        <t t-set="pd" t-value="pageData('products')"/>
+                        <div class="glass-panel padded">
+                            <div class="section-header">
+                                <div>
+                                    <h3>Productos más trasladados</h3>
+                                    <p class="section-sub"><t t-esc="formatNumber(pd.total)"/> productos</p>
+                                </div>
+                                <t t-call="stock_branch_transfer.MetricsInfoTip">
+                                    <t t-set="tip" t-value="'Lo enviado en el período por producto (sin borradores). Un producto que viaja mucho entre sucursales suele estar mal repartido en la compra.'"/>
+                                </t>
+                            </div>
+                            <div class="filter-row">
+                                <button class="btn btn-secondary" t-on-click="exportExcel">Exportar Excel</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="producto">Producto<span class="sort-mark" t-esc="sortMark('producto')"/></th>
+                                            <th class="sortable" t-on-click="onSortClick" data-key="categoria">Categoría<span class="sort-mark" t-esc="sortMark('categoria')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="transfers">Traslados<span class="sort-mark" t-esc="sortMark('transfers')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="routes">Rutas<span class="sort-mark" t-esc="sortMark('routes')"/></th>
+                                            <th class="sortable num th-highlight" t-on-click="onSortClick" data-key="units">Unidades<span class="sort-mark" t-esc="sortMark('units')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="cost">Costo<span class="sort-mark" t-esc="sortMark('cost')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="sale">Venta<span class="sort-mark" t-esc="sortMark('sale')"/></th>
+                                            <th class="sortable num" t-on-click="onSortClick" data-key="diff">Diferencia (u)<span class="sort-mark" t-esc="sortMark('diff')"/></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="state.loading and !pd.total">
+                                            <td colspan="8" class="text-center text-muted empty-row">Cargando...</td>
+                                        </tr>
+                                        <tr t-elif="pd.total === 0">
+                                            <td colspan="8" class="text-center text-muted empty-row">No hay productos trasladados con estos filtros.</td>
+                                        </tr>
+                                        <t t-foreach="pd.rows" t-as="r" t-key="r.product_id">
+                                            <tr>
+                                                <td class="cell-strong cell-text"><t t-esc="r.producto"/></td>
+                                                <td class="cell-secondary"><t t-esc="r.categoria"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.transfers)"/></td>
+                                                <td class="num"><t t-esc="formatNumber(r.routes)"/></td>
+                                                <td class="num cell-strong"><t t-esc="formatNumber(r.units)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(r.cost)"/></td>
+                                                <td class="num"><t t-esc="formatCurrency(r.sale)"/></td>
+                                                <td t-att-class="'num ' + (r.diff &lt; 0 ? 'diff-neg' : r.diff &gt; 0 ? 'diff-pos' : '')"><t t-esc="formatNumber(r.diff)"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <t t-call="stock_branch_transfer.MetricsPager"/>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </t>
+
+    <!-- Paginación de la pestaña activa. Usa pd (pageData de la pestaña) del contexto -->
+    <t t-name="stock_branch_transfer.MetricsPager">
+        <div class="pagination" t-if="pd.pages &gt; 1">
+            <button class="btn btn-secondary" t-att-disabled="pd.current &lt;= 1" t-on-click="changePage" data-dir="-1">Anterior</button>
+            <span class="page-info">Página <t t-esc="pd.current"/> de <t t-esc="pd.pages"/></span>
+            <button class="btn btn-secondary" t-att-disabled="pd.current &gt;= pd.pages" t-on-click="changePage" data-dir="1">Siguiente</button>
+        </div>
+    </t>
+</templates>

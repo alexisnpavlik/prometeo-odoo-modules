@@ -1,6 +1,9 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
+# Origen del precio cuando ninguna lista de la sucursal tiene regla para el producto
+PRODUCT_PRICE_SOURCE = "Precio de la ficha"
+
 
 class StockBranchTransferLine(models.Model):
     _name = "stock.branch.transfer.line"
@@ -32,23 +35,62 @@ class StockBranchTransferLine(models.Model):
     )
 
     sale_price = fields.Float(string="Precio de venta", compute="_compute_sale_price", digits="Product Price")
+    # Texto y no Many2one: la lista es de la empresa destino y el usuario de origen puede no tener acceso
+    sale_price_source = fields.Char(string="Lista de precios", compute="_compute_sale_price")
+    cost = fields.Float(string="Costo", compute="_compute_cost", digits="Product Price")
+
+    @api.depends("product_id", "transfer_id.company_id")
+    @api.depends_context("uid")
+    def _compute_cost(self):
+        """Costo del producto en la sucursal de origen (solo managers; no sale en el remito)."""
+        # Sin groups= en el campo: con groups, cualquier lectura de la línea (vista, remito) que lo
+        # incluya tira AccessError a quien no es manager. La columna se oculta en la vista.
+        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
+        for line in self:
+            company = line.transfer_id.company_id
+            line.cost = (
+                line.product_id.sudo().with_company(company).standard_price if company and is_manager else 0.0
+            )
 
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
         """Precio en la lista de la sucursal destino; sin regla para el producto, el precio de venta de la ficha."""
-        Pricelist = self.env["product.pricelist"].sudo()
+        # Agrupado por destino incluyendo "sin destino" (traslado nuevo): ahí valen las listas sin empresa
+        # o el precio de la ficha, como antes del cálculo en lote
+        by_company = {}
         for line in self:
-            product = line.product_id
-            if not product:
-                line.sale_price = 0.0
-                continue
-            price = product.lst_price
-            pricelists = Pricelist.search([("company_id", "=", line.transfer_id.dest_company_id.id)])
-            for pricelist in pricelists:
-                if pricelist._get_product_rule(product, 1.0):
-                    price = pricelist._get_product_price(product, 1.0)
-                    break
-            line.sale_price = price
+            by_company.setdefault(line.transfer_id.dest_company_id.id, self.env["res.company"])
+            by_company[line.transfer_id.dest_company_id.id] |= line.transfer_id.dest_company_id
+        prices = {}
+        for company_id, company in by_company.items():
+            lines = self.filtered(lambda ln: ln.transfer_id.dest_company_id.id == company_id)
+            prices[company_id] = self._sale_prices_for(lines.product_id, company[:1])
+        for line in self:
+            company_prices = prices[line.transfer_id.dest_company_id.id]
+            line.sale_price, line.sale_price_source = company_prices.get(line.product_id.id, (0.0, False))
+
+    @api.model
+    def _sale_prices_for(self, products, company):
+        """Precios de venta en la sucursal: {product_id: (precio, lista usada)}, en lote.
+
+        Primera lista de la empresa con regla para el producto; sin regla, el precio de la ficha.
+        Lo usan la columna Precio de venta y las métricas. En lote porque producto por producto
+        las métricas tardaban ~10 s con 1.200 pares producto/empresa.
+        """
+        prices = {}
+        remaining = products.sudo()
+        # company vacía = listas sin empresa (traslado sin destino todavía)
+        pricelists = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id or False)])
+        for pricelist in pricelists:
+            if not remaining:
+                break
+            # Mismo cálculo que _get_product_rule/_get_product_price: (precio, id de regla) por producto
+            results = pricelist._compute_price_rule(remaining, 1.0)
+            matched = remaining.filtered(lambda p: results[p.id][1])
+            prices.update({p.id: (results[p.id][0], pricelist.name) for p in matched})
+            remaining -= matched
+        prices.update({p.id: (p.lst_price, PRODUCT_PRICE_SOURCE) for p in remaining})
+        return prices
 
     def _company_stock(self, company):
         """Stock actual del producto de la línea en la ubicación de stock de la empresa."""
@@ -60,17 +102,23 @@ class StockBranchTransferLine(models.Model):
         )
         return sum(quants.mapped("quantity"))
 
+    # Stock en origen/destino: solo managers, igual que Costo. Sin groups= en el campo (rompería la
+    # lectura de la línea a los demás): el compute da 0 y la vista oculta la columna.
     @api.depends("product_id", "transfer_id.company_id")
+    @api.depends_context("uid")
     def _compute_qty_available_origin(self):
         """Stock actual del producto en la sucursal de origen (aviso, no bloquea)."""
+        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
         for line in self:
-            line.qty_available_origin = line._company_stock(line.transfer_id.company_id)
+            line.qty_available_origin = line._company_stock(line.transfer_id.company_id) if is_manager else 0.0
 
     @api.depends("product_id", "transfer_id.dest_company_id")
+    @api.depends_context("uid")
     def _compute_qty_available_dest(self):
         """Stock actual del producto en la sucursal de destino (referencia para decidir el envío)."""
+        is_manager = self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager")
         for line in self:
-            line.qty_available_dest = line._company_stock(line.transfer_id.dest_company_id)
+            line.qty_available_dest = line._company_stock(line.transfer_id.dest_company_id) if is_manager else 0.0
 
     @api.constrains("product_id")
     def _check_product(self):

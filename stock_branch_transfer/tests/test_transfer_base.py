@@ -70,6 +70,62 @@ class TestTransferBase(BranchTransferCommon):
         line = self.env["stock.branch.transfer.line"].new({"transfer_id": transfer.id})
         self.assertEqual(line.sale_price, 0.0)
 
+    def test_cost_only_for_managers(self):
+        self.product.with_company(self.company_a).standard_price = 37.5
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1].with_user(self.manager)
+        self.assertEqual(line.cost, 37.5)
+        self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
+
+    def test_sale_price_without_destination(self):
+        """Sin destino todavía (traslado nuevo) el precio sale de la ficha, no queda en 0."""
+        self.product.list_price = 123.0
+        transfer = self.env["stock.branch.transfer"].with_user(self.user_a).new({
+            "dest_company_id": False,
+            "line_ids": [(0, 0, {"product_id": self.product.id, "qty_sent": 1})],
+        })
+        self.assertFalse(transfer.dest_company_id)
+        self.assertGreater(transfer.line_ids.sale_price, 0.0)
+        self.assertTrue(transfer.line_ids.sale_price_source)
+
+    def test_sale_price_source_names_pricelist(self):
+        """La columna Lista de precios dice qué lista dio el precio, o la ficha si ninguna tiene regla."""
+        self.product.list_price = 50.0
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1]
+        self.assertEqual(line.sale_price_source, "Precio de la ficha")
+        self.env["product.pricelist"].create({
+            "name": "Lista SBT destino",
+            "company_id": self.company_b.id,
+            "item_ids": [(0, 0, {
+                "applied_on": "0_product_variant", "product_id": self.product.id,
+                "compute_price": "fixed", "fixed_price": 77.0,
+            })],
+        })
+        line.invalidate_recordset(["sale_price", "sale_price_source"])
+        self.assertEqual(line.sale_price, 77.0)
+        self.assertEqual(line.sale_price_source, "Lista SBT destino")
+        transfer.invalidate_recordset(["sale_pricelist_info"])
+        self.assertEqual(transfer.sale_pricelist_info, "Lista SBT destino")
+
+    def test_stock_columns_only_for_managers(self):
+        """Stock en origen y destino: el manager ve el número, el resto 0 (la columna se oculta)."""
+        self.set_stock(self.product, self.company_a, 25.0)
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1]
+        self.assertEqual(transfer.company_id, self.company_a)
+        self.assertEqual(line.with_user(self.manager).qty_available_origin, self.qty(self.product, self.company_a))
+        self.assertGreater(line.with_user(self.manager).qty_available_origin, 0.0)
+        self.assertEqual(line.with_user(self.user_a).qty_available_origin, 0.0)
+        self.assertEqual(line.with_user(self.user_a).qty_available_dest, 0.0)
+
+    def test_is_manager_on_new_record(self):
+        """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""
+        spec = {"is_manager": {}}
+        Transfer = self.env["stock.branch.transfer"]
+        self.assertTrue(Transfer.with_user(self.manager).onchange({}, [], spec)["value"]["is_manager"])
+        self.assertFalse(Transfer.with_user(self.user_a).onchange({}, [], spec)["value"]["is_manager"])
+
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
         # Odoo no trackea cambios de un registro creado en la misma transacción: se cierra la creación antes.
