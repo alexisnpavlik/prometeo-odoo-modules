@@ -36,27 +36,35 @@ class StockBranchTransferLine(models.Model):
     @api.depends("product_id", "transfer_id.dest_company_id")
     def _compute_sale_price(self):
         """Precio en la lista de la sucursal destino; sin regla para el producto, el precio de venta de la ficha."""
-        cache = {}
+        prices = {}
+        for company in self.transfer_id.dest_company_id:
+            lines = self.filtered(lambda ln: ln.transfer_id.dest_company_id == company)
+            prices[company.id] = self._sale_prices_for(lines.product_id, company)
         for line in self:
-            line.sale_price = (
-                self._sale_price_for(line.product_id, line.transfer_id.dest_company_id, cache)
-                if line.product_id else 0.0
-            )
+            company_prices = prices.get(line.transfer_id.dest_company_id.id, {})
+            line.sale_price = company_prices.get(line.product_id.id, 0.0)
 
     @api.model
-    def _sale_price_for(self, product, company, cache=None):
-        """Precio de venta en la sucursal: primera lista de la empresa con regla para el producto, si no la ficha.
+    def _sale_prices_for(self, products, company):
+        """Precios de venta en la sucursal: {product_id: precio}, en lote.
 
-        Lo usan la columna Precio de venta y las métricas; `cache` guarda las listas por empresa.
+        Primera lista de la empresa con regla para el producto; sin regla, el precio de la ficha.
+        Lo usan la columna Precio de venta y las métricas. En lote porque producto por producto
+        las métricas tardaban ~10 s con 1.200 pares producto/empresa.
         """
-        cache = {} if cache is None else cache
-        if company.id not in cache:
-            cache[company.id] = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id)])
-        product = product.sudo()
-        for pricelist in cache[company.id]:
-            if pricelist._get_product_rule(product, 1.0):
-                return pricelist._get_product_price(product, 1.0)
-        return product.lst_price
+        prices = {}
+        remaining = products.sudo()
+        pricelists = self.env["product.pricelist"].sudo().search([("company_id", "=", company.id)])
+        for pricelist in pricelists:
+            if not remaining:
+                break
+            # Mismo cálculo que _get_product_rule/_get_product_price: (precio, id de regla) por producto
+            results = pricelist._compute_price_rule(remaining, 1.0)
+            matched = remaining.filtered(lambda p: results[p.id][1])
+            prices.update({p.id: results[p.id][0] for p in matched})
+            remaining -= matched
+        prices.update({p.id: p.lst_price for p in remaining})
+        return prices
 
     def _company_stock(self, company):
         """Stock actual del producto de la línea en la ubicación de stock de la empresa."""

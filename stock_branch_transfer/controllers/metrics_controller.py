@@ -101,14 +101,19 @@ class BranchTransferMetricsController(http.Controller):
         Line = request.env["stock.branch.transfer.line"]
         Product = request.env["product.product"].sudo()
         Company = request.env["res.company"].sudo()
-        pricelists, prices = {}, {}
+        rows = self._fetch_lines(period)
+        # Precio de venta en lote por empresa destino: de a uno tardaba ~10 s
+        by_company = defaultdict(set)
+        for r in rows:
+            by_company[r["dest_company_id"]].add(r["product_id"])
+        prices = {}
+        for company_id, product_ids in by_company.items():
+            company_prices = Line._sale_prices_for(Product.browse(list(product_ids)), Company.browse(company_id))
+            prices.update({(pid, company_id): price for pid, price in company_prices.items()})
         now = datetime.now()
         lines = []
-        for r in self._fetch_lines(period):
+        for r in rows:
             key = (r["product_id"], r["dest_company_id"])
-            if key not in prices:
-                prices[key] = Line._sale_price_for(
-                    Product.browse(r["product_id"]), Company.browse(r["dest_company_id"]), pricelists)
             sent = float(r["qty_sent"])
             received = float(r["qty_received"])
             unit_cost = float(r["unit_cost"])
