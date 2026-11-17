@@ -77,6 +77,13 @@ class TestTransferBase(BranchTransferCommon):
         self.assertEqual(line.cost, 37.5)
         self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
 
+    def test_is_manager_on_new_record(self):
+        """La columna Costo depende de is_manager: tiene que valer también al cargar un traslado nuevo."""
+        spec = {"is_manager": {}}
+        Transfer = self.env["stock.branch.transfer"]
+        self.assertTrue(Transfer.with_user(self.manager).onchange({}, [], spec)["value"]["is_manager"])
+        self.assertFalse(Transfer.with_user(self.user_a).onchange({}, [], spec)["value"]["is_manager"])
+
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
         # Odoo no trackea cambios de un registro creado en la misma transacción: se cierra la creación antes.

@@ -35,6 +35,7 @@ class StockBranchTransferLine(models.Model):
     cost = fields.Float(string="Costo", compute="_compute_cost", digits="Product Price")
 
     @api.depends("product_id", "transfer_id.company_id")
+    @api.depends_context("uid")
     def _compute_cost(self):
         """Costo del producto en la sucursal de origen (solo managers; no sale en el remito)."""
         # Sin groups= en el campo: con groups, cualquier lectura de la línea (vista, remito) que lo

@@ -1,6 +1,10 @@
+from odoo.tests import tagged
 from odoo.tests.common import TransactionCase, new_test_user
 
 
+# post_install: en bases con `sale` ya instalado, un -u corre los at_install antes de que cargue sale
+# y crear productos falla por sale_line_warn NOT NULL
+@tagged("post_install", "-at_install")
 class BranchTransferCommon(TransactionCase):
     """Fixtures compartidos: tres sucursales, un producto global y usuarios por rol."""
 

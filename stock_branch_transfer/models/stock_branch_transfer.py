@@ -55,7 +55,12 @@ class StockBranchTransfer(models.Model):
         "stock.picking", string="Recepción vieja (intercompany)", readonly=True, copy=False,
         help="Recepción pendiente de stock_intercompany de la que se migró este traslado.",
     )
-    is_manager = fields.Boolean(compute="_compute_is_manager")
+    # default: un compute sin dependencias no corre en un registro nuevo (onchange) y la columna Costo
+    # quedaba oculta mientras se cargaba el traslado
+    is_manager = fields.Boolean(
+        compute="_compute_is_manager",
+        default=lambda self: self.env.user.has_group("stock_branch_transfer.group_branch_transfer_manager"),
+    )
     is_origin_mine = fields.Boolean(
         string="Salida de mi empresa", compute="_compute_is_mine", search="_search_is_origin_mine"
     )
@@ -63,6 +68,7 @@ class StockBranchTransfer(models.Model):
         string="Entrada a mi empresa", compute="_compute_is_mine", search="_search_is_dest_mine"
     )
 
+    @api.depends_context("uid")
     def _compute_is_manager(self):
         """Habilita en la vista la edición posterior al envío."""
         self.is_manager = self._is_manager()
