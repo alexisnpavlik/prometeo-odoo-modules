@@ -1,6 +1,6 @@
 {
     "name": "Traslados entre sucursales",
-    "version": "18.0.1.2.0",
+    "version": "18.0.1.3.0",
     "category": "Inventory/Inventory",
     "summary": "Envío y recepción de mercadería entre sucursales (empresas) con aviso de pendientes",
     "description": """

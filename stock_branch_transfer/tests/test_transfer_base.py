@@ -70,6 +70,13 @@ class TestTransferBase(BranchTransferCommon):
         line = self.env["stock.branch.transfer.line"].new({"transfer_id": transfer.id})
         self.assertEqual(line.sale_price, 0.0)
 
+    def test_cost_only_for_managers(self):
+        self.product.with_company(self.company_a).standard_price = 37.5
+        transfer = self.make_transfer(self.user_a)
+        line = transfer.line_ids[:1].with_user(self.manager)
+        self.assertEqual(line.cost, 37.5)
+        self.assertEqual(transfer.line_ids[:1].with_user(self.user_a).cost, 0.0)
+
     def test_change_dest_to_unassigned_company_tracks(self):
         transfer = self.make_transfer(self.user_a)
         # Odoo no trackea cambios de un registro creado en la misma transacción: se cierra la creación antes.
