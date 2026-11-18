@@ -1657,3 +1657,99 @@
         font-size: 13px;
     }
 }
+
+/* Filtro por código de barras: un chip por código, con el producto que encontró */
+.inv-dashboard-wrap .barcode-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.inv-dashboard-wrap .barcode-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 10px;
+    border-radius: 8px;
+    background: var(--color-blue-glow);
+    border: 1px solid var(--border-glow);
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.inv-dashboard-wrap .barcode-chip.missing {
+    background: var(--color-red-glow);
+    border-color: var(--color-red);
+}
+
+.inv-dashboard-wrap .barcode-chip-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.inv-dashboard-wrap .barcode-chip-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 600;
+}
+
+.inv-dashboard-wrap .barcode-chip-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inv-dashboard-wrap .barcode-chip.missing .barcode-chip-name {
+    color: var(--color-red);
+}
+
+.inv-dashboard-wrap .barcode-chip-remove {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.inv-dashboard-wrap .barcode-chip-remove:hover {
+    color: var(--text-primary);
+}
+
+/* Sugerencias del filtro por código de barras: en el flujo, para no quedar recortadas por el scroll del panel */
+.inv-dashboard-wrap .barcode-suggestions {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.inv-dashboard-wrap .barcode-suggestion {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.inv-dashboard-wrap .barcode-suggestion .barcode-chip-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inv-dashboard-wrap .barcode-suggestion.active,
+.inv-dashboard-wrap .barcode-suggestion:hover {
+    background: var(--color-blue-glow);
+}

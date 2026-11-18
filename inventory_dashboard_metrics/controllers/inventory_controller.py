@@ -152,6 +152,7 @@ class InventoryMetricsController(http.Controller):
                    COALESCE((pp.standard_price->>(k.company_id::text))::numeric,
                             (pp.standard_price->>'1')::numeric, 0.0) AS cost,
                    COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS producto,
+                   pp.barcode,
                    pc.name AS categoria,
                    COALESCE(st.stock, 0.0) AS stock,
                    COALESCE(st.value, 0.0) AS value,
@@ -204,6 +205,7 @@ class InventoryMetricsController(http.Controller):
             result.append({
                 "product_id": r["product_id"],
                 "producto": r["producto"],
+                "barcode": r["barcode"],
                 "categoria": r["categoria"],
                 "vendor": sup["vendor"] if sup else NO_VENDOR,
                 "stock": round(r["stock"], 2),
@@ -274,6 +276,7 @@ class InventoryMetricsController(http.Controller):
         return len(flagged), [{
             "product_id": r["product_id"],
             "producto": r["producto"],
+            "barcode": r["barcode"],
             "sucursal": r["sucursal"],
             "categoria": r["categoria"],
             "vendor": r["vendor"],
@@ -297,6 +300,7 @@ class InventoryMetricsController(http.Controller):
         return len(urgent), [{
             "product_id": r["product_id"],
             "producto": r["producto"],
+            "barcode": r["barcode"],
             "sucursal": r["sucursal"],
             "categoria": r["categoria"],
             "vendor": r["vendor"],
@@ -335,7 +339,7 @@ class InventoryMetricsController(http.Controller):
         return result
 
     @http.route('/inventory_dashboard_metrics/inventory', type='json', auth='user')
-    def get_inventory(self, company='all', category='all', vendor='all', product='all', **kwargs):
+    def get_inventory(self, company='all', category='all', vendor='all', barcode='all', **kwargs):
         self._check_access()
         period = _to_int(kwargs.get('period'), PERIODS, DEFAULT_PERIOD)
         target = _to_int(kwargs.get('target'), TARGET_DAYS, DEFAULT_TARGET)
@@ -344,7 +348,7 @@ class InventoryMetricsController(http.Controller):
 
         if not companies:
             return {"overstock": [], "restock": [], "summary": {},
-                    "options": {"categories": [], "vendors": [], "products": []}}
+                    "options": {"categories": [], "vendors": []}}
 
         # Una fila por producto y sucursal: juntar la red escondía faltantes y sumaba el depósito
         rows = self._classify(self._fetch_product_rows(companies, period, lang, by_branch=True), period, target)
@@ -357,14 +361,13 @@ class InventoryMetricsController(http.Controller):
         options = {
             "categories": sorted({r["categoria"] for r in flagged}),
             "vendors": sorted({r["vendor"] for r in flagged}),
-            "products": sorted({(r["producto"], r["categoria"]) for r in flagged}),
         }
-        category, vendor, product = _to_list(category), _to_list(vendor), _to_list(product)
+        category, vendor, barcode = _to_list(category), _to_list(vendor), _to_list(barcode)
 
         def keep(r):
             return ((not category or r["categoria"] in category)
                     and (not vendor or r["vendor"] in vendor)
-                    and (not product or r["producto"] in product))
+                    and (not barcode or r["barcode"] in barcode))
 
         overstock = [r for r in overstock if keep(r)]
         restock = [r for r in restock if keep(r)]
@@ -374,6 +377,52 @@ class InventoryMetricsController(http.Controller):
             "overstock": self._cap_per_status(overstock),
             "restock": self._cap_per_status(restock),
         }
+
+    @http.route('/inventory_dashboard_metrics/barcode_names', type='json', auth='user')
+    def get_barcode_names(self, barcodes=None, **kwargs):
+        """Nombre del producto de cada código de barras, para confirmar en el filtro lo escaneado."""
+        self._check_access()
+        codes = _to_list(barcodes)
+        if not codes:
+            return {}
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%s, pt.name->>'en_US')
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.barcode IN %s
+        """, (self._get_lang(), tuple(codes)))
+        return dict(request.env.cr.fetchall())
+
+    @http.route('/inventory_dashboard_metrics/barcode_search', type='json', auth='user')
+    def search_barcodes(self, term='', **kwargs):
+        """Productos con código de barras que contienen el texto en el código o en el nombre.
+
+        Primero los que empiezan con lo escrito: es lo normal al tipear las primeras cifras del código.
+        """
+        self._check_access()
+        term = (term or '').strip()
+        if len(term) < 2:
+            return []
+        lang = self._get_lang()
+        escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS name
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.active AND pt.active
+              AND COALESCE(pp.barcode, '') <> ''
+              AND (pt.company_id IS NULL OR pt.company_id IN %(companies)s)
+              AND (pp.barcode ILIKE %(like)s
+                   OR COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') ILIKE %(like)s)
+            ORDER BY pp.barcode ILIKE %(prefix)s DESC, 2, 1
+            LIMIT 15
+        """, {
+            'lang': lang,
+            'companies': tuple(request.env.companies.ids),
+            'like': f'%{escaped}%',
+            'prefix': f'{escaped}%',
+        })
+        return request.env.cr.dictfetchall()
 
     @http.route('/inventory_dashboard_metrics/purchase', type='json', auth='user')
     def get_purchase(self, company='all', **kwargs):
@@ -388,7 +437,7 @@ class InventoryMetricsController(http.Controller):
 
     @http.route('/inventory_dashboard_metrics/export', type='http', auth='user')
     def export_xlsx(self, table='overstock', company='all', period=None, target=None,
-                    status='all', category='all', product='all', sort='excess',
+                    status='all', category='all', barcode='all', sort='excess',
                     vendor='all', cover=None, **kwargs):
         """Exporta a Excel la tabla activa con los mismos filtros que ve el usuario."""
         try:
@@ -426,12 +475,12 @@ class InventoryMetricsController(http.Controller):
                            "Estado"]
                 keys = ["producto", "sucursal", "categoria", "vendor", "stock", "sold", "days", "daily", "cover", "status"]
 
-            status, category, vendor, product = _to_list(status), _to_list(category), _to_list(vendor), _to_list(product)
+            status, category, vendor, barcode = _to_list(status), _to_list(category), _to_list(vendor), _to_list(barcode)
             data = [r for r in data
                     if (not status or r["status"] in status)
                     and (not category or r["categoria"] in category)
                     and (not vendor or r["vendor"] in vendor)
-                    and (not product or r["producto"] in product)]
+                    and (not barcode or r["barcode"] in barcode)]
 
             output = io.BytesIO()
             workbook = xlsxwriter.Workbook(output, {'in_memory': True})

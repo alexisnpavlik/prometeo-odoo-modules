@@ -13,9 +13,15 @@ class PricelistDashboardMetrics extends Component {
         this.state = useState({
             pricelist: [],
             category: [],
-            product: [],
+            // Códigos de barras elegidos, lo que se está escribiendo y el producto de cada código
+            barcode: [],
+            barcodeInput: "",
+            barcodeNames: {},
+            // Sugerencias mientras se escribe y la marcada con las flechas
+            barcodeSuggestions: [],
+            barcodeActive: 0,
             openFilter: null,
-            filterSearch: { pricelist: "", category: "", product: "" },
+            filterSearch: { pricelist: "", category: "" },
             search: "",
             onlyDiff: false,
             page: 1,
@@ -29,8 +35,6 @@ class PricelistDashboardMetrics extends Component {
         this.filtersData = useState({
             pricelists: [],
             categories: [],
-            products: [],
-            products_by_category: {}
         });
 
         this.metricsData = useState({
@@ -83,23 +87,7 @@ class PricelistDashboardMetrics extends Component {
         });
     }
 
-    // --- Getters Reactivos ---
-    get currentProductsList() {
-        const categories = this.state.category;
-        if (!categories.length) {
-            return this.filtersData.products;
-        }
-        const byCategory = this.filtersData.products_by_category;
-        return categories.flatMap((cat) => byCategory[cat] || []);
-    }
-
     // --- Manejo de Eventos y Inputs ---
-    onCategoryChange() {
-        // Al cambiar de categoría, se descartan los productos que ya no están en la lista filtrada
-        const currentProds = this.currentProductsList;
-        this.state.product = this.state.product.filter((prod) => currentProds.includes(prod));
-    }
-
     switchTab(tab) {
         this.state.activeTab = tab;
         if (tab === "differences") {
@@ -117,7 +105,6 @@ class PricelistDashboardMetrics extends Component {
     filterOptions(field) {
         if (field === "pricelist") return this.filtersData.pricelists.map((pl) => [pl.id, pl.nombre + (pl.empresa ? ` (${pl.empresa})` : "")]);
         if (field === "category") return this.filtersData.categories.map((c) => [c, c]);
-        if (field === "product") return this.currentProductsList.map((p) => [p, p]);
         return [];
     }
 
@@ -153,23 +140,126 @@ class PricelistDashboardMetrics extends Component {
         } else {
             selection.splice(idx, 1);
         }
-        if (field === "category") {
-            this.onCategoryChange();
-        }
     }
 
     selectAllFilterValues(field) {
         this.state[field] = [];
-        if (field === "category") {
-            this.onCategoryChange();
-        }
     }
 
     onFilterSearchInput(field, ev) {
         this.state.filterSearch[field] = ev.target.value;
     }
 
+    // --- Filtro por código de barras ---
+    // Al escribir se sugieren productos por código parcial o nombre; el lector manda el código entero + Enter
+    onBarcodeInput(ev) {
+        this.state.barcodeInput = ev.target.value;
+        clearTimeout(this.barcodeTimer);
+        this.barcodeTimer = setTimeout(() => this.searchBarcodes(), 250);
+    }
+
+    async searchBarcodes() {
+        const term = (this.state.barcodeInput || "").trim();
+        if (term.length < 2) {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        try {
+            const found = await rpc("/pricelist_management_metrics/barcode_search", { term });
+            // Sólo vale la respuesta del último texto escrito
+            if (term !== (this.state.barcodeInput || "").trim()) {
+                return;
+            }
+            this.barcodeSuggestTerm = term;
+            this.state.barcodeSuggestions = found.filter((s) => !this.state.barcode.includes(s.barcode));
+            this.state.barcodeActive = 0;
+        } catch (e) {
+            console.error("Error al buscar productos por código de barras:", e);
+        }
+    }
+
+    closeBarcodeSuggestions() {
+        clearTimeout(this.barcodeTimer);
+        this.barcodeSuggestTerm = null;
+        this.state.barcodeSuggestions = [];
+        this.state.barcodeActive = 0;
+    }
+
+    async onBarcodeKeydown(ev) {
+        const list = this.state.barcodeSuggestions;
+        if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && list.length) {
+            ev.preventDefault();
+            const step = ev.key === "ArrowDown" ? 1 : -1;
+            this.state.barcodeActive = (this.state.barcodeActive + step + list.length) % list.length;
+            return;
+        }
+        if (ev.key === "Escape") {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        if (ev.key !== "Enter") {
+            return;
+        }
+        ev.preventDefault();
+        const typed = (this.state.barcodeInput || "").trim();
+        const pick = list[this.state.barcodeActive];
+        // Código parcial con sugerencias a la vista: se toma la marcada. Código completo (lector): tal cual
+        if (pick && this.barcodeSuggestTerm === typed && !list.some((s) => s.barcode === typed)) {
+            this.selectBarcode(pick);
+        } else {
+            await this.addBarcodes();
+        }
+    }
+
+    selectBarcode(suggestion) {
+        this.state.barcodeNames[suggestion.barcode] = suggestion.name;
+        if (!this.state.barcode.includes(suggestion.barcode)) {
+            this.state.barcode.push(suggestion.barcode);
+        }
+        this.state.barcodeInput = "";
+        this.closeBarcodeSuggestions();
+    }
+
+    // Suma lo escrito (uno o varios códigos separados por espacio, coma o punto y coma)
+    async addBarcodes() {
+        this.closeBarcodeSuggestions();
+        const codes = (this.state.barcodeInput || "").split(/[\s,;]+/).filter(Boolean);
+        this.state.barcodeInput = "";
+        const fresh = [...new Set(codes)].filter((c) => !this.state.barcode.includes(c));
+        if (!fresh.length) {
+            return;
+        }
+        this.state.barcode.push(...fresh);
+        await this.loadBarcodeNames(fresh);
+    }
+
+    removeBarcode(code) {
+        this.state.barcode = this.state.barcode.filter((c) => c !== code);
+    }
+
+    // null = ningún producto tiene ese código; undefined = todavía no se consultó
+    barcodeName(code) {
+        const name = this.state.barcodeNames[code];
+        if (name === null) {
+            return "Sin producto";
+        }
+        return name || "";
+    }
+
+    async loadBarcodeNames(codes) {
+        try {
+            const names = await rpc("/pricelist_management_metrics/barcode_names", { barcodes: codes });
+            for (const code of codes) {
+                this.state.barcodeNames[code] = names[code] || null;
+            }
+        } catch (e) {
+            console.error("Error al buscar los productos de los códigos de barras:", e);
+        }
+    }
+
     async applyFilters() {
+        // Un código escrito sin Enter también cuenta
+        await this.addBarcodes();
         this.state.openFilter = null;
         this.state.page = 1;
         await this.refreshData();
@@ -178,8 +268,9 @@ class PricelistDashboardMetrics extends Component {
     async clearFilters() {
         this.state.pricelist = [];
         this.state.category = [];
-        this.state.product = [];
-        this.state.filterSearch = { pricelist: "", category: "", product: "" };
+        this.state.barcode = [];
+        this.state.barcodeInput = "";
+        this.state.filterSearch = { pricelist: "", category: "" };
         this.state.openFilter = null;
         this.state.search = "";
         this.state.onlyDiff = false;
@@ -222,7 +313,7 @@ class PricelistDashboardMetrics extends Component {
         try {
             const metrics = await rpc("/pricelist_management_metrics/metrics", {
                 category: [...this.state.category],
-                product: [...this.state.product],
+                barcode: [...this.state.barcode],
                 pricelist: [...this.state.pricelist],
                 limit: 20
             });
@@ -247,7 +338,7 @@ class PricelistDashboardMetrics extends Component {
         try {
             const data = await rpc("/pricelist_management_metrics/price_table", {
                 category: [...this.state.category],
-                product: [...this.state.product],
+                barcode: [...this.state.barcode],
                 search: this.state.search,
                 pricelist: [...this.state.pricelist],
                 only_diff: this.state.onlyDiff,

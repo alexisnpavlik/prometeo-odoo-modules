@@ -78,6 +78,7 @@ class BranchTransferMetricsController(http.Controller):
                    t.date_sent, t.date_received,
                    l.product_id,
                    COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS producto,
+                   pp.barcode,
                    pc.complete_name AS categoria,
                    COALESCE(l.qty_sent, 0) AS qty_sent,
                    COALESCE(l.qty_received, 0) AS qty_received,
@@ -135,6 +136,7 @@ class BranchTransferMetricsController(http.Controller):
                 "hours": hours,
                 "product_id": r["product_id"],
                 "producto": r["producto"] or "",
+                "barcode": r["barcode"],
                 "categoria": r["categoria"] or UNCATEGORIZED,
                 "sent": sent,
                 "received": received,
@@ -146,24 +148,22 @@ class BranchTransferMetricsController(http.Controller):
             })
         return lines
 
-    def _compute(self, company, period, status, route, category, product):
+    def _compute(self, company, period, status, route, category, barcode):
         """Todo el dashboard con los filtros aplicados. Lo usan la pantalla y el Excel."""
         company, status = _to_list(company), _to_list(status)
-        route, category, product = _to_list(route), _to_list(category), _to_list(product)
+        route, category, barcode = _to_list(route), _to_list(category), _to_list(barcode)
 
         base = [ln for ln in self._build_lines(period)
                 if not company or ln["origen"] in company or ln["destino"] in company]
         options = {
             "routes": sorted({ln["route"] for ln in base}),
             "categories": sorted({ln["categoria"] for ln in base}),
-            "products": sorted({ln["producto"] for ln in base
-                                if not category or ln["categoria"] in category}),
         }
         # Sin el filtro de estado: las tarjetas no se vacían al elegir una
         unfiltered = [ln for ln in base
                       if (not route or ln["route"] in route)
                       and (not category or ln["categoria"] in category)
-                      and (not product or ln["producto"] in product)]
+                      and (not barcode or ln["barcode"] in barcode)]
         rows = [ln for ln in unfiltered if not status or ln["status"] in status]
         # Plata enviada: los borradores no salieron, salvo que se pidan explícitamente
         moved = [ln for ln in rows if ln["status"] != "draft" or "draft" in status]
@@ -299,22 +299,68 @@ class BranchTransferMetricsController(http.Controller):
         """)
         return {"companies": [r[0] for r in request.env.cr.fetchall()]}
 
+    @http.route('/stock_branch_transfer/metrics/barcode_names', type='json', auth='user')
+    def get_barcode_names(self, barcodes=None, **kwargs):
+        """Nombre del producto de cada código de barras, para confirmar en el filtro lo escaneado."""
+        self._check_access()
+        codes = _to_list(barcodes)
+        if not codes:
+            return {}
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%s, pt.name->>'en_US')
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.barcode IN %s
+        """, (request.env.context.get("lang") or "es_AR", tuple(codes)))
+        return dict(request.env.cr.fetchall())
+
+    @http.route('/stock_branch_transfer/metrics/barcode_search', type='json', auth='user')
+    def search_barcodes(self, term='', **kwargs):
+        """Productos con código de barras que contienen el texto en el código o en el nombre.
+
+        Primero los que empiezan con lo escrito: es lo normal al tipear las primeras cifras del código.
+        """
+        self._check_access()
+        term = (term or '').strip()
+        if len(term) < 2:
+            return []
+        lang = request.env.context.get("lang") or "es_AR"
+        escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS name
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.active AND pt.active
+              AND COALESCE(pp.barcode, '') <> ''
+              AND (pt.company_id IS NULL OR pt.company_id IN %(companies)s)
+              AND (pp.barcode ILIKE %(like)s
+                   OR COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') ILIKE %(like)s)
+            ORDER BY pp.barcode ILIKE %(prefix)s DESC, 2, 1
+            LIMIT 15
+        """, {
+            'lang': lang,
+            'companies': tuple(request.env.companies.ids),
+            'like': f'%{escaped}%',
+            'prefix': f'{escaped}%',
+        })
+        return request.env.cr.dictfetchall()
+
     @http.route("/stock_branch_transfer/metrics/data", type="json", auth="user")
     def get_data(self, company="all", period=None, status="all", route="all",
-                 category="all", product="all", **kwargs):
+                 category="all", barcode="all", **kwargs):
         """Tarjetas, totales y tablas con los filtros aplicados."""
         self._check_access()
         period = _to_int(period, PERIODS, DEFAULT_PERIOD)
-        return self._compute(company, period, status, route, category, product)
+        return self._compute(company, period, status, route, category, barcode)
 
     @http.route("/stock_branch_transfer/metrics/export", type="http", auth="user")
     def export_xlsx(self, company="all", period=None, status="all", route="all",
-                    category="all", product="all", **kwargs):
+                    category="all", barcode="all", **kwargs):
         """Excel con una hoja por pestaña, mismos filtros que la pantalla."""
         try:
             self._check_access()
             period = _to_int(period, PERIODS, DEFAULT_PERIOD)
-            data = self._compute(company, period, status, route, category, product)
+            data = self._compute(company, period, status, route, category, barcode)
             xlsx_data = self._render_xlsx(data, company, period)
             filename = f"metricas_traslados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             return request.make_response(xlsx_data, headers=[

@@ -19,12 +19,17 @@ class PosDashboardMetrics extends Component {
             pos: [],
             company: [],
             category: [],
-            product: [],
+            // Códigos de barras elegidos, lo que se está escribiendo y el producto de cada código
+            barcode: [],
+            barcodeInput: "",
+            barcodeNames: {},
+            // Sugerencias mientras se escribe y la marcada con las flechas
+            barcodeSuggestions: [],
+            barcodeActive: 0,
             openFilter: null,
             posSearch: "",
             companySearch: "",
             categorySearch: "",
-            productSearch: "",
             profitabilitySearch: "",
             marginSign: "positive",
             marginSort: "revenue",
@@ -41,8 +46,6 @@ class PosDashboardMetrics extends Component {
             cashiers: [],
             companies: [],
             categories: [],
-            products: [],
-            products_by_category: {},
             min_date: "",
             max_date: ""
         });
@@ -128,26 +131,13 @@ class PosDashboardMetrics extends Component {
         });
     }
 
-    // --- Getters Reactivos ---
-    get currentProductsList() {
-        const cats = this.state.category;
-        if (!cats.length) {
-            return this.filtersData.products;
-        }
-        const productos = new Set();
-        for (const cat of cats) {
-            (this.filtersData.products_by_category[cat] || []).forEach(p => productos.add(p));
-        }
-        return [...productos].sort((a, b) => a.localeCompare(b));
-    }
-
     // --- Filtros multi-selección (checkbox) ---
     get posFilter() {
         return [...this.state.pos];
     }
 
-    get productFilter() {
-        return [...this.state.product];
+    get barcodeFilter() {
+        return [...this.state.barcode];
     }
 
     get companyFilter() {
@@ -164,12 +154,6 @@ class PosDashboardMetrics extends Component {
         return term ? lista.filter(c => c.toLowerCase().includes(term)) : lista;
     }
 
-    get visibleProducts() {
-        const term = (this.state.productSearch || "").toLowerCase().trim();
-        const lista = this.currentProductsList;
-        return term ? lista.filter(p => p.toLowerCase().includes(term)) : lista;
-    }
-
     get visibleCompanies() {
         const term = (this.state.companySearch || "").toLowerCase().trim();
         const lista = this.filtersData.companies || [];
@@ -184,10 +168,6 @@ class PosDashboardMetrics extends Component {
 
     get posLabel() {
         return this._multiLabel(this.state.pos, "Todas las cajas", "cajas seleccionadas");
-    }
-
-    get productLabel() {
-        return this._multiLabel(this.state.product, "Todos los productos", "productos seleccionados");
     }
 
     get companyLabel() {
@@ -220,15 +200,116 @@ class PosDashboardMetrics extends Component {
         } else {
             selection.splice(idx, 1);
         }
-        if (field === "category") {
-            this.onCategoryChange();
-        }
     }
 
     selectAllFilterValues(field) {
         this.state[field] = [];
-        if (field === "category") {
-            this.onCategoryChange();
+    }
+
+    // --- Filtro por código de barras ---
+    // Al escribir se sugieren productos por código parcial o nombre; el lector manda el código entero + Enter
+    onBarcodeInput(ev) {
+        this.state.barcodeInput = ev.target.value;
+        clearTimeout(this.barcodeTimer);
+        this.barcodeTimer = setTimeout(() => this.searchBarcodes(), 250);
+    }
+
+    async searchBarcodes() {
+        const term = (this.state.barcodeInput || "").trim();
+        if (term.length < 2) {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        try {
+            const found = await rpc("/pos_management_metrics/barcode_search", { term });
+            // Sólo vale la respuesta del último texto escrito
+            if (term !== (this.state.barcodeInput || "").trim()) {
+                return;
+            }
+            this.barcodeSuggestTerm = term;
+            this.state.barcodeSuggestions = found.filter((s) => !this.state.barcode.includes(s.barcode));
+            this.state.barcodeActive = 0;
+        } catch (e) {
+            console.error("Error al buscar productos por código de barras:", e);
+        }
+    }
+
+    closeBarcodeSuggestions() {
+        clearTimeout(this.barcodeTimer);
+        this.barcodeSuggestTerm = null;
+        this.state.barcodeSuggestions = [];
+        this.state.barcodeActive = 0;
+    }
+
+    async onBarcodeKeydown(ev) {
+        const list = this.state.barcodeSuggestions;
+        if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && list.length) {
+            ev.preventDefault();
+            const step = ev.key === "ArrowDown" ? 1 : -1;
+            this.state.barcodeActive = (this.state.barcodeActive + step + list.length) % list.length;
+            return;
+        }
+        if (ev.key === "Escape") {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        if (ev.key !== "Enter") {
+            return;
+        }
+        ev.preventDefault();
+        const typed = (this.state.barcodeInput || "").trim();
+        const pick = list[this.state.barcodeActive];
+        // Código parcial con sugerencias a la vista: se toma la marcada. Código completo (lector): tal cual
+        if (pick && this.barcodeSuggestTerm === typed && !list.some((s) => s.barcode === typed)) {
+            this.selectBarcode(pick);
+        } else {
+            await this.addBarcodes();
+        }
+    }
+
+    selectBarcode(suggestion) {
+        this.state.barcodeNames[suggestion.barcode] = suggestion.name;
+        if (!this.state.barcode.includes(suggestion.barcode)) {
+            this.state.barcode.push(suggestion.barcode);
+        }
+        this.state.barcodeInput = "";
+        this.closeBarcodeSuggestions();
+    }
+
+    // Suma lo escrito (uno o varios códigos separados por espacio, coma o punto y coma)
+    async addBarcodes() {
+        this.closeBarcodeSuggestions();
+        const codes = (this.state.barcodeInput || "").split(/[\s,;]+/).filter(Boolean);
+        this.state.barcodeInput = "";
+        const fresh = [...new Set(codes)].filter((c) => !this.state.barcode.includes(c));
+        if (!fresh.length) {
+            return;
+        }
+        this.state.barcode.push(...fresh);
+        await this.loadBarcodeNames(fresh);
+    }
+
+    removeBarcode(code) {
+        this.state.barcode = this.state.barcode.filter((c) => c !== code);
+    }
+
+    // null = ningún producto tiene ese código; undefined = todavía no se consultó
+    barcodeName(code) {
+        const name = this.state.barcodeNames[code];
+        if (name === null) {
+            return "Sin producto";
+        }
+        return name || "";
+    }
+
+    async loadBarcodeNames(codes) {
+        try {
+            const names = await rpc("/pos_management_metrics/barcode_names", { barcodes: codes });
+            for (const code of codes) {
+                this.state.barcodeNames[code] = names[code] || null;
+            }
+        } catch (e) {
+            console.error("Error al buscar los productos de los códigos de barras:", e);
         }
     }
 
@@ -286,12 +367,6 @@ class PosDashboardMetrics extends Component {
         this.state.endDate = ev.target.value;
     }
 
-    onCategoryChange() {
-        // Al cambiar de categoría, descartamos los productos que ya no están en la lista filtrada
-        const currentProds = this.currentProductsList;
-        this.state.product = this.state.product.filter(p => currentProds.includes(p));
-    }
-
     switchTab(tab) {
         this.state.activeTab = tab;
 
@@ -321,6 +396,8 @@ class PosDashboardMetrics extends Component {
     }
 
     async applyFilters() {
+        // Un código escrito sin Enter también cuenta
+        await this.addBarcodes();
         // En móvil el panel está superpuesto: se cierra para dejar ver los gráficos
         this.state.showFilters = false;
         await this.refreshData();
@@ -333,11 +410,11 @@ class PosDashboardMetrics extends Component {
         this.state.cashier = "all";
         this.state.company = [];
         this.state.category = [];
-        this.state.product = [];
+        this.state.barcode = [];
+        this.state.barcodeInput = "";
         this.state.posSearch = "";
         this.state.companySearch = "";
         this.state.categorySearch = "";
-        this.state.productSearch = "";
         this.state.openFilter = null;
         this.state.profitabilitySearch = "";
         this.state.showFilters = false;
@@ -474,7 +551,7 @@ class PosDashboardMetrics extends Component {
                 cashier: this.state.cashier,
                 company: JSON.stringify(this.companyFilter),
                 category: JSON.stringify(this.categoryFilter),
-                product: JSON.stringify(this.productFilter)
+                barcode: JSON.stringify(this.barcodeFilter)
             });
 
             Object.assign(this.metricsData, metrics);
@@ -546,7 +623,7 @@ class PosDashboardMetrics extends Component {
                 cashier: this.state.cashier,
                 company: JSON.stringify(this.companyFilter),
                 category: JSON.stringify(this.categoryFilter),
-                product: JSON.stringify(this.productFilter),
+                barcode: JSON.stringify(this.barcodeFilter),
                 limit: 50
             });
             Object.assign(this.topArticlesData, data);
@@ -563,7 +640,7 @@ class PosDashboardMetrics extends Component {
                 end_date: this.state.endDate || null,
                 company: JSON.stringify(this.companyFilter),
                 category: JSON.stringify(this.categoryFilter),
-                product: JSON.stringify(this.productFilter)
+                barcode: JSON.stringify(this.barcodeFilter)
             });
             this.ccaData.available = Boolean(data);
             this.ccaData.kpis = data ? data.kpis : {};
@@ -586,7 +663,7 @@ class PosDashboardMetrics extends Component {
             cashier: this.state.cashier,
             company: JSON.stringify(this.companyFilter),
             category: JSON.stringify(this.categoryFilter),
-            product: JSON.stringify(this.productFilter),
+            barcode: JSON.stringify(this.barcodeFilter),
             limit: 50
         });
         window.open(`/pos_management_metrics/export_top_articles?${params.toString()}`, '_blank');
