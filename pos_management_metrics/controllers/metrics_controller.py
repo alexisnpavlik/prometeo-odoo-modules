@@ -62,14 +62,13 @@ class PosMetricsController(http.Controller):
         values = [v for v in value if v and v != 'all']
         return tuple(values) if values else None
 
-    def _build_where_clause(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all'):
+    def _build_where_clause(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all'):
         # Filtro multi-compañía nativo de Odoo
         allowed_companies = tuple(request.env.companies.ids)
         where_clause = "po.state IN ('done', 'invoiced') AND po.company_id IN %s"
         params = [allowed_companies]
         
         tz = self._get_timezone()
-        lang = self._get_lang()
 
         if start_date:
             where_clause += " AND po.date_order >= (%s::timestamp AT TIME ZONE %s AT TIME ZONE 'UTC')"
@@ -92,10 +91,10 @@ class PosMetricsController(http.Controller):
             where_clause += " AND rc.name IN %s"
             params.append(companies)
 
-        # Filtros de línea (Categoría o Producto) mediante EXISTS para optimizar y evitar duplicados a nivel orden
+        # Filtros de línea (Categoría o Código de barras) mediante EXISTS para optimizar y evitar duplicados a nivel orden
         categories = self._normalize_multi(category)
-        products = self._normalize_multi(product)
-        if categories or products:
+        barcodes = self._normalize_multi(barcode)
+        if categories or barcodes:
             where_clause += """ AND EXISTS (
                 SELECT 1 FROM pos_order_line pol2
                 JOIN product_product pp2 ON pp2.id = pol2.product_id
@@ -106,9 +105,9 @@ class PosMetricsController(http.Controller):
             if categories:
                 where_clause += " AND ic2.name IN %s"
                 params.append(categories)
-            if products:
-                where_clause += " AND COALESCE(pt2.name->>%s, pt2.name->>'en_US') IN %s"
-                params.extend([lang, products])
+            if barcodes:
+                where_clause += " AND pp2.barcode IN %s"
+                params.append(barcodes)
             where_clause += ")"
 
         return where_clause, params
@@ -164,26 +163,71 @@ class PosMetricsController(http.Controller):
             f" UNION SELECT * FROM {self._surcharge_products_sql()} s)"
         )
 
-    def _build_line_filters(self, category='all', product='all', lang='es_AR'):
+    def _build_line_filters(self, category='all', barcode='all'):
         clauses = []
         params = []
         categories = self._normalize_multi(category)
         if categories:
             clauses.append("ic.name IN %s")
             params.append(categories)
-        products = self._normalize_multi(product)
-        if products:
-            clauses.append("COALESCE(pt.name->>%s, pt.name->>'en_US') IN %s")
-            params.extend([lang, products])
+        # Código de barras de la variante: el nombre se repite entre productos y con traducciones
+        barcodes = self._normalize_multi(barcode)
+        if barcodes:
+            clauses.append("pp.barcode IN %s")
+            params.append(barcodes)
         return clauses, params
+
+    @http.route('/pos_management_metrics/barcode_names', type='json', auth='user')
+    def get_barcode_names(self, barcodes=None, **kwargs):
+        """Nombre del producto de cada código de barras, para confirmar en el filtro lo escaneado."""
+        self._check_access()
+        codes = self._normalize_multi(barcodes)
+        if not codes:
+            return {}
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%s, pt.name->>'en_US')
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.barcode IN %s
+        """, (self._get_lang(), codes))
+        return dict(request.env.cr.fetchall())
+
+    @http.route('/pos_management_metrics/barcode_search', type='json', auth='user')
+    def search_barcodes(self, term='', **kwargs):
+        """Productos con código de barras que contienen el texto en el código o en el nombre.
+
+        Primero los que empiezan con lo escrito: es lo normal al tipear las primeras cifras del código.
+        """
+        self._check_access()
+        term = (term or '').strip()
+        if len(term) < 2:
+            return []
+        lang = self._get_lang()
+        escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS name
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.active AND pt.active
+              AND COALESCE(pp.barcode, '') <> ''
+              AND (pt.company_id IS NULL OR pt.company_id IN %(companies)s)
+              AND (pp.barcode ILIKE %(like)s
+                   OR COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') ILIKE %(like)s)
+            ORDER BY pp.barcode ILIKE %(prefix)s DESC, 2, 1
+            LIMIT 15
+        """, {
+            'lang': lang,
+            'companies': tuple(request.env.companies.ids),
+            'like': f'%{escaped}%',
+            'prefix': f'{escaped}%',
+        })
+        return request.env.cr.dictfetchall()
 
     @http.route('/pos_management_metrics/filters', type='json', auth='user')
     def get_filters(self, **kwargs):
         self._check_access()
         cr = request.env.cr
-        non_merch = self._non_merchandise_sql()
         allowed_companies = tuple(request.env.companies.ids)
-        lang = self._get_lang()
 
         # 1. Cajas
         cr.execute("""
@@ -228,33 +272,7 @@ class PosMetricsController(http.Controller):
         """)
         categories = [r[0] for r in cr.fetchall() if r[0]]
 
-        # 5. Productos (traducido dinámicamente)
-        cr.execute("""
-            SELECT DISTINCT COALESCE(pt.name->>%s, pt.name->>'en_US') 
-            FROM product_template pt
-            WHERE pt.active = TRUE
-            ORDER BY 1
-        """, (lang,))
-        products = [r[0] for r in cr.fetchall() if r[0]]
-
-        # 6. Mapa categoría -> productos
-        cr.execute(f"""
-            SELECT DISTINCT ic.name, COALESCE(pt.name->>%s, pt.name->>'en_US') 
-            FROM product_product pp 
-            JOIN product_template pt ON pt.id = pp.product_tmpl_id 
-            JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE AND pp.id NOT IN {non_merch}
-            ORDER BY ic.name, 2
-        """, (lang,))
-        products_by_category = {}
-        for cat, prod in cr.fetchall():
-            if cat and prod:
-                if cat not in products_by_category:
-                    products_by_category[cat] = []
-                products_by_category[cat].append(prod)
-
-        # 7. Rango de fechas min/max
+        # 5. Rango de fechas min/max
         tz = self._get_timezone()
         cr.execute(f"""
             SELECT 
@@ -273,15 +291,13 @@ class PosMetricsController(http.Controller):
             "cashiers": cashiers,
             "companies": companies,
             "categories": categories,
-            "products": products,
-            "products_by_category": products_by_category,
             "min_date": min_date,
             "max_date": max_date
         }
 
-    def _get_period_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all'):
+    def _get_period_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all'):
         cr = request.env.cr
-        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
+        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, barcode)
         
         params_list = list(params)
         
@@ -322,8 +338,7 @@ class PosMetricsController(http.Controller):
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
 
-        lang = self._get_lang()
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
         query += "".join(f" AND {c}" for c in line_clauses)
         params_list.extend(line_params)
 
@@ -344,7 +359,7 @@ class PosMetricsController(http.Controller):
             "total_orders": int(res.get("total_orders") or 0)
         }
 
-    def _get_group_trend(self, group_by, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all'):
+    def _get_group_trend(self, group_by, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all'):
         """Facturación de cada sucursal (group_by='company') o categoría (group_by='category') en el
         período contra el período anterior de igual largo.
 
@@ -355,7 +370,6 @@ class PosMetricsController(http.Controller):
         """
         cr = request.env.cr
         tz = self._get_timezone()
-        lang = self._get_lang()
         non_merch = self._non_merchandise_sql()
         empty = {"rows": [], "chain_growth": None, "prev_start": None, "prev_end": None}
 
@@ -386,7 +400,7 @@ class PosMetricsController(http.Controller):
 
         where_clause, params = self._build_where_clause(
             prev_start.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d'),
-            pos, cashier, company, category, product
+            pos, cashier, company, category, barcode
         )
         local_ts = "(po.date_order AT TIME ZONE 'UTC' AT TIME ZONE %s)"
         query = f"""
@@ -408,7 +422,7 @@ class PosMetricsController(http.Controller):
             WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}{extra}
         """
         query_params = [tz, start_dt, end_dt, tz] + list(params)
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
         query += "".join(f" AND {c}" for c in line_clauses)
         query_params.extend(line_params)
         query += " GROUP BY 1, 2, 3"
@@ -482,7 +496,7 @@ class PosMetricsController(http.Controller):
             "prev_end": prev_end.strftime('%Y-%m-%d'),
         }
 
-    def _get_cca_metrics(self, start_date=None, end_date=None, company='all', category='all', product='all'):
+    def _get_cca_metrics(self, start_date=None, end_date=None, company='all', category='all', barcode='all'):
         """Ventas en cuenta corriente (customer_checking_account): no pasan por el POS.
 
         Cuenta los retiros confirmados (pendiente, pago parcial o pagado) por su fecha.
@@ -492,7 +506,6 @@ class PosMetricsController(http.Controller):
         if 'cca.withdrawal' not in request.env:
             return None
         cr = request.env.cr
-        lang = self._get_lang()
         where = ["w.state IN ('pending', 'partial', 'paid')", "w.company_id IN %s"]
         params = [tuple(request.env.companies.ids)]
         if start_date:
@@ -505,7 +518,7 @@ class PosMetricsController(http.Controller):
         if companies:
             where.append("rc.name IN %s")
             params.append(companies)
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
         where += line_clauses
         params += line_params
         unit_cost = "COALESCE((pp.standard_price->>(w.company_id::text))::numeric, 0.0)"
@@ -576,13 +589,13 @@ class PosMetricsController(http.Controller):
         return {"kpis": kpis, "withdrawals": rows}
 
     @http.route('/pos_management_metrics/cca', type='json', auth='user')
-    def get_cca(self, start_date=None, end_date=None, company='all', category='all', product='all', **kwargs):
+    def get_cca(self, start_date=None, end_date=None, company='all', category='all', barcode='all', **kwargs):
         """Pestaña Cuenta corriente: None si customer_checking_account no está instalado."""
         self._check_access()
-        return self._get_cca_metrics(start_date, end_date, company, category, product)
+        return self._get_cca_metrics(start_date, end_date, company, category, barcode)
 
     @http.route('/pos_management_metrics/metrics', type='json', auth='user')
-    def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', **kwargs):
+    def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all', **kwargs):
         self._check_access()
         cr = request.env.cr
         tz = self._get_timezone()
@@ -590,7 +603,7 @@ class PosMetricsController(http.Controller):
         allowed_companies = tuple(request.env.companies.ids)
 
         # Construir cláusula de filtrado
-        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
+        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, barcode)
 
         # Obtener IDs de órdenes que coinciden con los filtros y la compañía permitida
         query_orders = f"""
@@ -661,7 +674,7 @@ class PosMetricsController(http.Controller):
         order_ids_tuple = tuple(order_ids)
 
         # Generar cláusulas de filtrado a nivel de línea
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
         non_merch = self._non_merchandise_sql()
 
         # 1. KPIs principales de líneas
@@ -906,8 +919,8 @@ class PosMetricsController(http.Controller):
         }
 
         # 5b. Tendencia por sucursal y por categoría contra el total
-        company_trend = self._get_group_trend('company', start_date, end_date, pos, cashier, company, category, product)
-        category_trend = self._get_group_trend('category', start_date, end_date, pos, cashier, company, category, product)
+        company_trend = self._get_group_trend('company', start_date, end_date, pos, cashier, company, category, barcode)
+        category_trend = self._get_group_trend('category', start_date, end_date, pos, cashier, company, category, barcode)
 
         # 6. Top 10 Productos
         prod_query = f"""
@@ -1056,7 +1069,7 @@ class PosMetricsController(http.Controller):
         margin_percent = 0.0
 
         # Obtener métricas del período actual completo para KPI base
-        current_perf = self._get_period_metrics(start_date, end_date, pos, cashier, company, category, product)
+        current_perf = self._get_period_metrics(start_date, end_date, pos, cashier, company, category, barcode)
         total_cost = round(current_perf["total_cost"], 2)
         # El descuento global no se puede atribuir a un producto: se prorratea sobre la parte
         # de la venta que tiene costo cargado, la única que entra en el margen.
@@ -1097,7 +1110,7 @@ class PosMetricsController(http.Controller):
                 start_dt = end_dt.replace(day=1)
                 base_perf = self._get_period_metrics(
                     start_dt.strftime('%Y-%m-%d'), end_dt.strftime('%Y-%m-%d'),
-                    pos, cashier, company, category, product
+                    pos, cashier, company, category, barcode
                 )
 
             delta = (end_dt - start_dt).days + 1
@@ -1112,8 +1125,8 @@ class PosMetricsController(http.Controller):
             except ValueError:
                 yoy_end = (end_dt - datetime.timedelta(days=365)).strftime('%Y-%m-%d')
 
-            mom_perf = self._get_period_metrics(mom_start, mom_end, pos, cashier, company, category, product)
-            yoy_perf = self._get_period_metrics(yoy_start, yoy_end, pos, cashier, company, category, product)
+            mom_perf = self._get_period_metrics(mom_start, mom_end, pos, cashier, company, category, barcode)
+            yoy_perf = self._get_period_metrics(yoy_start, yoy_end, pos, cashier, company, category, barcode)
 
             if mom_perf["total_revenue"] > 0:
                 mom_growth_revenue = round(((base_perf["total_revenue"] - mom_perf["total_revenue"]) / mom_perf["total_revenue"]) * 100.0, 2)
@@ -1400,13 +1413,13 @@ class PosMetricsController(http.Controller):
         return {"sessions": sessions}
 
     @http.route('/pos_management_metrics/top_articles', type='json', auth='user')
-    def get_top_articles(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=50, **kwargs):
+    def get_top_articles(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all', limit=50, **kwargs):
         """Top de artículos por facturación y por unidades vendidas, respetando los filtros del dashboard."""
         self._check_access()
         cr = request.env.cr
         lang = self._get_lang()
 
-        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, product)
+        where_clause, params = self._build_where_clause(start_date, end_date, pos, cashier, company, category, barcode)
         non_merch = self._non_merchandise_sql()
 
         query = f"""
@@ -1428,7 +1441,7 @@ class PosMetricsController(http.Controller):
         """
         params_list = [lang] + list(params)
 
-        line_clauses, line_params = self._build_line_filters(category, product, lang)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
         query += "".join(f" AND {c}" for c in line_clauses)
         params_list.extend(line_params)
 
@@ -1453,7 +1466,7 @@ class PosMetricsController(http.Controller):
         return {"by_revenue": by_revenue, "by_units": by_units}
 
     @http.route('/pos_management_metrics/export_top_articles', type='http', auth='user')
-    def export_top_articles_xlsx(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', product='all', limit=50, **kwargs):
+    def export_top_articles_xlsx(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all', limit=50, **kwargs):
         """Exporta a Excel el top de artículos en dos hojas: por total vendido y por unidades."""
         try:
             self._check_access()
@@ -1465,7 +1478,7 @@ class PosMetricsController(http.Controller):
             cashier = cashier or 'all'
             company = company or 'all'
             category = category or 'all'
-            product = product or 'all'
+            barcode = barcode or 'all'
             try:
                 limit = int(limit or 50)
             except (TypeError, ValueError):
@@ -1473,7 +1486,7 @@ class PosMetricsController(http.Controller):
 
             data = self.get_top_articles(
                 start_date=start_date, end_date=end_date, pos=pos, cashier=cashier,
-                company=company, category=category, product=product, limit=limit
+                company=company, category=category, barcode=barcode, limit=limit
             )
 
             output = io.BytesIO()

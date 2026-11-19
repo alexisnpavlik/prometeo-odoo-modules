@@ -1739,3 +1739,99 @@
     border-color: #e2e8f0;
     color: #475569;
 }
+
+/* Filtro por código de barras: un chip por código, con el producto que encontró */
+.pos-dashboard-wrap .barcode-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.pos-dashboard-wrap .barcode-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 10px;
+    border-radius: 8px;
+    background: var(--color-blue-glow);
+    border: 1px solid var(--border-glow);
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.pos-dashboard-wrap .barcode-chip.missing {
+    background: var(--color-red-glow);
+    border-color: var(--color-red);
+}
+
+.pos-dashboard-wrap .barcode-chip-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.pos-dashboard-wrap .barcode-chip-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 600;
+}
+
+.pos-dashboard-wrap .barcode-chip-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pos-dashboard-wrap .barcode-chip.missing .barcode-chip-name {
+    color: var(--color-red);
+}
+
+.pos-dashboard-wrap .barcode-chip-remove {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pos-dashboard-wrap .barcode-chip-remove:hover {
+    color: var(--text-primary);
+}
+
+/* Sugerencias del filtro por código de barras: en el flujo, para no quedar recortadas por el scroll del panel */
+.pos-dashboard-wrap .barcode-suggestions {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.pos-dashboard-wrap .barcode-suggestion {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.pos-dashboard-wrap .barcode-suggestion .barcode-chip-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pos-dashboard-wrap .barcode-suggestion.active,
+.pos-dashboard-wrap .barcode-suggestion:hover {
+    background: var(--color-blue-glow);
+}

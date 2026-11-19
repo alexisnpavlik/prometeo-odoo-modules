@@ -116,17 +116,20 @@ class PricelistMetricsController(http.Controller):
             return None
         return diff
 
-    def _build_template_where(self, category='all', product='all', search=None):
+    def _build_template_where(self, category='all', barcode='all', search=None):
         lang = self._get_lang()
         where_clause = "pt.active = TRUE AND pt.sale_ok = TRUE"
         params = []
-        categories, products = _to_list(category), _to_list(product)
+        categories, barcodes = _to_list(category), _to_list(barcode)
         if categories:
             where_clause += " AND ic.name IN %s"
             params.append(tuple(categories))
-        if products:
-            where_clause += " AND COALESCE(pt.name->>%s, pt.name->>'en_US') IN %s"
-            params.extend([lang, tuple(products)])
+        if barcodes:
+            # El código de barras es de la variante; la tabla trabaja por plantilla
+            where_clause += """ AND EXISTS (
+                SELECT 1 FROM product_product ppb
+                WHERE ppb.product_tmpl_id = pt.id AND ppb.barcode IN %s)"""
+            params.append(tuple(barcodes))
         if search:
             where_clause += " AND LOWER(COALESCE(pt.name->>%s, pt.name->>'en_US')) LIKE %s"
             params.extend([lang, f"%{search.lower()}%"])
@@ -136,7 +139,6 @@ class PricelistMetricsController(http.Controller):
     def get_filters(self, **kwargs):
         self._check_access()
         cr = request.env.cr
-        lang = self._get_lang()
 
         # 1. Listas de precios (sucursales)
         pricelists = self._get_pricelists()
@@ -150,38 +152,59 @@ class PricelistMetricsController(http.Controller):
         """)
         categories = [r[0] for r in cr.fetchall() if r[0]]
 
-        # 3. Productos (traducido dinámicamente)
-        cr.execute("""
-            SELECT DISTINCT COALESCE(pt.name->>%s, pt.name->>'en_US')
-            FROM product_template pt
-            WHERE pt.active = TRUE AND pt.sale_ok = TRUE
-            ORDER BY 1
-        """, (lang,))
-        products = [r[0] for r in cr.fetchall() if r[0]]
-
-        # 4. Mapa categoría -> productos
-        cr.execute("""
-            SELECT DISTINCT ic.name, COALESCE(pt.name->>%s, pt.name->>'en_US')
-            FROM product_template pt
-            JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pt.active = TRUE AND pt.sale_ok = TRUE
-            ORDER BY ic.name, 2
-        """, (lang,))
-        products_by_category = {}
-        for cat, prod in cr.fetchall():
-            if cat and prod:
-                products_by_category.setdefault(cat, []).append(prod)
-
         return {
             "pricelists": pricelists,
             "categories": categories,
-            "products": products,
-            "products_by_category": products_by_category,
         }
 
+    @http.route('/pricelist_management_metrics/barcode_names', type='json', auth='user')
+    def get_barcode_names(self, barcodes=None, **kwargs):
+        """Nombre del producto de cada código de barras, para confirmar en el filtro lo escaneado."""
+        self._check_access()
+        codes = _to_list(barcodes)
+        if not codes:
+            return {}
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%s, pt.name->>'en_US')
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.barcode IN %s
+        """, (self._get_lang(), tuple(codes)))
+        return dict(request.env.cr.fetchall())
+
+    @http.route('/pricelist_management_metrics/barcode_search', type='json', auth='user')
+    def search_barcodes(self, term='', **kwargs):
+        """Productos con código de barras que contienen el texto en el código o en el nombre.
+
+        Primero los que empiezan con lo escrito: es lo normal al tipear las primeras cifras del código.
+        """
+        self._check_access()
+        term = (term or '').strip()
+        if len(term) < 2:
+            return []
+        lang = self._get_lang()
+        escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        request.env.cr.execute("""
+            SELECT pp.barcode, COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') AS name
+            FROM product_product pp
+            JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            WHERE pp.active AND pt.active
+              AND COALESCE(pp.barcode, '') <> ''
+              AND (pt.company_id IS NULL OR pt.company_id IN %(companies)s)
+              AND (pp.barcode ILIKE %(like)s
+                   OR COALESCE(pt.name->>%(lang)s, pt.name->>'en_US') ILIKE %(like)s)
+            ORDER BY pp.barcode ILIKE %(prefix)s DESC, 2, 1
+            LIMIT 15
+        """, {
+            'lang': lang,
+            'companies': tuple(request.env.companies.ids),
+            'like': f'%{escaped}%',
+            'prefix': f'{escaped}%',
+        })
+        return request.env.cr.dictfetchall()
+
     @http.route('/pricelist_management_metrics/price_table', type='json', auth='user')
-    def get_price_table(self, category='all', product='all', search=None, pricelist='all', only_diff=False, page=1, per_page=15, **kwargs):
+    def get_price_table(self, category='all', barcode='all', search=None, pricelist='all', only_diff=False, page=1, per_page=15, **kwargs):
         """Tabla comparativa paginada: precio base vs precio de cada lista/sucursal."""
         self._check_access()
         cr = request.env.cr
@@ -194,7 +217,7 @@ class PricelistMetricsController(http.Controller):
             return empty
         pl_ids = tuple(p["id"] for p in pricelists)
 
-        where_clause, params = self._build_template_where(category, product, search)
+        where_clause, params = self._build_template_where(category, barcode, search)
         if only_diff:
             where_clause += """ AND EXISTS (
                 SELECT 1 FROM product_pricelist_item pli2
@@ -270,7 +293,7 @@ class PricelistMetricsController(http.Controller):
         }
 
     @http.route('/pricelist_management_metrics/metrics', type='json', auth='user')
-    def get_metrics(self, category='all', product='all', pricelist='all', limit=20, **kwargs):
+    def get_metrics(self, category='all', barcode='all', pricelist='all', limit=20, **kwargs):
         """KPIs globales y top de productos con mayor diferencia base vs lista."""
         self._check_access()
         cr = request.env.cr
@@ -292,7 +315,7 @@ class PricelistMetricsController(http.Controller):
             return empty
         pl_ids = tuple(p["id"] for p in pricelists)
 
-        where_clause, params = self._build_template_where(category, product)
+        where_clause, params = self._build_template_where(category, barcode)
 
         # 1. Total de productos activos vendibles bajo los filtros
         cr.execute(f"""

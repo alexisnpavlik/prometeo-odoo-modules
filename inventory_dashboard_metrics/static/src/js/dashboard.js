@@ -68,13 +68,19 @@ class InventoryDashboardMetrics extends Component {
             syncTime: "Cargando...",
             theme: "dark",
             overPage: 1,
-            product: [],
+            barcode: [],
+            // Lo que se está escribiendo en el filtro de código de barras y el producto de cada código
+            barcodeInput: "",
+            barcodeNames: {},
+            // Sugerencias mientras se escribe y la marcada con las flechas
+            barcodeSuggestions: [],
+            barcodeActive: 0,
             category: [],
             vendor: [],
             status: [],
             // Multi-selección abierta y el texto de búsqueda de cada una
             openFilter: null,
-            filterSearch: { company: "", category: "", vendor: "", status: "", product: "" },
+            filterSearch: { company: "", category: "", vendor: "", status: "" },
             restPage: 1,
             buyPage: 1,
             buyCover: "30",
@@ -96,7 +102,7 @@ class InventoryDashboardMetrics extends Component {
         // summary y options vienen calculados sobre todas las filas; las tablas traen un tope por estado
         this.metricsData = useState({
             summary: {},
-            options: { categories: [], vendors: [], products: [] },
+            options: { categories: [], vendors: [] },
             overstock: [],
             restock: [],
         });
@@ -111,8 +117,8 @@ class InventoryDashboardMetrics extends Component {
     }
 
     // Copia de los filtros: las listas se duplican para que el borrador no edite el estado aplicado
-    pickFilters({ company, period, product, category, vendor, status }) {
-        return { company: [...company], period, product: [...product], category: [...category], vendor: [...vendor], status: [...status] };
+    pickFilters({ company, period, barcode, category, vendor, status }) {
+        return { company: [...company], period, barcode: [...barcode], category: [...category], vendor: [...vendor], status: [...status] };
     }
 
     // --- Listas filtradas ---
@@ -120,23 +126,13 @@ class InventoryDashboardMetrics extends Component {
         return this.metricsData.options.categories;
     }
 
-    // Productos para el filtro: sólo los de las categorías elegidas en el borrador, como en pos_management_metrics
-    get products() {
-        const { category } = this.draft;
-        const pairs = [
-            ...this.metricsData.options.products,
-            ...this.purchaseData.rows.map((r) => [r.producto, r.categoria]),
-        ].filter(([, categoria]) => !category.length || category.includes(categoria));
-        return [...new Set(pairs.map(([producto]) => producto))].sort((a, b) => a.localeCompare(b, "es"));
-    }
-
-    // Filtros de producto, categoría y proveedor: sin el estado, para que las tarjetas cuenten todos
+    // Filtros de código de barras, categoría y proveedor: sin el estado, para que las tarjetas cuenten todos
     baseFilter(rows) {
-        const { category, vendor, product } = this.state;
+        const { category, vendor, barcode } = this.state;
         return rows.filter((r) =>
             (!category.length || category.includes(r.categoria)) &&
             (!vendor.length || vendor.includes(r.vendor)) &&
-            (!product.length || product.includes(r.producto)));
+            (!barcode.length || barcode.includes(r.barcode)));
     }
 
     byStatus(rows) {
@@ -175,7 +171,6 @@ class InventoryDashboardMetrics extends Component {
         if (field === "company") return this.filtersData.companies.map((c) => [c, c]);
         if (field === "category") return this.categories.map((c) => [c, c]);
         if (field === "vendor") return this.vendors.map((v) => [v, v]);
-        if (field === "product") return this.products.map((p) => [p, p]);
         return this.statusOptions.map(([key, label]) => [key, label]);
     }
 
@@ -211,22 +206,117 @@ class InventoryDashboardMetrics extends Component {
         } else {
             selection.splice(idx, 1);
         }
-        if (field === "category") {
-            this.pruneDraftProducts();
-        }
     }
 
     selectAllFilterValues(field) {
         this.draft[field] = [];
-        if (field === "category") {
-            this.pruneDraftProducts();
+    }
+
+    // --- Filtro por código de barras ---
+    // Al escribir se sugieren productos por código parcial o nombre; el lector manda el código entero + Enter
+    onBarcodeInput(ev) {
+        this.state.barcodeInput = ev.target.value;
+        clearTimeout(this.barcodeTimer);
+        this.barcodeTimer = setTimeout(() => this.searchBarcodes(), 250);
+    }
+
+    async searchBarcodes() {
+        const term = (this.state.barcodeInput || "").trim();
+        if (term.length < 2) {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        try {
+            const found = await rpc("/inventory_dashboard_metrics/barcode_search", { term });
+            // Sólo vale la respuesta del último texto escrito
+            if (term !== (this.state.barcodeInput || "").trim()) {
+                return;
+            }
+            this.barcodeSuggestTerm = term;
+            this.state.barcodeSuggestions = found.filter((s) => !this.draft.barcode.includes(s.barcode));
+            this.state.barcodeActive = 0;
+        } catch (e) {
+            console.error("Error al buscar productos por código de barras:", e);
         }
     }
 
-    // Al cambiar de categoría se descartan los productos que ya no están en la lista
-    pruneDraftProducts() {
-        const products = this.products;
-        this.draft.product = this.draft.product.filter((p) => products.includes(p));
+    closeBarcodeSuggestions() {
+        clearTimeout(this.barcodeTimer);
+        this.barcodeSuggestTerm = null;
+        this.state.barcodeSuggestions = [];
+        this.state.barcodeActive = 0;
+    }
+
+    async onBarcodeKeydown(ev) {
+        const list = this.state.barcodeSuggestions;
+        if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && list.length) {
+            ev.preventDefault();
+            const step = ev.key === "ArrowDown" ? 1 : -1;
+            this.state.barcodeActive = (this.state.barcodeActive + step + list.length) % list.length;
+            return;
+        }
+        if (ev.key === "Escape") {
+            this.closeBarcodeSuggestions();
+            return;
+        }
+        if (ev.key !== "Enter") {
+            return;
+        }
+        ev.preventDefault();
+        const typed = (this.state.barcodeInput || "").trim();
+        const pick = list[this.state.barcodeActive];
+        // Código parcial con sugerencias a la vista: se toma la marcada. Código completo (lector): tal cual
+        if (pick && this.barcodeSuggestTerm === typed && !list.some((s) => s.barcode === typed)) {
+            this.selectBarcode(pick);
+        } else {
+            await this.addBarcodes();
+        }
+    }
+
+    selectBarcode(suggestion) {
+        this.state.barcodeNames[suggestion.barcode] = suggestion.name;
+        if (!this.draft.barcode.includes(suggestion.barcode)) {
+            this.draft.barcode.push(suggestion.barcode);
+        }
+        this.state.barcodeInput = "";
+        this.closeBarcodeSuggestions();
+    }
+
+    // Suma lo escrito (uno o varios códigos separados por espacio, coma o punto y coma)
+    async addBarcodes() {
+        this.closeBarcodeSuggestions();
+        const codes = (this.state.barcodeInput || "").split(/[\s,;]+/).filter(Boolean);
+        this.state.barcodeInput = "";
+        const fresh = [...new Set(codes)].filter((c) => !this.draft.barcode.includes(c));
+        if (!fresh.length) {
+            return;
+        }
+        this.draft.barcode.push(...fresh);
+        await this.loadBarcodeNames(fresh);
+    }
+
+    removeBarcode(code) {
+        this.draft.barcode = this.draft.barcode.filter((c) => c !== code);
+    }
+
+    // null = ningún producto tiene ese código; undefined = todavía no se consultó
+    barcodeName(code) {
+        const name = this.state.barcodeNames[code];
+        if (name === null) {
+            return "Sin producto";
+        }
+        return name || "";
+    }
+
+    async loadBarcodeNames(codes) {
+        try {
+            const names = await rpc("/inventory_dashboard_metrics/barcode_names", { barcodes: codes });
+            for (const code of codes) {
+                this.state.barcodeNames[code] = names[code] || null;
+            }
+        } catch (e) {
+            console.error("Error al buscar los productos de los códigos de barras:", e);
+        }
     }
 
     onFilterSearchInput(field, ev) {
@@ -431,7 +521,7 @@ class InventoryDashboardMetrics extends Component {
             cover: this.state.buyCover,
             category: JSON.stringify(this.state.category),
             status: JSON.stringify(this.state.status),
-            product: JSON.stringify(this.state.product),
+            barcode: JSON.stringify(this.state.barcode),
         });
         window.open(`/inventory_dashboard_metrics/export?${params.toString()}`, "_blank");
     }
@@ -445,14 +535,17 @@ class InventoryDashboardMetrics extends Component {
     }
 
     async applyFilters() {
+        // Un código escrito sin Enter también cuenta
+        await this.addBarcodes();
         Object.assign(this.state, this.pickFilters(this.draft), { showFilters: false, openFilter: null });
         this.onCategoryChange();
         await this.refreshData();
     }
 
     async clearFilters() {
-        Object.assign(this.draft, { company: [], period: "90", product: [], category: [], vendor: [], status: [] });
-        this.state.filterSearch = { company: "", category: "", vendor: "", status: "", product: "" };
+        Object.assign(this.draft, { company: [], period: "90", barcode: [], category: [], vendor: [], status: [] });
+        this.state.barcodeInput = "";
+        this.state.filterSearch = { company: "", category: "", vendor: "", status: "" };
         await this.applyFilters();
     }
 
@@ -516,12 +609,12 @@ class InventoryDashboardMetrics extends Component {
                 period: parseInt(this.state.period) || 90,
                 category: JSON.stringify(this.state.category),
                 vendor: JSON.stringify(this.state.vendor),
-                product: JSON.stringify(this.state.product),
+                barcode: JSON.stringify(this.state.barcode),
             });
             Object.assign(this.metricsData, metrics);
             Object.assign(this.state, { overPage: 1, restPage: 1 });
             // Se descartan categorías y proveedores que ya no aparecen con la nueva empresa o período
-            for (const [field, options] of [["category", this.categories], ["vendor", this.vendors], ["product", this.products]]) {
+            for (const [field, options] of [["category", this.categories], ["vendor", this.vendors]]) {
                 this.state[field] = this.state[field].filter((v) => options.includes(v));
                 this.draft[field] = this.draft[field].filter((v) => options.includes(v));
             }

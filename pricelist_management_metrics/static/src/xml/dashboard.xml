@@ -69,13 +69,33 @@
                         <t t-set="placeholder" t-value="'Buscar categoría...'"/>
                     </t>
 
-                    <t t-call="pricelist_management_metrics.MultiSelect">
-                        <t t-set="field" t-value="'product'"/>
-                        <t t-set="title" t-value="'Producto'"/>
-                        <t t-set="allLabel" t-value="'Todos los productos'"/>
-                        <t t-set="pluralLabel" t-value="'productos seleccionados'"/>
-                        <t t-set="placeholder" t-value="'Buscar producto...'"/>
-                    </t>
+                    <div class="input-group">
+                        <label>Código de barras</label>
+                        <input type="text" class="barcode-input" placeholder="Código, parte del código o nombre"
+                               autocomplete="off" t-att-value="state.barcodeInput"
+                               t-on-input="onBarcodeInput" t-on-keydown="onBarcodeKeydown" t-on-blur="closeBarcodeSuggestions"/>
+                        <div class="barcode-suggestions" t-if="state.barcodeSuggestions.length">
+                            <t t-foreach="state.barcodeSuggestions" t-as="sug" t-key="sug.barcode">
+                                <div t-att-class="'barcode-suggestion' + (sug_index === state.barcodeActive ? ' active' : '')"
+                                     t-on-mousedown.prevent="() => this.selectBarcode(sug)">
+                                    <span class="barcode-chip-code" t-esc="sug.barcode"/>
+                                    <span class="barcode-chip-name" t-esc="sug.name"/>
+                                </div>
+                            </t>
+                        </div>
+                        <div class="barcode-chips" t-if="state.barcode.length">
+                            <t t-foreach="state.barcode" t-as="code" t-key="code">
+                                <span t-att-class="'barcode-chip' + (state.barcodeNames[code] === null ? ' missing' : '')">
+                                    <span class="barcode-chip-text">
+                                        <span class="barcode-chip-code" t-esc="code"/>
+                                        <span class="barcode-chip-name" t-if="barcodeName(code)" t-esc="barcodeName(code)"/>
+                                    </span>
+                                    <button type="button" class="barcode-chip-remove" title="Quitar"
+                                            t-on-click="() => this.removeBarcode(code)">×</button>
+                                </span>
+                            </t>
+                        </div>
+                    </div>
 
                     <div class="input-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
