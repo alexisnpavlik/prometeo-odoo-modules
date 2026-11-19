@@ -12,6 +12,21 @@ patch(ProductScreen.prototype, {
         );
     },
 
+    /** Ids que se cargan solo como componente de un pack/combo: no se muestran ni se venden sueltos. */
+    _categoryHiddenIds() {
+        return new Set(
+            (this.pos.config.category_filter_hidden_product_ids || []).map((product) =>
+                typeof product === "object" ? product.id : product
+            )
+        );
+    },
+
+    get products() {
+        const hidden = this._categoryHiddenIds();
+        const products = super.products;
+        return hidden.size ? products.filter((product) => !hidden.has(product.id)) : products;
+    },
+
     /** "Buscar más" consulta el servidor: le suma el filtro por categoría de la caja. */
     loadProductFromDBDomain(searchProductWord) {
         const domain = super.loadProductFromDBDomain(searchProductWord);
@@ -27,6 +42,11 @@ patch(ProductScreen.prototype, {
     /** Código de un producto que la caja no vende: aviso propio en lugar de "no encontrado". */
     async _barcodeProductAction(code) {
         const product = await this._getProductByBarcode(code);
+        if (product && this._categoryHiddenIds().has(product.id)) {
+            this.sound.play("error");
+            this.notification.add(_t("Producto no habilitado en esta caja"), { type: "warning" });
+            return;
+        }
         if (!product && this.pos.config.category_filter_mode !== "all") {
             const blocked = await this.pos.data.call("pos.config", "is_barcode_blocked_by_category", [
                 [this.pos.config.id],

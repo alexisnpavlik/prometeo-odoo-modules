@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.osv import expression
 
 
@@ -26,6 +26,13 @@ class PosConfig(models.Model):
         "categ_id",
         string="Categorías",
     )
+    category_filter_hidden_product_ids = fields.Many2many(
+        "product.product",
+        compute="_compute_category_filter_hidden_product_ids",
+        string="Productos cargados solo como componente",
+        help="Componentes de packs e ítems de combos fuera de las categorías de la caja: "
+        "se cargan para que el pack/combo funcione, pero no se muestran ni se venden sueltos.",
+    )
 
     def _get_category_filter_domain(self):
         """Dominio de product.product según el filtro de categorías de la caja; vacío si no filtra."""
@@ -36,6 +43,26 @@ class PosConfig(models.Model):
         if self.category_filter_mode == "include":
             return leaf
         return ["!"] + leaf
+
+    @api.depends("category_filter_mode", "category_filter_ids")
+    def _compute_category_filter_hidden_product_ids(self):
+        """Componentes (packs de pos_promotions, ítems de combos) que no son de las categorías de la caja."""
+        for config in self:
+            category_domain = config._get_category_filter_domain()
+            if not category_domain:
+                config.category_filter_hidden_product_ids = False
+                continue
+            candidate_ids = self.env["product.combo.item"].sudo().search([]).product_id.ids
+            if "is_promotion_pack" in self.env["product.template"]._fields:
+                candidate_ids += (
+                    self.env["pos.promotion.pack.line"]
+                    .sudo()
+                    .search([("pack_tmpl_id.active", "=", True)])
+                    .product_id.ids
+                )
+            config.category_filter_hidden_product_ids = self.env["product.product"].search(
+                [("id", "in", candidate_ids)] + ["!"] + category_domain
+            )
 
     def _get_promotion_pack_domain(self):
         """Packs de pos_promotions y sus componentes, que se cargan siempre; vacío si el módulo no está."""
@@ -69,7 +96,7 @@ class PosConfig(models.Model):
         if not products or not self._get_category_filter_domain():
             return products
         domain = expression.AND([[("id", "in", products.ids)], self._get_available_product_domain()])
-        return self.env["product.product"].search(domain)
+        return self.env["product.product"].search(domain) - self.category_filter_hidden_product_ids
 
     def is_barcode_blocked_by_category(self, barcode):
         """True si el código existe (producto o empaque) pero ningún producto que le corresponde

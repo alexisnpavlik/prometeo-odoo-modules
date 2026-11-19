@@ -63,6 +63,9 @@ class TestCategoryFilter(TransactionCase):
         loaded = self.env["product.product"].search(self.config._get_available_product_domain())
         self.assertIn(pack, loaded)
         self.assertIn(self.p_other, loaded, "el componente del pack también se carga")
+        hidden = self.config.category_filter_hidden_product_ids
+        self.assertIn(self.p_other, hidden, "el componente se carga pero no se vende suelto")
+        self.assertNotIn(pack, hidden)
 
     def test_hook_disables_native_limit(self):
         pos_categ = self.env["pos.category"].create({"name": "CF PdV"})
@@ -96,3 +99,30 @@ class TestCategoryFilter(TransactionCase):
         self.env["product.packaging"].create({"name": "CF caja x6", "product_id": self.p_parent.id, "qty": 6, "barcode": "CF0006"})
         self.config.write({"category_filter_mode": "include", "category_filter_ids": [(6, 0, self.other.ids)]})
         self.assertTrue(self.config.is_barcode_blocked_by_category("CF0006"))
+
+    def _combo_with_other_item(self):
+        """Combo nativo en Padre cuyo ítem es el producto de Otra."""
+        combo = self.env["product.combo"].create({
+            "name": "CF combo",
+            "combo_item_ids": [(0, 0, {"product_id": self.p_other.id, "extra_price": 0})],
+        })
+        return self.env["product.product"].create({
+            "name": "CF combo prod",
+            "type": "combo",
+            "available_in_pos": True,
+            "sale_ok": True,
+            "categ_id": self.parent.id,
+            "combo_ids": [(6, 0, combo.ids)],
+        })
+
+    def test_combo_item_hidden_and_blocked(self):
+        combo_product = self._combo_with_other_item()
+        self.config.write({"category_filter_mode": "include", "category_filter_ids": [(6, 0, self.parent.ids)]})
+        hidden = self.config.category_filter_hidden_product_ids
+        self.assertIn(self.p_other, hidden)
+        self.assertNotIn(combo_product, hidden)
+        self.assertTrue(self.config.is_barcode_blocked_by_category("CF0003"))
+
+    def test_hidden_empty_without_filter(self):
+        self._combo_with_other_item()
+        self.assertFalse(self.config.category_filter_hidden_product_ids)
