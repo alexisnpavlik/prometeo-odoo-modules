@@ -6,7 +6,6 @@ import { rpc } from "@web/core/network/rpc";
 // Import popup components
 import { ValidationMethodPopup } from './ValidationMethodPopup';
 import { BarcodeValidationPopup } from './BarcodeValidationPopup';
-import { PasswordValidationPopup } from './PasswordValidationPopup';
 import { PinValidationPopup } from './PinValidationPopup';
 import { WrongValidationPopup } from './WrongValidationPopup';
 
@@ -22,11 +21,7 @@ export class ValidationService {
      */
     isValidationRequired(operation) {
         const pos = this.env.services.pos;
-        let validationEnabledUsers = [];
-        pos.config.manager_ids.forEach(user => {
-            validationEnabledUsers.push(user.id)
-        });
-        if (!pos.config.manager_validation || !validationEnabledUsers.includes(pos.user.id)) {
+        if (!pos.config.manager_validation || this.isUserExcluded()) {
             return false;
         }
 
@@ -50,51 +45,36 @@ export class ValidationService {
     }
 
     /**
-     * Check if user is already validated for current order (one-time password)
+     * True si el usuario logueado está en los excluidos de autorización de la caja
      */
-    isUserValidatedForOrder(userId, order = null) {
-        const config = this.env.services.pos.config;
-        if (!config.one_time_password) {
-            return false;
-        }
-
-        const currentOrder = order || this.env.services.pos.get_order();
-        if (!currentOrder) {
-            return false;
-        }
-
-        // Initialize validated_users array if it doesn't exist
-        if (!currentOrder.validated_users) {
-            currentOrder.validated_users = [];
-        }
-
-        return currentOrder.validated_users.includes(userId);
+    isUserExcluded() {
+        const pos = this.env.services.pos;
+        const excluded = pos.config.excluded_user_ids || [];
+        return excluded.some((user) => (user?.id ?? user) === pos.user.id);
     }
 
     /**
-     * Mark user as validated for current order
+     * True si el pedido ya fue autorizado (autorización única por pedido)
      */
-    markUserValidatedForOrder(userId, order = null) {
-        const config = this.env.services.pos.config;
-        if (!config.one_time_password) {
-            return;
+    isOrderApproved(order = null) {
+        if (!this.env.services.pos.config.one_time_password) {
+            return false;
         }
-
         const currentOrder = order || this.env.services.pos.get_order();
-        if (!currentOrder) {
+        return Boolean(currentOrder && currentOrder.approval_granted);
+    }
+
+    /**
+     * Marca el pedido como autorizado (autorización única por pedido)
+     */
+    markOrderApproved(order = null) {
+        if (!this.env.services.pos.config.one_time_password) {
             return;
         }
-
-        // Initialize validated_users array if it doesn't exist
-        if (!currentOrder.validated_users) {
-            currentOrder.validated_users = [];
+        const currentOrder = order || this.env.services.pos.get_order();
+        if (currentOrder) {
+            currentOrder.approval_granted = true;
         }
-
-        // Add user to validated list if not already present
-        if (!currentOrder.validated_users.includes(userId)) {
-            currentOrder.validated_users.push(userId);
-        }
-
     }
 
     /**
@@ -102,8 +82,8 @@ export class ValidationService {
      */
     clearOrderValidation(order = null) {
         const currentOrder = order || this.env.services.pos.get_order();
-        if (currentOrder && currentOrder.validated_users) {
-            currentOrder.validated_users = [];
+        if (currentOrder) {
+            currentOrder.approval_granted = false;
         }
     }
 
@@ -114,31 +94,12 @@ export class ValidationService {
         const config = this.env.services.pos.config;
         const validationType = config.validation_type || 'all';
         const methods = [];
-
-        switch(validationType) {
-            case 'all':
-                methods.push('barcode', 'password', 'pin');
-                break;
-            case 'barcode':
-                methods.push('barcode');
-                break;
-            case 'password':
-                methods.push('password');
-                break;
-            case 'pin':
-                methods.push('pin');
-                break;
-            case 'pin_password':
-                methods.push('password', 'pin');
-                break;
-            case 'pin_barcode':
-                methods.push('barcode', 'pin');
-                break;
-            case 'password_barcode':
-                methods.push('barcode', 'password');
-                break;
+        if (['all', 'barcode'].includes(validationType) && config.has_approval_barcode) {
+            methods.push('barcode');
         }
-
+        if (['all', 'pin'].includes(validationType) && config.has_approval_pin) {
+            methods.push('pin');
+        }
         return methods;
     }
 
@@ -149,12 +110,9 @@ export class ValidationService {
         try {
             const pos = this.env.services.pos;
             
-            // First check if user is already validated for current order (one-time password)
-            if (pos.config.one_time_password) {
-                const isUserValidated = this.isUserValidatedForOrder(pos.user.id);
-                if (isUserValidated) {
-                    return true;
-                }
+            // Pedido ya autorizado (autorización única por pedido)
+            if (this.isOrderApproved()) {
+                return true;
             }
 
             // Check if validation is required
@@ -165,13 +123,21 @@ export class ValidationService {
             const displayTitle = title || _t("Manager Validation Required");
             const availableMethods = this.getAvailableValidationMethods();
 
+            // Caja sin credenciales: se bloquea la operación
+            if (!availableMethods.length) {
+                await this.showWrongValidationPopup(
+                    _t("Esta caja no tiene PIN ni código de autorización configurado. Pedile a un administrador que lo cargue en la configuración del punto de venta.")
+                );
+                return false;
+            }
+
             // If only one method available, skip method selection
             let selectedMethod;
             if (availableMethods.length === 1) {
                 selectedMethod = availableMethods[0];
             } else {
                 // Show method selection popup
-                selectedMethod = await this.showValidationMethodPopup(displayTitle);
+                selectedMethod = await this.showValidationMethodPopup(displayTitle, availableMethods);
                 if (!selectedMethod) {
                     return false; // User cancelled
                 }
@@ -184,10 +150,9 @@ export class ValidationService {
             }
 
             // Validate credentials
-            const validationResult = await this.validateCredentials(credentials);
+            const validationResult = await this.validateCredentials(credentials, operation);
             if (validationResult.success) {
-                // Mark user as validated for current order if one-time password is enabled
-                this.markUserValidatedForOrder(validationResult.userId);
+                this.markOrderApproved();
                 return true;
             } else {
                 await this.showWrongValidationPopup(validationResult.message);
@@ -204,10 +169,11 @@ export class ValidationService {
     /**
      * Show validation method selection popup
      */
-    async showValidationMethodPopup(title) {
+    async showValidationMethodPopup(title, methods) {
         return new Promise((resolve) => {
             this.dialog.add(ValidationMethodPopup, {
                 title: title,
+                methods: methods,
                 getPayload: (result) => {
                     resolve(result ? result.method : null);
                 },
@@ -223,8 +189,6 @@ export class ValidationService {
         switch(method) {
             case 'barcode':
                 return await this.showBarcodeValidationPopup(title);
-            case 'password':
-                return await this.showPasswordValidationPopup(title);
             case 'pin':
                 return await this.showPinValidationPopup(title);
             default:
@@ -238,19 +202,6 @@ export class ValidationService {
     async showBarcodeValidationPopup(title) {
         return new Promise((resolve) => {
             this.dialog.add(BarcodeValidationPopup, {
-                title: title,
-                getPayload: resolve,
-                close: () => resolve(null)
-            });
-        });
-    }
-
-    /**
-     * Show password validation popup
-     */
-    async showPasswordValidationPopup(title) {
-        return new Promise((resolve) => {
-            this.dialog.add(PasswordValidationPopup, {
                 title: title,
                 getPayload: resolve,
                 close: () => resolve(null)
@@ -286,42 +237,23 @@ export class ValidationService {
     }
 
     /**
-     * Validate credentials against manager users
+     * Valida la credencial contra la caja en el servidor (y queda registrada)
      */
-    async validateCredentials(credentials) {
+    async validateCredentials(credentials, operation = null) {
         try {
-            const config = this.env.services.pos.config;
-            const managerIds = config.manager_ids || [];
-            
-            if (!managerIds.length) {
-                return {
-                    success: false,
-                    message: _t("No managers configured for validation.")
-                };
-            }
-            let manager_ids = [];
-            managerIds.forEach(manager => {
-                manager_ids.push(manager.id)
+            const pos = this.env.services.pos;
+            const order = pos.get_order();
+            const result = await rpc('/pos/validate_approval', {
+                config_id: pos.config.id,
+                session_id: pos.session?.id || null,
+                operation: operation,
+                order_reference: order?.pos_reference || order?.name || null,
+                credentials: credentials,
             });
-
-            const result = await rpc('/pos/validate_manager_credentials', {
-                manager_ids: manager_ids,
-                credentials: credentials
-            });
-
-            if (result.success) {
-                return {
-                    success: true,
-                    userId: result.user_id,
-                    message: _t("Validation successful.")
-                };
-            } else {
-                return {
-                    success: false,
-                    message: result.message || _t("Invalid credentials. Please check your barcode, password, or PIN and try again.")
-                };
-            }
-
+            return {
+                success: Boolean(result.success),
+                message: result.message || _t("Invalid credentials. Please check your barcode or PIN and try again."),
+            };
         } catch (error) {
             console.error('Credential validation error:', error);
             return {
@@ -337,15 +269,12 @@ export class ValidationService {
     async quickValidate(operation, userId = null) {
         const pos = this.env.services.pos;
         
-        // First check if user is already validated for current order (one-time password)
-        if (pos.config.one_time_password) {
-            const currentUserId = userId || pos.user.id;
-            if (this.isUserValidatedForOrder(currentUserId)) {
-                return true;
-            }
+        // Pedido ya autorizado (autorización única por pedido)
+        if (this.isOrderApproved()) {
+            return true;
         }
-        
-        // If not validated via one-time password, check if validation is required
+
+        // Si no está autorizado, ver si la operación requiere autorización
         if (!this.isValidationRequired(operation)) {
             return true;
         }

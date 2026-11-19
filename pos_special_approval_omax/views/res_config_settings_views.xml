@@ -11,21 +11,32 @@
                 <block id="pos_manager_validation_block" title="POS Manager Validation">
                     
                     <!-- Enable Manager Validation -->
-                    <setting help="Enable manager validation for POS operations.">
+                    <setting help="Pide autorización en las operaciones marcadas abajo a todos los usuarios, salvo los excluidos.">
                         <field name="manager_validation"/>
                         <div class="content-group mt16" invisible="not manager_validation">
-                            <label for="manager_ids"/>
-                            <field name="manager_ids" widget="many2many_tags"/>
+                            <label for="excluded_user_ids"/>
+                            <field name="excluded_user_ids" widget="many2many_tags"/>
+                        </div>
+                    </setting>
+
+                    <!-- Credenciales de la caja -->
+                    <setting string="Credenciales de autorización" help="PIN y código de barras de esta caja. Si la caja no tiene ninguno configurado, las operaciones que piden autorización quedan bloqueadas." invisible="not manager_validation">
+                        <div class="content-group mt8">
+                            <div class="row">
+                                <label for="approval_pin" class="col-lg-4 o_light_label"/>
+                                <field name="approval_pin" password="True"/>
+                            </div>
+                            <div class="row">
+                                <label for="approval_barcode" class="col-lg-4 o_light_label"/>
+                                <field name="approval_barcode" password="True"/>
+                            </div>
+                            <button name="action_generate_approval_pin" type="object" string="Generar PIN nuevo" class="btn-link" icon="fa-refresh"/>
                         </div>
                     </setting>
 
                     <!-- Validation Type -->
-                    <setting string="Validation Type" help="Select which type of validation to use." invisible="not manager_validation">
+                    <setting string="Validation Type" help="Qué credencial de la caja se acepta." invisible="not manager_validation">
                         <field name="validation_type"/>
-                        <div class="mt8" invisible="validation_type not in ['all', 'password', 'pin_password', 'password_barcode']">
-                            <field name="virtual_keyboard" class="oe_inline"/>
-                            <label for="virtual_keyboard"/>
-                        </div>
                     </setting>
 
                     <!-- Barcode Scanner Only -->
@@ -34,7 +45,7 @@
                     </setting>
 
                     <!-- One Time Password -->
-                    <setting string="One Time Password for Order" help="Enter the password once for an order, and it won't prompt for the password again for that order from the same person." invisible="not manager_validation">
+                    <setting string="One Time Password for Order" help="Una vez autorizado un pedido, no vuelve a pedir autorización en ese pedido." invisible="not manager_validation">
                         <field name="one_time_password"/>
                     </setting>
 

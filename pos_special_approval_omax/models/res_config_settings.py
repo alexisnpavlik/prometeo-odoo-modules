@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields
+import secrets
+
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+
+# Credenciales de la caja: nunca viajan al frontend del POS.
+APPROVAL_SECRET_FIELDS = ('approval_pin', 'approval_barcode')
 
 
 class PosConfig(models.Model):
@@ -15,26 +21,31 @@ class PosConfig(models.Model):
     # One time password setting
     one_time_password = fields.Boolean(
         string='One Time Password for Order',
-        help='Enter password once per order and reuse for that person'
+        help='Una vez autorizado el pedido, no vuelve a pedir autorización en ese pedido'
     )
 
     # Validation type selection
     validation_type = fields.Selection([
-        ('all', 'All'),
-        ('barcode', 'Only Barcode'),
-        ('password', 'Only Password'),
-        ('pin', 'Only PIN'),
-        ('pin_password', 'PIN and Password'),
-        ('pin_barcode', 'PIN and Barcode'),
-        ('password_barcode', 'Password and Barcode')
+        ('all', 'PIN y código de barras'),
+        ('pin', 'Solo PIN'),
+        ('barcode', 'Solo código de barras'),
     ], string='Validation Type',
        default='all')
 
-    # Virtual keyboard for password
-    virtual_keyboard = fields.Boolean(
-        string='Virtual Keyboard for Password',
-        help='Show virtual keyboard when password input is required'
+    # Credenciales de autorización de la caja (compartidas por quien autoriza)
+    approval_pin = fields.Char(
+        string='PIN de autorización',
+        size=10,
+        copy=False,
+        help='PIN numérico que autoriza las operaciones en esta caja.'
     )
+    approval_barcode = fields.Char(
+        string='Código de barras de autorización',
+        copy=False,
+        help='Código de barras (tarjeta/credencial) que autoriza las operaciones en esta caja.'
+    )
+    has_approval_pin = fields.Boolean(compute='_compute_has_approval_credentials', store=True)
+    has_approval_barcode = fields.Boolean(compute='_compute_has_approval_credentials', store=True)
 
     # Barcode validation hardening
     enforce_barcode_scanner = fields.Boolean(
@@ -45,15 +56,15 @@ class PosConfig(models.Model):
              'keystroke timing). Disable to allow manual entry.'
     )
 
-    # Manager selection
-    manager_ids = fields.Many2many(
+    # Usuarios a los que NO se les pide autorización (el resto, sí)
+    excluded_user_ids = fields.Many2many(
         'res.users',
-        'manager_validation_rel',
+        'pos_approval_excluded_user_rel',
         'config_id',
         'user_id',
-        string='POS Managers',
+        string='Usuarios excluidos de autorización',
         domain=[('share', '=', False)],
-        help='Users who can provide manager validation'
+        help='A estos usuarios no se les pide autorización. A todos los demás, sí.'
     )
 
     # Boolean fields for validation triggers
@@ -80,6 +91,36 @@ class PosConfig(models.Model):
     validate_open_session = fields.Boolean(string='Open Session')
     validate_close_session = fields.Boolean(string='Close Session')
 
+    @api.depends('approval_pin', 'approval_barcode')
+    def _compute_has_approval_credentials(self):
+        """Indica al POS qué credenciales tiene la caja sin exponer su valor."""
+        for config in self:
+            config.has_approval_pin = bool(config.approval_pin)
+            config.has_approval_barcode = bool(config.approval_barcode)
+
+    @api.constrains('approval_pin')
+    def _check_approval_pin(self):
+        """El PIN de la caja debe ser numérico."""
+        for config in self:
+            if config.approval_pin and not config.approval_pin.isdigit():
+                raise ValidationError(_('El PIN de autorización debe contener solo números.'))
+
+    def _load_pos_data(self, data):
+        """Quita las credenciales de la caja de lo que se envía al POS."""
+        res = super()._load_pos_data(data)
+        for record in res.get('data', []):
+            for field_name in APPROVAL_SECRET_FIELDS:
+                record.pop(field_name, None)
+        if res.get('fields'):
+            res['fields'] = [f for f in res['fields'] if f not in APPROVAL_SECRET_FIELDS]
+        return res
+
+    def action_generate_approval_pin(self):
+        """Genera un PIN nuevo de 6 dígitos (rotación tras una filtración)."""
+        for config in self:
+            config.approval_pin = ''.join(secrets.choice('0123456789') for _i in range(6))
+        return True
+
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
@@ -88,9 +129,10 @@ class ResConfigSettings(models.TransientModel):
     manager_validation = fields.Boolean(related='pos_config_id.manager_validation', readonly=False)
     one_time_password = fields.Boolean(related='pos_config_id.one_time_password', readonly=False)
     validation_type = fields.Selection(related='pos_config_id.validation_type', readonly=False)
-    virtual_keyboard = fields.Boolean(related='pos_config_id.virtual_keyboard', readonly=False)
+    approval_pin = fields.Char(related='pos_config_id.approval_pin', readonly=False)
+    approval_barcode = fields.Char(related='pos_config_id.approval_barcode', readonly=False)
     enforce_barcode_scanner = fields.Boolean(related='pos_config_id.enforce_barcode_scanner', readonly=False)
-    manager_ids = fields.Many2many(related='pos_config_id.manager_ids', readonly=False)
+    excluded_user_ids = fields.Many2many(related='pos_config_id.excluded_user_ids', readonly=False)
     validate_order_line_deletion = fields.Boolean(related='pos_config_id.validate_order_line_deletion', readonly=False)
     validate_order_deletion = fields.Boolean(related='pos_config_id.validate_order_deletion', readonly=False)
     validate_apply_discount = fields.Boolean(related='pos_config_id.validate_apply_discount', readonly=False)
@@ -104,3 +146,8 @@ class ResConfigSettings(models.TransientModel):
     validate_global_discount = fields.Boolean(related='pos_config_id.validate_global_discount', readonly=False)
     validate_open_session = fields.Boolean(related='pos_config_id.validate_open_session', readonly=False)
     validate_close_session = fields.Boolean(related='pos_config_id.validate_close_session', readonly=False)
+
+    def action_generate_approval_pin(self):
+        """Genera un PIN nuevo para la caja que se está configurando."""
+        self.pos_config_id.action_generate_approval_pin()
+        return {'type': 'ir.actions.client', 'tag': 'reload'}

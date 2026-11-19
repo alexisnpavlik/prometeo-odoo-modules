@@ -47,7 +47,7 @@ export class WrongValidationPopup extends Component {
     }
 
     get displayMessage() {
-        return this.props.message || _t("Invalid credentials. Please check your barcode, password, or PIN and try again.");
+        return this.props.message || _t("Invalid credentials. Please check your barcode or PIN and try again.");
     }
 
     close() {
