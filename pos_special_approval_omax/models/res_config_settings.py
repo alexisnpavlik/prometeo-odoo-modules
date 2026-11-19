@@ -24,7 +24,7 @@ class PosConfig(models.Model):
 
     # Validation type selection
     validation_type = fields.Selection([
-        ('all', 'PIN y código de barras'),
+        ('all', 'PIN o código de barras (a elección)'),
         ('pin', 'Solo PIN'),
         ('barcode', 'Solo código de barras'),
     ], string='Validation Type',
