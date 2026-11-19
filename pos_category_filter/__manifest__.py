@@ -14,7 +14,11 @@ Reemplaza las Categorías de PdV por la categoría de producto:
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
     "depends": ["point_of_sale"],
-    "data": [],
+    "data": [
+        "views/res_config_settings_views.xml",
+        "views/product_views.xml",
+        "views/menu_views.xml",
+    ],
     "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
