@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import secrets
-
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
@@ -115,12 +113,6 @@ class PosConfig(models.Model):
             res['fields'] = [f for f in res['fields'] if f not in APPROVAL_SECRET_FIELDS]
         return res
 
-    def action_generate_approval_pin(self):
-        """Genera un PIN nuevo de 6 dígitos (rotación tras una filtración)."""
-        for config in self:
-            config.approval_pin = ''.join(secrets.choice('0123456789') for _i in range(6))
-        return True
-
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
@@ -147,7 +139,3 @@ class ResConfigSettings(models.TransientModel):
     validate_open_session = fields.Boolean(related='pos_config_id.validate_open_session', readonly=False)
     validate_close_session = fields.Boolean(related='pos_config_id.validate_close_session', readonly=False)
 
-    def action_generate_approval_pin(self):
-        """Genera un PIN nuevo para la caja que se está configurando."""
-        self.pos_config_id.action_generate_approval_pin()
-        return {'type': 'ir.actions.client', 'tag': 'reload'}
