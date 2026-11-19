@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.pos.category.filter</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[.//field[@name='pos_limit_categories']]" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//setting[.//field[@name='pos_limit_categories']]" position="before">
+                <setting string="Productos de esta caja" help="Qué categorías de producto vende esta caja. Elegir una categoría incluye sus subcategorías.">
+                    <field name="pos_category_filter_mode" widget="radio" readonly="pos_has_active_session"/>
+                    <div class="content-group mt16" invisible="pos_category_filter_mode == 'all'">
+                        <field name="pos_category_filter_ids" widget="many2many_tags" readonly="pos_has_active_session"/>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
