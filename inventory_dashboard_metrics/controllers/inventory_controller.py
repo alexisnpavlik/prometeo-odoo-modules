@@ -75,6 +75,15 @@ class InventoryMetricsController(http.Controller):
         if not request.env.user.has_group('inventory_dashboard_metrics.group_inventory_metrics_user'):
             raise AccessError("No tienes permisos para acceder a las métricas de inventario.")
 
+    def _can_export(self):
+        """Si el usuario puede usar los botones de Excel.
+
+        Sin product_stock_export_restrict instalado no hay restricción.
+        """
+        xmlid = 'product_stock_export_restrict.group_product_stock_export'
+        group = request.env.ref(xmlid, raise_if_not_found=False)
+        return not group or request.env.user.has_group(xmlid)
+
     def _get_lang(self):
         return request.env.context.get('lang') or 'es_AR'
 
@@ -95,10 +104,11 @@ class InventoryMetricsController(http.Controller):
         self._check_access()
         allowed_companies = tuple(request.env.companies.ids)
         if not allowed_companies:
-            return {"companies": []}
+            return {"companies": [], "can_export": self._can_export()}
         request.env.cr.execute(
             "SELECT name FROM res_company WHERE id IN %s ORDER BY name", (allowed_companies,))
-        return {"companies": [r[0] for r in request.env.cr.fetchall() if r[0]]}
+        return {"companies": [r[0] for r in request.env.cr.fetchall() if r[0]],
+                "can_export": self._can_export()}
 
     def _fetch_product_rows(self, companies, period, lang, by_branch=False):
         """Una fila por producto almacenable: stock actual, valor, ventas del período y última venta.

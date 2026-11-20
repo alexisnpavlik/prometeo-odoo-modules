@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Métricas y Dashboard de Inventario Premium",
-    "version": "18.0.2.0.0",
+    "version": "18.0.2.1.0",
     "category": "Inventory",
     "summary": "Dashboard de inventario: capital inmovilizado, sobrestock, antigüedad de stock y reposición",
     "description": """

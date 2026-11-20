@@ -289,7 +289,7 @@
                                 </t>
                             </div>
                             <div class="filter-row">
-                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="restock">Exportar Excel</button>
+                                <button t-if="filtersData.can_export" class="btn btn-secondary" t-on-click="exportExcel" data-table="restock">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table">
@@ -358,7 +358,7 @@
                                 </t>
                             </div>
                             <div class="filter-row">
-                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
+                                <button t-if="filtersData.can_export" class="btn btn-secondary" t-on-click="exportExcel" data-table="overstock">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table">
@@ -440,7 +440,7 @@
                                 <div class="buy-slider-scale"><span>Poca</span><span>Mucha</span></div>
                             </div>
                             <div class="filter-row">
-                                <button class="btn btn-secondary" t-on-click="exportExcel" data-table="purchase">Exportar Excel</button>
+                                <button t-if="filtersData.can_export" class="btn btn-secondary" t-on-click="exportExcel" data-table="purchase">Exportar Excel</button>
                             </div>
                             <div class="table-responsive">
                                 <table class="data-table compact">
