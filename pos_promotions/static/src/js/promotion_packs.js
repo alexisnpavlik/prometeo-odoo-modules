@@ -34,6 +34,13 @@ patch(PosOrder.prototype, {
         return [...packs.values()].filter((pack) => pack.components.length);
     },
 
+    /** Fecha local de la caja como "AAAA-MM-DD", comparable con las fechas de validez. */
+    _getPromotionToday() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    },
+
     /** Precio de la promoción en esta lista: el puntual de la lista, el % sobre el precio
      *  de la lista o el precio fijo, en ese orden. */
     _getPromotionPackPrice(pack, regular, pricelistId) {
@@ -139,8 +146,11 @@ patch(PosOrder.prototype, {
             // Solo las promociones de la lista de la orden. El precio normal es el de esa
             // lista (precio de la sucursal); la promoción descuenta sobre él sin tocar la lista.
             const pricelistId = this.pricelist_id?.id;
+            const today = this._getPromotionToday();
             const packs = this.getPromotionPacks()
                 .filter((pack) => pricelistId && (pack.data.pricelists || []).includes(pricelistId))
+                .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
+                    (!pack.data.date_end || today <= pack.data.date_end))
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
                 .map((pack) => {
                     const regular = pack.components.reduce(

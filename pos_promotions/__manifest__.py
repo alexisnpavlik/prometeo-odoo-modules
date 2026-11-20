@@ -33,6 +33,7 @@
     "depends": ["point_of_sale"],
     "data": [
         "security/ir.model.access.csv",
+        "security/pos_promotions_security.xml",
         "views/promotion_pack_views.xml",
         "views/menu_views.xml",
         "views/res_config_settings_views.xml",

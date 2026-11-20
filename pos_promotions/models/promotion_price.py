@@ -18,14 +18,11 @@ class PromotionPrice(models.Model):
         ("pack_pricelist_unique", "unique(pack_tmpl_id, pricelist_id)", "Cada lista puede tener un solo precio por promoción."),
     ]
 
-    @api.constrains("pricelist_id", "price")
+    @api.constrains("price")
     def _check_price(self):
-        """El precio por lista va en una lista de la promoción y no puede ser 1 o menos.
-        Se guarda acá y no como regla de la lista para no pisar el precio de la sucursal."""
+        """No puede ser 1 o menos. Que la lista sea de la promoción lo valida la promoción
+        (al crearla, los precios se guardan antes que sus listas). Se guarda acá y no como
+        regla de la lista para no pisar el precio de la sucursal."""
         for record in self:
             if record.price <= 1:
                 raise ValidationError(_("Poné el precio de la promoción en %s (no puede ser 1 o menos).", record.pricelist_id.display_name))
-            if record.pricelist_id not in record.pack_tmpl_id.sudo().promotion_pricelist_ids:
-                raise ValidationError(
-                    _("%s no está en las listas de la promoción: agregala primero.", record.pricelist_id.display_name)
-                )

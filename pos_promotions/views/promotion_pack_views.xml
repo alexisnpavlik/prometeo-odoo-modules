@@ -17,6 +17,8 @@
                 <field name="promotion_discount_percent" invisible="promotion_price_mode != 'percent'"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
                 <field name="promotion_pricelist_ids" widget="many2many_tags" optional="show"/>
+                <field name="promotion_date_start" optional="show"/>
+                <field name="promotion_date_end" optional="show"/>
                 <field name="active" widget="boolean_toggle" string="Activo"/>
             </list>
         </field>
@@ -72,6 +74,16 @@
                             <field name="lst_price" widget="monetary"/>
                         </list>
                     </field>
+                    <separator string="Vigencia"/>
+                    <div class="text-muted mb-2">
+                        Opcional. Sin fechas, la promoción vale siempre mientras esté activa.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="promotion_date_start"/>
+                            <field name="promotion_date_end"/>
+                        </group>
+                    </group>
                     <separator string="Precio por lista"/>
                     <div class="text-muted mb-2">
                         Opcional: un precio puntual para una sucursal. En esa lista reemplaza al
@@ -98,6 +110,8 @@
             <search>
                 <field name="name" string="Promoción"/>
                 <filter name="inactive" string="Inactivos" domain="[('active', '=', False)]"/>
+                <filter name="expired" string="Vencidas"
+                        domain="[('promotion_date_end', '&lt;', context_today().strftime('%Y-%m-%d'))]"/>
             </search>
         </field>
     </record>

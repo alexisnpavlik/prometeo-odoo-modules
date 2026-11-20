@@ -39,6 +39,12 @@ class ProductTemplate(models.Model):
         "pos.promotion.price", "pack_tmpl_id", string="Precio por lista", copy=True,
         help="Precio puntual de la promoción en una lista. Pisa al tipo de promoción solo en esa lista.",
     )
+    promotion_date_start = fields.Date(
+        "Válida desde", help="Opcional. Vacío: vale desde ya.",
+    )
+    promotion_date_end = fields.Date(
+        "Válida hasta", help="Opcional, inclusive. Vacío: no vence.",
+    )
     promotion_pricelist_ids = fields.Many2many(
         "product.pricelist",
         "pos_promotion_pricelist_rel",
@@ -77,7 +83,8 @@ class ProductTemplate(models.Model):
     def _compute_promotion_allowed_pricelist_ids(self):
         """Opciones del campo Listas de precios. Una promoción con empresa solo puede usar
         listas de esa empresa o compartidas; una sin empresa, cualquiera permitida."""
-        allowed = self._promotion_allowed_pricelists()
+        # Solo las que el usuario puede leer (empresas activas): el formulario muestra sus nombres.
+        allowed = self.env["product.pricelist"].search([("id", "in", self._promotion_allowed_pricelists().ids)])
         for template in self:
             company = template.company_id
             options = allowed.filtered(lambda pl: not company or not pl.company_id or pl.company_id == company)
@@ -154,7 +161,7 @@ class ProductTemplate(models.Model):
             orphan = template.sudo().promotion_list_price_ids.pricelist_id - pricelists
             if orphan:
                 raise ValidationError(
-                    _("Sacaste %s de las listas pero tiene un precio cargado: borralo de Precio por lista.",
+                    _("%s tiene un precio en Precio por lista pero no está en las listas de la promoción: agregala o borrá ese precio.",
                       ", ".join(orphan.mapped("display_name")))
                 )
             company = template.company_id
@@ -162,6 +169,14 @@ class ProductTemplate(models.Model):
                 raise ValidationError(
                     _("Una promoción de %s solo puede usar listas de esa empresa o compartidas.", company.name)
                 )
+
+    @api.constrains("promotion_date_start", "promotion_date_end")
+    def _check_promotion_dates(self):
+        """La fecha de fin no puede ser anterior a la de inicio."""
+        for template in self:
+            start, end = template.promotion_date_start, template.promotion_date_end
+            if start and end and end < start:
+                raise ValidationError(_("La fecha Válida hasta no puede ser anterior a Válida desde."))
 
     @api.constrains("is_promotion_pack", "promotion_pack_line_ids")
     def _check_promotion_pack_lines(self):

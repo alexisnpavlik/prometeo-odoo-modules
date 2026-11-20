@@ -30,6 +30,7 @@ class PromotionPackLine(models.Model):
         "pack_tmpl_id.promotion_pricelist_ids", "pack_tmpl_id.promotion_price_mode",
         "pack_tmpl_id.promotion_discount_percent", "pack_tmpl_id.promotion_list_price_ids.price",
         "pack_tmpl_id.promotion_list_price_ids.pricelist_id",
+        "pack_tmpl_id.promotion_date_start", "pack_tmpl_id.promotion_date_end",
     )
     def _compute_promotion_data_json(self):
         """Ids crudos: el POS no carga las listas de otras cajas, así que no sirve un Many2many."""
@@ -40,6 +41,8 @@ class PromotionPackLine(models.Model):
                 "mode": template.promotion_price_mode,
                 "percent": template.promotion_discount_percent,
                 "prices": {str(p.pricelist_id.id): p.price for p in template.promotion_list_price_ids},
+                "date_start": fields.Date.to_string(template.promotion_date_start) or False,
+                "date_end": fields.Date.to_string(template.promotion_date_end) or False,
             }
 
     @api.model
@@ -51,6 +54,9 @@ class PromotionPackLine(models.Model):
             ("pack_tmpl_id.active", "=", True),
             ("pack_tmpl_id.available_in_pos", "=", True),
             ("pack_tmpl_id.promotion_pricelist_ids", "in", pricelists.ids),
+            # Las vencidas no se cargan; las futuras sí (la sesión puede seguir abierta al empezar).
+            "|", ("pack_tmpl_id.promotion_date_end", "=", False),
+            ("pack_tmpl_id.promotion_date_end", ">=", fields.Date.context_today(self)),
         ]
 
     @api.model
