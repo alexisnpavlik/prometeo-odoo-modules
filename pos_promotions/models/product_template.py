@@ -8,7 +8,6 @@ from odoo import Command, _, api, fields, models, tools
 from odoo.exceptions import ValidationError
 from odoo.tools.misc import format_date
 
-ALLOWED_COMPANIES_PARAM = "pos_promotions.allowed_company_ids"
 
 
 class ProductTemplate(models.Model):
@@ -70,29 +69,26 @@ class ProductTemplate(models.Model):
     promotion_allowed_company_ids = fields.Many2many(
         "res.company",
         compute="_compute_promotion_allowed_company_ids",
-        help="Sucursales que se pueden elegir: las permitidas en Ajustes y la de la promoción.",
+        help="Sucursales que se pueden elegir: todas a las que el usuario tiene acceso, o solo la de la promoción.",
     )
 
     @api.model
     def _promotion_allowed_companies(self):
-        """Sucursales permitidas en Ajustes > Promociones; sin ninguna elegida, todas."""
-        companies = self.env["res.company"].sudo()
-        raw = self.env["ir.config_parameter"].sudo().get_param(ALLOWED_COMPANIES_PARAM, "")
-        ids = [int(value) for value in raw.split(",") if value.strip().isdigit()]
-        return companies.browse(ids).exists() if ids else companies.search([])
+        """Sucursales que puede usar una promoción: todas las empresas."""
+        return self.env["res.company"].sudo().search([])
 
     @api.model
     def _promotion_default_companies(self, company=None):
-        """Sucursales que trae una promoción nueva: todas las permitidas a las que el usuario
-        tiene acceso, estén o no activas en el selector; si la promoción tiene empresa, solo esa."""
+        """Sucursales que trae una promoción nueva: todas a las que el usuario tiene acceso,
+        estén o no activas en el selector; si la promoción tiene empresa, solo esa."""
         companies = self._promotion_allowed_companies() & self.env.user.company_ids
         return companies & company if company else companies
 
     @api.depends("company_id")
     @api.depends_context("uid")
     def _compute_promotion_allowed_company_ids(self):
-        """Opciones del campo Sucursales: las permitidas a las que el usuario tiene acceso
-        (el formulario muestra sus nombres); con empresa en la promoción, solo esa."""
+        """Opciones del campo Sucursales: las que el usuario tiene acceso (el formulario
+        muestra sus nombres); con empresa en la promoción, solo esa."""
         allowed = self._promotion_allowed_companies() & self.env.user.company_ids
         for template in self:
             options = allowed & template.company_id if template.company_id else allowed
@@ -100,7 +96,7 @@ class ProductTemplate(models.Model):
 
     @api.model
     def default_get(self, fields_list):
-        """Una promoción nueva arranca con todas las sucursales permitidas seleccionadas."""
+        """Una promoción nueva arranca con todas las sucursales seleccionadas."""
         res = super().default_get(fields_list)
         if "promotion_company_ids" in fields_list and (
             res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack")

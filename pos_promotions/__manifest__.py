@@ -35,7 +35,6 @@
         "security/ir.model.access.csv",
         "views/promotion_pack_views.xml",
         "views/menu_views.xml",
-        "views/res_config_settings_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
