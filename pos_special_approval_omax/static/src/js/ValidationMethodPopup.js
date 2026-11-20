@@ -8,7 +8,7 @@ import { _t } from "@web/core/l10n/translation";
 export class ValidationMethodPopup extends Component {
     static components = { Dialog };
     static template = "pos_special_approval_omax.ValidationMethodPopup";
-    static props = ["close", "getPayload", "title"];
+    static props = ["close", "getPayload", "title", "methods?"];
 
     setup() {
         this.pos = usePos();
@@ -36,47 +36,11 @@ export class ValidationMethodPopup extends Component {
     }
 
     get validationMethods() {
-        const validationType = this.pos.config.pos_validation_type || 'all';
-        const methods = [];
-        
-        switch(validationType) {
-            case 'all':
-                methods.push(
-                    { key: 'barcode', label: _t('Barcode'), icon: 'fa-barcode' },
-                    { key: 'password', label: _t('Password'), icon: 'fa-lock' },
-                    { key: 'pin', label: _t('PIN'), icon: 'fa-key' }
-                );
-                break;
-            case 'barcode':
-                methods.push({ key: 'barcode', label: _t('Barcode'), icon: 'fa-barcode' });
-                break;
-            case 'password':
-                methods.push({ key: 'password', label: _t('Password'), icon: 'fa-lock' });
-                break;
-            case 'pin':
-                methods.push({ key: 'pin', label: _t('PIN'), icon: 'fa-key' });
-                break;
-            case 'pin_password':
-                methods.push(
-                    { key: 'password', label: _t('Password'), icon: 'fa-lock' },
-                    { key: 'pin', label: _t('PIN'), icon: 'fa-key' }
-                );
-                break;
-            case 'pin_barcode':
-                methods.push(
-                    { key: 'barcode', label: _t('Barcode'), icon: 'fa-barcode' },
-                    { key: 'pin', label: _t('PIN'), icon: 'fa-key' }
-                );
-                break;
-            case 'password_barcode':
-                methods.push(
-                    { key: 'barcode', label: _t('Barcode'), icon: 'fa-barcode' },
-                    { key: 'password', label: _t('Password'), icon: 'fa-lock' }
-                );
-                break;
-        }
-        
-        return methods;
+        const labels = {
+            barcode: { key: 'barcode', label: _t('Barcode'), icon: 'fa-barcode' },
+            pin: { key: 'pin', label: _t('PIN'), icon: 'fa-key' },
+        };
+        return (this.props.methods || []).map((key) => labels[key]).filter(Boolean);
     }
 
     selectMethod(method) {

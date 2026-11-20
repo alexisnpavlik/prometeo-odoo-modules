@@ -1,79 +1,68 @@
 # -*- coding: utf-8 -*-
 
+import hmac
 import logging
-from odoo import http
+
+from odoo import _, http
+from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
 
+def _matches(expected, given):
+    """Compara credenciales en tiempo constante; vacío nunca coincide."""
+    return bool(expected) and bool(given) and hmac.compare_digest(expected.encode(), given.encode())
+
+
 class PosValidationController(http.Controller):
 
-    @http.route('/pos/validate_manager_credentials', type='json', auth='user', methods=['POST'])
-    def validate_manager_credentials(self, manager_ids, credentials):
+    @http.route('/pos/validate_approval', type='json', auth='user', methods=['POST'])
+    def validate_approval(self, config_id, credentials, operation=None, order_reference=None, session_id=None):
         """
-        Validate manager credentials for POS operations
-        
-        :param manager_ids: List of manager user IDs
-        :param credentials: Dict containing validation data (barcode, password, pin)
-        :return: Dict with success status and user info
+        Valida la credencial de autorización contra la caja (pos.config) y registra el intento.
+
+        :param config_id: id de la caja del POS abierto
+        :param credentials: dict con 'pin' o 'barcode'
+        :param operation: clave de la operación que se autoriza (refund, price_change, ...)
+        :param order_reference: referencia del pedido en curso, si hay
+        :param session_id: id de la sesión abierta, si hay
+        :return: dict con success y message
         """
         try:
-            if not manager_ids:
+            config = request.env['pos.config'].browse(int(config_id))
+            config.check_access('read')
+            config = config.sudo()
+            log_model = request.env['pos.approval.log'].sudo()
+
+            if log_model._is_config_locked(config):
                 return {
                     'success': False,
-                    'message': 'No managers configured for validation.'
+                    'message': _('Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.'),
                 }
 
-            # Get manager users
-            managers = request.env['res.users'].sudo().browse(manager_ids)
-            if not managers:
-                return {
-                    'success': False,
-                    'message': 'Invalid manager configuration.'
-                }
+            pin = (credentials.get('pin') or '').strip()
+            barcode = (credentials.get('barcode') or '').strip()
+            method = 'pin' if pin else 'barcode' if barcode else False
+            success = _matches(config.approval_pin, pin) or _matches(config.approval_barcode, barcode)
 
-            # Extract credentials
-            barcode = credentials.get('barcode', '').strip()
-            password = credentials.get('password', '').strip()
-            pin = credentials.get('pin', '').strip()
+            session = request.env['pos.session'].sudo().browse(int(session_id)) if session_id else False
+            log_model.create({
+                'config_id': config.id,
+                'session_id': session.id if session and session.exists() else False,
+                'user_id': request.env.uid,
+                'operation': operation,
+                'order_reference': order_reference,
+                'method': method,
+                'success': success,
+            })
 
-            # Validate against each manager
-            for manager in managers:
-                validation_passed = False
-                
-                # Check barcode validation
-                if barcode and manager.pos_barcode:
-                    if manager.pos_barcode == barcode:
-                        validation_passed = True
-                        
-                # Check password validation
-                if password and manager.pos_password:
-                    if manager.pos_password == password:
-                        validation_passed = True
-                        
-                # Check PIN validation
-                if pin and manager.pos_pin:
-                    if manager.pos_pin == pin:
-                        validation_passed = True
+            if success:
+                return {'success': True, 'message': _('Autorización correcta.')}
+            return {'success': False, 'message': _('Credencial incorrecta.')}
 
-                if validation_passed:
-                    return {
-                        'success': True,
-                        'user_id': manager.id,
-                        'user_name': manager.name,
-                        'message': 'Validation successful.'
-                    }
-
-            # No validation passed
-            return {
-                'success': False,
-                'message': 'Invalid credentials. Please check your barcode, password, or PIN and try again.'
-            }
-
+        except (AccessError, MissingError):
+            return {'success': False, 'message': _('No tenés acceso a esta caja.')}
         except Exception as e:
-            _logger.error("Error in POS manager validation: %s", str(e))
-            return {
-                'success': False,
-                'message': 'An error occurred during validation. Please try again.'
-            }
+            _logger.error("Error validando autorización del POS: %s", str(e))
+            return {'success': False, 'message': _('Ocurrió un error al validar. Intentá de nuevo.')}

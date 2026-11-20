@@ -1,2 +1,2 @@
 from . import res_config_settings
-from . import res_users
+from . import pos_approval_log

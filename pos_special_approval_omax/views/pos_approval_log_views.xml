@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_approval_log_view_list" model="ir.ui.view">
+        <field name="name">pos.approval.log.list</field>
+        <field name="model">pos.approval.log</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false" decoration-danger="not success">
+                <field name="create_date" string="Fecha"/>
+                <field name="config_id"/>
+                <field name="user_id"/>
+                <field name="operation"/>
+                <field name="order_reference"/>
+                <field name="method"/>
+                <field name="success"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="pos_approval_log_view_search" model="ir.ui.view">
+        <field name="name">pos.approval.log.search</field>
+        <field name="model">pos.approval.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="config_id"/>
+                <field name="user_id"/>
+                <field name="order_reference"/>
+                <filter name="failed" string="Fallidas" domain="[('success', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_config" string="Caja" context="{'group_by': 'config_id'}"/>
+                    <filter name="group_user" string="Usuario" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_operation" string="Operación" context="{'group_by': 'operation'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="pos_approval_log_action" model="ir.actions.act_window">
+        <field name="name">Autorizaciones</field>
+        <field name="res_model">pos.approval.log</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="pos_approval_log_menu"
+              name="Autorizaciones"
+              parent="point_of_sale.menu_point_rep"
+              action="pos_approval_log_action"
+              groups="point_of_sale.group_pos_manager"
+              sequence="90"/>
+</odoo>

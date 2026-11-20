@@ -9,7 +9,7 @@
                     <h4 class="text-center mb-4">Choose validation method:</h4>
                     <div class="row">
                         <t t-foreach="validationMethods" t-as="method" t-key="method.key">
-                            <div class="col-md-4 mb-3">
+                            <div class="col mb-3">
                                 <button class="btn btn-outline-primary btn-lg w-100 method-btn" 
                                         t-on-click="selectMethod.bind(this, method)">
                                     <i t-attf-class="fa fa-2x {{method.icon}} mb-2"></i>
@@ -75,75 +75,6 @@
                         <button class="btn btn-primary" 
                                 t-on-click="confirm"
                                 t-att-disabled="!state.barcode.trim()">
-                            Validate
-                        </button>
-                    </div>
-                </t>
-            </div>
-        </Dialog>
-    </t>
-
-    <t t-name="pos_special_approval_omax.PasswordValidationPopup" owl="1">
-        <Dialog size="'lg'" title="props.title || 'Password Validation'">
-            <div class="password-validation-popup">
-                <div class="validation-content">
-                    <div class="text-center mb-4">
-                        <i class="fa fa-lock fa-3x text-primary mb-3"></i>
-                        <h4>Enter Manager Password</h4>
-                        <p class="text-muted">Please enter your manager password</p>
-                    </div>
-                    
-                    <div class="input-group mb-3">
-                        <input t-attf-type="{{state.showPassword ? 'text' : 'password'}}" 
-                            class="form-control form-control-lg text-center" 
-                            placeholder="Enter password..."
-                            t-model="state.password"
-                            t-on-input="onPasswordInput"
-                            t-ref="passwordInput"
-                            autocomplete="new-password" />
-                        <button class="btn btn-outline-secondary" 
-                                type="button" 
-                                t-on-click="togglePasswordVisibility">
-                            <i t-attf-class="fa {{state.showPassword ? 'fa-eye-slash' : 'fa-eye'}}"></i>
-                        </button>
-                    </div>
-
-                    <div class="virtual-keyboard mt-4" t-if="state.showVirtualKeyboard">
-                        
-                        <div class="keyboard-container p-3">
-                            <!-- Main Keyboard Rows -->
-                            <t t-foreach="virtualKeyboardKeys.rows" t-as="row" t-key="row_index">
-                                <div class="keyboard-row d-flex justify-content-center mb-2">
-                                    <t t-foreach="row" t-as="keyObj" t-key="keyObj.key">
-                                        <button t-attf-class="btn keyboard-key me-1 {{keyObj.class || 'btn-outline-primary'}}"
-                                                t-on-click="onVirtualKeyPress.bind(this, keyObj.key, keyObj.special)"
-                                                t-attf-data-key="{{keyObj.key}}">
-                                            <span t-esc="keyObj.display"></span>
-                                        </button>
-                                    </t>
-                                </div>
-                            </t>
-                            
-                            <!-- Bottom Row with Special Keys -->
-                            <div class="keyboard-bottom-row d-flex justify-content-center flex-wrap mt-3">
-                                <t t-foreach="virtualKeyboardKeys.bottomRow" t-as="keyObj" t-key="keyObj.key">
-                                    <button t-attf-class="btn keyboard-key me-1 mb-1 {{keyObj.class || 'btn-outline-primary'}}"
-                                            t-on-click="onVirtualKeyPress.bind(this, keyObj.key, keyObj.special)"
-                                            t-attf-data-key="{{keyObj.key}}">
-                                        <span t-esc="keyObj.display"></span>
-                                    </button>
-                                </t>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <t t-set-slot="footer">
-                    <div class="validation-popup-footer">
-                        <button class="btn btn-secondary me-2" t-on-click="cancel">Cancel</button>
-                        <button class="btn btn-primary" 
-                                t-on-click="confirm"
-                                t-att-disabled="!state.password.trim()">
                             Validate
                         </button>
                     </div>

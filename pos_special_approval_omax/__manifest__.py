@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Manager Special Approval',
-    'version': '18.0.1.0',
+    'version': '18.0.1.1',
     'category': 'Point of Sale',
     'sequence': 1,
     'author': 'OMAX Informatics',
@@ -11,8 +11,9 @@
     ''',
     'depends': ['point_of_sale','pos_discount'],
     'data': [
+        'security/ir.model.access.csv',
         'views/res_config_settings_views.xml',
-        'views/res_users_views.xml',
+        'views/pos_approval_log_views.xml',
     ],
     'assets': {
         'point_of_sale._assets_pos': [
