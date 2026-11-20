@@ -7,9 +7,9 @@ from odoo.exceptions import ValidationError
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
-    is_promotion_pack = fields.Boolean("Pack de promoción", copy=False)
+    is_promotion_pack = fields.Boolean("Es promoción", copy=False)
     promotion_pack_line_ids = fields.One2many(
-        "pos.promotion.pack.line", "pack_tmpl_id", string="Productos del pack", copy=True
+        "pos.promotion.pack.line", "pack_tmpl_id", string="Productos de la promoción", copy=True
     )
     promotion_pack_regular_price = fields.Float(
         "Precio normal", compute="_compute_promotion_pack_prices", digits="Product Price"
@@ -47,17 +47,17 @@ class ProductTemplate(models.Model):
         for template in self.filtered("is_promotion_pack"):
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             if template.list_price <= 1:
-                raise ValidationError(_("Poné el precio del pack (no puede ser 1 o menos)."))
+                raise ValidationError(_("Poné el precio de la promoción (no puede ser 1 o menos)."))
             if regular and template.list_price > regular:
                 raise ValidationError(
-                    _("El pack no puede costar más que sus productos sueltos (%s).", round(regular, 2))
+                    _("La promoción no puede costar más que sus productos sueltos (%s).", round(regular, 2))
                 )
 
     @api.constrains("is_promotion_pack", "promotion_pack_line_ids")
     def _check_promotion_pack_lines(self):
         """Un pack necesita al menos un producto."""
         if any(template.is_promotion_pack and not template.promotion_pack_line_ids for template in self):
-            raise ValidationError(_("Agregá al menos un producto al pack."))
+            raise ValidationError(_("Agregá al menos un producto a la promoción."))
 
     @api.model_create_multi
     def create(self, vals_list):

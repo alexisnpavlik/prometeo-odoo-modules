@@ -8,9 +8,9 @@ class PosOrderLine(models.Model):
 
     promotion_pack_tmpl_id = fields.Many2one(
         "product.template",
-        string="Pack de promoción",
+        string="Promoción",
         index="btree_not_null",
-        help="Pack que puso el descuento de la línea; sin pack, el descuento lo puso el cajero.",
+        help="Promoción que puso el descuento de la línea; sin promoción, el descuento lo puso el cajero.",
     )
 
     @api.model

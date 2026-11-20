@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.2.0.0",
+    "version": "18.0.2.0.1",
     "category": "Sales/Point Of Sale",
-    "summary": "App Promociones: packs de uno o varios productos a un precio",
+    "summary": "App Promociones: uno o varios productos juntos a un precio",
     "description": """
         App Promociones en el menú principal: abre directo en Packs.
 

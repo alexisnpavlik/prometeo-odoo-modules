@@ -7,11 +7,11 @@ from odoo.exceptions import ValidationError
 class PromotionPackLine(models.Model):
     _name = "pos.promotion.pack.line"
     _inherit = ["pos.load.mixin"]
-    _description = "Componente de pack de promoción"
+    _description = "Producto de una promoción"
     _order = "sequence, id"
 
     sequence = fields.Integer(default=10)
-    pack_tmpl_id = fields.Many2one("product.template", string="Pack", required=True, ondelete="cascade", index=True)
+    pack_tmpl_id = fields.Many2one("product.template", string="Promoción", required=True, ondelete="cascade", index=True)
     product_id = fields.Many2one(
         "product.product",
         string="Producto",
@@ -41,7 +41,7 @@ class PromotionPackLine(models.Model):
     def _check_quantity(self):
         """Cada componente lleva al menos una unidad."""
         if any(line.quantity < 1 for line in self):
-            raise ValidationError(_("La cantidad de cada producto del pack tiene que ser 1 o más."))
+            raise ValidationError(_("La cantidad de cada producto de la promoción tiene que ser 1 o más."))
 
     @api.constrains("product_id")
     def _check_product_in_pos(self):
@@ -49,5 +49,5 @@ class PromotionPackLine(models.Model):
         for line in self:
             if not line.product_id.available_in_pos:
                 raise ValidationError(
-                    _("%s no está disponible en el Punto de venta: no se puede usar en un pack.", line.product_id.display_name)
+                    _("%s no está disponible en el Punto de venta: no se puede usar en una promoción.", line.product_id.display_name)
                 )

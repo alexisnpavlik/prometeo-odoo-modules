@@ -6,12 +6,12 @@
         <field name="model">product.template</field>
         <field name="priority">200</field>
         <field name="arch" type="xml">
-            <list string="Packs">
-                <field name="name" string="Pack"/>
+            <list string="Promociones">
+                <field name="name" string="Promoción"/>
                 <field name="promotion_pack_line_ids" widget="many2many_tags" string="Productos"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="promotion_pack_regular_price" widget="monetary"/>
-                <field name="list_price" string="Precio del pack" widget="monetary"/>
+                <field name="list_price" string="Precio de la promoción" widget="monetary"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
                 <field name="active" widget="boolean_toggle" string="Activo"/>
             </list>
@@ -23,20 +23,20 @@
         <field name="model">product.template</field>
         <field name="priority">200</field>
         <field name="arch" type="xml">
-            <form string="Pack">
+            <form string="Promoción">
                 <sheet>
                     <field name="is_promotion_pack" invisible="1"/>
                     <field name="currency_id" invisible="1"/>
                     <field name="promotion_pack_auto_price" invisible="1"/>
                     <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>
                     <div class="oe_title">
-                        <label for="name" string="Nombre del pack"/>
+                        <label for="name" string="Nombre de la promoción"/>
                         <h1><field name="name" placeholder="p. ej. Fernet + Coca-Cola"/></h1>
                     </div>
                     <!-- Sin categoría del POS: el pack se muestra siempre (pos_config.py y product_screen_patch.js). -->
                     <group>
                         <group>
-                            <field name="list_price" string="Precio del pack" widget="monetary"/>
+                            <field name="list_price" string="Precio de la promoción" widget="monetary"/>
                             <field name="promotion_pack_regular_price" widget="monetary"/>
                             <field name="promotion_pack_saving" widget="monetary"/>
                         </group>
@@ -64,14 +64,14 @@
         <field name="priority">200</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name" string="Pack"/>
+                <field name="name" string="Promoción"/>
                 <filter name="inactive" string="Inactivos" domain="[('active', '=', False)]"/>
             </search>
         </field>
     </record>
 
     <record id="action_promotion_packs" model="ir.actions.act_window">
-        <field name="name">Packs</field>
+        <field name="name">Promociones</field>
         <field name="res_model">product.template</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('is_promotion_pack', '=', True)]</field>
@@ -86,7 +86,7 @@
             (0, 0, {'view_mode': 'list', 'view_id': ref('promotion_pack_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('promotion_pack_form')})]"/>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Creá un pack</p>
+            <p class="o_view_nocontent_smiling_face">Creá una promoción</p>
             <p>Varios productos juntos a un precio: en el POS se agregan con un toque y descuentan el stock de cada producto.</p>
         </field>
     </record>
