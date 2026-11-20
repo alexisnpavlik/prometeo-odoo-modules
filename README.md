@@ -113,7 +113,6 @@ Operaciones automatizadas, remitos e integración logística inter-compañía.
 | **Stock Intercompany** | [`stock_intercompany`](./stock_intercompany) | Vincula la entrega de una empresa con la recepción automática en la empresa destino. |
 | **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
 | **Stock Picking Auto Qty** | [`stock_picking_auto_qty`](./stock_picking_auto_qty) | Auto-completa la cantidad hecha con la cantidad demandada en albaranes de salida. |
-| **Conteo por Código de Barras** | [`stock_count_barcode`](./stock_count_barcode) | Sesiones de inventario rápido escaneando códigos de barra desde dispositivos móviles o lectores láser. |
 | **Escáner de productos** | [`stock_barcode_lookup`](./stock_barcode_lookup) | App "Escáner" en el panel principal: busca el producto escaneando el código de barras con la cámara (foto por HTTP, video en vivo con HTTPS) y ofrece Abrir ficha, Reabastecer o crear el producto con ese código. |
 
 ### 5. Productos & Catálogo
