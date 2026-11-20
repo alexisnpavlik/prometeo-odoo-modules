@@ -58,6 +58,9 @@
                             <field name="promotion_company_ids" widget="many2many_tags"
                                    domain="[('id', 'in', promotion_allowed_company_ids)]"
                                    options="{'no_create': True}"/>
+                            <field name="promotion_use_dates"/>
+                            <field name="promotion_date_start" invisible="not promotion_use_dates"/>
+                            <field name="promotion_date_end" invisible="not promotion_use_dates"/>
                         </group>
                     </group>
                     <div class="text-muted mb-2">
@@ -74,14 +77,6 @@
                             <field name="lst_price" widget="monetary"/>
                         </list>
                     </field>
-                    <separator string="Vigencia"/>
-                    <group>
-                        <group>
-                            <field name="promotion_use_dates"/>
-                            <field name="promotion_date_start" invisible="not promotion_use_dates"/>
-                            <field name="promotion_date_end" invisible="not promotion_use_dates"/>
-                        </group>
-                    </group>
                     <separator string="Precio por sucursal"/>
                     <div class="text-muted mb-2">
                         Opcional: un precio puntual para una sucursal. Ahí reemplaza al tipo de
