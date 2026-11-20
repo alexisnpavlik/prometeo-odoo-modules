@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_pos_promotions" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.pos.promotions</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Promociones" string="Promociones" name="pos_promotions"
+                     groups="point_of_sale.group_pos_manager">
+                    <block title="Listas de precios" name="pos_promotions_pricelists">
+                        <setting string="Listas permitidas"
+                                 help="Las listas que se pueden elegir en una promoción. Una promoción nueva trae todas seleccionadas. Vacío = todas las listas.">
+                            <field name="promotion_allowed_pricelist_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

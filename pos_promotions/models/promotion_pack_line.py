@@ -21,15 +21,31 @@ class PromotionPackLine(models.Model):
     quantity = fields.Integer(string="Cantidad", default=1, required=True)
     lst_price = fields.Float(related="product_id.lst_price", string="Precio unitario")
     currency_id = fields.Many2one(related="product_id.currency_id")
+    pricelist_ids_json = fields.Json(
+        compute="_compute_pricelist_ids_json",
+        help="Ids de las listas de la promoción, para que el POS sepa en qué órdenes aplicarla.",
+    )
+
+    @api.depends("pack_tmpl_id.promotion_pricelist_ids")
+    def _compute_pricelist_ids_json(self):
+        """Ids crudos: el POS no carga las listas de otras cajas, así que no sirve un Many2many."""
+        for line in self:
+            line.pricelist_ids_json = line.pack_tmpl_id.sudo().promotion_pricelist_ids.ids
 
     @api.model
     def _load_pos_data_domain(self, data):
-        """El POS detecta los packs activos: carga sus productos y cantidades."""
-        return [("pack_tmpl_id.active", "=", True), ("pack_tmpl_id.available_in_pos", "=", True)]
+        """El POS carga las promociones activas que usan alguna lista de esta caja."""
+        config = self.env["pos.config"].browse(data["pos.config"]["data"][0]["id"])
+        pricelists = config.available_pricelist_ids | config.pricelist_id
+        return [
+            ("pack_tmpl_id.active", "=", True),
+            ("pack_tmpl_id.available_in_pos", "=", True),
+            ("pack_tmpl_id.promotion_pricelist_ids", "in", pricelists.ids),
+        ]
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        return ["id", "pack_tmpl_id", "product_id", "quantity"]
+        return ["id", "pack_tmpl_id", "product_id", "quantity", "pricelist_ids_json"]
 
     @api.depends("product_id", "quantity")
     def _compute_display_name(self):

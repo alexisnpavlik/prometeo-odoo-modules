@@ -20,7 +20,12 @@ patch(PosOrder.prototype, {
                 if (!packProduct) {
                     continue;
                 }
-                packs.set(tmplId, { template: packProduct.product_tmpl_id, product: packProduct, components: [] });
+                packs.set(tmplId, {
+                    template: packProduct.product_tmpl_id,
+                    product: packProduct,
+                    pricelistIds: line.pricelist_ids_json || [],
+                    components: [],
+                });
             }
             if (line.product_id) {
                 packs.get(tmplId).components.push({ product: line.product_id, qty: line.quantity });
@@ -118,7 +123,10 @@ patch(PosOrder.prototype, {
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
+            // Solo las promociones de la lista de la orden.
+            const pricelistId = this.pricelist_id?.id;
             const packs = this.getPromotionPacks()
+                .filter((pack) => pricelistId && pack.pricelistIds.includes(pricelistId))
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
                 .map((pack) => ({
                     ...pack,
