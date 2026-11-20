@@ -39,6 +39,10 @@ class ProductTemplate(models.Model):
         "pos.promotion.price", "pack_tmpl_id", string="Precio por sucursal", copy=True,
         help="Precio puntual de la promoción en una sucursal. Pisa al tipo de promoción solo ahí.",
     )
+    promotion_use_dates = fields.Boolean(
+        "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
+        help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
+    )
     promotion_date_start = fields.Date(
         "Válida desde", help="Opcional. Vacío: vale desde ya.",
     )
@@ -163,6 +167,24 @@ class ProductTemplate(models.Model):
                 raise ValidationError(
                     _("Una promoción de %s solo puede aplicarse en esa sucursal.", template.company_id.name)
                 )
+
+    @api.depends("promotion_date_start", "promotion_date_end")
+    def _compute_promotion_use_dates(self):
+        """Marcado si la promoción ya tiene alguna fecha (promociones previas al campo)."""
+        for template in self:
+            template.promotion_use_dates = bool(template.promotion_date_start or template.promotion_date_end)
+
+    @api.onchange("promotion_use_dates")
+    def _onchange_promotion_use_dates(self):
+        """Al desmarcar la vigencia se borran las fechas: si no, seguirían aplicando ocultas."""
+        if not self.promotion_use_dates:
+            self.promotion_date_start = self.promotion_date_end = False
+
+    def write(self, vals):
+        """Mismo criterio que el onchange para escrituras que no pasan por el formulario."""
+        if "promotion_use_dates" in vals and not vals["promotion_use_dates"]:
+            vals = dict(vals, promotion_date_start=False, promotion_date_end=False)
+        return super().write(vals)
 
     @api.constrains("promotion_date_start", "promotion_date_end")
     def _check_promotion_dates(self):

@@ -75,13 +75,11 @@
                         </list>
                     </field>
                     <separator string="Vigencia"/>
-                    <div class="text-muted mb-2">
-                        Opcional. Sin fechas, la promoción vale siempre mientras esté activa.
-                    </div>
                     <group>
                         <group>
-                            <field name="promotion_date_start"/>
-                            <field name="promotion_date_end"/>
+                            <field name="promotion_use_dates"/>
+                            <field name="promotion_date_start" invisible="not promotion_use_dates"/>
+                            <field name="promotion_date_end" invisible="not promotion_use_dates"/>
                         </group>
                     </group>
                     <separator string="Precio por sucursal"/>
