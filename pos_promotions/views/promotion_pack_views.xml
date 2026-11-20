@@ -13,8 +13,10 @@
                 <field name="currency_id" column_invisible="1"/>
                 <field name="promotion_pack_regular_price" widget="monetary"/>
                 <field name="promotion_price_mode"/>
+                <field name="promotion_price_above_regular" column_invisible="1"/>
                 <field name="list_price" string="Precio de la promoción" widget="monetary"
-                       invisible="promotion_price_mode == 'percent'"/>
+                       invisible="promotion_price_mode == 'percent'"
+                       decoration-danger="promotion_price_above_regular"/>
                 <field name="promotion_discount_percent" invisible="promotion_price_mode != 'percent'"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
                 <field name="promotion_company_ids" widget="many2many_tags" optional="show"/>
@@ -50,8 +52,14 @@
                     <group>
                         <group>
                             <field name="promotion_price_mode" widget="radio"/>
+                            <field name="promotion_price_above_regular" invisible="1"/>
                             <field name="list_price" string="Precio de la promoción" widget="monetary"
-                                   invisible="promotion_price_mode == 'percent'"/>
+                                   invisible="promotion_price_mode == 'percent'"
+                                   decoration-danger="promotion_price_above_regular"/>
+                            <div colspan="2" class="text-danger small" invisible="not promotion_price_above_regular">
+                                Más cara que los productos sueltos: en las sucursales donde los sueltos
+                                cuesten menos, no se aplica.
+                            </div>
                             <field name="promotion_discount_percent"
                                    invisible="promotion_price_mode != 'percent'"
                                    required="promotion_price_mode == 'percent'"/>

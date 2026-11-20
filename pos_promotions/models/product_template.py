@@ -39,6 +39,9 @@ class ProductTemplate(models.Model):
         "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
         help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
     )
+    promotion_price_above_regular = fields.Boolean(
+        "Más cara que los sueltos", compute="_compute_promotion_pack_prices",
+    )
     promotion_expired = fields.Boolean("Vencida", compute="_compute_promotion_expired")
     promotion_status = fields.Selection(
         [("active", "Vigente"), ("scheduled", "Programada"), ("expired", "Vencida")],
@@ -110,6 +113,9 @@ class ProductTemplate(models.Model):
         for template in self:
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             template.promotion_pack_regular_price = regular
+            template.promotion_price_above_regular = bool(
+                regular and template.promotion_price_mode == "fixed" and template.list_price > regular
+            )
             if not regular:
                 template.promotion_pack_saving = 0.0
             elif template.promotion_price_mode == "percent":
