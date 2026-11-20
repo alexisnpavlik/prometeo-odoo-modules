@@ -128,11 +128,13 @@ class ProductTemplate(models.Model):
     def default_get(self, fields_list):
         """Una promoción nueva arranca con todas las sucursales seleccionadas."""
         res = super().default_get(fields_list)
-        if "promotion_company_ids" in fields_list and (
-            res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack")
-        ):
+        wanted = {"promotion_company_ids", "promotion_company_visible_ids"} & set(fields_list)
+        if wanted and (res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack")):
             company = self.env["res.company"].browse(res.get("company_id"))
-            res["promotion_company_ids"] = [Command.set(self._promotion_default_companies(company or None).ids)]
+            companies = self._promotion_default_companies(company or None)
+            for fname in wanted:
+                # El formulario usa el campo visible: sin default, arrancaba vacío.
+                res[fname] = [Command.set(companies.ids)]
         return res
 
     @api.depends(
