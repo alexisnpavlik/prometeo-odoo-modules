@@ -1,11 +1,13 @@
-from odoo import api, fields, models
+from odoo import fields, models
+
+from .res_config_settings import get_product_form_settings
 
 
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
     # Valores por defecto fijos. El bloqueo (readonly/gris) se aplica en la vista
-    # y depende del grupo "Editar valores por defecto de producto".
+    # y depende del ajuste global "Permitir editar los valores por defecto".
     type = fields.Selection(default="consu")            # Tipo de producto: Bien
     is_storable = fields.Boolean(default=True)          # Rastrear inventario
     invoice_policy = fields.Selection(default="order")  # Política de facturación: Cantidades pedidas
@@ -13,8 +15,8 @@ class ProductTemplate(models.Model):
     purchase_ok = fields.Boolean(default=True)          # Compras
     available_in_pos = fields.Boolean(default=True)     # Punto de venta
 
-    # Visibilidad de las pestañas del formulario. Cada una depende de su grupo,
-    # que se maneja como casilla desde Ajustes > Inventario.
+    # Visibilidad de las pestañas del formulario. Cada una depende de un ajuste
+    # global de Ajustes > Formulario de producto (igual para todos los usuarios).
     can_edit_product_defaults = fields.Boolean(
         string="Puede editar valores por defecto de producto",
         compute="_compute_product_form_flags",
@@ -40,33 +42,20 @@ class ProductTemplate(models.Model):
         compute="_compute_product_form_flags",
     )
 
-    @api.depends_context("uid")
     def _compute_product_form_flags(self):
-        """Resuelve de una sola vez los grupos que gobiernan la ficha de producto.
+        """Resuelve de una sola vez los ajustes globales que gobiernan la ficha.
 
-        depends_context("uid") es obligatorio: sin eso el caché de un usuario se
-        reutilizaría para otro y las pestañas se verían mal.
+        Vienen de Ajustes > Formulario de producto (ir.config_parameter) y valen
+        igual para todos los usuarios.
         """
-        user = self.env.user
+        settings = get_product_form_settings(self.env)
         flags = {
-            "can_edit_product_defaults": user.has_group(
-                "product_default_settings.group_edit_product_defaults"
-            ),
-            "show_page_variants": user.has_group(
-                "product_default_settings.group_show_page_variants"
-            ),
-            "show_page_sales": user.has_group(
-                "product_default_settings.group_show_page_sales"
-            ),
-            "show_page_purchase": user.has_group(
-                "product_default_settings.group_show_page_purchase"
-            ),
-            "show_page_inventory": user.has_group(
-                "product_default_settings.group_show_page_inventory"
-            ),
-            "show_page_pos": user.has_group(
-                "product_default_settings.group_show_page_pos"
-            ),
+            "can_edit_product_defaults": settings["edit_defaults"],
+            "show_page_variants": settings["show_page_variants"],
+            "show_page_sales": settings["show_page_sales"],
+            "show_page_purchase": settings["show_page_purchase"],
+            "show_page_inventory": settings["show_page_inventory"],
+            "show_page_pos": settings["show_page_pos"],
         }
         for record in self:
             record.update(flags)
