@@ -24,11 +24,11 @@
                         <div class="content-group mt8">
                             <div class="row">
                                 <label for="approval_pin" class="col-lg-4 o_light_label"/>
-                                <field name="approval_pin" password="True"/>
+                                <field name="approval_pin"/>
                             </div>
                             <div class="row">
                                 <label for="approval_barcode" class="col-lg-4 o_light_label"/>
-                                <field name="approval_barcode" password="True"/>
+                                <field name="approval_barcode"/>
                             </div>
                         </div>
                     </setting>
