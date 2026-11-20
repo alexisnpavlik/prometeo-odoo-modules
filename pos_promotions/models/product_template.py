@@ -120,8 +120,7 @@ class ProductTemplate(models.Model):
     @api.onchange("promotion_pack_line_ids", "promotion_price_mode", "promotion_discount_percent")
     def _onchange_promotion_pack_lines_price(self):
         """Precio del pack por defecto = suma de sus productos. Se recalcula mientras siga
-        en el default de Odoo (1), en la última suma sugerida o quede más caro que los
-        productos sueltos; un precio con descuento puesto a mano se respeta."""
+        en el default de Odoo (1) o en la última suma sugerida; un precio puesto a mano se respeta."""
         for template in self.filtered("is_promotion_pack"):
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             if template.promotion_price_mode == "percent":
@@ -130,25 +129,22 @@ class ProductTemplate(models.Model):
                     template.list_price = round(regular * (1 - template.promotion_discount_percent / 100), 2)
                 continue
             price = template.list_price
-            if regular and (price <= 1 or price == template.promotion_pack_auto_price or price > regular):
+            if regular and (price <= 1 or price == template.promotion_pack_auto_price):
                 template.list_price = template.promotion_pack_auto_price = regular
 
     @api.constrains("is_promotion_pack", "list_price", "promotion_pack_line_ids", "promotion_price_mode",
                     "promotion_discount_percent")
     def _check_promotion_pack_price(self):
-        """Precio fijo: ni 1 o menos ni más caro que los productos sueltos. %: entre 0 y 100."""
+        """Precio fijo: más de 1. %: entre 0 y 100."""
         for template in self.filtered("is_promotion_pack"):
             if template.promotion_price_mode == "percent":
                 if not 0 < template.promotion_discount_percent < 100:
                     raise ValidationError(_("El descuento tiene que ser mayor a 0 y menor a 100%."))
                 continue
-            regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
+            # Sin tope contra los sueltos: ese precio es el de la ficha, de referencia. En el POS,
+            # si en la lista de la sucursal los sueltos cuestan menos, la promoción no se aplica.
             if template.list_price <= 1:
                 raise ValidationError(_("Poné el precio de la promoción (no puede ser 1 o menos)."))
-            if regular and template.list_price > regular:
-                raise ValidationError(
-                    _("La promoción no puede costar más que sus productos sueltos (%s).", round(regular, 2))
-                )
 
     @api.constrains("is_promotion_pack", "promotion_company_ids", "company_id")
     def _check_promotion_companies(self):
