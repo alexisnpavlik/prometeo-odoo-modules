@@ -120,6 +120,10 @@ patch(PosOrder.prototype, {
             for (const line of lines) {
                 if (line.promotion_pack_tmpl_id) {
                     line.set_discount(0);
+                    // Un combo más caro que los sueltos sube el precio: vuelve al de la lista.
+                    line.set_unit_price(
+                        line.product_id.get_price(this.pricelist_id, line.get_quantity(), line.price_extra || 0)
+                    );
                     line.update({ promotion_pack_tmpl_id: false });
                 }
             }
@@ -134,7 +138,7 @@ patch(PosOrder.prototype, {
                     unitPrice.set(id, line.get_unit_price());
                 }
             }
-            // Por producto: unidades dentro de packs, ahorro y pack. Primero los que más ahorran.
+            // Por producto: unidades dentro de packs, ahorro (negativo si es recargo) y pack. Primero los que más ahorran.
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
@@ -154,7 +158,8 @@ patch(PosOrder.prototype, {
                     );
                     return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular) };
                 })
-                .filter((pack) => pack.regular > pack.price)
+                // Un combo puede costar más que los sueltos: también se aplica (sube el precio).
+                .filter((pack) => pack.price > 0 && pack.regular > 0 && pack.regular !== pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));
             for (const pack of packs) {
                 const times = Math.min(
@@ -176,7 +181,8 @@ patch(PosOrder.prototype, {
 
             for (const [id, units] of packed) {
                 // Odoo guarda el descuento con 2 decimales: el total puede diferir del pack en centavos.
-                const discount = Math.round((saving.get(id) / (units * unitPrice.get(id))) * 10000) / 100;
+                const share = saving.get(id) / (units * unitPrice.get(id));
+                const discount = Math.round(share * 10000) / 100;
                 let remaining = units;
                 for (const line of lines.filter((l) => l.product_id.id === id)) {
                     if (remaining <= 0) {
@@ -186,7 +192,12 @@ patch(PosOrder.prototype, {
                     if (take < line.get_quantity()) {
                         this._splitPromotionPackLine(line, take);
                     }
-                    line.set_discount(discount);
+                    if (discount >= 0) {
+                        line.set_discount(discount);
+                    } else {
+                        // Recargo: Odoo no acepta descuentos negativos, se sube el precio unitario.
+                        line.set_unit_price(unitPrice.get(id) * (1 - share));
+                    }
                     line.update({ promotion_pack_tmpl_id: packByProduct.get(id) });
                     remaining -= take;
                 }

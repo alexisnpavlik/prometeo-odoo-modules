@@ -39,9 +39,6 @@ class ProductTemplate(models.Model):
         "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
         help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
     )
-    promotion_price_above_regular = fields.Boolean(
-        "Más cara que los sueltos", compute="_compute_promotion_pack_prices",
-    )
     promotion_expired = fields.Boolean("Vencida", compute="_compute_promotion_expired")
     promotion_status = fields.Selection(
         [("active", "Vigente"), ("scheduled", "Programada"), ("expired", "Vencida")],
@@ -113,9 +110,6 @@ class ProductTemplate(models.Model):
         for template in self:
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             template.promotion_pack_regular_price = regular
-            template.promotion_price_above_regular = bool(
-                regular and template.promotion_price_mode == "fixed" and template.list_price > regular
-            )
             if not regular:
                 template.promotion_pack_saving = 0.0
             elif template.promotion_price_mode == "percent":
@@ -147,8 +141,7 @@ class ProductTemplate(models.Model):
                 if not 0 < template.promotion_discount_percent < 100:
                     raise ValidationError(_("El descuento tiene que ser mayor a 0 y menor a 100%."))
                 continue
-            # Sin tope contra los sueltos: ese precio es el de la ficha, de referencia. En el POS,
-            # si en la lista de la sucursal los sueltos cuestan menos, la promoción no se aplica.
+            # Sin tope contra los sueltos: hay combos que cuestan más juntos (en el POS sube el precio).
             if template.list_price <= 1:
                 raise ValidationError(_("Poné el precio de la promoción (no puede ser 1 o menos)."))
 
