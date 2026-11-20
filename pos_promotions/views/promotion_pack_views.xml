@@ -60,11 +60,10 @@
                         </group>
                         <group>
                             <field name="active" widget="boolean_toggle" string="Activo"/>
-                            <!-- allowed_company_ids: muestra y deja elegir todas las sucursales del
-                                 usuario aunque tenga una sola activa en el selector de empresas. -->
+                            <!-- pos.promotion.branch y no res.company: se leen aunque el usuario tenga
+                                 una sola empresa activa en el selector. -->
                             <field name="promotion_company_visible_ids" widget="many2many_tags"
                                    domain="[('id', 'in', promotion_allowed_company_ids)]"
-                                   context="{'allowed_company_ids': promotion_allowed_company_ids}"
                                    options="{'no_create': True}"/>
                             <field name="promotion_use_dates"/>
                             <field name="promotion_date_start" invisible="not promotion_use_dates"/>
