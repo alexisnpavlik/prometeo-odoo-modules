@@ -10,7 +10,7 @@
                      groups="point_of_sale.group_pos_manager">
                     <block title="Sucursales" name="pos_promotions_companies">
                         <setting string="Sucursales permitidas"
-                                 help="Las sucursales que se pueden elegir en una promoción. Una promoción nueva trae todas seleccionadas. Vacío = todas.">
+                                 help="Las sucursales que se pueden elegir en una promoción. Una promoción nueva trae todas seleccionadas, aunque no estén activas en el selector de empresas. Vacío = todas.">
                             <field name="promotion_allowed_company_ids" widget="many2many_tags"
                                    options="{'no_create': True}"/>
                         </setting>

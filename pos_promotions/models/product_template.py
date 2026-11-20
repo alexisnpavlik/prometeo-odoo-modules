@@ -74,9 +74,9 @@ class ProductTemplate(models.Model):
 
     @api.model
     def _promotion_default_companies(self, company=None):
-        """Sucursales que trae una promoción nueva: las permitidas y activas en el
-        selector de empresas; si la promoción tiene empresa, solo esa."""
-        companies = self._promotion_allowed_companies() & self.env.companies
+        """Sucursales que trae una promoción nueva: todas las permitidas a las que el usuario
+        tiene acceso, estén o no activas en el selector; si la promoción tiene empresa, solo esa."""
+        companies = self._promotion_allowed_companies() & self.env.user.company_ids
         return companies & company if company else companies
 
     @api.depends("company_id")
