@@ -82,6 +82,14 @@
                             <field name="lst_price" widget="monetary"/>
                         </list>
                     </field>
+                    <separator string="Precio en cada sucursal"/>
+                    <field name="promotion_branch_rule_count" invisible="1"/>
+                    <div class="alert alert-warning" role="alert" invisible="not promotion_branch_rule_count">
+                        <field name="promotion_branch_rule_count" class="oe_inline"/> sucursal(es) tienen un precio
+                        propio en su lista para estos productos (filas en amarillo). La promoción se calcula
+                        sobre ese precio.
+                    </div>
+                    <field name="promotion_branch_prices_html" nolabel="1" readonly="1"/>
                 </sheet>
             </form>
         </field>

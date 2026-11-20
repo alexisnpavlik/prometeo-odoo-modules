@@ -2,7 +2,9 @@
 
 from datetime import date
 
-from odoo import Command, _, api, fields, models
+from markupsafe import escape
+
+from odoo import Command, _, api, fields, models, tools
 from odoo.exceptions import ValidationError
 from odoo.tools.misc import format_date
 
@@ -42,6 +44,10 @@ class ProductTemplate(models.Model):
         "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
         help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
     )
+    promotion_branch_prices_html = fields.Html(
+        "Precio en cada sucursal", compute="_compute_promotion_branch_prices_html", sanitize=False,
+    )
+    promotion_branch_rule_count = fields.Integer(compute="_compute_promotion_branch_prices_html")
     promotion_expired = fields.Boolean("Vencida", compute="_compute_promotion_expired")
     promotion_status = fields.Selection(
         [("active", "Vigente"), ("scheduled", "Programada"), ("expired", "Vencida")],
@@ -165,6 +171,58 @@ class ProductTemplate(models.Model):
         """Marcado si la promoción ya tiene alguna fecha (promociones previas al campo)."""
         for template in self:
             template.promotion_use_dates = bool(template.promotion_date_start or template.promotion_date_end)
+
+    @api.depends("promotion_company_ids", "promotion_pack_line_ids.product_id", "promotion_pack_line_ids.quantity",
+                 "promotion_price_mode", "promotion_discount_percent", "list_price")
+    def _compute_promotion_branch_prices_html(self):
+        """Tabla de lo que cobra la caja en cada sucursal elegida: la lista de sus cajas, los
+        productos sueltos a ese precio y la promoción. Marca las listas con precio propio
+        para alguno de los productos (regla por producto, no una regla general)."""
+        configs = self.env["pos.config"].sudo().search([("pricelist_id", "!=", False)])
+        for template in self:
+            lines = template.promotion_pack_line_ids.filtered("product_id")
+            rows, rule_count = [], 0
+            for company in template.promotion_company_ids.sudo():
+                for pricelist in configs.filtered(lambda c: c.company_id == company).pricelist_id:
+                    regular, ruled = 0.0, []
+                    for line in lines:
+                        product = line.product_id.sudo()
+                        regular += pricelist._get_product_price(product, line.quantity) * line.quantity
+                        rule = self.env["product.pricelist.item"].sudo().browse(
+                            pricelist._get_product_rule(product, line.quantity)
+                        )
+                        if rule and rule.applied_on in ("0_product_variant", "1_product"):
+                            ruled.append(product.name)
+                    if template.promotion_price_mode == "percent":
+                        promo = regular * (1 - template.promotion_discount_percent / 100)
+                    else:
+                        promo = template.list_price
+                    rule_count += bool(ruled)
+                    rows.append((company.name, pricelist.name, regular, promo, ruled))
+            template.promotion_branch_rule_count = rule_count
+            if not rows or not lines:
+                template.promotion_branch_prices_html = False
+                continue
+            currency = template.currency_id
+            fmt = lambda amount: tools.format_amount(self.env, amount, currency)
+            body = []
+            for company_name, pricelist_name, regular, promo, ruled in rows:
+                diff = promo - regular
+                diff_cls = "text-success" if diff < 0 else "text-danger" if diff > 0 else ""
+                note = (_("Precio propio en la lista: %s", ", ".join(ruled)) if ruled else "")
+                body.append(
+                    f'<tr class="{"table-warning" if ruled else ""}">'
+                    f"<td>{escape(company_name)}</td><td>{escape(pricelist_name)}</td>"
+                    f'<td class="text-end">{fmt(regular)}</td><td class="text-end">{fmt(promo)}</td>'
+                    f'<td class="text-end {diff_cls}">{fmt(diff)}</td><td>{escape(note)}</td></tr>'
+                )
+            template.promotion_branch_prices_html = (
+                '<table class="table table-sm o_promotion_branch_prices"><thead><tr>'
+                f'<th>{_("Sucursal")}</th><th>{_("Lista de la caja")}</th>'
+                f'<th class="text-end">{_("Sueltos")}</th><th class="text-end">{_("Promoción")}</th>'
+                f'<th class="text-end">{_("Diferencia")}</th><th></th></tr></thead>'
+                f'<tbody>{"".join(body)}</tbody></table>'
+            )
 
     @api.depends("promotion_date_start", "promotion_date_end")
     @api.depends_context("tz")
