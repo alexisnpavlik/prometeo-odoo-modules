@@ -66,6 +66,18 @@ class ProductTemplate(models.Model):
         string="Sucursales",
         help="La promoción se aplica en las cajas de estas sucursales, sobre el precio de su lista.",
     )
+    promotion_company_visible_ids = fields.Many2many(
+        "res.company",
+        string="Sucursales",
+        compute="_compute_promotion_company_visible_ids",
+        inverse="_inverse_promotion_company_visible_ids",
+        help="La promoción se aplica en las cajas de estas sucursales, sobre el precio de su lista. "
+        "Solo se muestran las sucursales a las que tenés acceso; las demás se conservan al guardar.",
+    )
+    promotion_company_names = fields.Char(
+        "Sucursales", compute="_compute_promotion_company_visible_ids",
+        help="Todas las sucursales de la promoción, también las que el usuario no puede abrir.",
+    )
     promotion_allowed_company_ids = fields.Many2many(
         "res.company",
         compute="_compute_promotion_allowed_company_ids",
@@ -93,6 +105,24 @@ class ProductTemplate(models.Model):
         for template in self:
             options = allowed & template.company_id if template.company_id else allowed
             template.promotion_allowed_company_ids = [Command.set(options.ids)]
+
+    @api.depends("promotion_company_ids")
+    @api.depends_context("uid")
+    def _compute_promotion_company_visible_ids(self):
+        """El formulario edita solo las sucursales a las que el usuario tiene acceso: Odoo
+        no deja leer una empresa ajena y la pantalla fallaba (Lorena sin Barranqueras)."""
+        own = self.env.user.company_ids
+        for template in self:
+            companies = template.sudo().promotion_company_ids
+            template.promotion_company_visible_ids = [Command.set((companies & own).ids)]
+            template.promotion_company_names = ", ".join(companies.mapped("name"))
+
+    def _inverse_promotion_company_visible_ids(self):
+        """Guarda lo elegido sin perder las sucursales que el usuario no ve."""
+        own = self.env.user.company_ids
+        for template in self:
+            hidden = template.sudo().promotion_company_ids - own
+            template.promotion_company_ids = [Command.set((hidden | template.promotion_company_visible_ids).ids)]
 
     @api.model
     def default_get(self, fields_list):
