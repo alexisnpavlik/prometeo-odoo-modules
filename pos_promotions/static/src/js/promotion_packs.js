@@ -121,9 +121,12 @@ patch(PosOrder.prototype, {
                 if (line.promotion_pack_tmpl_id) {
                     line.set_discount(0);
                     // Un combo más caro que los sueltos sube el precio: vuelve al de la lista.
-                    line.set_unit_price(
-                        line.product_id.get_price(this.pricelist_id, line.get_quantity(), line.price_extra || 0)
+                    const listPrice = line.product_id.get_price(
+                        this.pricelist_id, line.get_quantity(), line.price_extra || 0
                     );
+                    if (Number.isFinite(listPrice)) {
+                        line.set_unit_price(listPrice);
+                    }
                     line.update({ promotion_pack_tmpl_id: false });
                 }
             }
@@ -181,7 +184,10 @@ patch(PosOrder.prototype, {
 
             for (const [id, units] of packed) {
                 // Odoo guarda el descuento con 2 decimales: el total puede diferir del pack en centavos.
-                const share = saving.get(id) / (units * unitPrice.get(id));
+                // Un producto a $0 en la lista no lleva parte del descuento ni del recargo
+                // (sin esto, 0 / 0 da NaN y Odoo rompe al recibir el precio).
+                const base = units * unitPrice.get(id);
+                const share = base ? saving.get(id) / base : 0;
                 const discount = Math.round(share * 10000) / 100;
                 let remaining = units;
                 for (const line of lines.filter((l) => l.product_id.id === id)) {
