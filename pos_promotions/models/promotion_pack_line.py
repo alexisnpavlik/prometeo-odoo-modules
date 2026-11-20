@@ -23,37 +23,36 @@ class PromotionPackLine(models.Model):
     currency_id = fields.Many2one(related="product_id.currency_id")
     promotion_data_json = fields.Json(
         compute="_compute_promotion_data_json",
-        help="Cómo se cobra la promoción en el POS: listas, tipo, % y precios por lista.",
+        help="Cómo se cobra la promoción en el POS: sucursales, tipo, % y precios por sucursal.",
     )
 
     @api.depends(
-        "pack_tmpl_id.promotion_pricelist_ids", "pack_tmpl_id.promotion_price_mode",
+        "pack_tmpl_id.promotion_company_ids", "pack_tmpl_id.promotion_price_mode",
         "pack_tmpl_id.promotion_discount_percent", "pack_tmpl_id.promotion_list_price_ids.price",
-        "pack_tmpl_id.promotion_list_price_ids.pricelist_id",
+        "pack_tmpl_id.promotion_list_price_ids.company_id",
         "pack_tmpl_id.promotion_date_start", "pack_tmpl_id.promotion_date_end",
     )
     def _compute_promotion_data_json(self):
-        """Ids crudos: el POS no carga las listas de otras cajas, así que no sirve un Many2many."""
+        """Ids crudos: el POS no carga las otras empresas, así que no sirve un Many2many."""
         for line in self:
             template = line.pack_tmpl_id.sudo()
             line.promotion_data_json = {
-                "pricelists": template.promotion_pricelist_ids.ids,
+                "companies": template.promotion_company_ids.ids,
                 "mode": template.promotion_price_mode,
                 "percent": template.promotion_discount_percent,
-                "prices": {str(p.pricelist_id.id): p.price for p in template.promotion_list_price_ids},
+                "prices": {str(p.company_id.id): p.price for p in template.promotion_list_price_ids},
                 "date_start": fields.Date.to_string(template.promotion_date_start) or False,
                 "date_end": fields.Date.to_string(template.promotion_date_end) or False,
             }
 
     @api.model
     def _load_pos_data_domain(self, data):
-        """El POS carga las promociones activas que usan alguna lista de esta caja."""
+        """El POS carga las promociones activas de la sucursal (empresa) de esta caja."""
         config = self.env["pos.config"].browse(data["pos.config"]["data"][0]["id"])
-        pricelists = config.available_pricelist_ids | config.pricelist_id
         return [
             ("pack_tmpl_id.active", "=", True),
             ("pack_tmpl_id.available_in_pos", "=", True),
-            ("pack_tmpl_id.promotion_pricelist_ids", "in", pricelists.ids),
+            ("pack_tmpl_id.promotion_company_ids", "in", config.company_id.ids),
             # Las vencidas no se cargan; las futuras sí (la sesión puede seguir abierta al empezar).
             "|", ("pack_tmpl_id.promotion_date_end", "=", False),
             ("pack_tmpl_id.promotion_date_end", ">=", fields.Date.context_today(self)),

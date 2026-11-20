@@ -41,12 +41,12 @@ patch(PosOrder.prototype, {
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     },
 
-    /** Precio de la promoción en esta lista: el puntual de la lista, el % sobre el precio
-     *  de la lista o el precio fijo, en ese orden. */
-    _getPromotionPackPrice(pack, regular, pricelistId) {
-        const listPrice = (pack.data.prices || {})[String(pricelistId)];
-        if (listPrice) {
-            return listPrice;
+    /** Precio de la promoción en esta sucursal: el puntual de la sucursal, el % sobre el
+     *  precio de la lista de la orden o el precio fijo, en ese orden. */
+    _getPromotionPackPrice(pack, regular, companyId) {
+        const companyPrice = (pack.data.prices || {})[String(companyId)];
+        if (companyPrice) {
+            return companyPrice;
         }
         if (pack.data.mode === "percent") {
             return regular * (1 - (pack.data.percent || 0) / 100);
@@ -143,12 +143,12 @@ patch(PosOrder.prototype, {
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
-            // Solo las promociones de la lista de la orden. El precio normal es el de esa
-            // lista (precio de la sucursal); la promoción descuenta sobre él sin tocar la lista.
-            const pricelistId = this.pricelist_id?.id;
+            // Solo las promociones de la sucursal de la caja. El precio normal es el de la
+            // lista de la orden (precio de la sucursal); la promoción descuenta sobre él sin tocarla.
+            const companyId = this.company_id?.id ?? this.config?.company_id?.id;
             const today = this._getPromotionToday();
             const packs = this.getPromotionPacks()
-                .filter((pack) => pricelistId && (pack.data.pricelists || []).includes(pricelistId))
+                .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
                 .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
                     (!pack.data.date_end || today <= pack.data.date_end))
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
@@ -157,7 +157,7 @@ patch(PosOrder.prototype, {
                         (acc, c) => acc + unitPrice.get(c.product.id) * c.qty,
                         0
                     );
-                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular, pricelistId) };
+                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular, companyId) };
                 })
                 .filter((pack) => pack.regular > pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));

@@ -3,7 +3,7 @@
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import ValidationError
 
-ALLOWED_PRICELISTS_PARAM = "pos_promotions.allowed_pricelist_ids"
+ALLOWED_COMPANIES_PARAM = "pos_promotions.allowed_company_ids"
 
 
 class ProductTemplate(models.Model):
@@ -36,8 +36,8 @@ class ProductTemplate(models.Model):
         help="Porcentaje que se descuenta del precio de la lista de la orden.",
     )
     promotion_list_price_ids = fields.One2many(
-        "pos.promotion.price", "pack_tmpl_id", string="Precio por lista", copy=True,
-        help="Precio puntual de la promoción en una lista. Pisa al tipo de promoción solo en esa lista.",
+        "pos.promotion.price", "pack_tmpl_id", string="Precio por sucursal", copy=True,
+        help="Precio puntual de la promoción en una sucursal. Pisa al tipo de promoción solo ahí.",
     )
     promotion_date_start = fields.Date(
         "Válida desde", help="Opcional. Vacío: vale desde ya.",
@@ -45,60 +45,54 @@ class ProductTemplate(models.Model):
     promotion_date_end = fields.Date(
         "Válida hasta", help="Opcional, inclusive. Vacío: no vence.",
     )
-    promotion_pricelist_ids = fields.Many2many(
-        "product.pricelist",
-        "pos_promotion_pricelist_rel",
+    promotion_company_ids = fields.Many2many(
+        "res.company",
+        "pos_promotion_company_rel",
         "product_tmpl_id",
-        "pricelist_id",
-        string="Listas de precios",
-        help="La promoción solo se aplica en el POS cuando la orden usa una de estas listas.",
+        "company_id",
+        string="Sucursales",
+        help="La promoción se aplica en las cajas de estas sucursales, sobre el precio de su lista.",
     )
-    promotion_allowed_pricelist_ids = fields.Many2many(
-        "product.pricelist",
-        compute="_compute_promotion_allowed_pricelist_ids",
-        help="Listas que se pueden elegir: las permitidas en Ajustes y de la empresa de la promoción.",
+    promotion_allowed_company_ids = fields.Many2many(
+        "res.company",
+        compute="_compute_promotion_allowed_company_ids",
+        help="Sucursales que se pueden elegir: las permitidas en Ajustes y la de la promoción.",
     )
 
     @api.model
-    def _promotion_allowed_pricelists(self):
-        """Listas permitidas en Ajustes > Promociones; sin ninguna elegida, todas las activas."""
-        pricelists = self.env["product.pricelist"].sudo()
-        raw = self.env["ir.config_parameter"].sudo().get_param(ALLOWED_PRICELISTS_PARAM, "")
+    def _promotion_allowed_companies(self):
+        """Sucursales permitidas en Ajustes > Promociones; sin ninguna elegida, todas."""
+        companies = self.env["res.company"].sudo()
+        raw = self.env["ir.config_parameter"].sudo().get_param(ALLOWED_COMPANIES_PARAM, "")
         ids = [int(value) for value in raw.split(",") if value.strip().isdigit()]
-        if ids:
-            return pricelists.browse(ids).exists().filtered("active")
-        return pricelists.search([])
+        return companies.browse(ids).exists() if ids else companies.search([])
 
     @api.model
-    def _promotion_default_pricelists(self, company=None):
-        """Listas que trae una promoción nueva: las permitidas que el usuario puede ver
-        (empresas activas) y que corresponden a la empresa de la promoción."""
-        allowed = self._promotion_allowed_pricelists()
-        domain = [("id", "in", allowed.ids)]
-        if company:
-            domain += ["|", ("company_id", "=", False), ("company_id", "=", company.id)]
-        return self.env["product.pricelist"].search(domain)
+    def _promotion_default_companies(self, company=None):
+        """Sucursales que trae una promoción nueva: las permitidas y activas en el
+        selector de empresas; si la promoción tiene empresa, solo esa."""
+        companies = self._promotion_allowed_companies() & self.env.companies
+        return companies & company if company else companies
 
     @api.depends("company_id")
-    def _compute_promotion_allowed_pricelist_ids(self):
-        """Opciones del campo Listas de precios. Una promoción con empresa solo puede usar
-        listas de esa empresa o compartidas; una sin empresa, cualquiera permitida."""
-        # Solo las que el usuario puede leer (empresas activas): el formulario muestra sus nombres.
-        allowed = self.env["product.pricelist"].search([("id", "in", self._promotion_allowed_pricelists().ids)])
+    @api.depends_context("uid")
+    def _compute_promotion_allowed_company_ids(self):
+        """Opciones del campo Sucursales: las permitidas a las que el usuario tiene acceso
+        (el formulario muestra sus nombres); con empresa en la promoción, solo esa."""
+        allowed = self._promotion_allowed_companies() & self.env.user.company_ids
         for template in self:
-            company = template.company_id
-            options = allowed.filtered(lambda pl: not company or not pl.company_id or pl.company_id == company)
-            template.promotion_allowed_pricelist_ids = [Command.set(options.ids)]
+            options = allowed & template.company_id if template.company_id else allowed
+            template.promotion_allowed_company_ids = [Command.set(options.ids)]
 
     @api.model
     def default_get(self, fields_list):
-        """Una promoción nueva arranca con todas las listas permitidas seleccionadas."""
+        """Una promoción nueva arranca con todas las sucursales permitidas seleccionadas."""
         res = super().default_get(fields_list)
-        if "promotion_pricelist_ids" in fields_list and (
+        if "promotion_company_ids" in fields_list and (
             res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack")
         ):
             company = self.env["res.company"].browse(res.get("company_id"))
-            res["promotion_pricelist_ids"] = [Command.set(self._promotion_default_pricelists(company or None).ids)]
+            res["promotion_company_ids"] = [Command.set(self._promotion_default_companies(company or None).ids)]
         return res
 
     @api.depends(
@@ -151,23 +145,23 @@ class ProductTemplate(models.Model):
                     _("La promoción no puede costar más que sus productos sueltos (%s).", round(regular, 2))
                 )
 
-    @api.constrains("is_promotion_pack", "promotion_pricelist_ids", "company_id", "promotion_list_price_ids")
-    def _check_promotion_pricelists(self):
-        """Al menos una lista, y de la empresa de la promoción si tiene una."""
+    @api.constrains("is_promotion_pack", "promotion_company_ids", "company_id", "promotion_list_price_ids")
+    def _check_promotion_companies(self):
+        """Al menos una sucursal; los precios por sucursal, de sucursales elegidas; y si la
+        promoción tiene empresa, solo esa."""
         for template in self.filtered("is_promotion_pack"):
-            pricelists = template.sudo().promotion_pricelist_ids
-            if not pricelists:
-                raise ValidationError(_("Elegí al menos una lista de precios para la promoción."))
-            orphan = template.sudo().promotion_list_price_ids.pricelist_id - pricelists
+            companies = template.sudo().promotion_company_ids
+            if not companies:
+                raise ValidationError(_("Elegí al menos una sucursal para la promoción."))
+            orphan = template.sudo().promotion_list_price_ids.company_id - companies
             if orphan:
                 raise ValidationError(
-                    _("%s tiene un precio en Precio por lista pero no está en las listas de la promoción: agregala o borrá ese precio.",
-                      ", ".join(orphan.mapped("display_name")))
+                    _("%s tiene un precio en Precio por sucursal pero no está en las sucursales de la promoción: agregala o borrá ese precio.",
+                      ", ".join(orphan.mapped("name")))
                 )
-            company = template.company_id
-            if company and pricelists.filtered(lambda pl: pl.company_id and pl.company_id != company):
+            if template.company_id and companies - template.company_id:
                 raise ValidationError(
-                    _("Una promoción de %s solo puede usar listas de esa empresa o compartidas.", company.name)
+                    _("Una promoción de %s solo puede aplicarse en esa sucursal.", template.company_id.name)
                 )
 
     @api.constrains("promotion_date_start", "promotion_date_end")
@@ -190,9 +184,9 @@ class ProductTemplate(models.Model):
         for vals in vals_list:
             if vals.get("is_promotion_pack"):
                 vals.update(type="consu", is_storable=False)
-                if not vals.get("promotion_pricelist_ids"):
+                if not vals.get("promotion_company_ids"):
                     company = self.env["res.company"].browse(vals.get("company_id"))
-                    vals["promotion_pricelist_ids"] = [
-                        Command.set(self._promotion_default_pricelists(company or None).ids)
+                    vals["promotion_company_ids"] = [
+                        Command.set(self._promotion_default_companies(company or None).ids)
                     ]
         return super().create(vals_list)

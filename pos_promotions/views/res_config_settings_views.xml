@@ -8,10 +8,10 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Promociones" string="Promociones" name="pos_promotions"
                      groups="point_of_sale.group_pos_manager">
-                    <block title="Listas de precios" name="pos_promotions_pricelists">
-                        <setting string="Listas permitidas"
-                                 help="Las listas que se pueden elegir en una promoción. Una promoción nueva trae todas seleccionadas. Vacío = todas las listas.">
-                            <field name="promotion_allowed_pricelist_ids" widget="many2many_tags"
+                    <block title="Sucursales" name="pos_promotions_companies">
+                        <setting string="Sucursales permitidas"
+                                 help="Las sucursales que se pueden elegir en una promoción. Una promoción nueva trae todas seleccionadas. Vacío = todas.">
+                            <field name="promotion_allowed_company_ids" widget="many2many_tags"
                                    options="{'no_create': True}"/>
                         </setting>
                     </block>

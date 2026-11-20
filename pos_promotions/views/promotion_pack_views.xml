@@ -16,7 +16,7 @@
                        invisible="promotion_price_mode == 'percent'"/>
                 <field name="promotion_discount_percent" invisible="promotion_price_mode != 'percent'"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
-                <field name="promotion_pricelist_ids" widget="many2many_tags" optional="show"/>
+                <field name="promotion_company_ids" widget="many2many_tags" optional="show"/>
                 <field name="promotion_date_start" optional="show"/>
                 <field name="promotion_date_end" optional="show"/>
                 <field name="active" widget="boolean_toggle" string="Activo"/>
@@ -35,7 +35,7 @@
                     <field name="currency_id" invisible="1"/>
                     <field name="promotion_pack_auto_price" invisible="1"/>
                     <field name="company_id" invisible="1"/>
-                    <field name="promotion_allowed_pricelist_ids" invisible="1"/>
+                    <field name="promotion_allowed_company_ids" invisible="1"/>
                     <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>
                     <div class="oe_title">
                         <label for="name" string="Nombre de la promoción"/>
@@ -55,15 +55,15 @@
                         </group>
                         <group>
                             <field name="active" widget="boolean_toggle" string="Activo"/>
-                            <field name="promotion_pricelist_ids" widget="many2many_tags"
-                                   domain="[('id', 'in', promotion_allowed_pricelist_ids)]"
+                            <field name="promotion_company_ids" widget="many2many_tags"
+                                   domain="[('id', 'in', promotion_allowed_company_ids)]"
                                    options="{'no_create': True}"/>
                         </group>
                     </group>
                     <div class="text-muted mb-2">
                         Precio normal y ahorro son de referencia, con el precio de venta de la ficha.
-                        En el POS la promoción descuenta sobre el precio de la lista de cada sucursal,
-                        sin modificar la lista.
+                        En el POS la promoción descuenta sobre el precio de cada sucursal (su lista de
+                        precios), sin modificarlo.
                     </div>
                     <field name="promotion_pack_line_ids">
                         <list editable="bottom">
@@ -84,15 +84,15 @@
                             <field name="promotion_date_end"/>
                         </group>
                     </group>
-                    <separator string="Precio por lista"/>
+                    <separator string="Precio por sucursal"/>
                     <div class="text-muted mb-2">
-                        Opcional: un precio puntual para una sucursal. En esa lista reemplaza al
-                        tipo de promoción. No se guarda como regla de la lista de precios.
+                        Opcional: un precio puntual para una sucursal. Ahí reemplaza al tipo de
+                        promoción. No modifica la lista de precios de la sucursal.
                     </div>
                     <field name="promotion_list_price_ids">
                         <list editable="bottom">
-                            <field name="pricelist_id" options="{'no_create': True}"
-                                   domain="[('id', 'in', parent.promotion_pricelist_ids)]"/>
+                            <field name="company_id" options="{'no_create': True}"
+                                   domain="[('id', 'in', parent.promotion_company_ids)]"/>
                             <field name="currency_id" column_invisible="1"/>
                             <field name="price" widget="monetary"/>
                         </list>

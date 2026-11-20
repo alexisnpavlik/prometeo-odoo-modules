@@ -6,23 +6,23 @@ from odoo.exceptions import ValidationError
 
 class PromotionPrice(models.Model):
     _name = "pos.promotion.price"
-    _description = "Precio de una promoción en una lista"
-    _order = "pricelist_id"
+    _description = "Precio de una promoción en una sucursal"
+    _order = "company_id"
 
     pack_tmpl_id = fields.Many2one("product.template", string="Promoción", required=True, ondelete="cascade", index=True)
-    pricelist_id = fields.Many2one("product.pricelist", string="Lista de precios", required=True, ondelete="cascade")
+    company_id = fields.Many2one("res.company", string="Sucursal", required=True, ondelete="cascade")
     price = fields.Float("Precio de la promoción", required=True, digits="Product Price")
-    currency_id = fields.Many2one(related="pricelist_id.currency_id")
+    currency_id = fields.Many2one(related="company_id.currency_id")
 
     _sql_constraints = [
-        ("pack_pricelist_unique", "unique(pack_tmpl_id, pricelist_id)", "Cada lista puede tener un solo precio por promoción."),
+        ("pack_company_unique", "unique(pack_tmpl_id, company_id)", "Cada sucursal puede tener un solo precio por promoción."),
     ]
 
     @api.constrains("price")
     def _check_price(self):
-        """No puede ser 1 o menos. Que la lista sea de la promoción lo valida la promoción
-        (al crearla, los precios se guardan antes que sus listas). Se guarda acá y no como
-        regla de la lista para no pisar el precio de la sucursal."""
+        """No puede ser 1 o menos. Que la sucursal sea de la promoción lo valida la promoción
+        (al crearla, los precios se guardan antes que sus sucursales). Se guarda acá y no
+        como regla de la lista para no pisar el precio de la sucursal."""
         for record in self:
             if record.price <= 1:
-                raise ValidationError(_("Poné el precio de la promoción en %s (no puede ser 1 o menos).", record.pricelist_id.display_name))
+                raise ValidationError(_("Poné el precio de la promoción en %s (no puede ser 1 o menos).", record.company_id.name))
