@@ -328,6 +328,10 @@ class StockBranchTransfer(models.Model):
                 grouped[(location_id, direction)].append((product, abs(delta)))
             for (location_id, direction), items in grouped.items():
                 transfer._create_done_picking(Location.browse(location_id), direction, items)
+        # Los pickings se crean con sudo y dejan picking_ids en caché sin filtrar por empresa:
+        # el web_save del formulario los relee como el usuario y falla si el origen no es su
+        # empresa activa. Se invalida para que la relectura aplique las reglas multiempresa.
+        self.invalidate_recordset(["picking_ids"])
 
     def _create_done_picking(self, location, direction, items):
         """Crea un picking validado entre la ubicación y tránsito (sin contacto)."""
