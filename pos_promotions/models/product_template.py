@@ -35,10 +35,6 @@ class ProductTemplate(models.Model):
         "Descuento (%)", digits=(5, 2),
         help="Porcentaje que se descuenta del precio de la lista de la orden.",
     )
-    promotion_list_price_ids = fields.One2many(
-        "pos.promotion.price", "pack_tmpl_id", string="Precio por sucursal", copy=True,
-        help="Precio puntual de la promoción en una sucursal. Pisa al tipo de promoción solo ahí.",
-    )
     promotion_use_dates = fields.Boolean(
         "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
         help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
@@ -149,20 +145,13 @@ class ProductTemplate(models.Model):
                     _("La promoción no puede costar más que sus productos sueltos (%s).", round(regular, 2))
                 )
 
-    @api.constrains("is_promotion_pack", "promotion_company_ids", "company_id", "promotion_list_price_ids")
+    @api.constrains("is_promotion_pack", "promotion_company_ids", "company_id")
     def _check_promotion_companies(self):
-        """Al menos una sucursal; los precios por sucursal, de sucursales elegidas; y si la
-        promoción tiene empresa, solo esa."""
+        """Al menos una sucursal; si la promoción tiene empresa, solo esa."""
         for template in self.filtered("is_promotion_pack"):
             companies = template.sudo().promotion_company_ids
             if not companies:
                 raise ValidationError(_("Elegí al menos una sucursal para la promoción."))
-            orphan = template.sudo().promotion_list_price_ids.company_id - companies
-            if orphan:
-                raise ValidationError(
-                    _("%s tiene un precio en Precio por sucursal pero no está en las sucursales de la promoción: agregala o borrá ese precio.",
-                      ", ".join(orphan.mapped("name")))
-                )
             if template.company_id and companies - template.company_id:
                 raise ValidationError(
                     _("Una promoción de %s solo puede aplicarse en esa sucursal.", template.company_id.name)

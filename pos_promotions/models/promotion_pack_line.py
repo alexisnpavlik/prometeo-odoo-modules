@@ -23,13 +23,12 @@ class PromotionPackLine(models.Model):
     currency_id = fields.Many2one(related="product_id.currency_id")
     promotion_data_json = fields.Json(
         compute="_compute_promotion_data_json",
-        help="Cómo se cobra la promoción en el POS: sucursales, tipo, % y precios por sucursal.",
+        help="Cómo se cobra la promoción en el POS: sucursales, tipo, % y vigencia.",
     )
 
     @api.depends(
         "pack_tmpl_id.promotion_company_ids", "pack_tmpl_id.promotion_price_mode",
-        "pack_tmpl_id.promotion_discount_percent", "pack_tmpl_id.promotion_list_price_ids.price",
-        "pack_tmpl_id.promotion_list_price_ids.company_id",
+        "pack_tmpl_id.promotion_discount_percent",
         "pack_tmpl_id.promotion_date_start", "pack_tmpl_id.promotion_date_end",
     )
     def _compute_promotion_data_json(self):
@@ -40,7 +39,6 @@ class PromotionPackLine(models.Model):
                 "companies": template.promotion_company_ids.ids,
                 "mode": template.promotion_price_mode,
                 "percent": template.promotion_discount_percent,
-                "prices": {str(p.company_id.id): p.price for p in template.promotion_list_price_ids},
                 "date_start": fields.Date.to_string(template.promotion_date_start) or False,
                 "date_end": fields.Date.to_string(template.promotion_date_end) or False,
             }

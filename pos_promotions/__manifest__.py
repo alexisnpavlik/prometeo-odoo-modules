@@ -15,9 +15,8 @@
         siguen siendo productos normales y descuentan su stock, y llevan la
         etiqueta Promoción.
 
-        Cada promoción elige sus sucursales (empresas). Precio: fijo, % de
-        descuento sobre el precio de la lista de la orden, o un precio puntual por
-        sucursal. Las listas de precios quedan para el precio de cada sucursal; la
+        Cada promoción elige sus sucursales (empresas). Precio: fijo o % de
+        descuento sobre el precio de la lista de la orden. Las listas de precios quedan para el precio de cada sucursal; la
         promoción es un descuento en la línea encima de ese precio, así que nunca
         se pisan. Una oferta de un solo producto es una
         promoción de un producto, no una regla de la lista. Las líneas con

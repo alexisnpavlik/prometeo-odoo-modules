@@ -77,19 +77,6 @@
                             <field name="lst_price" widget="monetary"/>
                         </list>
                     </field>
-                    <separator string="Precio por sucursal"/>
-                    <div class="text-muted mb-2">
-                        Opcional: un precio puntual para una sucursal. Ahí reemplaza al tipo de
-                        promoción. No modifica la lista de precios de la sucursal.
-                    </div>
-                    <field name="promotion_list_price_ids">
-                        <list editable="bottom">
-                            <field name="company_id" options="{'no_create': True}"
-                                   domain="[('id', 'in', parent.promotion_company_ids)]"/>
-                            <field name="currency_id" column_invisible="1"/>
-                            <field name="price" widget="monetary"/>
-                        </list>
-                    </field>
                 </sheet>
             </form>
         </field>

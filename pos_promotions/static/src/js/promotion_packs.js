@@ -41,13 +41,8 @@ patch(PosOrder.prototype, {
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     },
 
-    /** Precio de la promoción en esta sucursal: el puntual de la sucursal, el % sobre el
-     *  precio de la lista de la orden o el precio fijo, en ese orden. */
-    _getPromotionPackPrice(pack, regular, companyId) {
-        const companyPrice = (pack.data.prices || {})[String(companyId)];
-        if (companyPrice) {
-            return companyPrice;
-        }
+    /** Precio de la promoción: % sobre el precio de la lista de la orden, o precio fijo. */
+    _getPromotionPackPrice(pack, regular) {
         if (pack.data.mode === "percent") {
             return regular * (1 - (pack.data.percent || 0) / 100);
         }
@@ -157,7 +152,7 @@ patch(PosOrder.prototype, {
                         (acc, c) => acc + unitPrice.get(c.product.id) * c.qty,
                         0
                     );
-                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular, companyId) };
+                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular) };
                 })
                 .filter((pack) => pack.regular > pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));
