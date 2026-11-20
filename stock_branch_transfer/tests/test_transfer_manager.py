@@ -35,6 +35,21 @@ class TestTransferManager(BranchTransferCommon):
         self.assertEqual(self.qty(self.product, self.company_c), 10.0)
         self.assertEqual(self.qty(self.product, self.company_a), 40.0)
 
+    def test_manager_edits_from_other_active_company(self):
+        """Guardar desde el formulario con otra sucursal activa no falla por los movimientos del origen."""
+        manager = self._make_user(
+            "sbt_manager_stock",
+            self.company_b,
+            self.company_a | self.company_b,
+            "base.group_user,stock.group_stock_user,stock_branch_transfer.group_branch_transfer_manager",
+        )
+        transfer = self.transfer.with_user(manager).with_context(allowed_company_ids=[self.company_b.id])
+        spec = {"picking_ids": {"fields": {"name": {}, "company_id": {"fields": {"display_name": {}}}}}}
+        line = transfer.line_ids
+        transfer.web_save({"line_ids": [(1, line.id, {"qty_sent": 6.0})]}, spec)
+        self.assertEqual(self.qty(self.product, self.company_a), 44.0)
+        self.assertEqual(self.transit_qty(self.product), 6.0)
+
     def test_manager_adds_line_in_transit(self):
         self._as_manager().line_ids = [(0, 0, {"product_id": self.product2.id, "qty_sent": 4.0})]
         self.assertEqual(self.qty(self.product2, self.company_a), -4.0)
