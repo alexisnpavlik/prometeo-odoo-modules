@@ -97,7 +97,7 @@ class InventoryDashboardMetrics extends Component {
             this.state.openFilter = null;
         });
 
-        this.filtersData = useState({ companies: [] });
+        this.filtersData = useState({ companies: [], can_export: false });
 
         // summary y options vienen calculados sobre todas las filas; las tablas traen un tope por estado
         this.metricsData = useState({
