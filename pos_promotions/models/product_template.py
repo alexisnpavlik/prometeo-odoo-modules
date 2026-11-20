@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
+from datetime import date
+
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.tools.misc import format_date
 
 ALLOWED_COMPANIES_PARAM = "pos_promotions.allowed_company_ids"
 
@@ -190,6 +193,47 @@ class ProductTemplate(models.Model):
         if "promotion_use_dates" in vals and not vals["promotion_use_dates"]:
             vals = dict(vals, promotion_date_start=False, promotion_date_end=False)
         return super().write(vals)
+
+    def _promotion_signature(self):
+        """Productos y cantidades de la promoción, sin importar el orden de las líneas."""
+        totals = {}
+        for line in self.sudo().promotion_pack_line_ids:
+            totals[line.product_id.id] = totals.get(line.product_id.id, 0) + line.quantity
+        return tuple(sorted(totals.items()))
+
+    @api.constrains("is_promotion_pack", "active", "promotion_pack_line_ids", "promotion_company_ids",
+                    "promotion_date_start", "promotion_date_end")
+    def _check_promotion_duplicates(self):
+        """Dos promociones activas con los mismos productos, alguna sucursal en común y
+        fechas que se superponen chocan: en la caja solo se aplicaría la que más ahorra.
+        Sin fechas cuenta como siempre."""
+        for template in self.filtered(lambda t: t.is_promotion_pack and t.active and t.promotion_pack_line_ids):
+            signature = template._promotion_signature()
+            start = template.promotion_date_start or date.min
+            end = template.promotion_date_end or date.max
+            candidates = self.sudo().search([
+                ("is_promotion_pack", "=", True),
+                ("id", "!=", template.id),
+                ("promotion_pack_line_ids.product_id", "=", signature[0][0]),
+                ("promotion_company_ids", "in", template.sudo().promotion_company_ids.ids),
+            ])
+            for other in candidates:
+                other_start = other.promotion_date_start or date.min
+                other_end = other.promotion_date_end or date.max
+                if other_start > end or start > other_end or other._promotion_signature() != signature:
+                    continue
+                shared = other.promotion_company_ids & template.sudo().promotion_company_ids
+                if other.promotion_date_start or other.promotion_date_end:
+                    period = _("entre %(start)s y %(end)s",
+                               start=format_date(self.env, other.promotion_date_start) if other.promotion_date_start else _("siempre"),
+                               end=format_date(self.env, other.promotion_date_end) if other.promotion_date_end else _("sin vencimiento"))
+                else:
+                    period = _("sin fechas (vale siempre)")
+                raise ValidationError(_(
+                    "Ya existe '%(other)s' con los mismos productos en %(companies)s, %(period)s. "
+                    "Desactivala o cambiá las fechas o las sucursales.",
+                    other=other.name, companies=", ".join(shared.mapped("name")), period=period,
+                ))
 
     @api.constrains("promotion_date_start", "promotion_date_end")
     def _check_promotion_dates(self):
