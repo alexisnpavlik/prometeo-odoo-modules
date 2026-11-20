@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Una sucursal de promoción por empresa (se vuelve a correr en cada -u). -->
+    <function model="pos.promotion.branch" name="_sync_branches"/>
+</odoo>

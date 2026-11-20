@@ -67,7 +67,7 @@ class ProductTemplate(models.Model):
         help="La promoción se aplica en las cajas de estas sucursales, sobre el precio de su lista.",
     )
     promotion_company_visible_ids = fields.Many2many(
-        "res.company",
+        "pos.promotion.branch",
         string="Sucursales",
         compute="_compute_promotion_company_visible_ids",
         inverse="_inverse_promotion_company_visible_ids",
@@ -79,7 +79,7 @@ class ProductTemplate(models.Model):
         help="Todas las sucursales de la promoción, también las que el usuario no puede abrir.",
     )
     promotion_allowed_company_ids = fields.Many2many(
-        "res.company",
+        "pos.promotion.branch",
         compute="_compute_promotion_allowed_company_ids",
         help="Sucursales que se pueden elegir: todas a las que el usuario tiene acceso, o solo la de la promoción.",
     )
@@ -99,42 +99,49 @@ class ProductTemplate(models.Model):
     @api.depends("company_id")
     @api.depends_context("uid")
     def _compute_promotion_allowed_company_ids(self):
-        """Opciones del campo Sucursales: las que el usuario tiene acceso (el formulario
-        muestra sus nombres); con empresa en la promoción, solo esa."""
+        """Opciones del campo Sucursales: las empresas a las que el usuario tiene acceso
+        (activas o no en el selector); con empresa en la promoción, solo esa."""
         allowed = self._promotion_allowed_companies() & self.env.user.company_ids
+        Branch = self.env["pos.promotion.branch"]
         for template in self:
             options = allowed & template.company_id if template.company_id else allowed
-            template.promotion_allowed_company_ids = [Command.set(options.ids)]
+            template.promotion_allowed_company_ids = [Command.set(Branch._for_companies(options).ids)]
 
     @api.depends("promotion_company_ids")
     @api.depends_context("uid")
     def _compute_promotion_company_visible_ids(self):
-        """El formulario edita solo las sucursales a las que el usuario tiene acceso: Odoo
-        no deja leer una empresa ajena y la pantalla fallaba (Lorena sin Barranqueras)."""
+        """El formulario edita las sucursales (pos.promotion.branch) de las empresas a las que
+        el usuario tiene acceso. No se usa res.company: la regla de empresas no deja leer las
+        que no están activas en el selector y la pantalla fallaba."""
         own = self.env.user.company_ids
+        Branch = self.env["pos.promotion.branch"]
         for template in self:
             companies = template.sudo().promotion_company_ids
-            template.promotion_company_visible_ids = [Command.set((companies & own).ids)]
+            template.promotion_company_visible_ids = [Command.set(Branch._for_companies(companies & own).ids)]
             template.promotion_company_names = ", ".join(companies.mapped("name"))
 
     def _inverse_promotion_company_visible_ids(self):
-        """Guarda lo elegido sin perder las sucursales que el usuario no ve."""
+        """Guarda lo elegido sin perder las sucursales que el usuario no ve. Solo cuenta
+        empresas a las que el usuario tiene acceso."""
         own = self.env.user.company_ids
         for template in self:
             hidden = template.sudo().promotion_company_ids - own
-            template.promotion_company_ids = [Command.set((hidden | template.promotion_company_visible_ids).ids)]
+            chosen = template.promotion_company_visible_ids.sudo().company_id & own
+            template.promotion_company_ids = [Command.set((hidden | chosen).ids)]
 
     @api.model
     def default_get(self, fields_list):
         """Una promoción nueva arranca con todas las sucursales seleccionadas."""
         res = super().default_get(fields_list)
-        wanted = {"promotion_company_ids", "promotion_company_visible_ids"} & set(fields_list)
-        if wanted and (res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack")):
+        if res.get("is_promotion_pack") or self.env.context.get("default_is_promotion_pack"):
             company = self.env["res.company"].browse(res.get("company_id"))
             companies = self._promotion_default_companies(company or None)
-            for fname in wanted:
+            if "promotion_company_ids" in fields_list:
+                res["promotion_company_ids"] = [Command.set(companies.ids)]
+            if "promotion_company_visible_ids" in fields_list:
                 # El formulario usa el campo visible: sin default, arrancaba vacío.
-                res[fname] = [Command.set(companies.ids)]
+                branches = self.env["pos.promotion.branch"]._for_companies(companies)
+                res["promotion_company_visible_ids"] = [Command.set(branches.ids)]
         return res
 
     @api.depends(

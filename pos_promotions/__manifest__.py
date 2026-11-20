@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.2.3.3",
+    "version": "18.0.2.4.0",
     "category": "Sales/Point Of Sale",
     "summary": "App Promociones: uno o varios productos juntos a un precio",
     "description": """
@@ -33,6 +33,7 @@
     "depends": ["point_of_sale"],
     "data": [
         "security/ir.model.access.csv",
+        "data/promotion_branch_data.xml",
         "views/promotion_pack_views.xml",
         "views/menu_views.xml",
     ],
