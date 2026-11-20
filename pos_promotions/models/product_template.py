@@ -39,6 +39,11 @@ class ProductTemplate(models.Model):
         "Tiene vigencia", compute="_compute_promotion_use_dates", store=True, readonly=False,
         help="Marcalo para cargar desde y hasta cuándo vale. Sin marcar, vale siempre mientras esté activa.",
     )
+    promotion_expired = fields.Boolean("Vencida", compute="_compute_promotion_expired")
+    promotion_status = fields.Selection(
+        [("active", "Vigente"), ("scheduled", "Programada"), ("expired", "Vencida")],
+        string="Estado", compute="_compute_promotion_expired",
+    )
     promotion_date_start = fields.Date(
         "Válida desde", help="Opcional. Vacío: vale desde ya.",
     )
@@ -162,6 +167,22 @@ class ProductTemplate(models.Model):
         """Marcado si la promoción ya tiene alguna fecha (promociones previas al campo)."""
         for template in self:
             template.promotion_use_dates = bool(template.promotion_date_start or template.promotion_date_end)
+
+    @api.depends("promotion_date_start", "promotion_date_end")
+    @api.depends_context("tz")
+    def _compute_promotion_expired(self):
+        """Vencida si Válida hasta ya pasó (el último día todavía vale); Programada si
+        todavía no llegó Válida desde."""
+        today = fields.Date.context_today(self)
+        for template in self:
+            start, end = template.promotion_date_start, template.promotion_date_end
+            template.promotion_expired = bool(end and end < today)
+            if template.promotion_expired:
+                template.promotion_status = "expired"
+            elif start and start > today:
+                template.promotion_status = "scheduled"
+            else:
+                template.promotion_status = "active"
 
     @api.onchange("promotion_use_dates")
     def _onchange_promotion_use_dates(self):
