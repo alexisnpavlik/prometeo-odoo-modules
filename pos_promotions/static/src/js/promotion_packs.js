@@ -20,13 +20,33 @@ patch(PosOrder.prototype, {
                 if (!packProduct) {
                     continue;
                 }
-                packs.set(tmplId, { template: packProduct.product_tmpl_id, product: packProduct, components: [] });
+                packs.set(tmplId, {
+                    template: packProduct.product_tmpl_id,
+                    product: packProduct,
+                    data: line.promotion_data_json || {},
+                    components: [],
+                });
             }
             if (line.product_id) {
                 packs.get(tmplId).components.push({ product: line.product_id, qty: line.quantity });
             }
         }
         return [...packs.values()].filter((pack) => pack.components.length);
+    },
+
+    /** Fecha local de la caja como "AAAA-MM-DD", comparable con las fechas de validez. */
+    _getPromotionToday() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    },
+
+    /** Precio de la promoción: % sobre el precio de la lista de la orden, o precio fijo. */
+    _getPromotionPackPrice(pack, regular) {
+        if (pack.data.mode === "percent") {
+            return regular * (1 - (pack.data.percent || 0) / 100);
+        }
+        return pack.product.lst_price;
     },
 
     /** Líneas que puede tocar un pack: ventas a precio de lista sin descuento del cajero. */
@@ -100,6 +120,10 @@ patch(PosOrder.prototype, {
             for (const line of lines) {
                 if (line.promotion_pack_tmpl_id) {
                     line.set_discount(0);
+                    // Un combo más caro que los sueltos sube el precio: vuelve al de la lista.
+                    line.set_unit_price(
+                        line.product_id.get_price(this.pricelist_id, line.get_quantity(), line.price_extra || 0)
+                    );
                     line.update({ promotion_pack_tmpl_id: false });
                 }
             }
@@ -114,18 +138,28 @@ patch(PosOrder.prototype, {
                     unitPrice.set(id, line.get_unit_price());
                 }
             }
-            // Por producto: unidades dentro de packs, ahorro y pack. Primero los que más ahorran.
+            // Por producto: unidades dentro de packs, ahorro (negativo si es recargo) y pack. Primero los que más ahorran.
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
+            // Solo las promociones de la sucursal de la caja. El precio normal es el de la
+            // lista de la orden (precio de la sucursal); la promoción descuenta sobre él sin tocarla.
+            const companyId = this.company_id?.id ?? this.config?.company_id?.id;
+            const today = this._getPromotionToday();
             const packs = this.getPromotionPacks()
+                .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
+                .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
+                    (!pack.data.date_end || today <= pack.data.date_end))
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
-                .map((pack) => ({
-                    ...pack,
-                    price: pack.product.lst_price,
-                    regular: pack.components.reduce((acc, c) => acc + unitPrice.get(c.product.id) * c.qty, 0),
-                }))
-                .filter((pack) => pack.regular > pack.price)
+                .map((pack) => {
+                    const regular = pack.components.reduce(
+                        (acc, c) => acc + unitPrice.get(c.product.id) * c.qty,
+                        0
+                    );
+                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular) };
+                })
+                // Un combo puede costar más que los sueltos: también se aplica (sube el precio).
+                .filter((pack) => pack.price > 0 && pack.regular > 0 && pack.regular !== pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));
             for (const pack of packs) {
                 const times = Math.min(
@@ -147,7 +181,8 @@ patch(PosOrder.prototype, {
 
             for (const [id, units] of packed) {
                 // Odoo guarda el descuento con 2 decimales: el total puede diferir del pack en centavos.
-                const discount = Math.round((saving.get(id) / (units * unitPrice.get(id))) * 10000) / 100;
+                const share = saving.get(id) / (units * unitPrice.get(id));
+                const discount = Math.round(share * 10000) / 100;
                 let remaining = units;
                 for (const line of lines.filter((l) => l.product_id.id === id)) {
                     if (remaining <= 0) {
@@ -157,7 +192,12 @@ patch(PosOrder.prototype, {
                     if (take < line.get_quantity()) {
                         this._splitPromotionPackLine(line, take);
                     }
-                    line.set_discount(discount);
+                    if (discount >= 0) {
+                        line.set_discount(discount);
+                    } else {
+                        // Recargo: Odoo no acepta descuentos negativos, se sube el precio unitario.
+                        line.set_unit_price(unitPrice.get(id) * (1 - share));
+                    }
                     line.update({ promotion_pack_tmpl_id: packByProduct.get(id) });
                     remaining -= take;
                 }
@@ -181,6 +221,26 @@ patch(PosOrder.prototype, {
 });
 
 patch(PosOrderline.prototype, {
+    /** Un descuento o precio puesto a mano (fuera del recálculo) saca la línea de la
+     *  promoción: el cajero decidió el precio y los controles de motivo lo tienen que ver. */
+    _dropPromotionOnManualChange() {
+        if (this.promotion_pack_tmpl_id && !this.order_id?._applyingPromotionPacks) {
+            this.update({ promotion_pack_tmpl_id: false });
+        }
+    },
+
+    set_discount(discount) {
+        const res = super.set_discount(...arguments);
+        this._dropPromotionOnManualChange();
+        return res;
+    },
+
+    set_unit_price(price) {
+        const res = super.set_unit_price(...arguments);
+        this._dropPromotionOnManualChange();
+        return res;
+    },
+
     set_quantity(quantity, keep_price) {
         const res = super.set_quantity(...arguments);
         this.order_id?.applyPromotionPacks();

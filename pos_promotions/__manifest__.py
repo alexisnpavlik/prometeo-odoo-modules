@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.2.0.0",
+    "version": "18.0.2.3.0",
     "category": "Sales/Point Of Sale",
-    "summary": "App Promociones: packs de uno o varios productos a un precio",
+    "summary": "App Promociones: uno o varios productos juntos a un precio",
     "description": """
         App Promociones en el menú principal: abre directo en Packs.
 
@@ -14,6 +14,13 @@
         que los agrega). El ahorro se reparte como descuento % en esas líneas, que
         siguen siendo productos normales y descuentan su stock, y llevan la
         etiqueta Promoción.
+
+        Cada promoción elige sus sucursales (empresas). Precio: fijo o % de
+        descuento sobre el precio de la lista de la orden. Las listas de precios quedan para el precio de cada sucursal; la
+        promoción es un descuento en la línea encima de ese precio, así que nunca
+        se pisan. Una oferta de un solo producto es una
+        promoción de un producto, no una regla de la lista. Las líneas con
+        promoción muestran la etiqueta y el precio de la lista tachado.
 
         Desde 18.0.2.0.0 ya no gestiona reglas de listas de precios (la vieja
         pestaña Precios): las reglas que existan son reglas normales de Odoo.

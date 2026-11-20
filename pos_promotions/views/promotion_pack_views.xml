@@ -6,13 +6,24 @@
         <field name="model">product.template</field>
         <field name="priority">200</field>
         <field name="arch" type="xml">
-            <list string="Packs">
-                <field name="name" string="Pack"/>
+            <list string="Promociones" decoration-danger="promotion_expired">
+                <field name="promotion_expired" column_invisible="1"/>
+                <field name="name" string="Promoción"/>
                 <field name="promotion_pack_line_ids" widget="many2many_tags" string="Productos"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="promotion_pack_regular_price" widget="monetary"/>
-                <field name="list_price" string="Precio del pack" widget="monetary"/>
+                <field name="promotion_price_mode"/>
+                <field name="list_price" string="Precio de la promoción" widget="monetary"
+                       invisible="promotion_price_mode == 'percent'"/>
+                <field name="promotion_discount_percent" invisible="promotion_price_mode != 'percent'"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
+                <field name="promotion_company_ids" widget="many2many_tags" optional="show"/>
+                <field name="promotion_date_start" optional="show"/>
+                <field name="promotion_date_end" optional="show"/>
+                <field name="promotion_status" widget="badge"
+                       decoration-success="promotion_status == 'active'"
+                       decoration-info="promotion_status == 'scheduled'"
+                       decoration-danger="promotion_status == 'expired'"/>
                 <field name="active" widget="boolean_toggle" string="Activo"/>
             </list>
         </field>
@@ -23,27 +34,45 @@
         <field name="model">product.template</field>
         <field name="priority">200</field>
         <field name="arch" type="xml">
-            <form string="Pack">
+            <form string="Promoción">
                 <sheet>
                     <field name="is_promotion_pack" invisible="1"/>
                     <field name="currency_id" invisible="1"/>
                     <field name="promotion_pack_auto_price" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <field name="promotion_allowed_company_ids" invisible="1"/>
                     <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'image_128'}"/>
                     <div class="oe_title">
-                        <label for="name" string="Nombre del pack"/>
+                        <label for="name" string="Nombre de la promoción"/>
                         <h1><field name="name" placeholder="p. ej. Fernet + Coca-Cola"/></h1>
                     </div>
                     <!-- Sin categoría del POS: el pack se muestra siempre (pos_config.py y product_screen_patch.js). -->
                     <group>
                         <group>
-                            <field name="list_price" string="Precio del pack" widget="monetary"/>
+                            <field name="promotion_price_mode" widget="radio"/>
+                            <field name="list_price" string="Precio de la promoción" widget="monetary"
+                                   invisible="promotion_price_mode == 'percent'"/>
+                            <field name="promotion_discount_percent"
+                                   invisible="promotion_price_mode != 'percent'"
+                                   required="promotion_price_mode == 'percent'"/>
                             <field name="promotion_pack_regular_price" widget="monetary"/>
                             <field name="promotion_pack_saving" widget="monetary"/>
                         </group>
                         <group>
                             <field name="active" widget="boolean_toggle" string="Activo"/>
+                            <field name="promotion_company_ids" widget="many2many_tags"
+                                   domain="[('id', 'in', promotion_allowed_company_ids)]"
+                                   options="{'no_create': True}"/>
+                            <field name="promotion_use_dates"/>
+                            <field name="promotion_date_start" invisible="not promotion_use_dates"/>
+                            <field name="promotion_date_end" invisible="not promotion_use_dates"/>
                         </group>
                     </group>
+                    <div class="text-muted mb-2">
+                        Precio normal y ahorro son de referencia, con el precio de venta de la ficha.
+                        En el POS la promoción descuenta sobre el precio de cada sucursal (su lista de
+                        precios), sin modificarlo.
+                    </div>
                     <field name="promotion_pack_line_ids">
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>
@@ -53,6 +82,14 @@
                             <field name="lst_price" widget="monetary"/>
                         </list>
                     </field>
+                    <separator string="Precio en cada sucursal"/>
+                    <field name="promotion_branch_rule_count" invisible="1"/>
+                    <div class="alert alert-warning" role="alert" invisible="not promotion_branch_rule_count">
+                        <field name="promotion_branch_rule_count" class="oe_inline"/> sucursal(es) tienen un precio
+                        propio en su lista para estos productos (filas en amarillo). La promoción se calcula
+                        sobre ese precio.
+                    </div>
+                    <field name="promotion_branch_prices_html" nolabel="1" readonly="1"/>
                 </sheet>
             </form>
         </field>
@@ -64,14 +101,16 @@
         <field name="priority">200</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name" string="Pack"/>
+                <field name="name" string="Promoción"/>
                 <filter name="inactive" string="Inactivos" domain="[('active', '=', False)]"/>
+                <filter name="expired" string="Vencidas"
+                        domain="[('promotion_date_end', '&lt;', context_today().strftime('%Y-%m-%d'))]"/>
             </search>
         </field>
     </record>
 
     <record id="action_promotion_packs" model="ir.actions.act_window">
-        <field name="name">Packs</field>
+        <field name="name">Promociones</field>
         <field name="res_model">product.template</field>
         <field name="view_mode">list,form</field>
         <field name="domain">[('is_promotion_pack', '=', True)]</field>
@@ -86,7 +125,7 @@
             (0, 0, {'view_mode': 'list', 'view_id': ref('promotion_pack_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('promotion_pack_form')})]"/>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Creá un pack</p>
+            <p class="o_view_nocontent_smiling_face">Creá una promoción</p>
             <p>Varios productos juntos a un precio: en el POS se agregan con un toque y descuentan el stock de cada producto.</p>
         </field>
     </record>
