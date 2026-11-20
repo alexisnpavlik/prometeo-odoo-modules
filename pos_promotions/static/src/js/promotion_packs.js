@@ -221,6 +221,26 @@ patch(PosOrder.prototype, {
 });
 
 patch(PosOrderline.prototype, {
+    /** Un descuento o precio puesto a mano (fuera del recálculo) saca la línea de la
+     *  promoción: el cajero decidió el precio y los controles de motivo lo tienen que ver. */
+    _dropPromotionOnManualChange() {
+        if (this.promotion_pack_tmpl_id && !this.order_id?._applyingPromotionPacks) {
+            this.update({ promotion_pack_tmpl_id: false });
+        }
+    },
+
+    set_discount(discount) {
+        const res = super.set_discount(...arguments);
+        this._dropPromotionOnManualChange();
+        return res;
+    },
+
+    set_unit_price(price) {
+        const res = super.set_unit_price(...arguments);
+        this._dropPromotionOnManualChange();
+        return res;
+    },
+
     set_quantity(quantity, keep_price) {
         const res = super.set_quantity(...arguments);
         this.order_id?.applyPromotionPacks();

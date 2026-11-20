@@ -44,17 +44,22 @@ class PromotionPackLine(models.Model):
             }
 
     @api.model
-    def _load_pos_data_domain(self, data):
-        """El POS carga las promociones activas de la sucursal (empresa) de esta caja."""
-        config = self.env["pos.config"].browse(data["pos.config"]["data"][0]["id"])
+    def _promotion_domain_for_config(self, config):
+        """Promociones activas de la sucursal (empresa) de la caja y no vencidas. Las
+        futuras se cargan igual: la sesión puede seguir abierta el día que empiezan."""
         return [
             ("pack_tmpl_id.active", "=", True),
             ("pack_tmpl_id.available_in_pos", "=", True),
             ("pack_tmpl_id.promotion_company_ids", "in", config.company_id.ids),
-            # Las vencidas no se cargan; las futuras sí (la sesión puede seguir abierta al empezar).
             "|", ("pack_tmpl_id.promotion_date_end", "=", False),
             ("pack_tmpl_id.promotion_date_end", ">=", fields.Date.context_today(self)),
         ]
+
+    @api.model
+    def _load_pos_data_domain(self, data):
+        """El POS carga las promociones activas de la sucursal de esta caja."""
+        config = self.env["pos.config"].browse(data["pos.config"]["data"][0]["id"])
+        return self._promotion_domain_for_config(config)
 
     @api.model
     def _load_pos_data_fields(self, config_id):

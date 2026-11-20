@@ -210,6 +210,7 @@ patch(PosStore.prototype, {
             qty: line.get_quantity(),
             discount: line.get_discount(),
             price: line.get_unit_price(),
+            promotion: Boolean(line.promotion_pack_tmpl_id),
         });
     },
 
@@ -264,7 +265,22 @@ patch(PosStore.prototype, {
         });
     },
 
+    /**
+     * Descuento o precio puestos o sacados por una promoción (pos_promotions): no los hizo
+     * el cajero, no se pide motivo. Se evalúa justo al comparar, porque la promoción se
+     * recalcula después de seleccionar la línea. Un cambio manual le saca la marca de
+     * promoción a la línea, así que ese sí se controla.
+     */
+    _isPromotionChange(line, before) {
+        const promotionApplied = Boolean(line.promotion_pack_tmpl_id);
+        const promotionUndone = before.promotion && !line.get_discount() && line.price_type !== "manual";
+        return promotionApplied || promotionUndone;
+    },
+
     async _resolveHighDiscount(order, line, before) {
+        if (this._isPromotionChange(line, before)) {
+            return;
+        }
         if (!this.config.require_reason_high_discount) {
             return;
         }
@@ -300,6 +316,9 @@ patch(PosStore.prototype, {
      * sumas de importe afectado del dashboard no mezclen los dos sentidos.
      */
     async _resolvePriceChange(order, line, before) {
+        if (this._isPromotionChange(line, before)) {
+            return;
+        }
         const currentPrice = line.get_unit_price ? line.get_unit_price() : 0;
         if (currentPrice === before.price) {
             return;

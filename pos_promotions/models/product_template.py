@@ -247,10 +247,22 @@ class ProductTemplate(models.Model):
             self.promotion_date_start = self.promotion_date_end = False
 
     def write(self, vals):
-        """Mismo criterio que el onchange para escrituras que no pasan por el formulario."""
+        """Mismo criterio que los onchange para escrituras que no pasan por el formulario."""
         if "promotion_use_dates" in vals and not vals["promotion_use_dates"]:
             vals = dict(vals, promotion_date_start=False, promotion_date_end=False)
-        return super().write(vals)
+        res = super().write(vals)
+        if {"promotion_price_mode", "promotion_discount_percent", "promotion_pack_line_ids"} & set(vals):
+            self._promotion_sync_percent_price()
+        return res
+
+    def _promotion_sync_percent_price(self):
+        """Con % de descuento, el precio de la ficha (el que muestra la tarjeta del POS) es
+        el de los sueltos con el descuento; la caja cobra sobre la lista de la sucursal."""
+        for template in self.filtered(lambda t: t.is_promotion_pack and t.promotion_price_mode == "percent"):
+            regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
+            price = round(regular * (1 - template.promotion_discount_percent / 100), 2)
+            if regular and template.list_price != price:
+                super(ProductTemplate, template).write({"list_price": price})
 
     def _promotion_signature(self):
         """Productos y cantidades de la promoción, sin importar el orden de las líneas."""
@@ -318,4 +330,6 @@ class ProductTemplate(models.Model):
                     vals["promotion_company_ids"] = [
                         Command.set(self._promotion_default_companies(company or None).ids)
                     ]
-        return super().create(vals_list)
+        templates = super().create(vals_list)
+        templates._promotion_sync_percent_price()
+        return templates
