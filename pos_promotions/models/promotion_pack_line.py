@@ -21,16 +21,26 @@ class PromotionPackLine(models.Model):
     quantity = fields.Integer(string="Cantidad", default=1, required=True)
     lst_price = fields.Float(related="product_id.lst_price", string="Precio unitario")
     currency_id = fields.Many2one(related="product_id.currency_id")
-    pricelist_ids_json = fields.Json(
-        compute="_compute_pricelist_ids_json",
-        help="Ids de las listas de la promoción, para que el POS sepa en qué órdenes aplicarla.",
+    promotion_data_json = fields.Json(
+        compute="_compute_promotion_data_json",
+        help="Cómo se cobra la promoción en el POS: listas, tipo, % y precios por lista.",
     )
 
-    @api.depends("pack_tmpl_id.promotion_pricelist_ids")
-    def _compute_pricelist_ids_json(self):
+    @api.depends(
+        "pack_tmpl_id.promotion_pricelist_ids", "pack_tmpl_id.promotion_price_mode",
+        "pack_tmpl_id.promotion_discount_percent", "pack_tmpl_id.promotion_list_price_ids.price",
+        "pack_tmpl_id.promotion_list_price_ids.pricelist_id",
+    )
+    def _compute_promotion_data_json(self):
         """Ids crudos: el POS no carga las listas de otras cajas, así que no sirve un Many2many."""
         for line in self:
-            line.pricelist_ids_json = line.pack_tmpl_id.sudo().promotion_pricelist_ids.ids
+            template = line.pack_tmpl_id.sudo()
+            line.promotion_data_json = {
+                "pricelists": template.promotion_pricelist_ids.ids,
+                "mode": template.promotion_price_mode,
+                "percent": template.promotion_discount_percent,
+                "prices": {str(p.pricelist_id.id): p.price for p in template.promotion_list_price_ids},
+            }
 
     @api.model
     def _load_pos_data_domain(self, data):
@@ -45,7 +55,7 @@ class PromotionPackLine(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        return ["id", "pack_tmpl_id", "product_id", "quantity", "pricelist_ids_json"]
+        return ["id", "pack_tmpl_id", "product_id", "quantity", "promotion_data_json"]
 
     @api.depends("product_id", "quantity")
     def _compute_display_name(self):

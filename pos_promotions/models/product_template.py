@@ -23,6 +23,22 @@ class ProductTemplate(models.Model):
     promotion_pack_saving = fields.Float(
         "Ahorro", compute="_compute_promotion_pack_prices", digits="Product Price"
     )
+    promotion_price_mode = fields.Selection(
+        [("fixed", "Precio fijo"), ("percent", "% de descuento")],
+        string="Tipo de promoción",
+        default="fixed",
+        required=True,
+        help="Precio fijo: la promoción cuesta lo mismo en todas sus listas. "
+        "% de descuento: se descuenta sobre el precio de la lista de cada sucursal.",
+    )
+    promotion_discount_percent = fields.Float(
+        "Descuento (%)", digits=(5, 2),
+        help="Porcentaje que se descuenta del precio de la lista de la orden.",
+    )
+    promotion_list_price_ids = fields.One2many(
+        "pos.promotion.price", "pack_tmpl_id", string="Precio por lista", copy=True,
+        help="Precio puntual de la promoción en una lista. Pisa al tipo de promoción solo en esa lista.",
+    )
     promotion_pricelist_ids = fields.Many2many(
         "product.pricelist",
         "pos_promotion_pricelist_rel",
@@ -78,29 +94,48 @@ class ProductTemplate(models.Model):
             res["promotion_pricelist_ids"] = [Command.set(self._promotion_default_pricelists(company or None).ids)]
         return res
 
-    @api.depends("list_price", "promotion_pack_line_ids.quantity", "promotion_pack_line_ids.product_id.lst_price")
+    @api.depends(
+        "list_price", "promotion_price_mode", "promotion_discount_percent",
+        "promotion_pack_line_ids.quantity", "promotion_pack_line_ids.product_id.lst_price",
+    )
     def _compute_promotion_pack_prices(self):
-        """Precio de los productos sueltos y cuánto se ahorra con el pack."""
+        """Precio de venta de los productos sueltos y cuánto se ahorra (referencia: en el
+        POS manda el precio de la lista de cada sucursal)."""
         for template in self:
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             template.promotion_pack_regular_price = regular
-            template.promotion_pack_saving = regular - template.list_price if regular else 0.0
+            if not regular:
+                template.promotion_pack_saving = 0.0
+            elif template.promotion_price_mode == "percent":
+                template.promotion_pack_saving = regular * template.promotion_discount_percent / 100
+            else:
+                template.promotion_pack_saving = regular - template.list_price
 
-    @api.onchange("promotion_pack_line_ids")
+    @api.onchange("promotion_pack_line_ids", "promotion_price_mode", "promotion_discount_percent")
     def _onchange_promotion_pack_lines_price(self):
         """Precio del pack por defecto = suma de sus productos. Se recalcula mientras siga
         en el default de Odoo (1), en la última suma sugerida o quede más caro que los
         productos sueltos; un precio con descuento puesto a mano se respeta."""
         for template in self.filtered("is_promotion_pack"):
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
+            if template.promotion_price_mode == "percent":
+                # Precio de referencia que muestra la tarjeta del POS; el real sale de la lista.
+                if regular:
+                    template.list_price = round(regular * (1 - template.promotion_discount_percent / 100), 2)
+                continue
             price = template.list_price
             if regular and (price <= 1 or price == template.promotion_pack_auto_price or price > regular):
                 template.list_price = template.promotion_pack_auto_price = regular
 
-    @api.constrains("is_promotion_pack", "list_price", "promotion_pack_line_ids")
+    @api.constrains("is_promotion_pack", "list_price", "promotion_pack_line_ids", "promotion_price_mode",
+                    "promotion_discount_percent")
     def _check_promotion_pack_price(self):
-        """El pack no puede salir más caro que sus productos sueltos ni costar 1 o menos."""
+        """Precio fijo: ni 1 o menos ni más caro que los productos sueltos. %: entre 0 y 100."""
         for template in self.filtered("is_promotion_pack"):
+            if template.promotion_price_mode == "percent":
+                if not 0 < template.promotion_discount_percent < 100:
+                    raise ValidationError(_("El descuento tiene que ser mayor a 0 y menor a 100%."))
+                continue
             regular = sum(line.lst_price * line.quantity for line in template.promotion_pack_line_ids)
             if template.list_price <= 1:
                 raise ValidationError(_("Poné el precio de la promoción (no puede ser 1 o menos)."))
@@ -109,13 +144,19 @@ class ProductTemplate(models.Model):
                     _("La promoción no puede costar más que sus productos sueltos (%s).", round(regular, 2))
                 )
 
-    @api.constrains("is_promotion_pack", "promotion_pricelist_ids", "company_id")
+    @api.constrains("is_promotion_pack", "promotion_pricelist_ids", "company_id", "promotion_list_price_ids")
     def _check_promotion_pricelists(self):
         """Al menos una lista, y de la empresa de la promoción si tiene una."""
         for template in self.filtered("is_promotion_pack"):
             pricelists = template.sudo().promotion_pricelist_ids
             if not pricelists:
                 raise ValidationError(_("Elegí al menos una lista de precios para la promoción."))
+            orphan = template.sudo().promotion_list_price_ids.pricelist_id - pricelists
+            if orphan:
+                raise ValidationError(
+                    _("Sacaste %s de las listas pero tiene un precio cargado: borralo de Precio por lista.",
+                      ", ".join(orphan.mapped("display_name")))
+                )
             company = template.company_id
             if company and pricelists.filtered(lambda pl: pl.company_id and pl.company_id != company):
                 raise ValidationError(

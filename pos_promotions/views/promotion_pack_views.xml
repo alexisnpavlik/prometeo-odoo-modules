@@ -11,7 +11,10 @@
                 <field name="promotion_pack_line_ids" widget="many2many_tags" string="Productos"/>
                 <field name="currency_id" column_invisible="1"/>
                 <field name="promotion_pack_regular_price" widget="monetary"/>
-                <field name="list_price" string="Precio de la promoción" widget="monetary"/>
+                <field name="promotion_price_mode"/>
+                <field name="list_price" string="Precio de la promoción" widget="monetary"
+                       invisible="promotion_price_mode == 'percent'"/>
+                <field name="promotion_discount_percent" invisible="promotion_price_mode != 'percent'"/>
                 <field name="promotion_pack_saving" widget="monetary"/>
                 <field name="promotion_pricelist_ids" widget="many2many_tags" optional="show"/>
                 <field name="active" widget="boolean_toggle" string="Activo"/>
@@ -39,7 +42,12 @@
                     <!-- Sin categoría del POS: el pack se muestra siempre (pos_config.py y product_screen_patch.js). -->
                     <group>
                         <group>
-                            <field name="list_price" string="Precio de la promoción" widget="monetary"/>
+                            <field name="promotion_price_mode" widget="radio"/>
+                            <field name="list_price" string="Precio de la promoción" widget="monetary"
+                                   invisible="promotion_price_mode == 'percent'"/>
+                            <field name="promotion_discount_percent"
+                                   invisible="promotion_price_mode != 'percent'"
+                                   required="promotion_price_mode == 'percent'"/>
                             <field name="promotion_pack_regular_price" widget="monetary"/>
                             <field name="promotion_pack_saving" widget="monetary"/>
                         </group>
@@ -50,6 +58,11 @@
                                    options="{'no_create': True}"/>
                         </group>
                     </group>
+                    <div class="text-muted mb-2">
+                        Precio normal y ahorro son de referencia, con el precio de venta de la ficha.
+                        En el POS la promoción descuenta sobre el precio de la lista de cada sucursal,
+                        sin modificar la lista.
+                    </div>
                     <field name="promotion_pack_line_ids">
                         <list editable="bottom">
                             <field name="sequence" widget="handle"/>
@@ -57,6 +70,19 @@
                             <field name="quantity"/>
                             <field name="currency_id" column_invisible="1"/>
                             <field name="lst_price" widget="monetary"/>
+                        </list>
+                    </field>
+                    <separator string="Precio por lista"/>
+                    <div class="text-muted mb-2">
+                        Opcional: un precio puntual para una sucursal. En esa lista reemplaza al
+                        tipo de promoción. No se guarda como regla de la lista de precios.
+                    </div>
+                    <field name="promotion_list_price_ids">
+                        <list editable="bottom">
+                            <field name="pricelist_id" options="{'no_create': True}"
+                                   domain="[('id', 'in', parent.promotion_pricelist_ids)]"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="price" widget="monetary"/>
                         </list>
                     </field>
                 </sheet>

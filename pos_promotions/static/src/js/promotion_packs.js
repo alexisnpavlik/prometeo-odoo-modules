@@ -23,7 +23,7 @@ patch(PosOrder.prototype, {
                 packs.set(tmplId, {
                     template: packProduct.product_tmpl_id,
                     product: packProduct,
-                    pricelistIds: line.pricelist_ids_json || [],
+                    data: line.promotion_data_json || {},
                     components: [],
                 });
             }
@@ -32,6 +32,19 @@ patch(PosOrder.prototype, {
             }
         }
         return [...packs.values()].filter((pack) => pack.components.length);
+    },
+
+    /** Precio de la promoción en esta lista: el puntual de la lista, el % sobre el precio
+     *  de la lista o el precio fijo, en ese orden. */
+    _getPromotionPackPrice(pack, regular, pricelistId) {
+        const listPrice = (pack.data.prices || {})[String(pricelistId)];
+        if (listPrice) {
+            return listPrice;
+        }
+        if (pack.data.mode === "percent") {
+            return regular * (1 - (pack.data.percent || 0) / 100);
+        }
+        return pack.product.lst_price;
     },
 
     /** Líneas que puede tocar un pack: ventas a precio de lista sin descuento del cajero. */
@@ -123,16 +136,19 @@ patch(PosOrder.prototype, {
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
-            // Solo las promociones de la lista de la orden.
+            // Solo las promociones de la lista de la orden. El precio normal es el de esa
+            // lista (precio de la sucursal); la promoción descuenta sobre él sin tocar la lista.
             const pricelistId = this.pricelist_id?.id;
             const packs = this.getPromotionPacks()
-                .filter((pack) => pricelistId && pack.pricelistIds.includes(pricelistId))
+                .filter((pack) => pricelistId && (pack.data.pricelists || []).includes(pricelistId))
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
-                .map((pack) => ({
-                    ...pack,
-                    price: pack.product.lst_price,
-                    regular: pack.components.reduce((acc, c) => acc + unitPrice.get(c.product.id) * c.qty, 0),
-                }))
+                .map((pack) => {
+                    const regular = pack.components.reduce(
+                        (acc, c) => acc + unitPrice.get(c.product.id) * c.qty,
+                        0
+                    );
+                    return { ...pack, regular, price: this._getPromotionPackPrice(pack, regular, pricelistId) };
+                })
                 .filter((pack) => pack.regular > pack.price)
                 .sort((a, b) => b.regular - b.price - (a.regular - a.price));
             for (const pack of packs) {
