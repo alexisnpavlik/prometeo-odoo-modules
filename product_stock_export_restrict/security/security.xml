@@ -5,8 +5,4 @@
         <field name="category_id" ref="base.module_category_usability"/>
         <field name="comment">Muestra Exportar, Exportar todo y Descargar xlsx en productos y stock, y el Excel del dashboard de inventario.</field>
     </record>
-
-    <record id="base.group_system" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('product_stock_export_restrict.group_product_stock_export'))]"/>
-    </record>
 </odoo>

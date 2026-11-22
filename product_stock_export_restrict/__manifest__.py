@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Productos/Stock - Restringir exportación",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.1",
     "category": "Inventory/Inventory",
     "summary": "Oculta Exportar en productos y stock para usuarios sin el grupo de exportación",
     "description": """
@@ -15,7 +15,7 @@
         stock.move.line y product.supplierinfo. El resto de las exportaciones no cambia.
 
         Solo los usuarios del grupo "Puede exportar productos/stock" ven esas opciones.
-        El administrador (Ajustes) lo tiene por defecto.
+        Nadie lo tiene por defecto, tampoco el administrador: se asigna a mano.
 
         Es una restricción de interfaz: no bloquea /web/export en el servidor.
     """,
