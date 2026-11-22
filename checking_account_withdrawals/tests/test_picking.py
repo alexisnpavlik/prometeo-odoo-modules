@@ -64,6 +64,27 @@ class TestCawPicking(CawCommon):
         withdrawal.action_validate_picking()
         self.assertEqual(withdrawal.picking_id.state, "done")
 
+    def test_action_validate_picking_delivers_full_qty_with_short_stock(self):
+        """Con stock insuficiente entrega igual lo pedido, sin backorder.
+
+        No debe depender de `stock_picking_auto_qty`: el módulo iguala la cantidad
+        hecha a la demanda antes de validar.
+        """
+        stock_loc = self.warehouse.lot_stock_id
+        self.env["stock.quant"]._update_available_quantity(self.product, stock_loc, 1.0)
+        withdrawal = self._confirmed(qty=3.0)
+        withdrawal.action_validate_picking()
+        picking = withdrawal.picking_id
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(picking.move_ids.quantity, 3.0)
+        self.assertFalse(picking.backorder_ids)
+        self.assertEqual(
+            self.env["stock.quant"]._get_available_quantity(
+                self.product, stock_loc, allow_negative=True
+            ),
+            -2.0,
+        )
+
     def test_action_validate_picking_requires_picking(self):
         """Sin albarán asociado, no se puede validar la entrega."""
         withdrawal = self.env["caw.withdrawal"].create({
