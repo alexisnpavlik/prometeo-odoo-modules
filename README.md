@@ -11,7 +11,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 ## 📋 Índice
 
 - [🚀 Características Principales](#-características-principales)
-- [📂 Catálogo Completo de Módulos (71 Módulos)](#-catálogo-completo-de-módulos-71-módulos)
+- [📂 Catálogo Completo de Módulos (80 Módulos)](#-catálogo-completo-de-módulos-80-módulos)
   - [1. Localización Argentina & AFIP](#1-localización-argentina--afip)
   - [2. Punto de Venta (POS)](#2-punto-de-venta-pos)
   - [3. Contabilidad & Finanzas](#3-contabilidad--finanzas)
@@ -41,7 +41,7 @@ Colección optimizada y auditada de módulos y adaptaciones de **Odoo v18.0** pa
 
 ---
 
-## 📂 Catálogo Completo de Módulos (71 Módulos)
+## 📂 Catálogo Completo de Módulos (80 Módulos)
 
 ### 1. Localización Argentina & AFIP
 
@@ -70,6 +70,9 @@ Extensiones para mejorar la velocidad de atención, la seguridad y el control de
 | Módulo | Directorio | Descripción |
 | :--- | :--- | :--- |
 | **Card installment** | [`card_installment`](./card_installment) | Gestión de coeficientes de cuotas y recargos con tarjetas en los métodos de pago del POS. |
+| **POS Block Zero Price** | [`pos_block_zero_price`](./pos_block_zero_price) | No deja cobrar una orden con líneas a precio unitario $0 (producto sin precio o regla de lista mal cargada); excluye devoluciones, combos y descuentos. |
+| **POS Ingresos/Retiros con otros medios** | [`pos_cash_move_payment_methods`](./pos_cash_move_payment_methods) | El popup de Ingreso/Retiro suma un selector de método de pago; el movimiento va al diario del método y entra en el esperado del cierre, sin mezclarse con el arqueo de efectivo. |
+| **POS Productos por Categoría** | [`pos_category_filter`](./pos_category_filter) | Cada caja vende solo las categorías de producto configuradas (Todos / Solo estas / Todas menos estas); reemplaza las Categorías de PdV. |
 | **POS Close Draft Invoices** | [`pos_close_with_draft_invoices`](./pos_close_with_draft_invoices) | Permite cerrar la sesión de POS aunque queden facturas en borrador vinculadas a las órdenes. |
 | **POS Deletion Reason Log** | [`pos_deletion_reason_log`](./pos_deletion_reason_log) | Audit trail: solicita motivo y registra anulaciones de orden/línea, bajas de cantidad o descuentos; incluye dashboard interactivo y export a Excel. |
 | **POS Global Discount** | [`pos_global_discount_button`](./pos_global_discount_button) | Agrega un botón configurable para aplicar descuentos a todo el pedido de forma ágil. |
@@ -79,6 +82,7 @@ Extensiones para mejorar la velocidad de atención, la seguridad y el control de
 | **POS Pricelist Enforce** | [`pos_pricelist_enforce`](./pos_pricelist_enforce) | Corrige el comportamiento del POS que deja líneas a precio público en lugar de forzar la lista fija asignada. |
 | **POS Print Last Session** | [`pos_print_last_session`](./pos_print_last_session) | Permite imprimir el reporte de cierre de caja correspondiente a la sesión anterior. |
 | **POS Product Pack** | [`pos_product_pack`](./pos_product_pack) | Habilita la venta de productos compuestos (combos/packs) de forma integrada en el catálogo del POS. |
+| **POS Promociones** | [`pos_promotions`](./pos_promotions) | App Promociones: uno o varios productos juntos a un precio fijo o % de descuento, por sucursal; el pack se activa solo en el POS y el ahorro se reparte como descuento en las líneas, sin pisar las listas de precios. |
 | **POS Sales Advisors** | [`pos_sales_advisor`](./pos_sales_advisor) | Trackeo de asesores de venta: selección en pantalla de pago, registro en la orden y dashboard OWL de métricas. |
 | **POS Special Approval** | [`pos_special_approval_omax`](./pos_special_approval_omax) | Requiere la autorización con clave/pin de un supervisor para aplicar acciones críticas. |
 | **POS Readonly User** | [`pos_user_readonly`](./pos_user_readonly) | Restringe el POS a un modo de solo lectura para perfiles de cajero específicos. |
@@ -92,6 +96,8 @@ Flujos contables simplificados, cuentas corrientes informales y administración 
 | :--- | :--- | :--- |
 | **Cuentas Corrientes - Retiros** | [`checking_account_withdrawals`](./checking_account_withdrawals) | Retiros de mercadería a cuenta corriente con cuotas, pagos con imputación FIFO, límite de crédito, estado de cuenta imprimible y dashboard. |
 | **Cobranza a Vendedores y Cuotas** | [`collections_from_vendors_installments`](./collections_from_vendors_installments) | Venta domiciliaria en cuotas: entrega al vendedor, tarjeta, enrutamiento y cobranza. |
+| **Cuenta Corriente de Clientes** | [`customer_checking_account`](./customer_checking_account) | Versión simplificada de `checking_account_withdrawals` para una sola persona: cualquier contacto con DNI retira mercadería con recargo y cuotas calculadas en pantalla; pagos con imputación FIFO. |
+| **Cuenta Corriente de Clientes - POS** | [`customer_checking_account_pos`](./customer_checking_account_pos) | Vende a cuenta corriente desde el POS con un método de pago marcado "Cuenta corriente" y cobra cuotas con el producto "Pago Cuenta Corriente". |
 | **Transferencias Internas** | [`account_internal_transfer`](./account_internal_transfer) | Facilita el traspaso y conciliación automática de fondos entre bancos y cajas de la misma empresa. |
 | **Talonarios de Recibos** | [`account_payment_pro_receiptbook`](./account_payment_pro_receiptbook) | Control y numeración de cobros/pagos mediante el uso de talonarios de recibos físicos. |
 | **Pagos Avanzados** | [`account_payment_pro`](./account_payment_pro) | Interfaz unificada y extendida para el procesamiento de cobros y pagos contables complejos. |
@@ -111,6 +117,7 @@ Operaciones automatizadas, remitos e integración logística inter-compañía.
 | **Purchase/Sale Intercompany** | [`purchase_sale_inter_company`](./purchase_sale_inter_company) | Genera automáticamente una Sale Order (SO) en la empresa proveedora al confirmar una Purchase Order (PO). |
 | **Purchase/Sale Stock Intercompany** | [`purchase_sale_stock_inter_company`](./purchase_sale_stock_inter_company) | Extiende la integración PO/SO propagando la entrega/recepción de stock sincronizada entre compañías. |
 | **Stock Intercompany** | [`stock_intercompany`](./stock_intercompany) | Vincula la entrega de una empresa con la recepción automática en la empresa destino. |
+| **Traslados entre Sucursales** | [`stock_branch_transfer`](./stock_branch_transfer) | App Traslados: una sucursal envía mercadería a otra empresa interna y la destino la recibe completa o con diferencias; lo que está en camino vive en "Traslados en camino". |
 | **Remitos de Entrega** | [`stock_picking_delivery_note`](./stock_picking_delivery_note) | Generación e impresión de remitos oficiales y notas de entrega personalizadas. |
 | **Stock Picking Auto Qty** | [`stock_picking_auto_qty`](./stock_picking_auto_qty) | Auto-completa la cantidad hecha con la cantidad demandada en albaranes de salida. |
 | **Escáner de productos** | [`stock_barcode_lookup`](./stock_barcode_lookup) | App "Escáner" en el panel principal: busca el producto escaneando el código de barras con la cámara (foto por HTTP, video en vivo con HTTPS) y ofrece Abrir ficha, Reabastecer o crear el producto con ese código. |
@@ -128,6 +135,8 @@ Gestión del catálogo, control de cambios y restricciones multi-compañía sobr
 | **Product Pack** | [`product_pack`](./product_pack) | Define productos compuestos (packs/combos) con sus componentes y reglas de precio en backend. |
 | **Product Change History** | [`product_change_history`](./product_change_history) | Postea en el chatter **todos** los campos editados del producto, garantizando auditabilidad. |
 | **Product Company Restriction** | [`product_company_restriction`](./product_company_restriction) | Grupo que limita la creación/edición/borrado de productos a los de la propia empresa del usuario. |
+| **Código de Barras con Cámara** | [`product_barcode_camera`](./product_barcode_camera) | El campo Código de barras de la ficha suma un botón que escanea con la cámara del celular o la webcam (requiere HTTPS). |
+| **Restringir Exportación de Productos/Stock** | [`product_stock_export_restrict`](./product_stock_export_restrict) | Oculta Exportar, Exportar todo, Descargar xlsx y los botones Excel del dashboard de inventario en productos y stock a quien no tenga el grupo de exportación (solo UI). |
 | **Barcodes Generator** | [`barcodes_generator_abstract`](./barcodes_generator_abstract) · [`barcodes_generator_product`](./barcodes_generator_product) | Generación automática de códigos de barras (EAN13) para plantillas y variantes de producto. |
 
 ### 6. Métricas, Dashboards & Monitoreo
@@ -138,10 +147,12 @@ Tableros OWL con Chart.js sobre datos en vivo, más monitoreo de errores en prod
 | :--- | :--- | :--- |
 | **Métricas de Inventario** | [`inventory_dashboard_metrics`](./inventory_dashboard_metrics) | KPIs de rotación, stock crítico, valorización por sucursal y dead stock. |
 | **Métricas de POS** | [`pos_management_metrics`](./pos_management_metrics) | Dashboard gerencial de ventas: facturación neta de descuentos, descuentos otorgados, recargos cobrados, márgenes con aviso de cobertura de costo, top artículos y auditoría de arqueos con exportación a Excel. |
+| **Métricas de Caja** | [`pos_cash_metrics`](./pos_cash_metrics) | Caja del día para el dueño: ventas por cajero, efectivo en cajas abiertas, retiros e ingresos, diferencias al cierre y medios de pago agrupados. |
 | **Métricas de Facturación** | [`account_management_metrics`](./account_management_metrics) | Comprobantes por tipo (A/B/C, NC), facturación por sucursal/diario y cobros por medio de pago. |
 | **Métricas de Listas de Precios** | [`pricelist_management_metrics`](./pricelist_management_metrics) | Comparativa de precio base vs. precio vigente por lista/sucursal, filtrable por categoría. |
 | **Cambios de Precio (Góndola)** | [`product_price_change_metrics`](./product_price_change_metrics) | Lista de trabajo por sucursal con los productos que cambiaron de precio para reetiquetar en góndola. |
 | **Sentry Monitoring** | [`prometeo_sentry_monitoring`](./prometeo_sentry_monitoring) | Captura excepciones de frontend (backend web y POS) y las envía a Sentry (`SENTRY_DSN`). |
+| **Agente IA** | [`prometeo_ai_agent`](./prometeo_ai_agent) | Agente de solo lectura (Claude, OpenAI o Gemini): rutinas en lenguaje natural que dejan alertas, chat privado sobre los datos de Odoo y control de consumo con tope de gasto. |
 | **Aviso de Pago del Servicio** | [`prometeo_payment_notice`](./prometeo_payment_notice) | Aviso amistoso en backend web y POS cuando el pago mensual del servicio de Prometeo no figura registrado. |
 
 ### 7. Interfaz de Usuario & Base (Web)
@@ -155,10 +166,12 @@ Ajustes de framework para usabilidad y seguridad multi-empresa.
 | **Menú de apps a pantalla completa** | [`web_fullscreen_apps_menu`](./web_fullscreen_apps_menu) | El botón de apps abre una grilla a pantalla completa con íconos grandes, como en versiones anteriores de Odoo; también en el teléfono. |
 | **Foto con cámara** | [`web_image_camera`](./web_image_camera) | En el teléfono, los campos de imagen suman un botón que abre directo la cámara trasera (funciona sin HTTPS). |
 | **Botones Guardar y Descartar grandes** | [`web_form_save_buttons`](./web_form_save_buttons) | Reemplaza los íconos de guardar/descartar del formulario por botones grandes con texto; compactos en el teléfono. |
+| **Banner Instalar App** | [`web_pwa_install_banner`](./web_pwa_install_banner) | En el celular muestra un cartel "Instalar app" para agregar el ERP a la pantalla de inicio (diálogo nativo en Android, instrucciones en iOS; requiere HTTPS). |
 | **Marca Prometeo ERP** | [`prometeo_branding`](./prometeo_branding) | Reemplaza la marca Odoo por Prometeo ERP en títulos, diálogos, logos y Punto de venta. |
 | **Multi Company Base** | [`base_multi_company`](./base_multi_company) | Base técnica (OCA) para agregar soporte multi-compañía a modelos personalizados. |
 | **Bloqueo de Contactos y Productos de Sistema** | [`partner_protected_lock`](./partner_protected_lock) | Impide editar, archivar o borrar los contactos de las empresas propias, Consumidor Final Anónimo y los productos de Descuento y Recargo del POS. Solo administradores. |
 | **Aviso de Empresa Interna** | [`partner_internal_company_badge`](./partner_internal_company_badge) | Banner naranja en ventas, transferencias y facturas cuando el contacto es una empresa propia del grupo. |
+| **Ficha de Contacto Simplificada** | [`partner_form_simplify`](./partner_form_simplify) | Oculta Datos Fiscales, Calle 2 y Teléfono en la ficha de contacto; los nuevos arrancan como Persona, Argentina y DNI (CUIT para empresas). |
 
 ---
 
