@@ -606,9 +606,10 @@ class CawWithdrawal(models.Model):
         `skip_sms` saltea el aviso de confirmación de `stock_sms`: un retiro a cuenta
         corriente no notifica al contacto por SMS y, sin ese contexto, button_validate
         devuelve el wizard `confirm.stock.sms` en vez de validar.
-        Este módulo tampoco maneja entregas parciales: si Odoo devuelve el wizard de
-        backorder (cantidad hecha menor a la demandada), se resuelve automáticamente
-        eligiendo "sin entrega parcial".
+        La cantidad hecha se iguala a la demanda acá mismo: el retiro entrega siempre
+        lo pedido aunque falte stock (queda negativo). Antes eso lo hacía
+        `stock_picking_auto_qty` para todas las salidas; así este módulo no depende de él.
+        Si igual aparece el wizard de backorder, se resuelve "sin entrega parcial".
         """
         self.ensure_one()
         if not self.picking_id:
@@ -616,6 +617,9 @@ class CawWithdrawal(models.Model):
         if self.picking_id.state == "done":
             raise UserError(_("El albarán del retiro %s ya está validado.", self.name))
         picking = self.picking_id.sudo().with_context(skip_sms=True)
+        for move in picking.move_ids.filtered(lambda m: m.state not in ("done", "cancel")):
+            move.quantity = move.product_uom_qty
+            move.picked = True
         result = picking.button_validate()
         if isinstance(result, dict) and result.get("res_model"):
             self._caw_resolve_validation_wizard(result)
