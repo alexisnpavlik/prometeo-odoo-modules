@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Fuera de "Extra Rights" (solo debug): categoría propia con un único grupo
+         = desplegable visible. El padre "Métricas" se repite en cada módulo de
+         métricas con mismo nombre y secuencia; Odoo los agrupa en un solo bloque. -->
+    <record id="module_category_metrics_parent" model="ir.module.category">
+        <field name="name">Métricas</field>
+        <field name="sequence">90</field>
+    </record>
+
+    <record id="module_category_metrics" model="ir.module.category">
+        <field name="name">Métricas de Asesores de Venta</field>
+        <field name="parent_id" ref="module_category_metrics_parent"/>
+    </record>
+
     <record id="group_pos_advisor_metrics" model="res.groups">
-        <field name="name">Acceso a Métricas de Asesores de Venta</field>
-        <field name="category_id" ref="base.module_category_usability"/>
+        <field name="name">Acceso</field>
+        <field name="category_id" ref="module_category_metrics"/>
         <field name="comment">Permite acceder al menú de Métricas de Asesores y visualizar el dashboard de ventas por asesor.</field>
     </record>
 </odoo>
