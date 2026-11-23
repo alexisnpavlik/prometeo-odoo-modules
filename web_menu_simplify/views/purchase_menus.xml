@@ -2,10 +2,19 @@
 <odoo>
     <!-- Compras simplificado: enlaces directos en la barra. Se ocultan si la opción está apagada
          (MENU_OPTIONS_WHEN_OFF), y con la opción activa se oculta el desplegable Órdenes. -->
+    <!-- purchase.purchase_form_action filtra state in (purchase, done): ocultaba los borradores.
+         Acción propia sin dominio para ver todas las órdenes, borradores incluidos. -->
+    <record id="action_purchase_orders_all" model="ir.actions.act_window">
+        <field name="name">Órdenes de compra</field>
+        <field name="res_model">purchase.order</field>
+        <field name="view_mode">list,kanban,form,pivot,graph,calendar,activity</field>
+        <field name="search_view_id" ref="purchase.purchase_order_view_search"/>
+        <field name="context">{}</field>
+    </record>
     <menuitem id="menu_purchase_orders_direct"
               name="Órdenes de compra"
               parent="purchase.menu_purchase_root"
-              action="purchase.purchase_form_action"
+              action="action_purchase_orders_all"
               sequence="0"/>
     <menuitem id="menu_purchase_vendors_direct"
               name="Proveedores"
