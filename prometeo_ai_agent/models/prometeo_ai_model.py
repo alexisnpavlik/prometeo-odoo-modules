@@ -32,6 +32,13 @@ class PrometeoAiModel(models.Model):
             if rec.price_input or rec.price_output:
                 rec.price_known = True
 
+    def write(self, vals):
+        """Al activar un modelo, si todavía no hay modelo por defecto, lo elige."""
+        res = super().write(vals)
+        if vals.get("active"):
+            self.env["prometeo.ai.provider"]._ensure_default_model()
+        return res
+
     @api.model
     def _get_default(self):
         """Modelo por defecto configurado en Ajustes (vacío si no hay o está inactivo)."""

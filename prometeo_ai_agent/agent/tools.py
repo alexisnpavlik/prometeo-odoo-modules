@@ -4,6 +4,8 @@ import json
 import math
 import operator
 
+from odoo import fields as odoo_fields
+
 from ..models.params import get_param
 from .guard import BLOCKED_MODELS, SECRET_FIELD_RE, USER_FIELDS, ToolError, check_field, check_model, \
     check_order, parse_domain
@@ -59,6 +61,23 @@ READ_TOOLS = [
      "description": "Cuenta los registros que cumplen un dominio.",
      "parameters": {"type": "object", "properties": {"model": {"type": "string"}, "domain": {"type": "string"}},
                     "required": ["model", "domain"]}},
+    {"name": "sum_expression",
+     "description": "Suma una cuenta por registro y la agrupa: para totales que multiplican campos, que read_group "
+                    "no puede hacer. Ej.: valor del stock a precio de venta y a costo por sucursal: model "
+                    "'stock.quant', domain '[[\"location_id.usage\", \"=\", \"internal\"], [\"quantity\", \">\", 0]]', "
+                    "groupby ['company_id'], expressions ['quantity * sale_price(product_id)', "
+                    "'quantity * cost(product_id)']. Admite campos numéricos (también con punto por relaciones "
+                    "many2one, ej. 'product_id.weight'), números, + - * / ( ), y dos funciones sobre un campo de "
+                    "producto: sale_price(campo) = precio de venta unitario según la lista de precios de las cajas "
+                    "de la sucursal del registro; cost(campo) = costo unitario cargado en el producto para esa sucursal. products_at_zero cuenta productos con precio o costo en 0 (sin cargar): avisalo junto al total. groupby: campos "
+                    "directos (sin ':mes'); vacío para un total general.",
+     "parameters": {"type": "object", "properties": {
+         "model": {"type": "string"},
+         "domain": {"type": "string"},
+         "groupby": {"type": "array", "items": {"type": "string"}},
+         "expressions": {"type": "array", "items": {"type": "string"}},
+         "limit": {"type": "integer"}},
+         "required": ["model", "domain", "groupby", "expressions"]}},
 ]
 
 
@@ -243,6 +262,237 @@ def _calculate(env, ctx, expressions):
     return {"results": results}
 
 
+EXPR_FUNCS = ("sale_price", "cost")
+EXPR_NUMERIC = ("integer", "float", "monetary")
+EXPR_MAX_ROWS = 200000
+EXPR_BATCH = 5000
+
+
+def _expr_path(node):
+    """Name o Attribute → 'campo.subcampo'."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return "%s.%s" % (_expr_path(node.value), node.attr)
+    raise ToolError("Se esperaba un nombre de campo.")
+
+
+def _check_expr_path(env, model, path, final_types):
+    """Valida un camino: intermedios many2one y el último del tipo pedido."""
+    current = model
+    parts = path.split(".")
+    for index, name in enumerate(parts):
+        field = check_field(env, current, name)
+        if index < len(parts) - 1:
+            if field.type != "many2one":
+                raise ToolError("%s no es una relación simple (many2one) en %s." % (name, current))
+            current = field.comodel_name
+            check_model(env, current)
+    if field.type not in final_types and getattr(field, "comodel_name", None) not in final_types:
+        raise ToolError("%s no es un campo válido acá (tipo %s)." % (path, field.type))
+    return field
+
+
+def _compile_expression(env, model, expression):
+    """Valida la expresión y devuelve (árbol, caminos numéricos, {(función, camino de producto)})."""
+    try:
+        tree = ast.parse(str(expression), mode="eval")
+    except SyntaxError:
+        raise ToolError("Expresión inválida: %r" % expression)
+    paths, calls = set(), set()
+
+    def walk(node):
+        if isinstance(node, ast.Expression):
+            return walk(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+            return
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            return walk(node.operand)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
+            walk(node.left)
+            return walk(node.right)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id not in EXPR_FUNCS or len(node.args) != 1 or node.keywords:
+                raise ToolError("Funciones admitidas: sale_price(campo_producto), cost(campo_producto).")
+            path = _expr_path(node.args[0])
+            _check_expr_path(env, model, path, ("product.product",))
+            if node.func.id == "cost":
+                check_field(env, "product.product", "standard_price")
+            calls.add((node.func.id, path))
+            return
+        if isinstance(node, (ast.Name, ast.Attribute)):
+            path = _expr_path(node)
+            _check_expr_path(env, model, path, EXPR_NUMERIC)
+            paths.add(path)
+            return
+        raise ToolError("Solo se admiten campos, números, + - * / ( ), sale_price() y cost().")
+
+    walk(tree)
+    return tree, paths, calls
+
+
+def _resolve_path(record, path):
+    """Valor del camino en un registro (vacío = False)."""
+    value = record
+    for name in path.split("."):
+        value = value[name]
+    return value
+
+
+def _branch_pricelist(env, company):
+    """Lista de precios de la sucursal: la más usada por sus cajas; si no hay, la primera de la empresa."""
+    if "pos.config" in env:
+        counts = env["pos.config"].sudo()._read_group(
+            [("company_id", "=", company.id), ("pricelist_id", "!=", False)], ["pricelist_id"], ["__count"])
+        if counts:
+            return max(counts, key=lambda row: (row[1], -row[0].id))[0]
+    return env["product.pricelist"].sudo().search(
+        [("company_id", "in", [company.id, False])], order="sequence, id", limit=1)
+
+
+def _product_prices(env, func, company, products):
+    """{product_id: precio} de venta (lista de la sucursal) o costo (en la sucursal)."""
+    if func == "cost":
+        return {p.id: p.standard_price for p in products.with_company(company)}
+    pricelist = _branch_pricelist(env, company)
+    if not pricelist:
+        return {p.id: p.lst_price for p in products.with_company(company)}
+    return _fast_pricelist_prices(pricelist.with_company(company), products.with_company(company))
+
+
+def _fast_pricelist_prices(pricelist, products):
+    """Igual que pricelist._compute_price_rule(products, 1) pero indexando las reglas.
+
+    Odoo prueba cada producto contra todas las reglas (O(productos × reglas)): con listas de 20.000
+    reglas tarda minutos. Acá se mantiene el orden de reglas de Odoo y _is_applicable_for, solo que
+    cada producto se prueba contra sus candidatas (variante, plantilla, categoría, globales).
+    """
+    date = odoo_fields.Datetime.now()
+    currency = pricelist.currency_id or pricelist.env.company.currency_id
+    rules = pricelist._get_applicable_rules(products, date)
+    by_variant, by_tmpl, by_categ, global_rules = {}, {}, [], []
+    for index, rule in enumerate(rules):
+        if rule.applied_on == "0_product_variant":
+            by_variant.setdefault(rule.product_id.id, []).append(index)
+        elif rule.applied_on == "1_product":
+            by_tmpl.setdefault(rule.product_tmpl_id.id, []).append(index)
+        elif rule.applied_on == "2_product_category":
+            by_categ.append((index, rule.categ_id))
+        else:
+            global_rules.append(index)
+    empty = pricelist.env["product.pricelist.item"]
+    prices = {}
+    for product in products:
+        candidates = by_variant.get(product.id, []) + by_tmpl.get(product.product_tmpl_id.id, []) + global_rules
+        path = product.categ_id.parent_path or ""
+        candidates += [i for i, categ in by_categ if product.categ_id == categ or path.startswith(categ.parent_path)]
+        rule = empty
+        for index in sorted(candidates):
+            if rules[index]._is_applicable_for(product, 1.0):
+                rule = rules[index]
+                break
+        prices[product.id] = rule._compute_price(product, 1.0, product.uom_id, date=date, currency=currency)
+    return prices
+
+
+def _eval_expression(node, record, values, prices, company_id):
+    """Evalúa el árbol ya validado para un registro."""
+    if isinstance(node, ast.Expression):
+        return _eval_expression(node.body, record, values, prices, company_id)
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.UnaryOp):
+        value = _eval_expression(node.operand, record, values, prices, company_id)
+        return -value if isinstance(node.op, ast.USub) else value
+    if isinstance(node, ast.BinOp):
+        left = _eval_expression(node.left, record, values, prices, company_id)
+        right = _eval_expression(node.right, record, values, prices, company_id)
+        if isinstance(node.op, ast.Div):
+            return left / right if right else 0.0
+        return _BINOPS[type(node.op)](left, right)
+    if isinstance(node, ast.Call):
+        path = _expr_path(node.args[0])
+        product = values[path]
+        return prices.get((node.func.id, company_id), {}).get(product.id, 0.0) if product else 0.0
+    return values[_expr_path(node)] or 0.0
+
+
+def _sum_expression(env, ctx, model, domain, groupby, expressions, limit=None):
+    """Suma expresiones por registro, agrupadas. Corre como el usuario; solo los precios usan sudo."""
+    Model = check_model(env, model)
+    domain = parse_domain(env, model, domain)
+    groupby = list(groupby or [])
+    for name in groupby:
+        if ":" in str(name) or "." in str(name):
+            raise ToolError("groupby admite solo campos directos; para fechas por mes usá read_group.")
+        check_field(env, model, name)
+    if isinstance(expressions, str):
+        expressions = [expressions]
+    expressions = list(expressions or [])[:5]
+    if not expressions:
+        raise ToolError("Indicá al menos una expresión.")
+    compiled = [_compile_expression(env, model, expr) for expr in expressions]
+    paths = set().union(*(c[1] for c in compiled))
+    calls = set().union(*(c[2] for c in compiled))
+    records = Model.search(domain)
+    if len(records) > EXPR_MAX_ROWS:
+        raise ToolError("Son %s registros; acotá el dominio (máximo %s)." % (len(records), EXPR_MAX_ROWS))
+    has_company = "company_id" in Model._fields
+    default_company = env.company
+
+    # Precios de producto por sucursal, calculados en lote.
+    prices = {}
+    if calls:
+        wanted = {}
+        for rec in records:
+            company = (rec.company_id if has_company else None) or default_company
+            for _func, path in calls:
+                product = _resolve_path(rec, path)
+                if product:
+                    wanted.setdefault(company, set()).add(product.id)
+        for company, product_ids in wanted.items():
+            products = env["product.product"].sudo().browse(sorted(product_ids))
+            for func in {c[0] for c in calls}:
+                prices[(func, company.id)] = _product_prices(env, func, company, products)
+
+    groups = {}
+    for start in range(0, len(records), EXPR_BATCH):
+        for rec in records[start:start + EXPR_BATCH]:
+            company = (rec.company_id if has_company else None) or default_company
+            values = {path: _resolve_path(rec, path) for path in paths}
+            values.update({path: _resolve_path(rec, path) for _func, path in calls})
+            key = tuple(_plain(rec[name]) if rec._fields[name].relational else rec[name] for name in groupby)
+            key = tuple(tuple(map(tuple, k)) if isinstance(k, list) else k for k in key)
+            bucket = groups.setdefault(key, [0.0] * len(compiled) + [0])
+            for index, (tree, _paths, _calls) in enumerate(compiled):
+                bucket[index] += _eval_expression(tree, rec, values, prices, company.id)
+            bucket[-1] += 1
+    rows = []
+    for key, bucket in groups.items():
+        row = {name: (list(map(list, value)) if isinstance(value, tuple) else value) for name, value in zip(groupby, key)}
+        for expr, total in zip(expressions, bucket[:-1]):
+            row[expr] = round(total, 2)
+        row["records"] = bucket[-1]
+        rows.append(row)
+    rows.sort(key=lambda r: r[expressions[0]], reverse=True)
+    limit = min(int(limit or GROUP_LIMIT), get_param(env, "max_records"))
+    totals = {expr: round(sum(r[expr] for r in rows), 2) for expr in expressions}
+    result = {"groups": rows[:limit], "total_groups": len(rows), "shown": min(len(rows), limit),
+              "totals": totals, "records": len(records)}
+    if calls:
+        # Productos en cero: costo o precio sin cargar. El agente debe avisarlo junto al total.
+        zero = {}
+        for (func, _cid), product_prices in prices.items():
+            zero[func] = zero.get(func, 0) + sum(1 for value in product_prices.values() if not value)
+        result["products_at_zero"] = zero
+    if calls and any(c[0] == "sale_price" for c in calls):
+        companies = {c[1] for c in prices if c[0] == "sale_price"}
+        result["price_lists"] = {env["res.company"].browse(cid).name: _branch_pricelist(
+            env, env["res.company"].browse(cid)).display_name or "precio de la ficha" for cid in companies}
+    _remember_domain(ctx, model, domain)
+    return result
+
+
 _HANDLERS = {
     "calculate": _calculate,
     "list_models": _list_models,
@@ -250,6 +500,7 @@ _HANDLERS = {
     "search_read": _search_read,
     "read_group": _read_group,
     "search_count": _search_count,
+    "sum_expression": _sum_expression,
 }
 
 

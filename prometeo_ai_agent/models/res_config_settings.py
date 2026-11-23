@@ -1,4 +1,5 @@
-from odoo import _, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 from .. import llm
 
@@ -28,25 +29,30 @@ class ResConfigSettings(models.TransientModel):
     ai_digest_hour = fields.Integer("Hora del resumen diario", default=8, config_parameter=PREFIX + "digest_hour")
     ai_support_contact = fields.Char("Contacto de soporte", config_parameter=PREFIX + "support_contact",
                                      help="Se muestra cuando el servicio de IA falla. Ej.: Alexis, 11 5555-5555")
+    ai_business_notes = fields.Char(
+        "Notas del negocio", config_parameter=PREFIX + "business_notes",
+        help="El agente las lee en cada pregunta y las toma como ciertas.")
     ai_dismiss_silence_days = fields.Integer("Días de silencio al descartar", default=30,
                                              config_parameter=PREFIX + "dismiss_silence_days")
 
-    ai_anthropic_key = fields.Char("Clave de Claude (Anthropic)", compute="_compute_ai_keys",
-                                   inverse="_inverse_ai_anthropic_key", groups="prometeo_ai_agent.group_admin")
-    ai_openai_key = fields.Char("Clave de OpenAI", compute="_compute_ai_keys",
-                                inverse="_inverse_ai_openai_key", groups="prometeo_ai_agent.group_admin")
-    ai_openai_base_url = fields.Char("URL de OpenAI o compatible", compute="_compute_ai_keys",
-                                     inverse="_inverse_ai_openai_base_url", groups="prometeo_ai_agent.group_admin")
-    ai_google_key = fields.Char("Clave de Google Gemini", compute="_compute_ai_keys",
-                                inverse="_inverse_ai_google_key", groups="prometeo_ai_agent.group_admin")
-    ai_active_model_count = fields.Integer("Modelos activos", compute="_compute_ai_keys")
-    ai_month_cost = fields.Float("Gasto del mes (USD)", compute="_compute_ai_keys", digits=(12, 2))
-    ai_anthropic_status = fields.Char(compute="_compute_ai_keys")
-    ai_anthropic_ok = fields.Boolean(compute="_compute_ai_keys")
-    ai_openai_status = fields.Char(compute="_compute_ai_keys")
-    ai_openai_ok = fields.Boolean(compute="_compute_ai_keys")
-    ai_google_status = fields.Char(compute="_compute_ai_keys")
-    ai_google_ok = fields.Boolean(compute="_compute_ai_keys")
+    # Las claves no pasan por compute/inverse: el onchange inicial del formulario no corre computes sin
+    # dependencias, el campo llegaba vacío y al guardar pisaba la clave real. Se leen en get_values y se
+    # guardan en set_values; la clave nunca viaja al navegador y el campo vacío significa "no cambiar".
+    ai_anthropic_key = fields.Char("Nueva clave de Claude (Anthropic)", groups="prometeo_ai_agent.group_admin")
+    ai_openai_key = fields.Char("Nueva clave de OpenAI", groups="prometeo_ai_agent.group_admin")
+    ai_openai_base_url = fields.Char("URL de OpenAI o compatible", groups="prometeo_ai_agent.group_admin")
+    ai_google_key = fields.Char("Nueva clave de Google Gemini", groups="prometeo_ai_agent.group_admin")
+    ai_active_model_count = fields.Integer("Modelos activos", readonly=True)
+    ai_month_cost = fields.Float("Gasto del mes (USD)", readonly=True, digits=(12, 2))
+    ai_anthropic_status = fields.Char(readonly=True)
+    ai_anthropic_ok = fields.Boolean(readonly=True)
+    ai_anthropic_has_key = fields.Boolean(readonly=True)
+    ai_openai_status = fields.Char(readonly=True)
+    ai_openai_ok = fields.Boolean(readonly=True)
+    ai_openai_has_key = fields.Boolean(readonly=True)
+    ai_google_status = fields.Char(readonly=True)
+    ai_google_ok = fields.Boolean(readonly=True)
+    ai_google_has_key = fields.Boolean(readonly=True)
 
     def _ai_provider(self, provider_type):
         """Proveedor de ese tipo (el que tenga clave primero); lo crea si no existe."""
@@ -59,45 +65,58 @@ class ResConfigSettings(models.TransientModel):
                                         "base_url": llm.DEFAULT_BASE_URLS[provider_type]})
         return provider
 
-    def _compute_ai_keys(self):
-        """Lee las claves de los proveedores."""
+    @api.model
+    def _ai_is_admin(self):
+        """Solo el administrador del agente ve y guarda las claves."""
+        return self.env.su or self.env.user.has_group("prometeo_ai_agent.group_admin")
+
+    @api.model
+    def _ai_key_status(self, provider):
+        """Texto de estado de un proveedor: clave enmascarada más el resultado de la última prueba."""
+        if not provider.api_key:
+            return _("Sin clave cargada.")
+        masked = _("Clave cargada (termina en %s).", provider.api_key.strip()[-4:])
+        return "%s %s" % (masked, provider.check_message or _("Sin probar."))
+
+    @api.model
+    def get_values(self):
+        """Carga estado de proveedores, modelos activos y gasto. Los campos de clave quedan vacíos."""
+        res = super().get_values()
+        if not self._ai_is_admin():
+            return res
+        for ptype in ("anthropic", "openai", "google"):
+            provider = self._ai_provider(ptype)
+            res["ai_%s_status" % ptype] = self._ai_key_status(provider)
+            res["ai_%s_ok" % ptype] = provider.check_state == "ok"
+            res["ai_%s_has_key" % ptype] = bool(provider.api_key)
+        res["ai_openai_base_url"] = self._ai_provider("openai").base_url
+        res["ai_active_model_count"] = self.env["prometeo.ai.model"].sudo().search_count([("active", "=", True)])
+        res["ai_month_cost"] = self.env["prometeo.ai.run"].sudo()._month_cost()
+        return res
+
+    def set_values(self):
+        """Guarda solo las claves escritas (vacío = conservar) y la URL si cambió."""
+        super().set_values()
+        if not self._ai_is_admin():
+            return
         for rec in self:
-            rec.ai_anthropic_key = rec._ai_provider("anthropic").api_key
-            openai = rec._ai_provider("openai")
-            rec.ai_openai_key = openai.api_key
-            rec.ai_openai_base_url = openai.base_url
-            rec.ai_google_key = rec._ai_provider("google").api_key
-            rec.ai_active_model_count = self.env["prometeo.ai.model"].sudo().search_count([("active", "=", True)])
-            rec.ai_month_cost = self.env["prometeo.ai.run"].sudo()._month_cost()
             for ptype in ("anthropic", "openai", "google"):
+                key = (rec["ai_%s_key" % ptype] or "").strip()
                 provider = rec._ai_provider(ptype)
-                rec["ai_%s_status" % ptype] = provider.check_message or (
-                    _("Sin clave cargada.") if not provider.api_key else _("Clave sin probar."))
-                rec["ai_%s_ok" % ptype] = provider.check_state == "ok"
+                if key and key != provider.api_key:
+                    provider.api_key = key
+            url = (rec.ai_openai_base_url or "").strip()
+            openai = rec._ai_provider("openai")
+            if url and url != openai.base_url:
+                openai.base_url = url
 
-    def _inverse_ai_anthropic_key(self):
-        for rec in self:
-            provider = rec._ai_provider("anthropic")
-            if (provider.api_key or False) != (rec.ai_anthropic_key or False):
-                provider.api_key = rec.ai_anthropic_key
-
-    def _inverse_ai_openai_key(self):
-        for rec in self:
-            provider = rec._ai_provider("openai")
-            if (provider.api_key or False) != (rec.ai_openai_key or False):
-                provider.api_key = rec.ai_openai_key
-
-    def _inverse_ai_openai_base_url(self):
-        for rec in self:
-            provider = rec._ai_provider("openai")
-            if rec.ai_openai_base_url and rec.ai_openai_base_url != provider.base_url:
-                provider.base_url = rec.ai_openai_base_url
-
-    def _inverse_ai_google_key(self):
-        for rec in self:
-            provider = rec._ai_provider("google")
-            if (provider.api_key or False) != (rec.ai_google_key or False):
-                provider.api_key = rec.ai_google_key
+    def action_ai_clear_key(self):
+        """Borra la clave del proveedor indicado en el contexto (único modo de dejarlo sin clave)."""
+        ptype = self.env.context.get("ai_provider_type")
+        if ptype not in ("anthropic", "openai", "google") or not self._ai_is_admin():
+            raise UserError(_("Proveedor inválido."))
+        self._ai_provider(ptype).api_key = False
+        return {"type": "ir.actions.client", "tag": "soft_reload"}
 
     def _ai_fetch(self, provider_type):
         """Guarda los ajustes y trae los modelos del proveedor."""

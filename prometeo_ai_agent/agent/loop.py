@@ -29,6 +29,7 @@ STEP_VERBS = {
     "search_read": "Leyendo",
     "read_group": "Calculando totales en",
     "search_count": "Contando en",
+    "sum_expression": "Calculando valores en",
     "create_alert": "Dejando una alerta",
     "resolve_alert": "Cerrando una alerta",
 }
