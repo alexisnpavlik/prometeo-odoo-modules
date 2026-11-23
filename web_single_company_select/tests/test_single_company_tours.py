@@ -94,6 +94,33 @@ class TestSingleCompanySettingsTours(HttpCase):
         if self.skip_settings:
             self.skipTest("pos_hr no instalado")
 
+    def test_settings_admin_chain_three_companies(self):
+        """Como prod: la caja de la empresa de inicio tiene empleados de otras dos.
+
+        Ajustes carga con las tres empresas (la de inicio primero) y sin bucle.
+        """
+        Company = self.env["res.company"]
+        company_x = Company.create({"name": "SCS Ajustes X"})
+        Employee = self.env["hr.employee"]
+        emp_x = Employee.create({"name": "SCS Empleado X", "company_id": company_x.id})
+        config_x = self.env["pos.config"].with_company(company_x).create(
+            {"name": "Caja X", "payment_method_ids": [(6, 0, [])]}
+        )
+        emp_ab = Employee.search([("name", "in", ["SCS Empleado A", "SCS Empleado B"])])
+        self.env.cr.execute(
+            "INSERT INTO pos_hr_basic_employee_hr_employee (pos_config_id, hr_employee_id) "
+            "SELECT %s, e FROM unnest(%s) e ON CONFLICT DO NOTHING",
+            (config_x.id, (emp_ab + emp_x).ids),
+        )
+        self.env.invalidate_all()
+        new_test_user(
+            self.env, login="scs_settings_admin_x", groups="base.group_system,point_of_sale.group_pos_manager",
+            company_id=company_x.id,
+            company_ids=[(6, 0, [company_x.id, self.company_a.id, self.company_b.id])],
+        )
+        self.start_tour("/odoo/settings", "scs_settings_three_companies", login="scs_settings_admin_x")
+        self.assertTrue(company_x)
+
     def test_settings_admin_two_companies(self):
         """Admin con A y B entra a Ajustes: carga sin bucle de recargas."""
         self.start_tour("/odoo/settings", "scs_settings_no_loop", login="scs_settings_admin")

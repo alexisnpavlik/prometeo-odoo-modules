@@ -10,7 +10,7 @@ const LAST_AUTO_SWITCH_KEY = "web_single_company_select.last_auto_switch";
 const MULTI_IDS_KEY = "web_single_company_select.multi_ids";
 const AUTO_COUNT_KEY = "web_single_company_select.auto_count";
 const BOUNCE_WINDOW_MS = 60000;
-const MAX_AUTO_SWITCHES = 3;
+const MAX_AUTO_SWITCHES = 4;
 
 /**
  * Corta el cambio automático de empresa: en lugar de recargar la página se
@@ -88,24 +88,43 @@ export function pickSingleCompanyId(requestedIds, activeIds) {
 }
 
 /**
- * ¿Es un rebote? El formulario pide volver a la empresa de la que se acaba de
- * salir por un cambio automático: la pantalla necesita las dos a la vez (p. ej.
- * Ajustes muestra empleados de varias empresas) y saltar entre ellas sería un
- * bucle de recargas.
+ * ¿Hubo un cambio automático hace menos de un minuto que dejó activa la
+ * empresa actual? Si el formulario vuelve a pedir otra empresa, la pantalla
+ * necesita registros de varias empresas a la vez (p. ej. Ajustes muestra
+ * empleados de varias) y seguir saltando de a una sería un bucle de recargas.
  *
  * @param {{from: number, to: number, ts: number}|null} lastAutoSwitch
  * @param {number} currentId empresa activa hoy
- * @param {number} targetId empresa que pide el formulario
  * @param {number} now
  * @returns {boolean}
  */
-export function isBounce(lastAutoSwitch, currentId, targetId, now) {
+export function isRecentAutoSwitch(lastAutoSwitch, currentId, now) {
     return Boolean(
         lastAutoSwitch &&
             now - lastAutoSwitch.ts < BOUNCE_WINDOW_MS &&
-            lastAutoSwitch.to === currentId &&
-            lastAutoSwitch.from === targetId
+            lastAutoSwitch.to === currentId
     );
+}
+
+/**
+ * Empresas para una pantalla que necesita varias: la de origen primero (sigue
+ * siendo la empresa actual), después las activas y la pedida, sin repetir.
+ *
+ * @param {number|null} originId empresa de la que salió el cambio anterior
+ * @param {number[]} activeIds
+ * @param {number} targetId
+ * @returns {number[]}
+ */
+export function multiCompanyIds(originId, activeIds, targetId) {
+    const ids = originId ? [originId, ...activeIds, targetId] : [...activeIds, targetId];
+    return [...new Set(ids)];
+}
+
+/**
+ * Deja rastro en la consola del navegador de cada decisión automática.
+ */
+function logDecision(message, data) {
+    console.info(`[web_single_company_select] ${message}`, JSON.stringify(data));
 }
 
 patch(companyService, {
@@ -151,28 +170,28 @@ patch(companyService, {
                         return service.setCompanies([targetId], false);
                     }
                     const targetId = pickSingleCompanyId(requested, activeIds);
+                    const now = Date.now();
                     // la empresa pedida ya está activa: recargar no arregla nada
                     if (activeIds.includes(targetId)) {
+                        logDecision("corte: la empresa pedida ya está activa", { activeIds, targetId });
                         return stopAutoSwitch();
                     }
-                    if (autoSwitchLimitReached(Date.now())) {
+                    if (autoSwitchLimitReached(now)) {
+                        logDecision("corte: demasiados cambios automáticos", { activeIds, targetId });
                         return stopAutoSwitch();
                     }
                     const lastAutoSwitch = readSession(LAST_AUTO_SWITCH_KEY);
-                    if (
-                        multiMode ||
-                        isBounce(lastAutoSwitch, activeIds[0], targetId, Date.now())
-                    ) {
-                        const ids = [...new Set([...activeIds, targetId])];
+                    const recent = isRecentAutoSwitch(lastAutoSwitch, activeIds[0], now);
+                    if (multiMode || recent) {
+                        const originId = !multiMode && recent ? lastAutoSwitch.from : null;
+                        const ids = multiCompanyIds(originId, activeIds, targetId);
+                        logDecision("pantalla con varias empresas: se suman", { activeIds, targetId, ids });
                         writeSession(MULTI_IDS_KEY, ids);
                         writeSession(LAST_AUTO_SWITCH_KEY, null);
                         return service.setCompanies(ids, false);
                     }
-                    writeSession(LAST_AUTO_SWITCH_KEY, {
-                        from: activeIds[0],
-                        to: targetId,
-                        ts: Date.now(),
-                    });
+                    logDecision("registro de otra empresa: se cambia", { activeIds, targetId });
+                    writeSession(LAST_AUTO_SWITCH_KEY, { from: activeIds[0], to: targetId, ts: now });
                     return service.setCompanies([targetId], false);
                 },
             },
