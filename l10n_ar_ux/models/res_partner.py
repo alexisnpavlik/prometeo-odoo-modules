@@ -129,5 +129,11 @@ class ResPartner(models.Model):
             lambda p: p.vat and (p.l10n_latam_identification_type_id.l10n_ar_afip_code or p.country_code == "AR")
         )
         for partner in l10n_ar_partners:
-            if id_number := partner._get_id_number_sanitize():
+            try:
+                id_number = partner._get_id_number_sanitize()
+            except ValueError:
+                # Texto que no es un número (ej. un nombre en el campo CUIT): no se formatea;
+                # la validación del CUIT al guardar le avisa al usuario.
+                continue
+            if id_number:
                 partner.vat = str(id_number)
