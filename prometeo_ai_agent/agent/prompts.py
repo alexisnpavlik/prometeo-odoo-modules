@@ -3,13 +3,15 @@ from datetime import datetime
 
 import pytz
 
+from ..models.params import get_param
+
 DEFAULT_TZ = "America/Argentina/Buenos_Aires"
 
 OFF_TOPIC_REPLY = ("Solo puedo ayudarte con preguntas sobre los datos de tu negocio: ventas, stock, "
                    "compras, facturas, caja, clientes y proveedores.")
 
 BASE = """Sos el asistente de datos del sistema de gestión de este negocio (por dentro es Odoo 18). Fecha y hora actual: {now} ({tz}).
-Usuario: {user}. Empresas activas: {companies}.
+Usuario: {user}. Sucursal activa (la que el usuario ve en pantalla): {active_company}. Empresas activas: {companies}.
 
 Reglas:
 - Respondé en español, en texto plano y breve. Sin tablas markdown.
@@ -30,6 +32,13 @@ Cómo responder:
   01/11 al 21/11, todas las sucursales"). "Ventas" sin más son las ventas de caja cobradas o facturadas;
   nunca cuentes canceladas ni borradores, y no mezcles ventas de caja con facturas sin aclararlo.
 - Si el usuario tiene varias empresas activas, incluilas todas y desglosá por sucursal cuando sirva.
+- Si no dice sucursal, empezá por su sucursal activa (es lo que ve en pantalla) y después el total de
+  todas, desglosado (ej.: "En Mayorista, tu sucursal activa, se vendieron 4. En todas: 6, Mayorista 4 y
+  Santo Tomé 2").
+- Para totales que multiplican campos (valor del stock a precio de venta o a costo, ventas a costo,
+  márgenes) usá sum_expression: hace la cuenta sobre todos los registros. Nunca digas que el sistema no
+  puede calcular algo sin haber probado sum_expression. Si products_at_zero no es 0, avisá cuántos
+  productos no tienen precio o costo cargado.
 - Si el resultado da cero o vacío, decí cuál es la fecha del último registro que sí existe
   (ej.: "ayer no hubo ventas; la última fue el 04/11 en Caja 2").
 - Hablá como el dueño de un comercio: nada de estados técnicos ("contabilizada", "en proceso"), ni
@@ -57,6 +66,11 @@ Alcance:
   muestres nombres técnicos de modelos o campos (como stock.picking) salvo que te los pidan.
 """
 
+NOTES = """
+Notas del negocio (las escribió el administrador; tomalas como ciertas y priorizalas sobre tus supuestos):
+%s
+"""
+
 ROUTINE = """
 Estás ejecutando una rutina programada. Analizá lo que pide la rutina y, solo si encontrás algo que
 el dueño del negocio deba saber, dejalo con create_alert:
@@ -77,7 +91,10 @@ def build_system_prompt(env, mode):
     now = datetime.now(pytz.utc).astimezone(pytz.timezone(tz_name))
     companies = ", ".join(env.companies.mapped("name")) or env.company.name
     text = BASE.format(now=now.strftime("%Y-%m-%d %H:%M (%A)"), tz=tz_name, user=env.user.name,
-                       companies=companies, off_topic=OFF_TOPIC_REPLY)
+                       active_company=env.company.name, companies=companies, off_topic=OFF_TOPIC_REPLY)
+    notes = (get_param(env, "business_notes") or "").strip()
+    if notes:
+        text += NOTES % notes
     if mode == "routine":
         text += ROUTINE
     return text

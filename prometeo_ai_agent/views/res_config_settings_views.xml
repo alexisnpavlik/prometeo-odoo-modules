@@ -55,6 +55,11 @@
                             <button name="action_ai_open_models" type="object" string="Activar modelos y precios" class="btn-link" icon="oi-arrow-right"/>
                         </setting>
                     </block>
+                    <block title="Conocimiento del negocio" name="ai_notes_block">
+                        <setting string="Notas del negocio" help="Reglas propias que el agente no puede adivinar: qué cuenta como venta, qué precio usar, sucursales que no operan, productos de relleno. Una regla por línea.">
+                            <field name="ai_business_notes" widget="text" class="w-100" placeholder="Ej.: Las ventas de la Caja Mayorista de Impacto son al por mayor; no las mezcles con las minoristas."/>
+                        </setting>
+                    </block>
                     <block title="Límites" name="ai_limits_block">
                         <setting string="Consultas" help="Máximo de registros por consulta y tamaño del resultado que recibe el modelo.">
                             <div class="content-group">

@@ -14,6 +14,7 @@ DEFAULTS = {
     "digest_hour": 8,
     "dismiss_silence_days": 30,
     "support_contact": "",
+    "business_notes": "",
 }
 
 

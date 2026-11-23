@@ -10,3 +10,4 @@ from . import test_chat
 from . import test_review_fixes
 from . import test_live_steps
 from . import test_exactness
+from . import test_sum_expression
