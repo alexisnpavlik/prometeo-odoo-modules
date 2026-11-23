@@ -8,7 +8,34 @@ import { CompanySelector } from "@web/webclient/switch_company_menu/switch_compa
 
 const LAST_AUTO_SWITCH_KEY = "web_single_company_select.last_auto_switch";
 const MULTI_IDS_KEY = "web_single_company_select.multi_ids";
+const AUTO_COUNT_KEY = "web_single_company_select.auto_count";
 const BOUNCE_WINDOW_MS = 60000;
+const MAX_AUTO_SWITCHES = 3;
+
+/**
+ * Corta el cambio automático de empresa: en lugar de recargar la página se
+ * muestra el error original del formulario. Nunca puede haber un bucle.
+ */
+function stopAutoSwitch() {
+    writeSession(AUTO_COUNT_KEY, null);
+    writeSession(LAST_AUTO_SWITCH_KEY, null);
+    throw new Error(
+        "web_single_company_select: no se cambió de empresa automáticamente para no entrar en un bucle de recargas. Elegí la empresa en el selector."
+    );
+}
+
+/**
+ * Suma un cambio automático a la ventana actual y dice si se pasó del máximo.
+ */
+function autoSwitchLimitReached(now) {
+    const count = readSession(AUTO_COUNT_KEY);
+    const recent = count && now - count.ts < BOUNCE_WINDOW_MS ? count : { n: 0, ts: now };
+    if (recent.n >= MAX_AUTO_SWITCHES) {
+        return true;
+    }
+    writeSession(AUTO_COUNT_KEY, { n: recent.n + 1, ts: recent.ts });
+    return false;
+}
 
 /**
  * Lee un valor JSON de sessionStorage sin romper si no está disponible.
@@ -119,10 +146,18 @@ patch(companyService, {
                     if (!isAutoAdd) {
                         writeSession(MULTI_IDS_KEY, null);
                         writeSession(LAST_AUTO_SWITCH_KEY, null);
+                        writeSession(AUTO_COUNT_KEY, null);
                         const targetId = pickSingleCompanyId(requested, activeIds);
                         return service.setCompanies([targetId], false);
                     }
                     const targetId = pickSingleCompanyId(requested, activeIds);
+                    // la empresa pedida ya está activa: recargar no arregla nada
+                    if (activeIds.includes(targetId)) {
+                        return stopAutoSwitch();
+                    }
+                    if (autoSwitchLimitReached(Date.now())) {
+                        return stopAutoSwitch();
+                    }
                     const lastAutoSwitch = readSession(LAST_AUTO_SWITCH_KEY);
                     if (
                         multiMode ||

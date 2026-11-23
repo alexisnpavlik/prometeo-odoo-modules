@@ -1,6 +1,6 @@
 {
     "name": "Web - Una sola empresa a la vez",
-    "version": "18.0.1.0.1",
+    "version": "18.0.1.0.2",
     "category": "Hidden/Tools",
     "summary": "El selector de empresas permite elegir una sola empresa activa por vez",
     "description": """
@@ -26,7 +26,10 @@ Evita que los usuarios trabajen con dos o más empresas seleccionadas sin querer
             "web_single_company_select/static/src/xml/switch_company_menu.xml",
         ],
         "web.assets_unit_tests": [
-            "web_single_company_select/static/tests/**/*",
+            "web_single_company_select/static/tests/*.test.js",
+        ],
+        "web.assets_tests": [
+            "web_single_company_select/static/tests/tours/*.js",
         ],
     },
     "installable": True,

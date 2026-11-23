@@ -233,3 +233,41 @@ test("cookie con varias empresas sin permiso guardado: colapsa a una", async () 
     await makeMockEnv();
     expect(getService("company").activeCompanyIds).toEqual([2]);
 });
+
+test("corte: más de 3 cambios automáticos en un minuto no recarga", async () => {
+    browser.sessionStorage.setItem(
+        "web_single_company_select.auto_count",
+        JSON.stringify({ n: 3, ts: Date.now() })
+    );
+    stepOnCookieChange();
+    await makeMockEnv();
+    expect.verifySteps(["3"]);
+    const company = getService("company");
+    let error;
+    try {
+        await company.setCompanies([...company.activeCompanyIds, 2], true);
+    } catch (e) {
+        error = e;
+    }
+    expect(error?.message).toInclude("bucle");
+    expect.verifySteps([]);
+    expect(browser.sessionStorage.getItem("web_single_company_select.auto_count")).toBe(null);
+});
+
+test("corte: pedir una empresa que ya está activa no recarga", async () => {
+    browser.sessionStorage.setItem("web_single_company_select.multi_ids", JSON.stringify([2, 3]));
+    cookie.set("cids", "2-3");
+    stepOnCookieChange();
+    await makeMockEnv();
+    expect.verifySteps(["2-3"]);
+    const company = getService("company");
+    let error;
+    try {
+        // form_controller pide sumar una empresa que ya está (el error persiste)
+        await company.setCompanies([2, 3, 3], true);
+    } catch (e) {
+        error = e;
+    }
+    expect(error?.message).toInclude("bucle");
+    expect.verifySteps([]);
+});
