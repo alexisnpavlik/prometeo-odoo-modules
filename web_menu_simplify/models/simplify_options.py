@@ -216,6 +216,7 @@ OTHER_OPTIONS = (
     "replenish_hide_route",
     "replenish_vendor_partner",
     "purchase_return_button",
+    "block_uom_create",
 )
 
 ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *MENU_OPTIONS_WHEN_OFF, *VIEW_OPTIONS, *APP_START_OPTIONS, *OTHER_OPTIONS)))

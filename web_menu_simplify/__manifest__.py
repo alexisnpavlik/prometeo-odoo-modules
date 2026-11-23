@@ -1,6 +1,6 @@
 {
     "name": "Web - Menús simplificados",
-    "version": "18.0.1.0.2",
+    "version": "18.0.1.0.3",
     "category": "Hidden/Tools",
     "summary": "Oculta menús avanzados, botones de producto y chat/actividades, configurable desde Ajustes",
     "description": """
@@ -33,7 +33,7 @@
     "author": "Alexis Medina",
     "website": "alexis.medn@gmail.com",
     "license": "LGPL-3",
-    "depends": ["web", "mail", "product", "account", "point_of_sale", "stock", "purchase", "purchase_stock"],
+    "depends": ["web", "mail", "product", "account", "point_of_sale", "stock", "purchase", "purchase_stock", "uom"],
     "data": [
         "data/stock_location_data.xml",
         "views/res_config_settings_views.xml",
