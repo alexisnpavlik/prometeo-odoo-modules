@@ -18,7 +18,7 @@ import { cookie } from "@web/core/browser/cookie";
 import { user } from "@web/core/user";
 import { SwitchCompanyMenu } from "@web/webclient/switch_company_menu/switch_company_menu";
 import { WebClient } from "@web/webclient/webclient";
-import { isBounce, pickSingleCompanyId } from "@web_single_company_select/js/single_company";
+import { isRecentAutoSwitch, multiCompanyIds, pickSingleCompanyId } from "@web_single_company_select/js/single_company";
 import { browser } from "@web/core/browser/browser";
 
 describe.current.tags("desktop");
@@ -171,12 +171,15 @@ test("abrir un registro de otra empresa cambia a esa empresa, no la suma", async
     expect(user.context.allowed_company_ids).toEqual([2]);
 });
 
-test("isBounce: volver enseguida a la empresa de la que se salió", () => {
-    const last = { from: 2, to: 3, ts: 1000 };
-    expect(isBounce(last, 3, 2, 2000)).toBe(true);
-    expect(isBounce(last, 3, 5, 2000)).toBe(false); // otra empresa
-    expect(isBounce(last, 3, 2, 1000 + 61000)).toBe(false); // pasó el minuto
-    expect(isBounce(null, 3, 2, 2000)).toBe(false);
+test("isRecentAutoSwitch y multiCompanyIds", () => {
+    const last = { from: 5, to: 3, ts: 1000 };
+    expect(isRecentAutoSwitch(last, 3, 2000)).toBe(true);
+    expect(isRecentAutoSwitch(last, 2, 2000)).toBe(false); // no dejó activa a 2
+    expect(isRecentAutoSwitch(last, 3, 1000 + 61000)).toBe(false); // pasó el minuto
+    expect(isRecentAutoSwitch(null, 3, 2000)).toBe(false);
+    expect(multiCompanyIds(5, [3], 2)).toEqual([5, 3, 2]);
+    expect(multiCompanyIds(3, [2], 3)).toEqual([3, 2]);
+    expect(multiCompanyIds(null, [2, 3], 5)).toEqual([2, 3, 5]);
 });
 
 test("rebote (Ajustes con empleados de dos empresas): deja las dos, sin bucle", async () => {
@@ -202,10 +205,10 @@ test("rebote: estando en 2 y pidiendo volver a 3, activa las dos", async () => {
     expect.verifySteps(["2"]);
     const company = getService("company");
     await company.setCompanies([...company.activeCompanyIds, 3], true);
-    expect.verifySteps(["2-3"]);
+    expect.verifySteps(["3-2"]);
     expect(
         JSON.parse(browser.sessionStorage.getItem("web_single_company_select.multi_ids"))
-    ).toEqual([2, 3]);
+    ).toEqual([3, 2]);
 });
 
 test("rebote: al recargar con las dos permitidas no las colapsa", async () => {
@@ -234,10 +237,10 @@ test("cookie con varias empresas sin permiso guardado: colapsa a una", async () 
     expect(getService("company").activeCompanyIds).toEqual([2]);
 });
 
-test("corte: más de 3 cambios automáticos en un minuto no recarga", async () => {
+test("corte: más de 4 cambios automáticos en un minuto no recarga", async () => {
     browser.sessionStorage.setItem(
         "web_single_company_select.auto_count",
-        JSON.stringify({ n: 3, ts: Date.now() })
+        JSON.stringify({ n: 4, ts: Date.now() })
     );
     stepOnCookieChange();
     await makeMockEnv();
@@ -270,4 +273,22 @@ test("corte: pedir una empresa que ya está activa no recarga", async () => {
     }
     expect(error?.message).toInclude("bucle");
     expect.verifySteps([]);
+});
+
+test("cadena por tres empresas (prod: 5 -> 3 -> pide 2): suma las tres con la de origen primero", async () => {
+    serverState.companies = [
+        ...serverState.companies,
+        { id: 6, name: "Sucursal 5", sequence: 6, parent_id: false, child_ids: [] },
+    ];
+    browser.sessionStorage.setItem(
+        "web_single_company_select.last_auto_switch",
+        JSON.stringify({ from: 6, to: 3, ts: Date.now() })
+    );
+    cookie.set("cids", "3");
+    stepOnCookieChange();
+    await makeMockEnv();
+    expect.verifySteps(["3"]);
+    const company = getService("company");
+    await company.setCompanies([...company.activeCompanyIds, 2], true);
+    expect.verifySteps(["6-3-2"]);
 });

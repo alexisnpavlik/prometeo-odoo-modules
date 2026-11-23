@@ -1,6 +1,6 @@
 {
     "name": "Web - Una sola empresa a la vez",
-    "version": "18.0.1.0.2",
+    "version": "18.0.1.0.3",
     "category": "Hidden/Tools",
     "summary": "El selector de empresas permite elegir una sola empresa activa por vez",
     "description": """

@@ -125,3 +125,20 @@ registry.category("web_tour.tours").add("scs_settings_error_no_loop", {
         ...noReloadLoop(),
     ],
 });
+
+// Caso prod: la caja de la empresa de inicio tiene empleados de otras dos.
+registry.category("web_tour.tours").add("scs_settings_three_companies", {
+    steps: () => [
+        {
+            content: "Ajustes cargó",
+            trigger: ".o_form_view .app_settings_block, .o_form_view .o_setting_box",
+            run() {
+                console.log(`SCS_RESULT three cids=${activeCompanyIds().join("-")}`);
+            },
+        },
+        checkCompanies("las tres empresas activas", (ids) =>
+            ids.length === 3 ? null : "esperaba tres empresas"
+        ),
+        ...noReloadLoop(),
+    ],
+});
