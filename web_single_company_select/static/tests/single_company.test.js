@@ -18,7 +18,8 @@ import { cookie } from "@web/core/browser/cookie";
 import { user } from "@web/core/user";
 import { SwitchCompanyMenu } from "@web/webclient/switch_company_menu/switch_company_menu";
 import { WebClient } from "@web/webclient/webclient";
-import { pickSingleCompanyId } from "@web_single_company_select/js/single_company";
+import { isBounce, pickSingleCompanyId } from "@web_single_company_select/js/single_company";
+import { browser } from "@web/core/browser/browser";
 
 describe.current.tags("desktop");
 
@@ -168,4 +169,67 @@ test("abrir un registro de otra empresa cambia a esa empresa, no la suma", async
     await animationFrame();
     expect.verifySteps(["2"]);
     expect(user.context.allowed_company_ids).toEqual([2]);
+});
+
+test("isBounce: volver enseguida a la empresa de la que se salió", () => {
+    const last = { from: 2, to: 3, ts: 1000 };
+    expect(isBounce(last, 3, 2, 2000)).toBe(true);
+    expect(isBounce(last, 3, 5, 2000)).toBe(false); // otra empresa
+    expect(isBounce(last, 3, 2, 1000 + 61000)).toBe(false); // pasó el minuto
+    expect(isBounce(null, 3, 2, 2000)).toBe(false);
+});
+
+test("rebote (Ajustes con empleados de dos empresas): deja las dos, sin bucle", async () => {
+    // 1ra carga en Hermit (3): el formulario pide Herman's (2) -> cambia a 2
+    stepOnCookieChange();
+    await makeMockEnv();
+    expect.verifySteps(["3"]);
+    let company = getService("company");
+    await company.setCompanies([...company.activeCompanyIds, 2], true);
+    expect.verifySteps(["2"]);
+    const saved = browser.sessionStorage.getItem("web_single_company_select.last_auto_switch");
+    expect(JSON.parse(saved)).toMatchObject({ from: 3, to: 2 });
+});
+
+test("rebote: estando en 2 y pidiendo volver a 3, activa las dos", async () => {
+    browser.sessionStorage.setItem(
+        "web_single_company_select.last_auto_switch",
+        JSON.stringify({ from: 3, to: 2, ts: Date.now() })
+    );
+    cookie.set("cids", "2");
+    stepOnCookieChange();
+    await makeMockEnv();
+    expect.verifySteps(["2"]);
+    const company = getService("company");
+    await company.setCompanies([...company.activeCompanyIds, 3], true);
+    expect.verifySteps(["2-3"]);
+    expect(
+        JSON.parse(browser.sessionStorage.getItem("web_single_company_select.multi_ids"))
+    ).toEqual([2, 3]);
+});
+
+test("rebote: al recargar con las dos permitidas no las colapsa", async () => {
+    browser.sessionStorage.setItem("web_single_company_select.multi_ids", JSON.stringify([2, 3]));
+    cookie.set("cids", "2-3");
+    await makeMockEnv();
+    expect(getService("company").activeCompanyIds).toEqual([2, 3]);
+});
+
+test("elegir una empresa en el selector sale del modo varias empresas", async () => {
+    browser.sessionStorage.setItem("web_single_company_select.multi_ids", JSON.stringify([2, 3]));
+    cookie.set("cids", "2-3");
+    stepOnCookieChange();
+    await mountWithCleanup(SwitchCompanyMenu);
+    expect.verifySteps(["2-3"]);
+    await openCompanyMenu();
+    await contains("[data-company-id='3'] [role=menuitemradio]").click();
+    expect.verifySteps(["3"]);
+    expect(browser.sessionStorage.getItem("web_single_company_select.multi_ids")).toBe(null);
+});
+
+test("cookie con varias empresas sin permiso guardado: colapsa a una", async () => {
+    browser.sessionStorage.setItem("web_single_company_select.multi_ids", JSON.stringify([2, 5]));
+    cookie.set("cids", "2-3");
+    await makeMockEnv();
+    expect(getService("company").activeCompanyIds).toEqual([2]);
 });
