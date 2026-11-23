@@ -234,10 +234,10 @@ test("cookie con varias empresas sin permiso guardado: colapsa a una", async () 
     expect(getService("company").activeCompanyIds).toEqual([2]);
 });
 
-test("corte: más de 2 cambios automáticos en un minuto no recarga", async () => {
+test("corte: más de 3 cambios automáticos en un minuto no recarga", async () => {
     browser.sessionStorage.setItem(
         "web_single_company_select.auto_count",
-        JSON.stringify({ n: 2, ts: Date.now() })
+        JSON.stringify({ n: 3, ts: Date.now() })
     );
     stepOnCookieChange();
     await makeMockEnv();

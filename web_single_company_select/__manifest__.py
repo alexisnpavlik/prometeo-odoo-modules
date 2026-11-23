@@ -26,7 +26,10 @@ Evita que los usuarios trabajen con dos o más empresas seleccionadas sin querer
             "web_single_company_select/static/src/xml/switch_company_menu.xml",
         ],
         "web.assets_unit_tests": [
-            "web_single_company_select/static/tests/**/*",
+            "web_single_company_select/static/tests/*.test.js",
+        ],
+        "web.assets_tests": [
+            "web_single_company_select/static/tests/tours/*.js",
         ],
     },
     "installable": True,

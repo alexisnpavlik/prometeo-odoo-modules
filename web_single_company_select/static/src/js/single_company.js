@@ -10,7 +10,7 @@ const LAST_AUTO_SWITCH_KEY = "web_single_company_select.last_auto_switch";
 const MULTI_IDS_KEY = "web_single_company_select.multi_ids";
 const AUTO_COUNT_KEY = "web_single_company_select.auto_count";
 const BOUNCE_WINDOW_MS = 60000;
-const MAX_AUTO_SWITCHES = 2;
+const MAX_AUTO_SWITCHES = 3;
 
 /**
  * Corta el cambio automático de empresa: en lugar de recargar la página se
