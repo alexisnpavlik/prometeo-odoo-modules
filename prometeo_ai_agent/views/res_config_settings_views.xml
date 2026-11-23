@@ -10,7 +10,8 @@
                      groups="prometeo_ai_agent.group_admin">
                     <block title="Proveedores" name="ai_providers_block">
                         <setting string="Claude (Anthropic)" help="Clave de API de console.anthropic.com.">
-                            <field name="ai_anthropic_key" password="True" placeholder="sk-ant-..."/>
+                            <field name="ai_anthropic_has_key" invisible="1"/>
+                            <field name="ai_anthropic_key" password="True" placeholder="Pegá una clave nueva (sk-ant-...) — vacío conserva la actual"/>
                             <div class="mt8 small">
                                 <field name="ai_anthropic_ok" invisible="1"/>
                                 <span invisible="not ai_anthropic_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
@@ -18,9 +19,11 @@
                                 <field name="ai_anthropic_status" class="d-inline" readonly="1"/>
                             </div>
                             <button name="action_ai_fetch_models_anthropic" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                            <button name="action_ai_clear_key" type="object" string="Quitar clave" class="btn-link text-danger" icon="fa-trash" context="{'ai_provider_type': 'anthropic'}" invisible="not ai_anthropic_has_key" confirm="¿Quitar la clave? El agente deja de usar este proveedor."/>
                         </setting>
                         <setting string="OpenAI o compatible" help="Cambiando la URL sirve para cualquier API compatible con OpenAI.">
-                            <field name="ai_openai_key" password="True" placeholder="sk-..."/>
+                            <field name="ai_openai_has_key" invisible="1"/>
+                            <field name="ai_openai_key" password="True" placeholder="Pegá una clave nueva (sk-...) — vacío conserva la actual"/>
                             <div class="mt8 small">
                                 <field name="ai_openai_ok" invisible="1"/>
                                 <span invisible="not ai_openai_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
@@ -29,9 +32,11 @@
                             </div>
                             <div class="content-group mt8"><label for="ai_openai_base_url" string="URL" class="me-2"/><field name="ai_openai_base_url"/></div>
                             <button name="action_ai_fetch_models_openai" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                            <button name="action_ai_clear_key" type="object" string="Quitar clave" class="btn-link text-danger" icon="fa-trash" context="{'ai_provider_type': 'openai'}" invisible="not ai_openai_has_key" confirm="¿Quitar la clave? El agente deja de usar este proveedor."/>
                         </setting>
                         <setting string="Google Gemini" help="Clave de API de aistudio.google.com.">
-                            <field name="ai_google_key" password="True" placeholder="AIza..."/>
+                            <field name="ai_google_has_key" invisible="1"/>
+                            <field name="ai_google_key" password="True" placeholder="Pegá una clave nueva (AIza...) — vacío conserva la actual"/>
                             <div class="mt8 small">
                                 <field name="ai_google_ok" invisible="1"/>
                                 <span invisible="not ai_google_ok" class="text-success"><i class="fa fa-check-circle me-1"/></span>
@@ -39,6 +44,7 @@
                                 <field name="ai_google_status" class="d-inline" readonly="1"/>
                             </div>
                             <button name="action_ai_fetch_models_google" type="object" string="Actualizar modelos" class="btn-link" icon="oi-arrow-right"/>
+                            <button name="action_ai_clear_key" type="object" string="Quitar clave" class="btn-link text-danger" icon="fa-trash" context="{'ai_provider_type': 'google'}" invisible="not ai_google_has_key" confirm="¿Quitar la clave? El agente deja de usar este proveedor."/>
                         </setting>
                     </block>
                     <block title="Modelo por defecto" name="ai_model_block">

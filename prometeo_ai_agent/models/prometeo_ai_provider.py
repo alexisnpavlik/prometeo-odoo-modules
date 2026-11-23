@@ -37,7 +37,7 @@ class PrometeoAiProvider(models.Model):
         return {"type": rec.provider_type, "api_key": rec.api_key, "base_url": rec.base_url.rstrip("/")}
 
     def _sync_models(self, listed):
-        """Crea los modelos que falten. Si el proveedor no tiene ninguno activo, activa los de precio conocido."""
+        """Crea los modelos que falten, siempre inactivos: el administrador activa a mano los que quiere usar."""
         self.ensure_one()
         Model = self.env["prometeo.ai.model"].sudo().with_context(active_test=False)
         existing = set(Model.search([("provider_id", "=", self.id)]).mapped("name"))
@@ -51,19 +51,15 @@ class PrometeoAiProvider(models.Model):
                 "provider_id": self.id, "name": item["name"], "label": item.get("label") or item["name"],
                 "active": False, "price_input": price[0] if price else 0.0,
                 "price_output": price[1] if price else 0.0, "price_known": bool(price)})
-        created = Model.create(vals_list)
-        mine = Model.search([("provider_id", "=", self.id)])
-        if not mine.filtered("active"):
-            mine.filtered("price_known").write({"active": True})
-        self._ensure_default_model()
-        return created
+        return Model.create(vals_list)
 
     def _ensure_default_model(self):
-        """Si no hay modelo por defecto, elige uno activo con precio: el más barato que no sea 'lite'."""
+        """Si no hay modelo por defecto, elige uno activo: el más barato con precio que no sea 'lite'."""
         if self.env["prometeo.ai.model"]._get_default():
             return
-        active = self.env["prometeo.ai.model"].sudo().search([("active", "=", True), ("price_known", "=", True)],
-                                                             order="price_input, id")
+        Model = self.env["prometeo.ai.model"].sudo()
+        active = (Model.search([("active", "=", True), ("price_known", "=", True)], order="price_input, id")
+                  or Model.search([("active", "=", True)], order="id"))
         choice = active.filtered(lambda m: "lite" not in m.name)[:1] or active[:1]
         if choice:
             self.env["ir.config_parameter"].sudo().set_param("prometeo_ai_agent.default_model_id", choice.id)
