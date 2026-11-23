@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Sin "Seleccionar todas": queda solo el buscador -->
+    <t t-inherit="web.SwitchCompanyMenu.Items" t-inherit-mode="extension">
+        <xpath expr="//div[@t-on-click='() => companySelector.selectAll()']" position="attributes">
+            <attribute name="t-if">false</attribute>
+        </xpath>
+    </t>
+
+    <!-- Casillero → botón de opción: deja claro que se elige una sola -->
+    <t t-inherit="web.SwitchCompanyItem" t-inherit-mode="extension">
+        <xpath expr="//div[@role='menuitemcheckbox']" position="attributes">
+            <attribute name="role">menuitemradio</attribute>
+            <attribute name="t-att-title">'Entrar a ' + props.company.name</attribute>
+        </xpath>
+        <xpath expr="//i[hasclass('fa-fw')]" position="attributes">
+            <attribute name="t-att-class">isCompanySelected ? 'fa-dot-circle-o text-primary' : 'fa-circle-o'</attribute>
+        </xpath>
+    </t>
+
+</templates>
