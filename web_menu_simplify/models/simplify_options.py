@@ -102,8 +102,8 @@ VIEW_OPTIONS = {
     "purchase_confirmed_only_return": {
         "models": ("purchase.order",),
         "form": (
-            # Cancelar se oculta siempre: en borrador hace lo mismo que Descartar.
-            "//header/button[@name='button_cancel']",
+            # Cancelar en borrador y confirmada (sin el estado "a aprobar", que no se usa).
+            ("//header/button[@name='button_cancel']", "invisible", "state not in ('draft', 'sent', 'purchase')"),
             "//header/button[@name='button_done']",
             "//header/button[@name='button_unlock']",
             "//header/button[@name='confirm_reminder_mail']",
@@ -217,6 +217,7 @@ OTHER_OPTIONS = (
     "replenish_vendor_partner",
     "purchase_return_button",
     "block_uom_create",
+    "hide_send_message",
 )
 
 ALL_OPTIONS = tuple(dict.fromkeys((*MENU_OPTIONS, *MENU_OPTIONS_WHEN_OFF, *VIEW_OPTIONS, *APP_START_OPTIONS, *OTHER_OPTIONS)))

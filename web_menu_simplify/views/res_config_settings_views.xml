@@ -8,6 +8,9 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Interfaz simplificada" string="Interfaz simplificada" name="web_menu_simplify">
                     <block title="General" name="simplify_general">
+                        <setting help="Saca el botón Enviar mensaje del historial de todos los formularios. Registrar una nota y Actividades siguen disponibles.">
+                            <field name="simplify_hide_send_message"/>
+                        </setting>
                         <setting help="App de chat interno: oculta el menú y bloquea abrirla por URL.">
                             <field name="simplify_hide_discuss"/>
                         </setting>
@@ -61,7 +64,7 @@
                         <setting help="El título dice siempre Orden de compra y no se muestra la barra Solicitud de cotización → enviada → Orden de compra.">
                             <field name="simplify_purchase_order_no_rfq"/>
                         </setting>
-                        <setting help="Sin Cancelar (en borrador ya está Descartar), Bloquear, Desbloquear, Confirmar la fecha de recepción ni el botón Recepción. Ya confirmada, la orden muestra solo Devolver e Imprimir.">
+                        <setting help="Sin Bloquear, Desbloquear, Confirmar la fecha de recepción ni el botón Recepción. En borrador quedan Confirmar e ingresar y Cancelar; ya confirmada, Devolver, Imprimir y Cancelar.">
                             <field name="simplify_purchase_confirmed_only_return"/>
                         </setting>
                     </block>

@@ -16,3 +16,8 @@ if (session.web_menu_simplify_hide_systray) {
     // Las ventanas de chat se registran al iniciar su servicio: se ocultan por CSS.
     document.documentElement.classList.add("o_web_menu_simplify_hide_chat");
 }
+
+// Enviar mensaje del historial: se oculta por CSS en todos los formularios.
+if (session.web_menu_simplify_hide_send_message) {
+    document.documentElement.classList.add("o_web_menu_simplify_hide_send_message");
+}
