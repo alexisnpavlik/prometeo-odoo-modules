@@ -39,10 +39,9 @@ export class PromotionHints extends Component {
         return (name.match(/[\p{L}\p{N}]/gu) || []).slice(0, 2).join("").toUpperCase();
     }
 
-    /** "+ 1 Coca-Cola" o "+ 1 Coca-Cola, + 2 Hielo". */
-    missingText(hint) {
-        // Nombre del producto sin la variante: "Escritorio personalizable", no "(Personalizado, Blanco)".
-        return hint.missing.map(({ product, qty }) => `+ ${qty} ${product.name || product.display_name}`).join(", ");
+    /** Una línea por producto que falta: "+ 1 Escritorio personalizable" (sin la variante). */
+    missingText({ product, qty }) {
+        return `+ ${qty} ${product.name || product.display_name}`;
     }
 
     formatCurrency(amount) {

@@ -7,7 +7,7 @@
                 <div t-if="!isCollapsed(hint)" class="o_promotion_hint_card">
                     <button type="button" class="o_promotion_hint_close btn-close" aria-label="Descartar"
                             t-on-click.stop="() => this.onClose(hint)"/>
-                    <div class="o_promotion_hint_missing" t-esc="missingText(hint)"/>
+                    <div t-foreach="hint.missing" t-as="item" t-key="item.product.id" class="o_promotion_hint_missing" t-esc="missingText(item)"/>
                     <div class="o_promotion_hint_price"><t t-esc="hint.name"/> a</div>
                     <div class="o_promotion_hint_amount">
                         <t t-esc="formatCurrency(hint.price)"/>

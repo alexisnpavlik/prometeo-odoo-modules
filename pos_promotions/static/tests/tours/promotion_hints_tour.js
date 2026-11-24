@@ -167,5 +167,16 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             ProductScreen.clickDisplayedProduct("PH Vaso"),
             expectHints("orden nueva: lo descartado no se arrastra", [VASOS]),
             { content: "círculo en la orden nueva", trigger: DOT },
+            ProductScreen.clickDisplayedProduct("PH Mesa"),
+            dom("cada producto que falta en su línea, completo", () => {
+                const lines = [...document.querySelectorAll(`${row("Promo Living")} .o_promotion_hint_missing`)];
+                const texts = lines.map((el) => el.textContent.trim());
+                if (JSON.stringify(texts) !== JSON.stringify(["+ 2 PH Silla de comedor tapizada", "+ 1 PH Lámpara colgante de techo"])) {
+                    fail(`líneas: ${JSON.stringify(texts)}`);
+                }
+                if (lines.some((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) {
+                    fail("un nombre quedó cortado");
+                }
+            }),
         ].flat(),
 });
