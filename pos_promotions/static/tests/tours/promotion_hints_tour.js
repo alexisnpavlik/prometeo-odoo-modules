@@ -44,11 +44,12 @@ function dom(content, check) {
 
 const DOT = ".o_promotion_hints .o_promotion_hint_dot";
 const CARD = ".o_promotion_hints .o_promotion_hint_card";
-const row = (name) => `.o_promotion_hints .o_promotion_hint_row[data-promo='${name}']`;
+const applied = (name) => `.o_promotion_hints .o_promotion_hint_row_applied[data-promo='${name}']`;
+const row = (name) => `.o_promotion_hints .o_promotion_hint_row:not(.o_promotion_hint_row_applied)[data-promo='${name}']`;
 
 /** Las filas en orden: [{promo, card: bool, top}] (una fila por promo, círculo a la derecha). */
 function rows() {
-    return [...document.querySelectorAll(".o_promotion_hints .o_promotion_hint_row")].map((el) => ({
+    return [...document.querySelectorAll(".o_promotion_hints .o_promotion_hint_row:not(.o_promotion_hint_row_applied)")].map((el) => ({
         promo: el.dataset.promo,
         card: Boolean(el.querySelector(".o_promotion_hint_card")),
         top: el.getBoundingClientRect().top,
@@ -72,13 +73,19 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             { content: "burbuja abierta con el texto", trigger: `${CARD}:contains('+ 1 PH Vaso'):contains('Ahorra')` },
             ProductScreen.clickDisplayedProduct("PH Vaso"),
             expectHints("2 Vasos: promo aplicada, sin hint", []),
-            dom("sin círculos con la promo completa", () => {
-                if (document.querySelector(DOT)) {
-                    fail("quedó un círculo con la promo completa");
+            { content: "la promo aplicada queda en el cuadro", trigger: `${applied(VASOS.name)} .o_promotion_hint_card:contains('Aplicada'):contains('Ahorra'):contains('300')` },
+            dom("la aplicada no se puede descartar y no hay pendientes", () => {
+                if (document.querySelector(`${applied(VASOS.name)} .o_promotion_hint_close`)) {
+                    fail("la promo aplicada tiene ✕");
+                }
+                if (document.querySelector(row(VASOS.name))) {
+                    fail("quedó la promo como pendiente");
                 }
             }),
             ProductScreen.clickDisplayedProduct("PH Vaso"),
             expectHints("3 Vasos: sobra 1, falta otro", [VASOS]),
+            { content: "3 Vasos: la pendiente", trigger: `${row(VASOS.name)} .o_promotion_hint_card:contains('+ 1 PH Vaso')` },
+            { content: "3 Vasos: y la aplicada", trigger: `${applied(VASOS.name)} .o_promotion_hint_card:contains('Aplicada')` },
             ProductScreen.clickDisplayedProduct("PH Fernet"),
             expectHints("Fernet: primero la que más ahorra", [FERNET, VASOS]),
             { content: "fila de Fernet con su texto", trigger: `${row(FERNET.name)} .o_promotion_hint_card:contains('+ 1 PH Coca'):contains('Promo Fernet Coca'):contains('Ahorra')` },

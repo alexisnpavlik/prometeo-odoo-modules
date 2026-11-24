@@ -24,6 +24,23 @@ export class PromotionHints extends Component {
         return this.order?.getPromotionHints() || [];
     }
 
+    get applied() {
+        return this.order?.getAppliedPromotions() || [];
+    }
+
+    /** Clave para ocultar el texto: las aplicadas van aparte de las pendientes de la misma promo. */
+    appliedKey(promo) {
+        return `applied-${promo.tmplId}`;
+    }
+
+    isAppliedCollapsed(promo) {
+        return (this.order?.uiState.collapsedPromotionHints || []).includes(this.appliedKey(promo));
+    }
+
+    onClickAppliedDot(promo) {
+        this._toggleCollapsed(this.appliedKey(promo));
+    }
+
     /** Promo con el texto oculto (el cajero tocó su círculo para destapar productos). */
     isCollapsed(hint) {
         return (this.order?.uiState.collapsedPromotionHints || []).includes(hint.tmplId);
@@ -50,11 +67,15 @@ export class PromotionHints extends Component {
 
     /** Oculta o muestra el texto de la promo (no la descarta). */
     onClickDot(hint) {
+        this._toggleCollapsed(hint.tmplId);
+    }
+
+    _toggleCollapsed(key) {
         const uiState = this.order.uiState;
         const collapsed = uiState.collapsedPromotionHints || [];
-        uiState.collapsedPromotionHints = collapsed.includes(hint.tmplId)
-            ? collapsed.filter((id) => id !== hint.tmplId)
-            : [...collapsed, hint.tmplId];
+        uiState.collapsedPromotionHints = collapsed.includes(key)
+            ? collapsed.filter((id) => id !== key)
+            : [...collapsed, key];
     }
 
     onClose(hint) {

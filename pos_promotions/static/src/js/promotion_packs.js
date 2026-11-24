@@ -284,6 +284,36 @@ patch(PosOrder.prototype, {
         return hints.sort((a, b) => b.saving - a.saving).slice(0, 3);
     },
 
+    /**
+     * Promos ya aplicadas en la orden: [{tmplId, name, product, times, saving}]. El ahorro
+     * es el descuento puesto en sus líneas (una promo más cara sube el precio: ahorro 0).
+     */
+    getAppliedPromotions() {
+        const byTmpl = new Map();
+        for (const line of this.get_orderlines()) {
+            const tmplId = recordId(line.promotion_pack_tmpl_id);
+            if (!tmplId) {
+                continue;
+            }
+            const entry = byTmpl.get(tmplId) || { units: new Map(), saving: 0 };
+            const id = line.product_id.id;
+            entry.units.set(id, (entry.units.get(id) || 0) + line.get_quantity());
+            entry.saving += line.get_unit_price() * line.get_quantity() * (line.get_discount() || 0) / 100;
+            byTmpl.set(tmplId, entry);
+        }
+        const applied = [];
+        for (const pack of this.getPromotionPacks()) {
+            const tmplId = recordId(pack.template);
+            const entry = byTmpl.get(tmplId);
+            if (!entry) {
+                continue;
+            }
+            const times = Math.min(...pack.components.map((c) => Math.floor((entry.units.get(c.product.id) || 0) / c.qty)));
+            applied.push({ tmplId, name: pack.product.display_name, product: pack.product, times, saving: entry.saving });
+        }
+        return applied;
+    },
+
     removeOrderline(line) {
         const res = super.removeOrderline(...arguments);
         this.applyPromotionPacks();

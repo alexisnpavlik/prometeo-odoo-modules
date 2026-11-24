@@ -153,6 +153,28 @@ $o-promotion-hint-green: #2b8a3e;
     }
 }
 
+// Promo ya aplicada: verde, sin animación de flotar (no pide nada al cajero).
+.o_promotion_hint_row_applied {
+    .o_promotion_hint_card {
+        border-right-color: $o-promotion-hint-green;
+        padding-right: 11px;
+
+        &::after {
+            border-left-color: $o-promotion-hint-green;
+        }
+    }
+
+    .o_promotion_hint_dot {
+        background: $o-promotion-hint-green;
+        box-shadow: 0 6px 16px rgba($o-promotion-hint-green, 0.35);
+        animation: none;
+    }
+
+    .o_promotion_hint_dot_active {
+        box-shadow: 0 0 0 3px #fff, 0 0 0 6px $o-promotion-hint-green;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .o_promotion_hint_dot,
     .o_promotion_hint_card {

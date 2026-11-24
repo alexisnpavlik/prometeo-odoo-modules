@@ -2,7 +2,8 @@
 <templates id="template" xml:space="preserve">
     <t t-name="pos_promotions.PromotionHints">
         <t t-set="hintList" t-value="hints"/>
-        <div t-if="hintList.length" class="o_promotion_hints">
+        <t t-set="appliedList" t-value="applied"/>
+        <div t-if="hintList.length or appliedList.length" class="o_promotion_hints">
             <div t-foreach="hintList" t-as="hint" t-key="hint.tmplId" class="o_promotion_hint_row" t-att-data-promo="hint.name">
                 <div t-if="!isCollapsed(hint)" class="o_promotion_hint_card">
                     <button type="button" class="o_promotion_hint_close btn-close" aria-label="Descartar"
@@ -21,6 +22,22 @@
                     <img t-if="imageUrl(hint)" t-att-src="imageUrl(hint)" t-att-alt="hint.missing[0].product.display_name"/>
                     <span t-else="" class="o_promotion_hint_initials" t-esc="initials(hint)"/>
                     <span t-if="hint.saving > 0" class="o_promotion_hint_saving">−<t t-esc="formatCurrency(hint.saving)"/></span>
+                </button>
+            </div>
+            <div t-foreach="appliedList" t-as="promo" t-key="appliedKey(promo)"
+                 class="o_promotion_hint_row o_promotion_hint_row_applied" t-att-data-promo="promo.name">
+                <div t-if="!isAppliedCollapsed(promo)" class="o_promotion_hint_card">
+                    <div class="o_promotion_hint_missing">✓ <t t-esc="promo.name"/></div>
+                    <div class="o_promotion_hint_amount">
+                        Aplicada × <t t-esc="promo.times"/>
+                        <span t-if="promo.saving > 0" class="o_promotion_hint_card_saving ms-1">Ahorra <t t-esc="formatCurrency(promo.saving)"/></span>
+                    </div>
+                </div>
+                <button type="button"
+                        t-attf-class="o_promotion_hint_dot {{ isAppliedCollapsed(promo) ? '' : 'o_promotion_hint_dot_active' }}"
+                        t-att-title="promo.name"
+                        t-on-click="() => this.onClickAppliedDot(promo)">
+                    <i class="fa fa-check fa-lg" role="img" aria-label="Aplicada"/>
                 </button>
             </div>
         </div>
