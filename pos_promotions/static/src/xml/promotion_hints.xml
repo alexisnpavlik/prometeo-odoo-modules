@@ -2,25 +2,26 @@
 <templates id="template" xml:space="preserve">
     <t t-name="pos_promotions.PromotionHints">
         <t t-set="hintList" t-value="hints"/>
-        <t t-set="open" t-value="openHint(hintList)"/>
         <div t-if="hintList.length" class="o_promotion_hints">
-            <div class="o_promotion_hint_dots">
-                <button t-foreach="hintList" t-as="hint" t-key="hint.tmplId" type="button"
-                        t-attf-class="o_promotion_hint_dot {{ imageUrl(hint) ? 'o_promotion_hint_dot_photo' : '' }} {{ open?.tmplId === hint.tmplId ? 'o_promotion_hint_dot_active' : '' }}"
+            <div t-foreach="hintList" t-as="hint" t-key="hint.tmplId" class="o_promotion_hint_row" t-att-data-promo="hint.name">
+                <div t-if="!isCollapsed(hint)" class="o_promotion_hint_card">
+                    <button type="button" class="o_promotion_hint_close btn-close" aria-label="Descartar"
+                            t-on-click.stop="() => this.onClose(hint)"/>
+                    <div class="o_promotion_hint_missing" t-esc="missingText(hint)"/>
+                    <div class="o_promotion_hint_price"><t t-esc="hint.name"/> a</div>
+                    <div class="o_promotion_hint_amount">
+                        <t t-esc="formatCurrency(hint.price)"/>
+                        <span t-if="hint.saving > 0" class="o_promotion_hint_card_saving ms-1">Ahorra <t t-esc="formatCurrency(hint.saving)"/></span>
+                    </div>
+                </div>
+                <button type="button"
+                        t-attf-class="o_promotion_hint_dot {{ imageUrl(hint) ? 'o_promotion_hint_dot_photo' : '' }} {{ isCollapsed(hint) ? '' : 'o_promotion_hint_dot_active' }}"
                         t-att-title="hint.name"
                         t-on-click="() => this.onClickDot(hint)">
                     <img t-if="imageUrl(hint)" t-att-src="imageUrl(hint)" t-att-alt="hint.missing[0].product.display_name"/>
                     <span t-else="" class="o_promotion_hint_initials" t-esc="initials(hint)"/>
                     <span t-if="hint.saving > 0" class="o_promotion_hint_saving">−<t t-esc="formatCurrency(hint.saving)"/></span>
                 </button>
-            </div>
-            <div t-if="open" class="o_promotion_hint_card" t-key="open.tmplId">
-                <button type="button" class="o_promotion_hint_close btn-close" aria-label="Descartar"
-                        t-on-click.stop="() => this.onClose(open)"/>
-                <div class="o_promotion_hint_title">Promo disponible</div>
-                <div class="o_promotion_hint_missing" t-esc="missingText(open)"/>
-                <div><t t-esc="open.name"/> a <t t-esc="formatCurrency(open.price)"/></div>
-                <div t-if="open.saving > 0" class="o_promotion_hint_card_saving">Ahorra <t t-esc="formatCurrency(open.saving)"/></div>
             </div>
         </div>
     </t>

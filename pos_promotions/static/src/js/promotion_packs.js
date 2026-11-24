@@ -353,12 +353,15 @@ patch(PosStore.prototype, {
             order._promotionPacksPaused = false;
         }
         order.applyPromotionPacks();
-        // Abre la burbuja de la promo que toca el producto recién agregado (si hay una).
-        const touched = order.getPromotionHints().find((hint) =>
-            hint.components.some((c) => c.product.id === product?.id)
-        );
-        if (touched) {
-            order.uiState.openPromotionHintTmplId = touched.tmplId;
+        // Vuelve a mostrar el texto de las promos que toca el producto recién agregado.
+        const collapsed = order.uiState.collapsedPromotionHints;
+        if (collapsed?.length) {
+            const touched = order.getPromotionHints()
+                .filter((hint) => hint.components.some((c) => c.product.id === product?.id))
+                .map((hint) => hint.tmplId);
+            if (touched.length) {
+                order.uiState.collapsedPromotionHints = collapsed.filter((id) => !touched.includes(id));
+            }
         }
         return line;
     },

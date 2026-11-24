@@ -44,6 +44,16 @@ function dom(content, check) {
 
 const DOT = ".o_promotion_hints .o_promotion_hint_dot";
 const CARD = ".o_promotion_hints .o_promotion_hint_card";
+const row = (name) => `.o_promotion_hints .o_promotion_hint_row[data-promo='${name}']`;
+
+/** Las filas en orden: [{promo, card: bool, top}] (una fila por promo, círculo a la derecha). */
+function rows() {
+    return [...document.querySelectorAll(".o_promotion_hints .o_promotion_hint_row")].map((el) => ({
+        promo: el.dataset.promo,
+        card: Boolean(el.querySelector(".o_promotion_hint_card")),
+        top: el.getBoundingClientRect().top,
+    }));
+}
 
 const VASOS = { name: "Promo 2 Vasos", missing: ["1 PH Vaso"], saving: 300 };
 const FERNET = { name: "Promo Fernet Coca", missing: ["1 PH Coca"], saving: 1200 };
@@ -59,7 +69,7 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             expectHints("1 Vaso: falta otro", [VASOS]),
             { content: "aparece el círculo con iniciales", trigger: `${DOT} .o_promotion_hint_initials:contains('PH')` },
             { content: "pastilla con el ahorro", trigger: `${DOT} .o_promotion_hint_saving:contains('300')` },
-            { content: "burbuja abierta con el texto", trigger: `${CARD}:contains('Sumá 1 PH Vaso'):contains('Ahorra')` },
+            { content: "burbuja abierta con el texto", trigger: `${CARD}:contains('+ 1 PH Vaso'):contains('Ahorra')` },
             ProductScreen.clickDisplayedProduct("PH Vaso"),
             expectHints("2 Vasos: promo aplicada, sin hint", []),
             dom("sin círculos con la promo completa", () => {
@@ -71,82 +81,77 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             expectHints("3 Vasos: sobra 1, falta otro", [VASOS]),
             ProductScreen.clickDisplayedProduct("PH Fernet"),
             expectHints("Fernet: primero la que más ahorra", [FERNET, VASOS]),
-            {
-                content: "el último producto agregado abre su promo",
-                trigger: ".product-list",
-                run: () => {
-                    const fernet = hints().find((hint) => hint.name === FERNET.name);
-                    if (order().uiState.openPromotionHintTmplId !== fernet.tmplId) {
-                        fail(`abierta ${order().uiState.openPromotionHintTmplId}, esperaba ${fernet.tmplId}`);
-                    }
-                    window.__phOpen = fernet.tmplId;
-                },
-            },
-            { content: "dos círculos", trigger: `${DOT}:nth-child(2)` },
-            { content: "el activo (Coca) muestra la foto", trigger: `${DOT}.o_promotion_hint_dot_active img` },
-            { content: "la burbuja abierta es la de Fernet", trigger: `${CARD}:contains('Sumá 1 PH Coca'):contains('Promo Fernet Coca')` },
-            dom("guardar cantidad de líneas", () => {
+            { content: "fila de Fernet con su texto", trigger: `${row(FERNET.name)} .o_promotion_hint_card:contains('+ 1 PH Coca'):contains('Promo Fernet Coca'):contains('Ahorra')` },
+            { content: "precio en su propia línea", trigger: `${row(FERNET.name)} .o_promotion_hint_price:contains('Promo Fernet Coca a') + .o_promotion_hint_amount:contains('Ahorra')` },
+            dom("texto simple: sin encabezado ni 'Sumá'", () => {
+                const text = document.querySelector(row(FERNET.name)).textContent;
+                if (/Promo disponible|Sumá/i.test(text)) {
+                    fail(`texto viejo: ${text}`);
+                }
+            }),
+            { content: "fila de Vasos con su texto", trigger: `${row(VASOS.name)} .o_promotion_hint_card:contains('+ 1 PH Vaso')` },
+            { content: "el círculo de Coca muestra la foto", trigger: `${row(FERNET.name)} .o_promotion_hint_dot img` },
+            dom("filas una debajo de otra, todas con su texto y el círculo a la derecha", () => {
+                const got = rows();
+                if (got.length !== 2 || !got.every((r) => r.card) || !(got[0].top < got[1].top)) {
+                    fail(`filas: ${JSON.stringify(got)}`);
+                }
+                const el = document.querySelector(row(FERNET.name));
+                const card = el.querySelector(".o_promotion_hint_card").getBoundingClientRect();
+                const dot = el.querySelector(".o_promotion_hint_dot").getBoundingClientRect();
+                if (!(card.right <= dot.left + 1)) {
+                    fail("el texto no queda a la izquierda del círculo");
+                }
                 window.__phLines = order().get_orderlines().length;
             }),
-            { content: "tocar el círculo de Vasos", trigger: `${DOT}:not(.o_promotion_hint_dot_active)`, run: "click" },
-            { content: "se abre la de Vasos", trigger: `${CARD}:contains('Promo 2 Vasos')` },
-            { content: "tocar el círculo activo", trigger: `${DOT}.o_promotion_hint_dot_active`, run: "click" },
-            dom("la burbuja se cierra sin descartar la promo", () => {
-                if (document.querySelector(CARD)) {
-                    fail("tocar el círculo activo no cerró la burbuja");
+            { content: "tocar el círculo de Vasos", trigger: `${row(VASOS.name)} .o_promotion_hint_dot`, run: "click" },
+            dom("oculta solo el texto de Vasos, sin descartarla", () => {
+                const got = rows();
+                if (got.length !== 2 || got.find((r) => r.promo === VASOS.name).card || !got.find((r) => r.promo === FERNET.name).card) {
+                    fail(`filas: ${JSON.stringify(got)}`);
                 }
-                if (document.querySelectorAll(DOT).length !== 2 || !hints().some((h) => h.name === VASOS.name)) {
-                    fail("cerrar la burbuja descartó la promo");
+                if (!hints().some((h) => h.name === VASOS.name)) {
+                    fail("ocultar el texto descartó la promo");
                 }
             }),
-            { content: "volver a abrir Vasos", trigger: `${DOT}:not(.o_promotion_hint_dot_active):last`, run: "click" },
-            { content: "Vasos abierta otra vez", trigger: `${CARD}:contains('Promo 2 Vasos')` },
-            { content: "tocar la burbuja abierta", trigger: CARD, run: "click" },
+            { content: "volver a mostrar Vasos", trigger: `${row(VASOS.name)} .o_promotion_hint_dot`, run: "click" },
+            { content: "Vasos con su texto otra vez", trigger: `${row(VASOS.name)} .o_promotion_hint_card` },
+            { content: "tocar el texto de Vasos", trigger: `${row(VASOS.name)} .o_promotion_hint_card`, run: "click" },
             dom("tocar no agrega nada a la orden", () => {
                 if (order().get_orderlines().length !== window.__phLines) {
                     fail("tocar la burbuja cambió la orden");
                 }
             }),
-            { content: "descartar la de Vasos", trigger: `${CARD} .o_promotion_hint_close`, run: "click" },
-            dom("queda un círculo y Vasos ya no está", () => {
-                if (document.querySelectorAll(DOT).length !== 1) {
-                    fail(`hay ${document.querySelectorAll(DOT).length} círculos, esperaba 1`);
+            { content: "descartar la de Vasos", trigger: `${row(VASOS.name)} .o_promotion_hint_close`, run: "click" },
+            dom("queda una fila y Vasos ya no está", () => {
+                if (rows().length !== 1) {
+                    fail(`hay ${rows().length} filas, esperaba 1`);
                 }
                 if (hints().some((hint) => hint.name === VASOS.name)) {
                     fail("la promo descartada sigue en los hints");
                 }
             }),
-            { content: "reabrir Fernet para seguir", trigger: DOT, run: "click" },
             ProductScreen.clickDisplayedProduct("PH Agua"),
             expectHints("Agua cara: aparece al final, con ahorro negativo", [FERNET, AGUA]),
-            dom("se abre la de Agua (último producto agregado)", () => {
-                const agua = hints().find((hint) => hint.name === AGUA.name);
-                if (order().uiState.openPromotionHintTmplId !== agua.tmplId) {
-                    fail("no se abrió la promo del producto agregado");
-                }
-            }),
-            { content: "burbuja de Agua con su precio", trigger: `${CARD}:contains('Sumá 1 PH Agua más'):contains('Promo Agua cara')` },
+            { content: "fila de Agua con su precio", trigger: `${row(AGUA.name)} .o_promotion_hint_card:contains('+ 1 PH Agua'):contains('Promo Agua cara')` },
             dom("la promo más cara no dice Ahorra ni lleva pastilla", () => {
-                if (document.querySelector(CARD).textContent.includes("Ahorra")) {
-                    fail("la promo más cara muestra Ahorra");
-                }
-                if (document.querySelector(`${DOT}.o_promotion_hint_dot_active .o_promotion_hint_saving`)) {
-                    fail("la promo más cara lleva pastilla de ahorro");
+                const el = document.querySelector(row(AGUA.name));
+                if (el.textContent.includes("Ahorra") || el.querySelector(".o_promotion_hint_saving")) {
+                    fail("la promo más cara muestra ahorro");
                 }
             }),
-            { content: "volver a abrir Fernet", trigger: `${DOT}:not(.o_promotion_hint_dot_active)`, run: "click" },
-            { content: "Fernet abierta", trigger: `${CARD}:contains('Promo Fernet Coca')` },
+            { content: "ocultar el texto de Fernet", trigger: `${row(FERNET.name)} .o_promotion_hint_dot`, run: "click" },
             ProductScreen.clickDisplayedProduct("PH Pan"),
-            {
-                content: "un producto sin promo no cambia la abierta",
-                trigger: ".product-list",
-                run: () => {
-                    if (order().uiState.openPromotionHintTmplId !== window.__phOpen) {
-                        fail("cambió la promo abierta");
-                    }
-                },
-            },
-            ProductScreen.clickLine("PH Fernet"),
+            dom("un producto sin promo no vuelve a mostrar el texto oculto", () => {
+                if (rows().find((r) => r.promo === FERNET.name).card) {
+                    fail("se volvió a mostrar Fernet");
+                }
+            }),
+            ProductScreen.clickDisplayedProduct("PH Fernet"),
+            { content: "agregar un producto de la promo vuelve a mostrar su texto", trigger: `${row(FERNET.name)} .o_promotion_hint_card` },
+            // La línea de Fernet quedó seleccionada (último producto): vuelve a 1 y lleva descuento.
+            ProductScreen.clickNumpad("1"),
+            ProductScreen.selectedOrderlineHas("PH Fernet", "1"),
             ProductScreen.addDiscount("10"),
             {
                 content: "esperar el descuento en la línea",

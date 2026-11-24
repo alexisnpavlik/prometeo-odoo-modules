@@ -4,8 +4,9 @@ import { Component } from "@odoo/owl";
 import { usePos } from "@point_of_sale/app/store/pos_hook";
 
 /**
- * Burbujas flotantes con las promos que la orden arrancó y no completó. Solo informan:
- * tocar un círculo abre su burbuja, la ✕ la descarta para esta orden.
+ * Burbujas flotantes con las promos que la orden arrancó y no completó, una fila por promo
+ * (texto a la izquierda, círculo a la derecha). Solo informan: tocar un círculo oculta o
+ * muestra su texto, la ✕ la descarta para esta orden.
  */
 export class PromotionHints extends Component {
     static template = "pos_promotions.PromotionHints";
@@ -23,10 +24,9 @@ export class PromotionHints extends Component {
         return this.order?.getPromotionHints() || [];
     }
 
-    /** La burbuja abierta, dentro de los hints ya calculados en este render. */
-    openHint(hints) {
-        const openId = this.order?.uiState.openPromotionHintTmplId;
-        return hints.find((hint) => hint.tmplId === openId);
+    /** Promo con el texto oculto (el cajero tocó su círculo para destapar productos). */
+    isCollapsed(hint) {
+        return (this.order?.uiState.collapsedPromotionHints || []).includes(hint.tmplId);
     }
 
     imageUrl(hint) {
@@ -39,31 +39,27 @@ export class PromotionHints extends Component {
         return (name.match(/[\p{L}\p{N}]/gu) || []).slice(0, 2).join("").toUpperCase();
     }
 
-    /** "Sumá 1 Vaso más" si ya hay de ese producto; si no, "Sumá 1 Coca-Cola y 2 Hielo". */
+    /** "+ 1 Coca-Cola" o "+ 1 Coca-Cola, + 2 Hielo". */
     missingText(hint) {
-        const lines = this.order.get_orderlines();
-        const parts = hint.missing.map(({ product, qty }) => {
-            const more = lines.some((line) => line.product_id.id === product.id) ? " más" : "";
-            return `${qty} ${product.display_name}${more}`;
-        });
-        return `Sumá ${parts.join(" y ")}`;
+        // Nombre del producto sin la variante: "Escritorio personalizable", no "(Personalizado, Blanco)".
+        return hint.missing.map(({ product, qty }) => `+ ${qty} ${product.name || product.display_name}`).join(", ");
     }
 
     formatCurrency(amount) {
         return this.env.utils.formatCurrency(amount);
     }
 
-    /** Abre la burbuja del círculo; si ya estaba abierta, la cierra (sin descartar la promo). */
+    /** Oculta o muestra el texto de la promo (no la descarta). */
     onClickDot(hint) {
         const uiState = this.order.uiState;
-        uiState.openPromotionHintTmplId = uiState.openPromotionHintTmplId === hint.tmplId ? false : hint.tmplId;
+        const collapsed = uiState.collapsedPromotionHints || [];
+        uiState.collapsedPromotionHints = collapsed.includes(hint.tmplId)
+            ? collapsed.filter((id) => id !== hint.tmplId)
+            : [...collapsed, hint.tmplId];
     }
 
     onClose(hint) {
         const uiState = this.order.uiState;
         uiState.dismissedPromotionHints = [...(uiState.dismissedPromotionHints || []), hint.tmplId];
-        if (uiState.openPromotionHintTmplId === hint.tmplId) {
-            uiState.openPromotionHintTmplId = false;
-        }
     }
 }
