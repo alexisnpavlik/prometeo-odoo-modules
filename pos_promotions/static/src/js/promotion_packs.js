@@ -11,12 +11,15 @@ patch(PosOrder.prototype, {
     /** Packs activos cargados en el POS: {template, price, components: [{product, qty}]}. */
     getPromotionPacks() {
         const packs = new Map();
+        // Producto de cada pack, indexado una vez: buscarlo por pack recorría todo el catálogo.
+        const packProducts = new Map();
+        for (const product of this.models["product.product"].filter((p) => p.is_promotion_pack)) {
+            packProducts.set(recordId(product.product_tmpl_id), product);
+        }
         for (const line of this.models["pos.promotion.pack.line"].getAll()) {
             const tmplId = recordId(line.pack_tmpl_id);
             if (!packs.has(tmplId)) {
-                const packProduct = this.models["product.product"].find(
-                    (product) => recordId(product.product_tmpl_id) === tmplId
-                );
+                const packProduct = packProducts.get(tmplId);
                 if (!packProduct) {
                     continue;
                 }
@@ -145,14 +148,9 @@ patch(PosOrder.prototype, {
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
-            // Solo las promociones de la sucursal de la caja. El precio normal es el de la
-            // lista de la orden (precio de la sucursal); la promoción descuenta sobre él sin tocarla.
-            const companyId = this.company_id?.id ?? this.config?.company_id?.id;
-            const today = this._getPromotionToday();
-            const packs = this.getPromotionPacks()
-                .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
-                .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
-                    (!pack.data.date_end || today <= pack.data.date_end))
+            // El precio normal es el de la lista de la orden (precio de la sucursal); la
+            // promoción descuenta sobre él sin tocarla.
+            const packs = this._getActivePromotionPacks()
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
                 .map((pack) => {
                     const regular = pack.components.reduce(
@@ -211,6 +209,109 @@ patch(PosOrder.prototype, {
         } finally {
             this._applyingPromotionPacks = false;
         }
+    },
+
+    /** Packs de la sucursal de la caja vigentes hoy. */
+    _getActivePromotionPacks() {
+        const companyId = this.company_id?.id ?? this.config?.company_id?.id;
+        const today = this._getPromotionToday();
+        return this.getPromotionPacks()
+            .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
+            .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
+                (!pack.data.date_end || today <= pack.data.date_end));
+    },
+
+    /**
+     * Promociones arrancadas pero incompletas: la orden tiene unidades de algún producto del
+     * pack que quedaron fuera de los packs ya aplicados, y falta algo para completar otro.
+     * La que más ahorra primero (las más caras que los sueltos al final), sin las
+     * descartadas, hasta 3.
+     * Lee el estado ya aplicado: no recalcula los packs.
+     */
+    getPromotionHints() {
+        if (this.finalized) {
+            return [];
+        }
+        const leftover = new Map();
+        const unitPrice = new Map();
+        for (const line of this.get_orderlines()) {
+            if (!this._isPromotionPackCandidate(line) || line.promotion_pack_tmpl_id) {
+                continue;
+            }
+            const id = line.product_id.id;
+            leftover.set(id, (leftover.get(id) || 0) + line.get_quantity());
+            if (!unitPrice.has(id)) {
+                unitPrice.set(id, line.get_unit_price());
+            }
+        }
+        if (!leftover.size) {
+            return [];
+        }
+        const dismissed = this.uiState.dismissedPromotionHints || [];
+        const hints = [];
+        for (const pack of this._getActivePromotionPacks()) {
+            const tmplId = recordId(pack.template);
+            if (dismissed.includes(tmplId) || !pack.components.some((c) => leftover.get(c.product.id) > 0)) {
+                continue;
+            }
+            const missing = pack.components
+                .filter((c) => (leftover.get(c.product.id) || 0) < c.qty)
+                .map((c) => ({ product: c.product, qty: c.qty - (leftover.get(c.product.id) || 0) }));
+            if (!missing.length) {
+                continue;
+            }
+            const regular = pack.components.reduce((acc, c) => {
+                const price = unitPrice.has(c.product.id)
+                    ? unitPrice.get(c.product.id)
+                    : c.product.get_price(this.pricelist_id, c.qty);
+                return acc + price * c.qty;
+            }, 0);
+            if (!Number.isFinite(regular) || regular <= 0) {
+                continue;
+            }
+            const price = this._getPromotionPackPrice(pack, regular);
+            const saving = regular - price;
+            // Igual que applyPromotionPacks: una promo más cara que los sueltos también se
+            // sugiere (saving negativo, va al final); una que cuesta lo mismo no cambia nada.
+            if (!(price > 0) || !Number.isFinite(saving) || saving === 0) {
+                continue;
+            }
+            hints.push({
+                tmplId, name: pack.product.display_name, product: pack.product,
+                components: pack.components, missing, price, regular, saving,
+            });
+        }
+        return hints.sort((a, b) => b.saving - a.saving).slice(0, 3);
+    },
+
+    /**
+     * Promos ya aplicadas en la orden: [{tmplId, name, product, times, saving}]. El ahorro
+     * es el descuento puesto en sus líneas (una promo más cara sube el precio: ahorro 0).
+     */
+    getAppliedPromotions() {
+        const byTmpl = new Map();
+        for (const line of this.get_orderlines()) {
+            const tmplId = recordId(line.promotion_pack_tmpl_id);
+            if (!tmplId) {
+                continue;
+            }
+            const entry = byTmpl.get(tmplId) || { units: new Map(), saving: 0 };
+            const id = line.product_id.id;
+            entry.units.set(id, (entry.units.get(id) || 0) + line.get_quantity());
+            entry.saving += line.get_unit_price() * line.get_quantity() * (line.get_discount() || 0) / 100;
+            byTmpl.set(tmplId, entry);
+        }
+        const applied = [];
+        for (const pack of this.getPromotionPacks()) {
+            const tmplId = recordId(pack.template);
+            const entry = byTmpl.get(tmplId);
+            if (!entry) {
+                continue;
+            }
+            const times = Math.min(...pack.components.map((c) => Math.floor((entry.units.get(c.product.id) || 0) / c.qty)));
+            applied.push({ tmplId, name: pack.product.display_name, product: pack.product, times, saving: entry.saving });
+        }
+        return applied;
     },
 
     removeOrderline(line) {
@@ -282,6 +383,16 @@ patch(PosStore.prototype, {
             order._promotionPacksPaused = false;
         }
         order.applyPromotionPacks();
+        // Vuelve a mostrar el texto de las promos que toca el producto recién agregado.
+        const collapsed = order.uiState.collapsedPromotionHints;
+        if (collapsed?.length) {
+            const touched = order.getPromotionHints()
+                .filter((hint) => hint.components.some((c) => c.product.id === product?.id))
+                .map((hint) => hint.tmplId);
+            if (touched.length) {
+                order.uiState.collapsedPromotionHints = collapsed.filter((id) => !touched.includes(id));
+            }
+        }
         return line;
     },
 });
