@@ -153,7 +153,11 @@ class PurchaseOrder(models.Model):
         for order, changes in updates.items():
             products = self.env["product.product"]
             for line, field, _old, new in changes:
-                line.product_id.with_company(order.company_id).write({field: new})
+                product = line.product_id.with_company(order.company_id)
+                # El costo se graba en la variante: sin esto el seguimiento de la
+                # plantilla no lo ve (solo se activa con escrituras a la plantilla).
+                product.product_tmpl_id._track_prepare([field])
+                product.write({field: new})
                 products |= line.product_id
             # Los montos los registra el seguimiento de Costo y Precio de venta;
             # este mensaje deja a mano la compra que los cambió.
