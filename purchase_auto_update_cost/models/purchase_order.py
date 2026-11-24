@@ -1,3 +1,5 @@
+from markupsafe import Markup
+
 from odoo import api, fields, models
 from odoo.tools import format_amount
 
@@ -135,7 +137,20 @@ class PurchaseOrder(models.Model):
         """
         updates = {order: order._price_updates() for order in self}
         res = super().button_confirm()
+        labels = {"standard_price": "Costo", "list_price": "Precio de venta"}
         for order, changes in updates.items():
-            for line, field, _old, new in changes:
+            cur = order.company_id.currency_id
+            by_product = {}
+            for line, field, old, new in changes:
                 line.product_id.with_company(order.company_id).write({field: new})
+                by_product.setdefault(line.product_id, []).append("%s: %s → %s" % (
+                    labels[field], format_amount(order.env, old, cur), format_amount(order.env, new, cur),
+                ))
+            # Costo y precio de venta no tienen seguimiento: se deja el cambio en el historial.
+            for product, lines in by_product.items():
+                product.product_tmpl_id.message_post(
+                    body=Markup("Precios actualizados por la compra %s<br/>%s") % (
+                        order._get_html_link(), Markup("<br/>").join(lines),
+                    ),
+                )
         return res
