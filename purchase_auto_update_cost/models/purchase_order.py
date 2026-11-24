@@ -121,7 +121,7 @@ class PurchaseOrder(models.Model):
                  "order_line.price_sale", "order_line.product_uom")
     def _compute_price_update_warning(self):
         """Aviso en borrador con los precios de producto que cambian al confirmar."""
-        labels = {"standard_price": "costo", "list_price": "precio de venta"}
+        labels = {"standard_price": "Costo", "list_price": "Precio de venta"}
         for order in self:
             updates = order.state in ("draft", "sent") and order._price_updates()
             if not updates:
