@@ -145,14 +145,9 @@ patch(PosOrder.prototype, {
             const packed = new Map();
             const saving = new Map();
             const packByProduct = new Map();
-            // Solo las promociones de la sucursal de la caja. El precio normal es el de la
-            // lista de la orden (precio de la sucursal); la promoción descuenta sobre él sin tocarla.
-            const companyId = this.company_id?.id ?? this.config?.company_id?.id;
-            const today = this._getPromotionToday();
-            const packs = this.getPromotionPacks()
-                .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
-                .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
-                    (!pack.data.date_end || today <= pack.data.date_end))
+            // El precio normal es el de la lista de la orden (precio de la sucursal); la
+            // promoción descuenta sobre él sin tocarla.
+            const packs = this._getActivePromotionPacks()
                 .filter((pack) => pack.components.every((c) => unitPrice.has(c.product.id)))
                 .map((pack) => {
                     const regular = pack.components.reduce(
@@ -211,6 +206,76 @@ patch(PosOrder.prototype, {
         } finally {
             this._applyingPromotionPacks = false;
         }
+    },
+
+    /** Packs de la sucursal de la caja vigentes hoy. */
+    _getActivePromotionPacks() {
+        const companyId = this.company_id?.id ?? this.config?.company_id?.id;
+        const today = this._getPromotionToday();
+        return this.getPromotionPacks()
+            .filter((pack) => companyId && (pack.data.companies || []).includes(companyId))
+            .filter((pack) => (!pack.data.date_start || pack.data.date_start <= today) &&
+                (!pack.data.date_end || today <= pack.data.date_end));
+    },
+
+    /**
+     * Promociones arrancadas pero incompletas: la orden tiene unidades de algún producto del
+     * pack que quedaron fuera de los packs ya aplicados, y falta algo para completar otro.
+     * Solo las que ahorran, la que más ahorra primero, sin las descartadas, hasta 3.
+     * Lee el estado ya aplicado: no recalcula los packs.
+     */
+    getPromotionHints() {
+        if (this.finalized) {
+            return [];
+        }
+        const leftover = new Map();
+        const unitPrice = new Map();
+        for (const line of this.get_orderlines()) {
+            if (!this._isPromotionPackCandidate(line) || line.promotion_pack_tmpl_id) {
+                continue;
+            }
+            const id = line.product_id.id;
+            leftover.set(id, (leftover.get(id) || 0) + line.get_quantity());
+            if (!unitPrice.has(id)) {
+                unitPrice.set(id, line.get_unit_price());
+            }
+        }
+        if (!leftover.size) {
+            return [];
+        }
+        const dismissed = this.uiState.dismissedPromotionHints || [];
+        const hints = [];
+        for (const pack of this._getActivePromotionPacks()) {
+            const tmplId = recordId(pack.template);
+            if (dismissed.includes(tmplId) || !pack.components.some((c) => leftover.get(c.product.id) > 0)) {
+                continue;
+            }
+            const missing = pack.components
+                .filter((c) => (leftover.get(c.product.id) || 0) < c.qty)
+                .map((c) => ({ product: c.product, qty: c.qty - (leftover.get(c.product.id) || 0) }));
+            if (!missing.length) {
+                continue;
+            }
+            const regular = pack.components.reduce((acc, c) => {
+                const price = unitPrice.has(c.product.id)
+                    ? unitPrice.get(c.product.id)
+                    : c.product.get_price(this.pricelist_id, c.qty);
+                return acc + price * c.qty;
+            }, 0);
+            if (!Number.isFinite(regular) || regular <= 0) {
+                continue;
+            }
+            const price = this._getPromotionPackPrice(pack, regular);
+            const saving = regular - price;
+            if (!(saving > 0)) {
+                continue;
+            }
+            hints.push({
+                tmplId, name: pack.product.display_name, product: pack.product,
+                components: pack.components, missing, price, regular, saving,
+            });
+        }
+        return hints.sort((a, b) => b.saving - a.saving).slice(0, 3);
     },
 
     removeOrderline(line) {
@@ -282,6 +347,13 @@ patch(PosStore.prototype, {
             order._promotionPacksPaused = false;
         }
         order.applyPromotionPacks();
+        // Abre la burbuja de la promo que toca el producto recién agregado (si hay una).
+        const touched = order.getPromotionHints().find((hint) =>
+            hint.components.some((c) => c.product.id === product?.id)
+        );
+        if (touched) {
+            order.uiState.openPromotionHintTmplId = touched.tmplId;
+        }
         return line;
     },
 });

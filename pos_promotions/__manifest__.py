@@ -45,6 +45,9 @@
             "pos_promotions/static/src/xml/orderline.xml",
             "pos_promotions/static/src/scss/orderline.scss",
         ],
+        "web.assets_tests": [
+            "pos_promotions/static/tests/tours/*.js",
+        ],
     },
     "installable": True,
     "auto_install": False,
