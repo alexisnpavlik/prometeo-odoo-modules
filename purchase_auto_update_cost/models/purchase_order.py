@@ -173,8 +173,8 @@ class PurchaseOrder(models.Model):
                 products |= line.product_id
             # Los montos los registra el seguimiento de Costo y Precio de venta;
             # este mensaje deja a mano la compra que los cambió.
-            for template in products.product_tmpl_id:
-                template.message_post(
-                    body=Markup("Precios actualizados por la compra %s") % order._get_html_link(),
-                )
+            # En la plantilla y en la variante: cada ficha tiene su propio historial.
+            body = Markup("Precios actualizados por la compra %s") % order._get_html_link()
+            for record in [*products.product_tmpl_id, *products]:
+                record.message_post(body=body)
         return res
