@@ -27,11 +27,3 @@
         font-size: 1.05rem;
     }
 }
-
-// Orden de compra: Cancelar al extremo derecho del encabezado, lejos de Confirmar.
-.o_statusbar_buttons:has(.o_simplify_cancel) {
-    flex-grow: 1;
-}
-.o_simplify_cancel {
-    margin-left: auto !important;
-}
