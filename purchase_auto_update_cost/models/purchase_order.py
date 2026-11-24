@@ -1,4 +1,4 @@
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 from odoo import api, fields, models
 from odoo.tools import format_amount
@@ -45,6 +45,47 @@ class PurchaseOrderLine(models.Model):
             )
             if cost and seller:
                 line.price_unit = line._convert_price_from_company(cost)
+
+    def _general_sellers(self):
+        """Líneas de proveedor del producto que aplican a todas las variantes, en orden."""
+        self.ensure_one()
+        return self.product_id.product_tmpl_id.seller_ids.filtered(
+            lambda s: not s.product_id and s.company_id in (self.company_id, self.env["res.company"])
+        ).sorted(lambda s: (s.sequence, s.id))
+
+    def _main_vendor(self):
+        """Proveedor principal actual del producto (primera línea de proveedor)."""
+        return self._general_sellers()[:1].partner_id
+
+    def _set_main_vendor(self):
+        """Deja al proveedor de la orden primero y con el precio de esta compra.
+
+        Reusa su línea si existe (la de la compañía de la orden antes que la
+        compartida) o la crea; renumera la secuencia para no usar negativos.
+        """
+        self.ensure_one()
+        vendor = self.order_id.partner_id.commercial_partner_id
+        sellers = self._general_sellers()
+        mine = sellers.filtered(lambda s: s.partner_id.commercial_partner_id == vendor)
+        seller = (mine.filtered(lambda s: s.company_id == self.company_id) or mine)[:1]
+        vals = {
+            "price": self.price_unit,
+            "currency_id": self.order_id.currency_id.id,
+            "product_uom": self.product_uom.id,
+        }
+        if seller:
+            seller.write(vals)
+        else:
+            seller = self.env["product.supplierinfo"].create({
+                **vals,
+                "partner_id": vendor.id,
+                "product_tmpl_id": self.product_id.product_tmpl_id.id,
+                "company_id": self.company_id.id,
+                "min_qty": 0.0,
+            })
+        for sequence, line in enumerate(seller | (sellers - seller), start=1):
+            if line.sequence != sequence:
+                line.sequence = sequence
 
     def _convert_price_from_company(self, price):
         """Inversa de _convert_price_to_company: de la UdM del producto y la moneda
@@ -129,38 +170,57 @@ class PurchaseOrder(models.Model):
                     updates.append((line, field, product[field], new))
         return updates
 
-    @api.depends("state", "order_line.product_id", "order_line.price_unit",
+    def _vendor_updates(self):
+        """Productos cuyo proveedor principal cambia al confirmar: [(línea, actual, nuevo)]."""
+        self.ensure_one()
+        vendor = self.partner_id.commercial_partner_id
+        updates = []
+        for line in self.order_line.filtered("product_id"):
+            current = line._main_vendor()
+            if vendor and current.commercial_partner_id != vendor:
+                updates.append((line, current, vendor))
+        return updates
+
+    @api.depends("state", "partner_id", "order_line.product_id", "order_line.price_unit",
                  "order_line.price_sale", "order_line.product_uom")
     def _compute_price_update_warning(self):
         """Aviso en borrador con los precios de producto que cambian al confirmar."""
         labels = {"standard_price": "Costo", "list_price": "Precio de venta"}
         for order in self:
-            updates = order.state in ("draft", "sent") and order._price_updates()
-            if not updates:
+            draft = order.state in ("draft", "sent")
+            updates = draft and order._price_updates() or []
+            vendors = draft and order._vendor_updates() or []
+            if not updates and not vendors:
                 order.price_update_warning = False
                 continue
             cur = order.company_id.currency_id
-            # Una línea por producto con todos sus cambios (costo · precio de venta).
+            # Una línea por producto con todos sus cambios (costo · precio de venta · proveedor).
             by_line = {}
             for line, field, old, new in updates:
                 by_line.setdefault(line, []).append("%s %s → %s" % (
                     labels[field], format_amount(order.env, old, cur), format_amount(order.env, new, cur),
+                ))
+            for line, old, new in vendors:
+                by_line.setdefault(line, []).append("Proveedor %s → %s" % (
+                    escape(old.display_name or "(ninguno)"), escape(new.display_name),
                 ))
             items = "".join(
                 "<li><b>%s</b>: %s</li>" % (line.product_id.display_name, " · ".join(changes))
                 for line, changes in by_line.items()
             )
             order.price_update_warning = (
-                "<b>Al confirmar se actualizan estos precios de producto:</b><ul class='mb-0'>%s</ul>" % items
+                "<b>Al confirmar se actualizan estos datos de producto:</b><ul class='mb-0'>%s</ul>" % items
             )
 
     def button_confirm(self):
-        """Al confirmar, pasa a cada producto el costo y el precio de venta de la línea.
+        """Al confirmar, pasa a cada producto el costo y el precio de venta de la línea,
+        y deja al proveedor de la orden como principal con el precio de esta compra.
 
         Los cambios se calculan antes del super; el costo se graba en la compañía
         de la orden (standard_price depende de la compañía).
         """
         updates = {order: order._price_updates() for order in self}
+        vendor_updates = {order: order._vendor_updates() for order in self}
         res = super().button_confirm()
         for order, changes in updates.items():
             products = self.env["product.product"]
@@ -173,8 +233,18 @@ class PurchaseOrder(models.Model):
                 products |= line.product_id
             # Los montos los registra el seguimiento de Costo y Precio de venta;
             # este mensaje deja a mano la compra que los cambió.
+            vendor_changes = {}
+            for line, old, new in vendor_updates[order]:
+                vendor_changes[line.product_id] = Markup("<br/>Proveedor: %s → %s") % (
+                    old.display_name or "(ninguno)", new.display_name,
+                )
+                products |= line.product_id
+            for line in order.order_line.filtered("product_id"):
+                line._set_main_vendor()
             # En la plantilla y en la variante: cada ficha tiene su propio historial.
-            body = Markup("Precios actualizados por la compra %s") % order._get_html_link()
-            for record in [*products.product_tmpl_id, *products]:
-                record.message_post(body=body)
+            for product in products:
+                body = Markup("Datos actualizados por la compra %s") % order._get_html_link()
+                body += vendor_changes.get(product, "")
+                for record in (product.product_tmpl_id, product):
+                    record.message_post(body=body)
         return res
