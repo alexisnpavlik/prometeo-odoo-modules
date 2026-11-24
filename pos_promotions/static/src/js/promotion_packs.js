@@ -224,7 +224,8 @@ patch(PosOrder.prototype, {
     /**
      * Promociones arrancadas pero incompletas: la orden tiene unidades de algún producto del
      * pack que quedaron fuera de los packs ya aplicados, y falta algo para completar otro.
-     * Solo las que ahorran, la que más ahorra primero, sin las descartadas, hasta 3.
+     * La que más ahorra primero (las más caras que los sueltos al final), sin las
+     * descartadas, hasta 3.
      * Lee el estado ya aplicado: no recalcula los packs.
      */
     getPromotionHints() {
@@ -270,7 +271,9 @@ patch(PosOrder.prototype, {
             }
             const price = this._getPromotionPackPrice(pack, regular);
             const saving = regular - price;
-            if (!(saving > 0)) {
+            // Igual que applyPromotionPacks: una promo más cara que los sueltos también se
+            // sugiere (saving negativo, va al final); una que cuesta lo mismo no cambia nada.
+            if (!(price > 0) || !Number.isFinite(saving) || saving === 0) {
                 continue;
             }
             hints.push({

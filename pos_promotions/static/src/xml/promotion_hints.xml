@@ -11,7 +11,7 @@
                         t-on-click="() => this.onClickDot(hint)">
                     <img t-if="imageUrl(hint)" t-att-src="imageUrl(hint)" t-att-alt="hint.missing[0].product.display_name"/>
                     <span t-else="" class="o_promotion_hint_initials" t-esc="initials(hint)"/>
-                    <span class="o_promotion_hint_saving">−<t t-esc="formatCurrency(hint.saving)"/></span>
+                    <span t-if="hint.saving > 0" class="o_promotion_hint_saving">−<t t-esc="formatCurrency(hint.saving)"/></span>
                 </button>
             </div>
             <div t-if="open" class="o_promotion_hint_card" t-key="open.tmplId">
@@ -20,7 +20,7 @@
                 <div class="o_promotion_hint_title">Promo disponible</div>
                 <div class="o_promotion_hint_missing" t-esc="missingText(open)"/>
                 <div><t t-esc="open.name"/> a <t t-esc="formatCurrency(open.price)"/></div>
-                <div class="o_promotion_hint_card_saving">Ahorra <t t-esc="formatCurrency(open.saving)"/></div>
+                <div t-if="open.saving > 0" class="o_promotion_hint_card_saving">Ahorra <t t-esc="formatCurrency(open.saving)"/></div>
             </div>
         </div>
     </t>

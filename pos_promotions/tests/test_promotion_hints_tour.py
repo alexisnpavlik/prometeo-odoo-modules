@@ -19,6 +19,7 @@ class TestPromotionHintsTour(TestPointOfSaleHttpCommon):
         fernet = Product.create({**values, "name": "PH Fernet", "list_price": 7000})
         coca = Product.create({**values, "name": "PH Coca", "list_price": 3200, "image_1920": PNG_1X1, "default_code": "7790895"})
         agua = Product.create({**values, "name": "PH Agua", "list_price": 1000})
+        Product.create({**values, "name": "PH Pan", "list_price": 500})
         company = cls.main_pos_config.company_id
 
         def pack(name, price, lines):
@@ -36,7 +37,7 @@ class TestPromotionHintsTour(TestPointOfSaleHttpCommon):
 
         pack("Promo 2 Vasos", 1500, [(vaso, 2)])
         pack("Promo Fernet Coca", 9000, [(fernet, 1), (coca, 1)])
-        # Más cara que los sueltos (2 × 1.000): no ahorra, nunca se sugiere.
+        # Más cara que los sueltos (2 × 1.000): se sugiere igual, sin ahorro.
         pack("Promo Agua cara", 2500, [(agua, 2)])
 
     def test_promotion_hints_tour(self):

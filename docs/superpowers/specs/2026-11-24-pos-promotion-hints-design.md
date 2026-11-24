@@ -49,7 +49,8 @@ ofrezca la promo al cliente en el momento y se vendan más packs.
 - **Qué promos:** las mismas que puede aplicar `applyPromotionPacks()`: sucursal de la caja,
   vigentes hoy, mismas líneas candidatas.
 - **Ahorro y precio:** con el precio de la lista de la orden y `_getPromotionPackPrice()`, igual
-  que la promo en sí. Solo se muestran las que ahorran (precio del pack < precio normal).
+  que la promo en sí. También se muestran las promos más caras que los sueltos (decisión de
+  Alexis, 24/11): van al final, sin pastilla ni línea "Ahorra". Las que cuestan lo mismo, no.
 
 ## Para el builder
 

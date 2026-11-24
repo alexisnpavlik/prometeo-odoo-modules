@@ -47,6 +47,8 @@ const CARD = ".o_promotion_hints .o_promotion_hint_card";
 
 const VASOS = { name: "Promo 2 Vasos", missing: ["1 PH Vaso"], saving: 300 };
 const FERNET = { name: "Promo Fernet Coca", missing: ["1 PH Coca"], saving: 1200 };
+// Más cara que los sueltos (2 × 1.000 = 2.000 contra 2.500): se muestra igual, al final y sin ahorro.
+const AGUA = { name: "Promo Agua cara", missing: ["1 PH Agua"], saving: -500 };
 
 registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
     steps: () =>
@@ -116,9 +118,27 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             }),
             { content: "reabrir Fernet para seguir", trigger: DOT, run: "click" },
             ProductScreen.clickDisplayedProduct("PH Agua"),
-            expectHints("Agua cara no ahorra: no aparece", [FERNET]),
+            expectHints("Agua cara: aparece al final, con ahorro negativo", [FERNET, AGUA]),
+            dom("se abre la de Agua (último producto agregado)", () => {
+                const agua = hints().find((hint) => hint.name === AGUA.name);
+                if (order().uiState.openPromotionHintTmplId !== agua.tmplId) {
+                    fail("no se abrió la promo del producto agregado");
+                }
+            }),
+            { content: "burbuja de Agua con su precio", trigger: `${CARD}:contains('Sumá 1 PH Agua más'):contains('Promo Agua cara')` },
+            dom("la promo más cara no dice Ahorra ni lleva pastilla", () => {
+                if (document.querySelector(CARD).textContent.includes("Ahorra")) {
+                    fail("la promo más cara muestra Ahorra");
+                }
+                if (document.querySelector(`${DOT}.o_promotion_hint_dot_active .o_promotion_hint_saving`)) {
+                    fail("la promo más cara lleva pastilla de ahorro");
+                }
+            }),
+            { content: "volver a abrir Fernet", trigger: `${DOT}:not(.o_promotion_hint_dot_active)`, run: "click" },
+            { content: "Fernet abierta", trigger: `${CARD}:contains('Promo Fernet Coca')` },
+            ProductScreen.clickDisplayedProduct("PH Pan"),
             {
-                content: "un producto sin promo sugerida no cambia la abierta",
+                content: "un producto sin promo no cambia la abierta",
                 trigger: ".product-list",
                 run: () => {
                     if (order().uiState.openPromotionHintTmplId !== window.__phOpen) {
@@ -132,7 +152,7 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
                 content: "esperar el descuento en la línea",
                 trigger: ".orderline.selected:contains('PH Fernet') em:contains('10')",
             },
-            expectHints("descuento manual en Fernet: deja de contar", []),
+            expectHints("descuento manual en Fernet: deja de contar", [AGUA]),
             Chrome.createFloatingOrder(),
             dom("orden nueva: sin círculos", () => {
                 if (document.querySelector(DOT)) {
