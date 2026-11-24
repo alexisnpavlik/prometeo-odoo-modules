@@ -150,6 +150,9 @@
                         </setting>
                     </block>
                     <block title="Productos" name="simplify_products">
+                        <setting help="Solo el administrador puede crear unidades de medida. Los demás usuarios eligen entre las que ya existen.">
+                            <field name="simplify_block_uom_create"/>
+                        </setting>
                         <setting help="Menús de variantes en Inventario, Punto de venta, Ventas y Compras.">
                             <field name="simplify_hide_variants"/>
                         </setting>

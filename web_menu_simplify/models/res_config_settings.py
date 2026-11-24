@@ -73,6 +73,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_sale_taxes = fields.Boolean("Ocultar Impuestos de venta")
     simplify_hide_purchase_taxes = fields.Boolean("Ocultar Impuestos de compra")
     simplify_product_form_comfort = fields.Boolean("Ficha de producto más legible")
+    simplify_block_uom_create = fields.Boolean("No permitir crear unidades de medida")
 
     @api.model
     def get_values(self):
