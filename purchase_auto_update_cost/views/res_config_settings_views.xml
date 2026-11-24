@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_purchase_auto_update_cost" model="ir.ui.view">
+        <field name="name">res.config.settings.form.purchase.auto.update.cost</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Precios desde compras" string="Precios desde compras" name="purchase_auto_update_cost">
+                    <block title="Orden de compra" name="purchase_auto_update_cost_order">
+                        <setting help="Muestra la columna Precio de venta en la orden de compra y, al confirmar, la pasa al producto. Apagada, la compra solo actualiza el costo.">
+                            <field name="purchase_edit_sale_price"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

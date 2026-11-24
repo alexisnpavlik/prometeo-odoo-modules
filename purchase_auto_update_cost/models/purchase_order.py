@@ -3,6 +3,8 @@ from markupsafe import Markup
 from odoo import api, fields, models
 from odoo.tools import format_amount
 
+from .res_config_settings import edit_sale_price_enabled
+
 
 class PurchaseOrderLine(models.Model):
     _inherit = "purchase.order.line"
@@ -85,7 +87,14 @@ class PurchaseOrderLine(models.Model):
 class PurchaseOrder(models.Model):
     _inherit = "purchase.order"
 
+    edit_sale_price = fields.Boolean(compute="_compute_edit_sale_price")
     price_update_warning = fields.Html(compute="_compute_price_update_warning", sanitize=False)
+
+    def _compute_edit_sale_price(self):
+        """Opción de Ajustes: la vista oculta la columna Precio de venta si está apagada."""
+        enabled = edit_sale_price_enabled(self.env)
+        for order in self:
+            order.edit_sale_price = enabled
 
     def _price_updates(self):
         """Cambios que hará la confirmación: [(línea, campo, actual, nuevo)].
@@ -94,9 +103,13 @@ class PurchaseOrder(models.Model):
         """
         self.ensure_one()
         updates = []
+        fields_prices = ["standard_price"]
+        if edit_sale_price_enabled(self.env):
+            fields_prices.append("list_price")
         for line in self.order_line.filtered("product_id"):
             product = line.product_id.with_company(self.company_id)
-            for field, price in (("standard_price", line.price_unit), ("list_price", line.price_sale)):
+            for field in fields_prices:
+                price = line.price_unit if field == "standard_price" else line.price_sale
                 if not price:
                     continue
                 new = line._convert_price_to_company(price)
