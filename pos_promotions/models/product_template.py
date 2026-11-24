@@ -286,9 +286,21 @@ class ProductTemplate(models.Model):
         if "promotion_use_dates" in vals and not vals["promotion_use_dates"]:
             vals = dict(vals, promotion_date_start=False, promotion_date_end=False)
         res = super().write(vals)
+        if "promotion_pack_line_ids" in vals:
+            self._promotion_merge_pack_lines()
         if {"promotion_price_mode", "promotion_discount_percent", "promotion_pack_line_ids"} & set(vals):
             self._promotion_sync_percent_price()
         return res
+
+    def _promotion_merge_pack_lines(self):
+        """Junta las líneas del mismo producto en una sola, sumando cantidades (queda la primera)."""
+        for template in self:
+            kept = {}
+            for line in template.promotion_pack_line_ids:
+                first = kept.setdefault(line.product_id, line)
+                if first != line:
+                    first.quantity += line.quantity
+                    line.unlink()
 
     def _promotion_sync_percent_price(self):
         """Con % de descuento, el precio de la ficha (el que muestra la tarjeta del POS) es
@@ -366,5 +378,6 @@ class ProductTemplate(models.Model):
                         Command.set(self._promotion_default_companies(company or None).ids)
                     ]
         templates = super().create(vals_list)
+        templates._promotion_merge_pack_lines()
         templates._promotion_sync_percent_price()
         return templates
