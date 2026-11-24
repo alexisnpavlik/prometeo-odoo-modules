@@ -19,6 +19,7 @@ class ResConfigSettings(models.TransientModel):
     simplify_hide_tests = fields.Boolean("Ocultar Pruebas")
     simplify_hide_sales = fields.Boolean("Ocultar Ventas")
     simplify_hide_systray = fields.Boolean("Ocultar chat y actividades de la barra superior")
+    simplify_hide_send_message = fields.Boolean("Ocultar Enviar mensaje en los formularios")
     simplify_partner_form_simple = fields.Boolean("Ficha de contacto simplificada")
     simplify_flatten_single_menus = fields.Boolean("Menús de una sola opción como enlace directo")
     simplify_pos_first = fields.Boolean("Punto de venta primero y al iniciar sesión")

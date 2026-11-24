@@ -8,6 +8,9 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Interfaz simplificada" string="Interfaz simplificada" name="web_menu_simplify">
                     <block title="General" name="simplify_general">
+                        <setting help="Saca el botón Enviar mensaje del historial de todos los formularios. Registrar una nota y Actividades siguen disponibles.">
+                            <field name="simplify_hide_send_message"/>
+                        </setting>
                         <setting help="App de chat interno: oculta el menú y bloquea abrirla por URL.">
                             <field name="simplify_hide_discuss"/>
                         </setting>
