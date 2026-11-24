@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_promotions.PromotionHints">
+        <div t-if="hints.length" class="o_promotion_hints">
+            <div class="o_promotion_hint_dots">
+                <button t-foreach="hints" t-as="hint" t-key="hint.tmplId" type="button"
+                        t-attf-class="o_promotion_hint_dot {{ imageUrl(hint) ? 'o_promotion_hint_dot_photo' : '' }} {{ openHint?.tmplId === hint.tmplId ? 'o_promotion_hint_dot_active' : '' }}"
+                        t-att-title="hint.name"
+                        t-on-click="() => this.onClickDot(hint)">
+                    <img t-if="imageUrl(hint)" t-att-src="imageUrl(hint)" t-att-alt="hint.missing[0].product.display_name"/>
+                    <span t-else="" class="o_promotion_hint_initials" t-esc="initials(hint)"/>
+                    <span class="o_promotion_hint_saving">−<t t-esc="formatCurrency(hint.saving)"/></span>
+                </button>
+            </div>
+            <div t-if="openHint" class="o_promotion_hint_card" t-key="openHint.tmplId">
+                <button type="button" class="o_promotion_hint_close btn-close" aria-label="Descartar"
+                        t-on-click.stop="() => this.onClose(openHint)"/>
+                <div class="o_promotion_hint_title">Promo disponible</div>
+                <div class="o_promotion_hint_missing" t-esc="missingText(openHint)"/>
+                <div><t t-esc="openHint.name"/> a <t t-esc="formatCurrency(openHint.price)"/></div>
+                <div class="o_promotion_hint_card_saving">Ahorra <t t-esc="formatCurrency(openHint.saving)"/></div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="pos_promotions.ProductScreen" t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('rightpane')]/div[hasclass('position-relative')]" position="inside">
+            <PromotionHints/>
+        </xpath>
+    </t>
+</templates>

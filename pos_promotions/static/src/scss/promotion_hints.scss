@@ -1,0 +1,145 @@
+$o-promotion-hint-orange: #e8590c;
+$o-promotion-hint-green: #2b8a3e;
+
+@keyframes o-promotion-hint-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+@keyframes o-promotion-hint-in {
+    from { opacity: 0; transform: translateY(-12px) scale(0.9); }
+    to { opacity: 1; transform: none; }
+}
+
+// Flota sobre la grilla sin bloquear los productos que quedan debajo de los huecos.
+.o_promotion_hints {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.o_promotion_hint_dots {
+    display: flex;
+    gap: 10px;
+}
+
+.o_promotion_hint_dot {
+    position: relative;
+    width: 54px;
+    height: 54px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: $o-promotion-hint-orange;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba($o-promotion-hint-orange, 0.4);
+    animation: o-promotion-hint-float 3s ease-in-out infinite;
+    pointer-events: auto;
+    cursor: pointer;
+
+    &:nth-child(2) { animation-delay: 0.6s; }
+    &:nth-child(3) { animation-delay: 1.2s; }
+
+    img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+}
+
+.o_promotion_hint_dot_photo {
+    background: #fff;
+    border: 3px solid $o-promotion-hint-orange;
+}
+
+.o_promotion_hint_dot_active {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px $o-promotion-hint-orange, 0 6px 16px rgba($o-promotion-hint-orange, 0.4);
+}
+
+.o_promotion_hint_initials {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.o_promotion_hint_saving {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: $o-promotion-hint-green;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    border-radius: 999px;
+    padding: 0 6px;
+    white-space: nowrap;
+}
+
+.o_promotion_hint_card {
+    position: relative;
+    width: 230px;
+    padding: 11px 30px 11px 13px;
+    background: #fff;
+    color: #212529;
+    border-top: 4px solid $o-promotion-hint-orange;
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+    animation: o-promotion-hint-in 0.35s ease-out;
+    pointer-events: auto;
+
+    &::before {
+        content: "";
+        position: absolute;
+        top: -11px;
+        right: 20px;
+        border: 7px solid transparent;
+        border-bottom-color: $o-promotion-hint-orange;
+    }
+}
+
+.o_promotion_hint_close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+}
+
+.o_promotion_hint_title {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: $o-promotion-hint-orange;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.o_promotion_hint_missing {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 2px 0;
+}
+
+.o_promotion_hint_card_saving {
+    margin-top: 2px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: $o-promotion-hint-green;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .o_promotion_hint_dot,
+    .o_promotion_hint_card {
+        animation: none;
+    }
+}

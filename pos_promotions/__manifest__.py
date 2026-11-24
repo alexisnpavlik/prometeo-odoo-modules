@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS - Promociones",
-    "version": "18.0.2.4.0",
+    "version": "18.0.2.5.0",
     "category": "Sales/Point Of Sale",
     "summary": "App Promociones: uno o varios productos juntos a un precio",
     "description": """
@@ -42,8 +42,11 @@
             "pos_promotions/static/src/js/pos_order_line_patch.js",
             "pos_promotions/static/src/js/product_screen_patch.js",
             "pos_promotions/static/src/js/promotion_packs.js",
+            "pos_promotions/static/src/js/promotion_hints.js",
             "pos_promotions/static/src/xml/orderline.xml",
+            "pos_promotions/static/src/xml/promotion_hints.xml",
             "pos_promotions/static/src/scss/orderline.scss",
+            "pos_promotions/static/src/scss/promotion_hints.scss",
         ],
         "web.assets_tests": [
             "pos_promotions/static/tests/tours/*.js",

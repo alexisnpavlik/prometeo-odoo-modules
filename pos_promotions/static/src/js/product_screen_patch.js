@@ -2,6 +2,11 @@
 
 import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product_screen";
 import { patch } from "@web/core/utils/patch";
+import { PromotionHints } from "./promotion_hints";
+
+patch(ProductScreen, {
+    components: { ...ProductScreen.components, PromotionHints },
+});
 
 patch(ProductScreen.prototype, {
     /** Si el POS limita categorías, muestra igual los packs aunque no tengan una habilitada. */
