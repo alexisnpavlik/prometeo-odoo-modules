@@ -26,6 +26,13 @@
                         icon="fa-undo"
                         invisible="not simplify_can_return"/>
             </xpath>
+            <!-- Cancelar último del encabezado y separado a la derecha, lejos de Confirmar. -->
+            <xpath expr="//header" position="inside">
+                <xpath expr="//header/button[@name='button_cancel']" position="move"/>
+            </xpath>
+            <xpath expr="//header/button[@name='button_cancel']" position="attributes">
+                <attribute name="class" add="o_simplify_cancel" separator=" "/>
+            </xpath>
             <!-- En el teléfono Odoo manda los botones del encabezado al menú del engranaje:
                  esta barra los deja a la vista. En pantallas medianas y grandes no se muestra. -->
             <xpath expr="//sheet/div[hasclass('oe_title')]" position="before">
