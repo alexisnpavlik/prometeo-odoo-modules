@@ -23,9 +23,10 @@ export class PromotionHints extends Component {
         return this.order?.getPromotionHints() || [];
     }
 
-    get openHint() {
+    /** La burbuja abierta, dentro de los hints ya calculados en este render. */
+    openHint(hints) {
         const openId = this.order?.uiState.openPromotionHintTmplId;
-        return this.hints.find((hint) => hint.tmplId === openId);
+        return hints.find((hint) => hint.tmplId === openId);
     }
 
     imageUrl(hint) {
@@ -52,8 +53,10 @@ export class PromotionHints extends Component {
         return this.env.utils.formatCurrency(amount);
     }
 
+    /** Abre la burbuja del círculo; si ya estaba abierta, la cierra (sin descartar la promo). */
     onClickDot(hint) {
-        this.order.uiState.openPromotionHintTmplId = hint.tmplId;
+        const uiState = this.order.uiState;
+        uiState.openPromotionHintTmplId = uiState.openPromotionHintTmplId === hint.tmplId ? false : hint.tmplId;
     }
 
     onClose(hint) {

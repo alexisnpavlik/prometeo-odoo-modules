@@ -11,12 +11,15 @@ patch(PosOrder.prototype, {
     /** Packs activos cargados en el POS: {template, price, components: [{product, qty}]}. */
     getPromotionPacks() {
         const packs = new Map();
+        // Producto de cada pack, indexado una vez: buscarlo por pack recorría todo el catálogo.
+        const packProducts = new Map();
+        for (const product of this.models["product.product"].filter((p) => p.is_promotion_pack)) {
+            packProducts.set(recordId(product.product_tmpl_id), product);
+        }
         for (const line of this.models["pos.promotion.pack.line"].getAll()) {
             const tmplId = recordId(line.pack_tmpl_id);
             if (!packs.has(tmplId)) {
-                const packProduct = this.models["product.product"].find(
-                    (product) => recordId(product.product_tmpl_id) === tmplId
-                );
+                const packProduct = packProducts.get(tmplId);
                 if (!packProduct) {
                     continue;
                 }

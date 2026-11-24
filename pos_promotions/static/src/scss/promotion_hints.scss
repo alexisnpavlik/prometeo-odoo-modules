@@ -137,6 +137,13 @@ $o-promotion-hint-green: #2b8a3e;
     color: $o-promotion-hint-green;
 }
 
+// Teléfono: burbuja más angosta para tapar menos grilla.
+@media (max-width: 575.98px) {
+    .o_promotion_hint_card {
+        width: min(200px, 60vw);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .o_promotion_hint_dot,
     .o_promotion_hint_card {

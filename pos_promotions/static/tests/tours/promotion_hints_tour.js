@@ -20,7 +20,7 @@ function hints() {
         .map((hint) => ({
             name: hint.name,
             tmplId: hint.tmplId,
-            missing: hint.missing.map((m) => `${m.qty} ${m.product.display_name}`),
+            missing: hint.missing.map((m) => `${m.qty} ${m.product.name}`),
             saving: Math.round(hint.saving),
         }));
 }
@@ -88,6 +88,17 @@ registry.category("web_tour.tours").add("pos_promotion_hints_tour", {
             }),
             { content: "tocar el círculo de Vasos", trigger: `${DOT}:not(.o_promotion_hint_dot_active)`, run: "click" },
             { content: "se abre la de Vasos", trigger: `${CARD}:contains('Promo 2 Vasos')` },
+            { content: "tocar el círculo activo", trigger: `${DOT}.o_promotion_hint_dot_active`, run: "click" },
+            dom("la burbuja se cierra sin descartar la promo", () => {
+                if (document.querySelector(CARD)) {
+                    fail("tocar el círculo activo no cerró la burbuja");
+                }
+                if (document.querySelectorAll(DOT).length !== 2 || !hints().some((h) => h.name === VASOS.name)) {
+                    fail("cerrar la burbuja descartó la promo");
+                }
+            }),
+            { content: "volver a abrir Vasos", trigger: `${DOT}:not(.o_promotion_hint_dot_active):last`, run: "click" },
+            { content: "Vasos abierta otra vez", trigger: `${CARD}:contains('Promo 2 Vasos')` },
             { content: "tocar la burbuja abierta", trigger: CARD, run: "click" },
             dom("tocar no agrega nada a la orden", () => {
                 if (order().get_orderlines().length !== window.__phLines) {

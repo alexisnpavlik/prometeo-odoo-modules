@@ -15,9 +15,9 @@ class TestPromotionHintsTour(TestPointOfSaleHttpCommon):
         super().setUpClass()
         values = {"available_in_pos": True, "sale_ok": True, "taxes_id": [(5, 0, 0)]}
         Product = cls.env["product.product"]
-        vaso = Product.create({**values, "name": "PH Vaso", "list_price": 900})
+        vaso = Product.create({**values, "name": "PH Vaso", "list_price": 900, "default_code": "123"})
         fernet = Product.create({**values, "name": "PH Fernet", "list_price": 7000})
-        coca = Product.create({**values, "name": "PH Coca", "list_price": 3200, "image_1920": PNG_1X1})
+        coca = Product.create({**values, "name": "PH Coca", "list_price": 3200, "image_1920": PNG_1X1, "default_code": "7790895"})
         agua = Product.create({**values, "name": "PH Agua", "list_price": 1000})
         company = cls.main_pos_config.company_id
 
