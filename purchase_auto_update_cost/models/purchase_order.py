@@ -113,12 +113,15 @@ class PurchaseOrder(models.Model):
                 order.price_update_warning = False
                 continue
             cur = order.company_id.currency_id
+            # Una línea por producto con todos sus cambios (costo · precio de venta).
+            by_line = {}
+            for line, field, old, new in updates:
+                by_line.setdefault(line, []).append("%s %s → %s" % (
+                    labels[field], format_amount(order.env, old, cur), format_amount(order.env, new, cur),
+                ))
             items = "".join(
-                "<li><b>%s</b>: %s %s → %s</li>" % (
-                    line.product_id.display_name, labels[field],
-                    format_amount(order.env, old, cur), format_amount(order.env, new, cur),
-                )
-                for line, field, old, new in updates
+                "<li><b>%s</b>: %s</li>" % (line.product_id.display_name, " · ".join(changes))
+                for line, changes in by_line.items()
             )
             order.price_update_warning = (
                 "<b>Al confirmar se actualizan estos precios de producto:</b><ul class='mb-0'>%s</ul>" % items
