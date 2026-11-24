@@ -87,14 +87,26 @@ class PurchaseOrderLine(models.Model):
 class PurchaseOrder(models.Model):
     _inherit = "purchase.order"
 
-    edit_sale_price = fields.Boolean(compute="_compute_edit_sale_price")
     price_update_warning = fields.Html(compute="_compute_price_update_warning", sanitize=False)
 
-    def _compute_edit_sale_price(self):
-        """Opción de Ajustes: la vista oculta la columna Precio de venta si está apagada."""
-        enabled = edit_sale_price_enabled(self.env)
-        for order in self:
-            order.edit_sale_price = enabled
+    @api.model
+    def _get_view_cache_key(self, view_id=None, view_type="form", **options):
+        """Separa la caché de vistas según la opción de editar el precio de venta."""
+        key = super()._get_view_cache_key(view_id, view_type, **options)
+        return key + (edit_sale_price_enabled(self.env),)
+
+    @api.model
+    def _get_view(self, view_id=None, view_type="form", **options):
+        """Quita Precio de venta de la vista si la opción de Ajustes está apagada.
+
+        Se hace acá y no con invisible sobre un campo calculado: en una orden
+        nueva el campo llega vacío y la columna se ocultaba siempre.
+        """
+        arch, view = super()._get_view(view_id, view_type, **options)
+        if view_type == "form" and not edit_sale_price_enabled(self.env):
+            for node in arch.xpath("//field[@name='order_line']//field[@name='price_sale']"):
+                node.getparent().remove(node)
+        return arch, view
 
     def _price_updates(self):
         """Cambios que hará la confirmación: [(línea, campo, actual, nuevo)].

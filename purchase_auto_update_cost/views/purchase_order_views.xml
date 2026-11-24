@@ -8,9 +8,6 @@
         <field name="arch" type="xml">
 
             <!-- Aviso de precios que cambian al confirmar (solo en borrador) -->
-            <xpath expr="//field[@name='partner_id']" position="after">
-                <field name="edit_sale_price" invisible="1"/>
-            </xpath>
             <xpath expr="//sheet" position="before">
                 <div class="alert alert-warning mb-0" role="alert" invisible="not price_update_warning">
                     <field name="price_update_warning" nolabel="1" readonly="1"/>
@@ -25,7 +22,7 @@
 
             <!-- Nuevo campo "Precio de venta" en la lista, tras el precio de costo -->
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
-                <field name="price_sale" width="130px" readonly="qty_invoiced != 0" column_invisible="not parent.edit_sale_price"/>
+                <field name="price_sale" width="130px" readonly="qty_invoiced != 0"/>
             </xpath>
 
             <!-- Mismo cambio en el formulario de la línea -->
@@ -33,7 +30,7 @@
                 <attribute name="string">Precio de costo</attribute>
             </xpath>
             <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
-                <field name="price_sale" invisible="not parent.edit_sale_price"/>
+                <field name="price_sale"/>
             </xpath>
 
         </field>
