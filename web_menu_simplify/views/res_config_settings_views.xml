@@ -61,7 +61,7 @@
                         <setting help="El título dice siempre Orden de compra y no se muestra la barra Solicitud de cotización → enviada → Orden de compra.">
                             <field name="simplify_purchase_order_no_rfq"/>
                         </setting>
-                        <setting help="Sin Cancelar (en borrador ya está Descartar), Bloquear, Desbloquear, Confirmar la fecha de recepción ni el botón Recepción. Ya confirmada, la orden muestra solo Devolver e Imprimir.">
+                        <setting help="Sin Bloquear, Desbloquear, Confirmar la fecha de recepción ni el botón Recepción. Cancelar solo aparece con la orden confirmada (en borrador ya está Descartar). Ya confirmada, la orden muestra Devolver, Imprimir y Cancelar.">
                             <field name="simplify_purchase_confirmed_only_return"/>
                         </setting>
                     </block>

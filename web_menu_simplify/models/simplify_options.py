@@ -102,8 +102,8 @@ VIEW_OPTIONS = {
     "purchase_confirmed_only_return": {
         "models": ("purchase.order",),
         "form": (
-            # Cancelar se oculta siempre: en borrador hace lo mismo que Descartar.
-            "//header/button[@name='button_cancel']",
+            # Cancelar solo en la orden confirmada: en borrador hace lo mismo que Descartar.
+            ("//header/button[@name='button_cancel']", "invisible", "state != 'purchase'"),
             "//header/button[@name='button_done']",
             "//header/button[@name='button_unlock']",
             "//header/button[@name='confirm_reminder_mail']",
