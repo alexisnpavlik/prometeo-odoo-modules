@@ -12,6 +12,7 @@ class IrHttp(models.AbstractModel):
         """Le indica al cliente web las opciones que resuelve el frontend."""
         result = super().session_info()
         result["web_menu_simplify_hide_systray"] = is_option_active(self.env, "hide_systray")
+        result["web_menu_simplify_hide_send_message"] = is_option_active(self.env, "hide_send_message")
         # Solo para quien tiene bloqueada la creación (el administrador sigue creando).
         result["web_menu_simplify_block_uom_create"] = is_option_active(
             self.env, "block_uom_create"
