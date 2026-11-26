@@ -866,6 +866,17 @@
                     
                     <!-- TAB: CUENTA CORRIENTE (customer_checking_account; no pasa por el POS) -->
                     <section t-if="ccaData.available" t-att-class="'tab-pane ' + (state.activeTab === 'cca' ? 'active' : '')">
+                        <div class="iva-mode-bar">
+                            <span class="iva-mode-label">Márgenes y valores</span>
+                            <div class="nav-tabs iva-mode-tabs">
+                                <button t-att-class="'nav-tab ' + (state.ivaMode === 'net' ? 'active' : '')"
+                                        title="Venta y costo sin IVA (responsable inscripto)"
+                                        t-on-click="() => this.setIvaMode('net')">Sin IVA</button>
+                                <button t-att-class="'nav-tab ' + (state.ivaMode === 'gross' ? 'active' : '')"
+                                        title="Precio final contra costo + IVA de compra (monotributo / exento)"
+                                        t-on-click="() => this.setIvaMode('gross')">Con IVA</button>
+                            </div>
+                        </div>
                         <div class="kpi-grid">
                             <div class="kpi-card shadow-glow green">
                                 <div class="kpi-card-inner">
@@ -896,7 +907,7 @@
                             </div>
                             <div class="kpi-card shadow-glow purple">
                                 <div class="kpi-card-inner">
-                                    <div class="kpi-meta"><span class="kpi-title">Margen bruto</span></div>
+                                    <div class="kpi-meta"><span class="kpi-title">Margen bruto (<t t-esc="ivaLabel"/>)</span></div>
                                     <div class="kpi-value"><t t-esc="formatCurrency(ccaData.kpis.gross_profit)"/></div>
                                     <div class="kpi-footer">
                                         <span class="kpi-subtext"><t t-esc="ccaData.kpis.margin_percent"/>% · sobre el <t t-esc="ccaData.kpis.cost_coverage_percent"/>% de la venta con costo</span>
@@ -944,6 +955,17 @@
 
                     <!-- TAB: VENTAS Y RENTABILIDAD -->
                     <section t-att-class="'tab-pane ' + (state.activeTab === 'profitability' ? 'active' : '')">
+                        <div class="iva-mode-bar">
+                            <span class="iva-mode-label">Márgenes y valores</span>
+                            <div class="nav-tabs iva-mode-tabs">
+                                <button t-att-class="'nav-tab ' + (state.ivaMode === 'net' ? 'active' : '')"
+                                        title="Venta y costo sin IVA (responsable inscripto)"
+                                        t-on-click="() => this.setIvaMode('net')">Sin IVA</button>
+                                <button t-att-class="'nav-tab ' + (state.ivaMode === 'gross' ? 'active' : '')"
+                                        title="Precio final contra costo + IVA de compra (monotributo / exento)"
+                                        t-on-click="() => this.setIvaMode('gross')">Con IVA</button>
+                            </div>
+                        </div>
                         <div t-if="metricsData.kpis.total_orders &gt; 0"
                              t-att-class="'cost-coverage-alert' + (metricsData.profitability.cost_coverage_percent &lt; 90 ? '' : ' ok')">
                             <strong t-if="metricsData.profitability.cost_coverage_percent &lt; 90">Margen poco confiable: </strong>
@@ -959,7 +981,7 @@
                             <div class="kpi-card shadow-glow green">
                                 <div class="kpi-card-inner">
                                     <div class="kpi-meta">
-                                        <span class="kpi-title">Utilidad Bruta (Margen $)</span>
+                                        <span class="kpi-title">Utilidad Bruta (<t t-esc="ivaLabel"/>)</span>
                                         <div class="kpi-icon">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
@@ -988,7 +1010,7 @@
                                     </div>
                                     <div class="kpi-value"><t t-esc="metricsData.profitability.margin_percent"/>%</div>
                                     <div class="kpi-footer">
-                                        <span class="kpi-subtext">Ganancia por peso vendido, descuentos incluidos</span>
+                                        <span class="kpi-subtext">Ganancia por peso vendido <t t-esc="ivaLabel"/>, descuentos incluidos</span>
                                     </div>
                                 </div>
                             </div>
@@ -1014,12 +1036,91 @@
                             </div>
                         </div>
 
+                        <!-- Valor de la mercadería en stock (foto actual) -->
+                        <div class="glass-panel padded" style="margin-bottom: 20px;">
+                            <div class="section-header" style="margin-bottom: 20px;">
+                                <div>
+                                    <h2>Valor de la Mercadería en Stock</h2>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Stock actual (no depende de las fechas, caja ni cajero) valuado al precio de venta de la lista de cada sucursal y al costo cargado</p>
+                                </div>
+                            </div>
+                            <div t-if="stockValueData.loaded and stockValueData.totals.products &gt; 0"
+                                 t-att-class="'cost-coverage-alert' + (stockValueData.totals.with_cost_percent &lt; 90 ? '' : ' ok')">
+                                <strong t-if="stockValueData.totals.with_cost_percent &lt; 90">Valor a costo incompleto: </strong>
+                                <t t-esc="stockValueData.totals.with_cost.toLocaleString()"/> de
+                                <t t-esc="stockValueData.totals.products.toLocaleString()"/> productos en stock
+                                (<t t-esc="stockValueData.totals.with_cost_percent"/>%) tienen costo cargado.
+                                El margen potencial sólo considera esos productos.
+                            </div>
+                            <div class="kpi-grid">
+                                <div class="kpi-card shadow-glow green">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta"><span class="kpi-title">Stock a Precio de Venta (<t t-esc="ivaLabel"/>)</span></div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(stockValueData.totals.sale_value || 0)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext"><t t-esc="(stockValueData.totals.qty || 0).toLocaleString()"/> unidades</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="kpi-card shadow-glow blue">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta"><span class="kpi-title">Stock a Precio de Costo (<t t-esc="ivaLabel"/>)</span></div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(stockValueData.totals.cost_value || 0)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext">Sólo productos con costo cargado</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="kpi-card shadow-glow purple">
+                                    <div class="kpi-card-inner">
+                                        <div class="kpi-meta"><span class="kpi-title">Margen Potencial</span></div>
+                                        <div class="kpi-value"><t t-esc="formatCurrency(stockValueData.totals.potential_margin || 0)"/></div>
+                                        <div class="kpi-footer">
+                                            <span class="kpi-subtext"><t t-esc="stockValueData.totals.potential_margin_percent || 0"/>% sobre la venta de los productos con costo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sucursal</th>
+                                            <th style="text-align: right;">Productos</th>
+                                            <th style="text-align: right;">Unidades</th>
+                                            <th style="text-align: right;">A Precio de Venta</th>
+                                            <th style="text-align: right;">A Precio de Costo</th>
+                                            <th style="text-align: right;">Con Costo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="!stockValueData.rows.length">
+                                            <td colspan="6" class="text-center text-muted">
+                                                <t t-if="stockValueData.loaded">Sin stock para los filtros elegidos.</t>
+                                                <t t-else="">Cargando...</t>
+                                            </td>
+                                        </tr>
+                                        <t t-foreach="stockValueData.rows" t-as="r" t-key="r_index + '-' + r.company">
+                                            <tr>
+                                                <td style="font-weight: 700; color: var(--text-primary);"><t t-esc="r.company"/></td>
+                                                <td style="text-align: right;"><t t-esc="r.products.toLocaleString()"/></td>
+                                                <td style="text-align: right;"><t t-esc="r.qty.toLocaleString()"/></td>
+                                                <td style="text-align: right;"><t t-esc="formatCurrency(r.sale_value)"/></td>
+                                                <td style="text-align: right;"><t t-esc="formatCurrency(r.cost_value)"/></td>
+                                                <td style="text-align: right;"><t t-esc="r.with_cost.toLocaleString()"/> / <t t-esc="r.products.toLocaleString()"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Product Profitability Table -->
                         <div class="glass-panel padded" style="margin-bottom: 20px;">
                             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Producto</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo y precio de venta por unidad, ventas con IVA, utilidad y porcentaje de margen por producto</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo y precio de venta por unidad, ventas <t t-esc="ivaLabel"/>, utilidad y porcentaje de margen por producto</p>
                                 </div>
                                 <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
                                     <div class="nav-tabs" style="display: flex; gap: 4px;">
@@ -1046,7 +1147,7 @@
                                             <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
                                             <th class="text-right" style="text-align: right;">Costo</th>
                                             <th class="text-right" style="text-align: right;">Precio de Venta</th>
-                                            <th class="text-right" style="text-align: right;">Ventas Total</th>
+                                            <th class="text-right" style="text-align: right;">Ventas <t t-esc="ivaLabel"/></th>
                                             <th class="text-right" style="text-align: right;">Utilidad</th>
                                             <th>% Margen</th>
                                         </tr>
@@ -1091,7 +1192,7 @@
                             <div class="section-header" style="margin-bottom: 20px;">
                                 <div>
                                     <h2>Análisis de Margen por Categoría</h2>
-                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo total, ventas con IVA, utilidad y porcentaje de margen por categoría</p>
+                                    <p class="subtitle" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Unidades, costo total, ventas <t t-esc="ivaLabel"/>, utilidad y porcentaje de margen por categoría</p>
                                 </div>
                             </div>
                             
@@ -1102,7 +1203,7 @@
                                             <th>Categoría</th>
                                             <th class="text-right" style="text-align: right;">Unidades Vendidas</th>
                                             <th class="text-right" style="text-align: right;">Costo Total</th>
-                                            <th class="text-right" style="text-align: right;">Ventas Total</th>
+                                            <th class="text-right" style="text-align: right;">Ventas <t t-esc="ivaLabel"/></th>
                                             <th class="text-right" style="text-align: right;">Utilidad</th>
                                             <th>% Margen</th>
                                         </tr>
