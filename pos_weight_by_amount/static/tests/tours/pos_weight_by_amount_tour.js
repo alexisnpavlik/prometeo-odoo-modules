@@ -58,8 +58,8 @@ registry.category("web_tour.tours").add("pos_weight_by_amount_tour", {
                 trigger: ".o_weight_by_amount_button[disabled]",
             },
             {
-                content: "fila de arriba: Reembolso a la vista y Nota interna oculta",
-                trigger: ".control-buttons .o_refund_row_button",
+                content: "fila de arriba: Nota interna oculta",
+                trigger: ".control-buttons .o_qty_mode_button",
                 run: () => {
                     const note = document.querySelector(".control-buttons .o_line_note_button");
                     if (note && note.offsetParent !== null) {

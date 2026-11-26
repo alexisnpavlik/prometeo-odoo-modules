@@ -11,16 +11,6 @@
                 Cant.
             </button>
         </xpath>
-        <!-- Escritorio: Reembolso a mano en el lugar que deja Nota interna.
-             Si la caja tiene el botón Descuento (pos_global_discount_button) ese lugar ya está ocupado. -->
-        <xpath expr="//button[hasclass('more-btn')]" position="before">
-            <button t-if="!props.showRemainingButtons and !ui.isSmall and !(pos.config.module_pos_discount and pos.config.discount_product_id)"
-                class="o_refund_row_button"
-                t-att-class="buttonClass"
-                t-on-click="() => this.clickRefund()">
-                Reembolso
-            </button>
-        </xpath>
         <!-- Escritorio: Nota interna (de la línea) sale de la fila y pasa al popup de Acciones -->
         <xpath expr="//div[hasclass('control-buttons-modal')]" position="inside">
             <OrderlineNoteButton t-if="!ui.isSmall"
