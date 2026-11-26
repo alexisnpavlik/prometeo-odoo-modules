@@ -57,6 +57,30 @@ registry.category("web_tour.tours").add("pos_weight_by_amount_tour", {
                 content: "producto por unidad: botón deshabilitado",
                 trigger: ".o_weight_by_amount_button[disabled]",
             },
+            {
+                content: "fila de arriba: Reembolso a la vista y Nota interna oculta",
+                trigger: ".control-buttons .o_refund_row_button",
+                run: () => {
+                    const note = document.querySelector(".control-buttons .o_line_note_button");
+                    if (note && note.offsetParent !== null) {
+                        fail("Nota interna sigue visible en la fila de arriba");
+                    }
+                },
+            },
+            {
+                content: "Cant. en la fila de arriba cambia el teclado a modo cantidad",
+                trigger: ".control-buttons .o_qty_mode_button",
+                run: "click",
+            },
+            {
+                content: "modo cantidad activo",
+                trigger: ".control-buttons .o_qty_mode_button.active",
+                run: () => {
+                    if (window.posmodel.numpadMode !== "quantity") {
+                        fail(`numpadMode = ${window.posmodel.numpadMode}`);
+                    }
+                },
+            },
             ProductScreen.clickDisplayedProduct("PWA Queso"),
             // 5000 / 8000 = 0,625 kg → 0,63 kg y precio ajustado para que dé 5000
             chargeAmount("5000"),

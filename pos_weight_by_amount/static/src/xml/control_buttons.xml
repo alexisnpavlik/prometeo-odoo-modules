@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_weight_by_amount.ControlButtons" t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+        <!-- Escritorio: Cant. al final de la fila, alineada con la última columna del teclado -->
+        <xpath expr="//button[hasclass('more-btn')]" position="after">
+            <button t-if="!props.showRemainingButtons and !ui.isSmall"
+                class="o_qty_mode_button btn btn-light btn-lg lh-lg"
+                t-att-class="{'active': pos.numpadMode === 'quantity'}"
+                t-att-disabled="!hasSelectedLine"
+                t-on-click="() => this.clickQuantityMode()">
+                Cant.
+            </button>
+        </xpath>
+        <!-- Escritorio: Reembolso a mano en el lugar que deja Nota interna.
+             Si la caja tiene el botón Descuento (pos_global_discount_button) ese lugar ya está ocupado. -->
+        <xpath expr="//button[hasclass('more-btn')]" position="before">
+            <button t-if="!props.showRemainingButtons and !ui.isSmall and !(pos.config.module_pos_discount and pos.config.discount_product_id)"
+                class="o_refund_row_button"
+                t-att-class="buttonClass"
+                t-on-click="() => this.clickRefund()">
+                Reembolso
+            </button>
+        </xpath>
+        <!-- Escritorio: Nota interna (de la línea) sale de la fila y pasa al popup de Acciones -->
+        <xpath expr="//div[hasclass('control-buttons-modal')]" position="inside">
+            <OrderlineNoteButton t-if="!ui.isSmall"
+                label="internalNoteLabel()"
+                getter="(orderline) => orderline.getNote()"
+                class="buttonClass"
+                setter="(orderline, note) => orderline.setNote(note)"/>
+        </xpath>
+        <!-- Celular: el teclado no cambia y "Por $" va al popup de Acciones -->
+        <xpath expr="//div[hasclass('control-buttons-modal')]" position="inside">
+            <button t-if="ui.isSmall"
+                class="o_weight_by_amount_button"
+                t-att-class="buttonClass"
+                t-att-disabled="!weightByAmountLine"
+                t-on-click="() => this.clickWeightByAmount()">
+                <i class="fa fa-balance-scale me-1"/>Por $
+            </button>
+        </xpath>
+    </t>
+
+    <!-- Marca la Nota interna de la línea (la única con getter) para ocultarla en la fila de arriba.
+         Se hace por CSS y no con xpath sobre ControlButtons porque pos_global_discount_button
+         reemplaza ese mismo nodo y los dos xpath chocarían según el orden de carga. -->
+    <t t-name="pos_weight_by_amount.OrderlineNoteButton" t-inherit="point_of_sale.OrderlineNoteButton" t-inherit-mode="extension">
+        <xpath expr="//button" position="attributes">
+            <attribute name="t-att-class">{'o_line_note_button': props.getter}</attribute>
+        </xpath>
+    </t>
+</templates>
