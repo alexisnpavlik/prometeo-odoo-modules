@@ -100,7 +100,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp2 ON pp2.id = pol2.product_id
                 JOIN product_template pt2 ON pt2.id = pp2.product_tmpl_id
                 LEFT JOIN product_category ic2 ON ic2.id = pt2.categ_id
-                WHERE pol2.order_id = po.id AND pp2.active = TRUE AND pt2.active = TRUE
+                WHERE pol2.order_id = po.id
             """
             if categories:
                 where_clause += " AND ic2.name IN %s"
@@ -111,6 +111,42 @@ class PosMetricsController(http.Controller):
             where_clause += ")"
 
         return where_clause, params
+
+    def _tax_join_sql(self, tmpl_expr, company_expr, alias='tx'):
+        """LEFT JOIN con las alícuotas del producto en esa empresa, agregadas una sola vez por consulta.
+
+        Columnas: sale_rate / purchase_rate (0.21 = 21%, impuestos porcentuales de venta y de compra)
+        e included (el precio de venta trae el IVA adentro: impuesto o empresa en tax_included).
+        Un producto sin impuestos queda en NULL: usar COALESCE(..., 0). Antes eran subconsultas
+        correlacionadas por línea y el dashboard tardaba minutos en prod.
+        """
+        return f"""
+            LEFT JOIN (
+                SELECT x.tmpl_id, x.company_id,
+                       SUM(x.sale) / 100.0 AS sale_rate,
+                       SUM(x.purchase) / 100.0 AS purchase_rate,
+                       BOOL_OR(x.incl) AS included
+                FROM (
+                    SELECT r.prod_id AS tmpl_id, t.company_id, t.amount AS sale, 0 AS purchase,
+                           COALESCE(t.price_include_override, c.account_price_include) = 'tax_included' AS incl
+                    FROM product_taxes_rel r
+                    JOIN account_tax t ON t.id = r.tax_id AND t.amount_type = 'percent' AND t.active
+                    JOIN res_company c ON c.id = t.company_id
+                    UNION ALL
+                    SELECT r.prod_id, t.company_id, 0, t.amount, FALSE
+                    FROM product_supplier_taxes_rel r
+                    JOIN account_tax t ON t.id = r.tax_id AND t.amount_type = 'percent' AND t.active
+                ) x
+                GROUP BY 1, 2
+            ) {alias} ON {alias}.tmpl_id = {tmpl_expr} AND {alias}.company_id = {company_expr}"""
+
+    SALE_RATE = "COALESCE(tx.sale_rate, 0)"
+    PURCHASE_RATE = "COALESCE(tx.purchase_rate, 0)"
+    INCLUDED = "COALESCE(tx.included, FALSE)"
+
+    def _iva_mode(self, iva_mode):
+        """'gross' = márgenes con IVA (precio final contra costo + IVA de compra), si no 'net'."""
+        return 'gross' if iva_mode == 'gross' else 'net'
 
     def _surcharge_products_sql(self):
         """Subconsulta con los productos de recargo de las cajas (pos_global_surcharge_button).
@@ -307,6 +343,7 @@ class PosMetricsController(http.Controller):
         is_surcharge = f"pp.id IN {self._surcharge_products_sql()}"
         is_merchandise = f"NOT {is_discount} AND NOT {is_surcharge}"
         unit_cost = "COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)"
+        purchase_rate = self.PURCHASE_RATE
         # price_subtotal_incl ya viene neto del descuento de línea: se reconstruye el monto descontado.
         # Al 100% el subtotal es 0 y no hay de dónde despejarlo; se usa qty * price_unit.
         line_discount = """CASE
@@ -321,7 +358,11 @@ class PosMetricsController(http.Controller):
                 SUM(pol.qty) FILTER (WHERE {is_merchandise} AND po.amount_total >= 0) AS total_qty,
                 SUM(pol.price_subtotal_incl) FILTER (WHERE {is_merchandise}) AS products_revenue,
                 SUM(pol.price_subtotal_incl) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS costed_revenue,
+                SUM(pol.price_subtotal) FILTER (WHERE {is_merchandise}) AS products_revenue_net,
+                SUM(pol.price_subtotal) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS costed_revenue_net,
+                SUM(pol.price_subtotal) FILTER (WHERE {is_discount}) AS global_discount_net,
                 SUM(pol.qty * {unit_cost}) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS total_cost,
+                SUM(pol.qty * {unit_cost} * (1 + {purchase_rate})) FILTER (WHERE {is_merchandise} AND {unit_cost} > 0) AS total_cost_gross,
                 SUM(pol.price_subtotal_incl) FILTER (WHERE {is_discount}) AS global_discount,
                 SUM(pol.price_subtotal_incl) FILTER (WHERE {is_surcharge}) AS surcharge_total,
                 SUM({line_discount}) FILTER (WHERE {is_merchandise}) AS line_discount,
@@ -331,11 +372,12 @@ class PosMetricsController(http.Controller):
             JOIN pos_config pc ON pc.id = po.config_id
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            {self._tax_join_sql('pt.id', 'po.company_id')}
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
 
         line_clauses, line_params = self._build_line_filters(category, barcode)
@@ -349,9 +391,14 @@ class PosMetricsController(http.Controller):
             "total_revenue": float(res.get("total_revenue") or 0.0),
             "total_revenue_net": float(res.get("total_revenue_net") or 0.0),
             "total_qty": float(res.get("total_qty") or 0.0),
-            "products_revenue": float(res.get("products_revenue") or 0.0),
             "costed_revenue": float(res.get("costed_revenue") or 0.0),
+            # Sin IVA: el costo (standard_price) se carga sin IVA, el margen se mide contra esto
+            "products_revenue_net": float(res.get("products_revenue_net") or 0.0),
+            "costed_revenue_net": float(res.get("costed_revenue_net") or 0.0),
+            "global_discount_net": float(res.get("global_discount_net") or 0.0),
+            "products_revenue": float(res.get("products_revenue") or 0.0),
             "total_cost": float(res.get("total_cost") or 0.0),
+            "total_cost_gross": float(res.get("total_cost_gross") or 0.0),
             # Negativo: es la suma de las líneas de descuento global
             "global_discount": float(res.get("global_discount") or 0.0),
             "line_discount": float(res.get("line_discount") or 0.0),
@@ -419,7 +466,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}{extra}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()}{extra}
         """
         query_params = [tz, start_dt, end_dt, tz] + list(params)
         line_clauses, line_params = self._build_line_filters(category, barcode)
@@ -496,7 +543,7 @@ class PosMetricsController(http.Controller):
             "prev_end": prev_end.strftime('%Y-%m-%d'),
         }
 
-    def _get_cca_metrics(self, start_date=None, end_date=None, company='all', category='all', barcode='all'):
+    def _get_cca_metrics(self, start_date=None, end_date=None, company='all', category='all', barcode='all', iva_mode='net'):
         """Ventas en cuenta corriente (customer_checking_account): no pasan por el POS.
 
         Cuenta los retiros confirmados (pendiente, pago parcial o pagado) por su fecha.
@@ -522,15 +569,24 @@ class PosMetricsController(http.Controller):
         where += line_clauses
         params += line_params
         unit_cost = "COALESCE((pp.standard_price->>(w.company_id::text))::numeric, 0.0)"
-
+        # El precio del retiro es el de la ficha: con o sin IVA según el impuesto/la empresa.
+        # Para el margen se pasa venta y costo al mismo lado del IVA (ver _iva_mode).
+        sale_rate, purchase_rate, included = self.SALE_RATE, self.PURCHASE_RATE, self.INCLUDED
+        if self._iva_mode(iva_mode) == 'gross':
+            margin_sale = f"CASE WHEN {included} THEN l.price_subtotal ELSE l.price_subtotal * (1 + {sale_rate}) END"
+            margin_cost = f"l.quantity * {unit_cost} * (1 + {purchase_rate})"
+        else:
+            margin_sale = f"CASE WHEN {included} THEN l.price_subtotal / (1 + {sale_rate}) ELSE l.price_subtotal END"
+            margin_cost = f"l.quantity * {unit_cost}"
         cr.execute(f"""
             WITH lines AS (
-                SELECT w.id AS withdrawal_id, l.price_subtotal, l.quantity * {unit_cost} AS cost,
+                SELECT w.id AS withdrawal_id, l.price_subtotal, {margin_sale} AS margin_sale, {margin_cost} AS cost,
                        {unit_cost} > 0 AS has_cost
                 FROM cca_withdrawal_line l
                 JOIN cca_withdrawal w ON w.id = l.withdrawal_id
                 JOIN product_product pp ON pp.id = l.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                {self._tax_join_sql('pt.id', 'w.company_id')}
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
                 LEFT JOIN res_company rc ON rc.id = w.company_id
                 WHERE {' AND '.join(where)}
@@ -539,6 +595,7 @@ class PosMetricsController(http.Controller):
                 (SELECT COUNT(DISTINCT withdrawal_id) FROM lines) AS withdrawals,
                 (SELECT SUM(price_subtotal) FROM lines) AS sales,
                 (SELECT SUM(price_subtotal) FROM lines WHERE has_cost) AS costed_revenue,
+                (SELECT SUM(margin_sale) FROM lines WHERE has_cost) AS margin_revenue,
                 (SELECT SUM(cost) FROM lines WHERE has_cost) AS cost,
                 (SELECT SUM(w.amount_surcharge) FROM cca_withdrawal w
                  WHERE w.id IN (SELECT withdrawal_id FROM lines)) AS surcharge,
@@ -549,7 +606,8 @@ class PosMetricsController(http.Controller):
         sales = float(res.get("sales") or 0.0)
         surcharge = float(res.get("surcharge") or 0.0)
         costed_revenue = float(res.get("costed_revenue") or 0.0)
-        gross_profit = round(costed_revenue - float(res.get("cost") or 0.0), 2)
+        margin_revenue = float(res.get("margin_revenue") or 0.0)
+        gross_profit = round(margin_revenue - float(res.get("cost") or 0.0), 2)
         withdrawals = int(res.get("withdrawals") or 0)
         kpis = {
             "withdrawals": withdrawals,
@@ -559,7 +617,7 @@ class PosMetricsController(http.Controller):
             "average": round((sales + surcharge) / withdrawals, 2) if withdrawals else 0.0,
             "residual": round(float(res.get("residual") or 0.0), 2),
             "gross_profit": gross_profit,
-            "margin_percent": round(gross_profit / costed_revenue * 100.0, 2) if costed_revenue > 0 else 0.0,
+            "margin_percent": round(gross_profit / margin_revenue * 100.0, 2) if margin_revenue > 0 else 0.0,
             "cost_coverage_percent": round(costed_revenue / sales * 100.0, 1) if sales > 0 else 0.0,
         }
 
@@ -589,14 +647,144 @@ class PosMetricsController(http.Controller):
         return {"kpis": kpis, "withdrawals": rows}
 
     @http.route('/pos_management_metrics/cca', type='json', auth='user')
-    def get_cca(self, start_date=None, end_date=None, company='all', category='all', barcode='all', **kwargs):
+    def get_cca(self, start_date=None, end_date=None, company='all', category='all', barcode='all', iva_mode='net', **kwargs):
         """Pestaña Cuenta corriente: None si customer_checking_account no está instalado."""
         self._check_access()
-        return self._get_cca_metrics(start_date, end_date, company, category, barcode)
+        return self._get_cca_metrics(start_date, end_date, company, category, barcode, iva_mode)
+
+    @http.route('/pos_management_metrics/stock_value', type='json', auth='user')
+    def get_stock_value(self, company='all', category='all', barcode='all', iva_mode='net', **kwargs):
+        """Valor del stock actual por sucursal, a precio de venta y a precio de costo.
+
+        Es una foto del momento: ignora fechas, caja y cajero. Sólo cuenta stock positivo en
+        ubicaciones internas (los quants negativos son errores de carga, no mercadería).
+        Precio de venta: precio fijo de la lista de la caja de la sucursal; si el producto no
+        está en la lista, el list_price. Los precios < $1 son relleno y se dejan afuera.
+        iva_mode 'net' valúa venta y costo sin IVA; 'gross', los dos con IVA (costo + IVA de compra).
+        """
+        gross = self._iva_mode(iva_mode) == 'gross'
+        sale_rate, purchase_rate, included = self.SALE_RATE, self.PURCHASE_RATE, self.INCLUDED
+        raw_price = "COALESCE(lpv.fixed_price, lpt.fixed_price, pt.list_price, 0.0)"
+        raw_cost = "COALESCE((pp.standard_price->>(s.company_id::text))::numeric, 0.0)"
+        if gross:
+            sale_expr = f"CASE WHEN {included} THEN {raw_price} ELSE {raw_price} * (1 + {sale_rate}) END"
+            cost_expr = f"{raw_cost} * (1 + {purchase_rate})"
+        else:
+            sale_expr = f"CASE WHEN {included} THEN {raw_price} / (1 + {sale_rate}) ELSE {raw_price} END"
+            cost_expr = raw_cost
+        self._check_access()
+        cr = request.env.cr
+        params = [tuple(request.env.companies.ids)]
+        extra = []
+        companies = self._normalize_multi(company)
+        if companies:
+            extra.append("rc.name IN %s")
+            params.append(companies)
+        line_clauses, line_params = self._build_line_filters(category, barcode)
+        extra.extend(line_clauses)
+        params.extend(line_params)
+        extra_sql = "".join(f" AND {c}" for c in extra)
+
+        query = f"""
+            WITH company_pricelist AS (
+                SELECT DISTINCT ON (pc.company_id) pc.company_id, pc.pricelist_id
+                FROM pos_config pc
+                WHERE pc.active AND pc.pricelist_id IS NOT NULL
+                ORDER BY pc.company_id, pc.id
+            ),
+            -- Precio fijo vigente de cada producto en cada lista, calculado una vez (un LATERAL con OR
+            -- por producto tardaba ~1 min en prod). Variante gana sobre plantilla; a igualdad, el último.
+            list_prices AS (
+                SELECT DISTINCT ON (i.pricelist_id, i.applied_on, COALESCE(i.product_id, 0), i.product_tmpl_id)
+                       i.pricelist_id, i.applied_on, i.product_id, i.product_tmpl_id, i.fixed_price
+                FROM product_pricelist_item i
+                WHERE i.pricelist_id IN (SELECT pricelist_id FROM company_pricelist)
+                  AND i.compute_price = 'fixed'
+                  AND i.applied_on IN ('0_product_variant', '1_product')
+                  AND COALESCE(i.min_quantity, 0) <= 1
+                  AND (i.date_start IS NULL OR i.date_start <= NOW())
+                  AND (i.date_end IS NULL OR i.date_end >= NOW())
+                ORDER BY i.pricelist_id, i.applied_on, COALESCE(i.product_id, 0), i.product_tmpl_id, i.id DESC
+            ),
+            stock AS (
+                SELECT sq.company_id, sq.product_id, SUM(sq.quantity) AS qty
+                FROM stock_quant sq
+                JOIN stock_location sl ON sl.id = sq.location_id AND sl.usage = 'internal'
+                WHERE sq.company_id IN %s
+                GROUP BY 1, 2
+                HAVING SUM(sq.quantity) > 0
+            ),
+            valued AS (
+                SELECT rc.name AS company, s.qty,
+                    {raw_price} AS list_price,
+                    {sale_expr} AS sale_price,
+                    {cost_expr} AS unit_cost
+                FROM stock s
+                JOIN res_company rc ON rc.id = s.company_id
+                JOIN product_product pp ON pp.id = s.product_id
+                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                {self._tax_join_sql('pt.id', 's.company_id')}
+                LEFT JOIN product_category ic ON ic.id = pt.categ_id
+                LEFT JOIN company_pricelist cp ON cp.company_id = s.company_id
+                LEFT JOIN list_prices lpv ON lpv.pricelist_id = cp.pricelist_id
+                     AND lpv.applied_on = '0_product_variant' AND lpv.product_id = pp.id
+                LEFT JOIN list_prices lpt ON lpt.pricelist_id = cp.pricelist_id
+                     AND lpt.applied_on = '1_product' AND lpt.product_tmpl_id = pt.id
+                WHERE pp.active AND pt.active AND pt.is_storable{extra_sql}
+            )
+            SELECT company,
+                COUNT(*) AS products,
+                SUM(qty) AS qty,
+                SUM(qty * sale_price) FILTER (WHERE list_price >= 1) AS sale_value,
+                SUM(qty * unit_cost) FILTER (WHERE unit_cost > 0) AS cost_value,
+                SUM(qty * sale_price) FILTER (WHERE list_price >= 1 AND unit_cost > 0) AS costed_sale_value,
+                COUNT(*) FILTER (WHERE list_price >= 1) AS with_price,
+                COUNT(*) FILTER (WHERE unit_cost > 0) AS with_cost
+            FROM valued
+            GROUP BY company
+            ORDER BY sale_value DESC NULLS LAST
+        """
+        cr.execute(query, params)
+        rows = []
+        for r in cr.dictfetchall():
+            rows.append({
+                "company": r["company"],
+                "products": int(r["products"] or 0),
+                "qty": float(r["qty"] or 0.0),
+                "sale_value": float(r["sale_value"] or 0.0),
+                "cost_value": float(r["cost_value"] or 0.0),
+                "costed_sale_value": float(r["costed_sale_value"] or 0.0),
+                "with_price": int(r["with_price"] or 0),
+                "with_cost": int(r["with_cost"] or 0),
+            })
+
+        def total(key):
+            return sum(r[key] for r in rows)
+
+        products = total("products")
+        costed_sale = total("costed_sale_value")
+        cost_value = total("cost_value")
+        return {
+            "rows": rows,
+            "iva_mode": 'gross' if gross else 'net',
+            "totals": {
+                "products": products,
+                "qty": total("qty"),
+                "sale_value": total("sale_value"),
+                "cost_value": cost_value,
+                "with_price": total("with_price"),
+                "with_cost": total("with_cost"),
+                "with_cost_percent": round(total("with_cost") * 100.0 / products, 1) if products else 0.0,
+                # Margen potencial sólo sobre productos con costo: mezclar los sin costo lo infla
+                "potential_margin": costed_sale - cost_value,
+                "potential_margin_percent": round((costed_sale - cost_value) * 100.0 / costed_sale, 1) if costed_sale else 0.0,
+            },
+        }
 
     @http.route('/pos_management_metrics/metrics', type='json', auth='user')
-    def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all', **kwargs):
+    def get_metrics(self, start_date=None, end_date=None, pos='all', cashier='all', company='all', category='all', barcode='all', iva_mode='net', **kwargs):
         self._check_access()
+        iva_mode = self._iva_mode(iva_mode)
         cr = request.env.cr
         tz = self._get_timezone()
         lang = self._get_lang()
@@ -690,7 +878,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+            WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         kpi_params = [order_ids_tuple]
         kpi_query += "".join(f" AND {c}" for c in line_clauses)
@@ -789,7 +977,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+                WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -819,7 +1007,7 @@ class PosMetricsController(http.Controller):
                 JOIN product_product pp ON pp.id = pol.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
                 LEFT JOIN product_category ic ON ic.id = pt.categ_id
-                WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+                WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
             """
             trend_params = [tz, order_ids_tuple]
             trend_query += "".join(f" AND {c}" for c in line_clauses)
@@ -884,7 +1072,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+            WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         pos_params = [order_ids_tuple]
         pos_query += "".join(f" AND {c}" for c in line_clauses)
@@ -932,7 +1120,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+            WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         prod_params = [lang, order_ids_tuple]
         prod_query += "".join(f" AND {c}" for c in line_clauses)
@@ -962,7 +1150,7 @@ class PosMetricsController(http.Controller):
             JOIN product_category ic ON ic.id = pt.categ_id
             WHERE pol.order_id IN %s
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
-              AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+              AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         cat_params = [order_ids_tuple]
         cat_query += "".join(f" AND {c}" for c in line_clauses)
@@ -991,7 +1179,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+            WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         dow_params = [tz, order_ids_tuple]
         dow_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1043,7 +1231,7 @@ class PosMetricsController(http.Controller):
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
-            WHERE pol.order_id IN %s AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()}
+            WHERE pol.order_id IN %s AND pol.product_id NOT IN {self._cca_payment_products_sql()}
         """
         hour_params = [tz, order_ids_tuple]
         hour_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1070,15 +1258,22 @@ class PosMetricsController(http.Controller):
 
         # Obtener métricas del período actual completo para KPI base
         current_perf = self._get_period_metrics(start_date, end_date, pos, cashier, company, category, barcode)
-        total_cost = round(current_perf["total_cost"], 2)
+        gross = iva_mode == 'gross'
+        cost_key = "total_cost_gross" if gross else "total_cost"
+        total_cost = round(current_perf[cost_key], 2)
         # El descuento global no se puede atribuir a un producto: se prorratea sobre la parte
         # de la venta que tiene costo cargado, la única que entra en el margen.
+        # Venta y costo siempre del mismo lado del IVA: restar el costo sin IVA de la venta con IVA
+        # inflaba el margen (sep/2026: 47% mostrado contra 36% real). 'net' sirve a un responsable
+        # inscripto; 'gross' (precio final contra costo + IVA de compra) a monotributo/exento.
         costed_revenue = current_perf["costed_revenue"]
+        sfx = "" if gross else "_net"
+        margin_revenue = current_perf["costed_revenue" + sfx]
         discount_share = 0.0
-        if current_perf["products_revenue"]:
-            discount_share = current_perf["global_discount"] * costed_revenue / current_perf["products_revenue"]
-        margin_base = costed_revenue + discount_share
-        gross_profit = round(margin_base - current_perf["total_cost"], 2)
+        if current_perf["products_revenue" + sfx]:
+            discount_share = current_perf["global_discount" + sfx] * margin_revenue / current_perf["products_revenue" + sfx]
+        margin_base = margin_revenue + discount_share
+        gross_profit = round(margin_base - current_perf[cost_key], 2)
         if margin_base > 0:
             margin_percent = round((gross_profit / margin_base) * 100.0, 2)
         # Qué parte de la venta de productos tiene costo cargado: el margen sólo habla de esa parte
@@ -1140,24 +1335,30 @@ class PosMetricsController(http.Controller):
         except (ValueError, KeyError, TypeError) as e:
             _logger.error(f"Error calculating MoM/YoY growth: {e}")
 
-        # 10. Margen de ganancia por producto
+        # 10. Margen de ganancia por producto (net_revenue = venta del lado del IVA elegido)
+        margin_revenue_sql = "pol.price_subtotal_incl" if gross else "pol.price_subtotal"
+        tax_join = self._tax_join_sql('pt.id', 'po.company_id') if gross else ""
+        margin_cost_sql = "COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)"
+        if gross:
+            margin_cost_sql += f" * (1 + {self.PURCHASE_RATE})"
         prod_margin_query = f"""
             SELECT
                 COALESCE(pt.name->>%s, pt.name->>'en_US') AS producto,
                 SUM(pol.qty) AS total_qty,
-                SUM(pol.price_subtotal_incl) AS net_revenue,
-                SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS total_cost,
-                SUM(pol.price_subtotal_incl) - SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS gross_profit
+                SUM({margin_revenue_sql}) AS net_revenue,
+                SUM(pol.qty * {margin_cost_sql}) AS total_cost,
+                SUM({margin_revenue_sql}) - SUM(pol.qty * {margin_cost_sql}) AS gross_profit
             FROM pos_order_line pol
             JOIN pos_order po ON po.id = pol.order_id
             JOIN pos_config pc ON pc.id = po.config_id
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            {tax_join}
             LEFT JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
         prod_margin_params = [lang] + list(params)
@@ -1187,19 +1388,20 @@ class PosMetricsController(http.Controller):
             SELECT
                 ic.name AS categoria,
                 SUM(pol.qty) AS total_qty,
-                SUM(pol.price_subtotal_incl) AS net_revenue,
-                SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS total_cost,
-                SUM(pol.price_subtotal_incl) - SUM(pol.qty * COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0)) AS gross_profit
+                SUM({margin_revenue_sql}) AS net_revenue,
+                SUM(pol.qty * {margin_cost_sql}) AS total_cost,
+                SUM({margin_revenue_sql}) - SUM(pol.qty * {margin_cost_sql}) AS gross_profit
             FROM pos_order_line pol
             JOIN pos_order po ON po.id = pol.order_id
             JOIN pos_config pc ON pc.id = po.config_id
             JOIN product_product pp ON pp.id = pol.product_id
             JOIN product_template pt ON pt.id = pp.product_tmpl_id
+            {tax_join}
             JOIN product_category ic ON ic.id = pt.categ_id
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
               AND LOWER(ic.name) NOT IN ('all', 'todos', 'all / saleable')
               AND COALESCE((pp.standard_price->>(po.company_id::text))::numeric, 0.0) > 0
         """
@@ -1241,7 +1443,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         coverage_params = list(params)
         coverage_query += "".join(f" AND {c}" for c in line_clauses)
@@ -1288,6 +1490,7 @@ class PosMetricsController(http.Controller):
                 "sales_by_hour": sales_by_hour
             },
             "profitability": {
+                "iva_mode": iva_mode,
                 "product_margins": product_margins,
                 "category_margins": category_margins,
                 "mom_growth_revenue": mom_growth_revenue,
@@ -1437,7 +1640,7 @@ class PosMetricsController(http.Controller):
             LEFT JOIN res_users ru ON ru.id = po.user_id
             {self._employee_join('ru', 'po.company_id', 'emp')}
             LEFT JOIN res_company rc ON rc.id = po.company_id
-            WHERE {where_clause} AND pp.active = TRUE AND pt.active = TRUE AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
+            WHERE {where_clause} AND pol.product_id NOT IN {self._cca_payment_products_sql()} AND pp.id NOT IN {non_merch}
         """
         params_list = [lang] + list(params)
 

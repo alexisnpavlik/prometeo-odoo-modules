@@ -35,6 +35,9 @@ class PosDashboardMetrics extends Component {
             marginSort: "revenue",
             showFilters: false,
             activeTab: "general",
+            // Márgenes y valor de stock: "net" (sin IVA, responsable inscripto) o "gross"
+            // (con IVA: precio final contra costo + IVA de compra, monotributo/exento)
+            ivaMode: "net",
             topSort: "revenue",
             loading: false,
             syncTime: "Cargando...",
@@ -102,6 +105,9 @@ class PosDashboardMetrics extends Component {
 
         // Pestaña Cuenta corriente: solo aparece si customer_checking_account está instalado
         this.ccaData = useState({ available: false, kpis: {}, withdrawals: [] });
+
+        // Valor del stock actual (pestaña Rentabilidad): foto del momento, sin filtro de fechas
+        this.stockValueData = useState({ loaded: false, rows: [], totals: {} });
         
         this.charts = {};
 
@@ -377,6 +383,8 @@ class PosDashboardMetrics extends Component {
             this.loadTopArticles();
         } else if (tab === "cca") {
             this.loadCca();
+        } else if (tab === "profitability") {
+            this.loadStockValue();
         } else if (tab === "general") {
             // Re-renderizar gráficos en pestaña general para ajustar dimensiones
             setTimeout(() => this.renderAllCharts(), 50);
@@ -551,7 +559,8 @@ class PosDashboardMetrics extends Component {
                 cashier: this.state.cashier,
                 company: JSON.stringify(this.companyFilter),
                 category: JSON.stringify(this.categoryFilter),
-                barcode: JSON.stringify(this.barcodeFilter)
+                barcode: JSON.stringify(this.barcodeFilter),
+                iva_mode: this.state.ivaMode
             });
 
             Object.assign(this.metricsData, metrics);
@@ -564,6 +573,8 @@ class PosDashboardMetrics extends Component {
                 await this.loadTopArticles();
             } else if (this.state.activeTab === "cca") {
                 await this.loadCca();
+            } else if (this.state.activeTab === "profitability") {
+                await this.loadStockValue();
             }
 
             this.state.syncTime = `Sincronizado: ${new Date().toLocaleTimeString()}`;
@@ -640,13 +651,38 @@ class PosDashboardMetrics extends Component {
                 end_date: this.state.endDate || null,
                 company: JSON.stringify(this.companyFilter),
                 category: JSON.stringify(this.categoryFilter),
-                barcode: JSON.stringify(this.barcodeFilter)
+                barcode: JSON.stringify(this.barcodeFilter),
+                iva_mode: this.state.ivaMode
             });
             this.ccaData.available = Boolean(data);
             this.ccaData.kpis = data ? data.kpis : {};
             this.ccaData.withdrawals = data ? data.withdrawals : [];
         } catch (e) {
             console.error("Error al cargar cuenta corriente:", e);
+        }
+    }
+
+    setIvaMode(mode) {
+        if (this.state.ivaMode === mode) return;
+        this.state.ivaMode = mode;
+        this.refreshData();
+    }
+
+    get ivaLabel() {
+        return this.state.ivaMode === "gross" ? "con IVA" : "sin IVA";
+    }
+
+    async loadStockValue() {
+        try {
+            const data = await rpc("/pos_management_metrics/stock_value", {
+                company: JSON.stringify(this.companyFilter),
+                category: JSON.stringify(this.categoryFilter),
+                barcode: JSON.stringify(this.barcodeFilter),
+                iva_mode: this.state.ivaMode
+            });
+            Object.assign(this.stockValueData, data, { loaded: true });
+        } catch (e) {
+            console.error("Error al cargar el valor del stock:", e);
         }
     }
 

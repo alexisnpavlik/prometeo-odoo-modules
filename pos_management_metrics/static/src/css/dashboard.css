@@ -1835,3 +1835,22 @@
 .pos-dashboard-wrap .barcode-suggestion:hover {
     background: var(--color-blue-glow);
 }
+
+/* Selector Sin IVA / Con IVA de márgenes y valores */
+.pos-dashboard-wrap .iva-mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.pos-dashboard-wrap .iva-mode-label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+.pos-dashboard-wrap .iva-mode-tabs {
+    display: flex;
+    gap: 4px;
+    flex: 0 0 auto;
+}
