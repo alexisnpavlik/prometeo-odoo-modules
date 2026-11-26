@@ -4,7 +4,7 @@
     "category": "Sales/Point Of Sale",
     "summary": "Ingresar el importe a cobrar y que el POS calcule los kg",
     "description": """
-        Agrega el botón "$ → kg" en la pantalla de productos del POS.
+        Agrega "Por $" debajo de la tecla Cant. del teclado del POS.
         Con una línea de un producto que no se vende por unidad (kg, litro, metro...),
         el cajero ingresa el importe que pide el cliente y el POS fija la cantidad
         = importe / precio unitario mostrado (con impuestos y descuento de la línea),
@@ -19,8 +19,8 @@
     "depends": ["point_of_sale"],
     "assets": {
         "point_of_sale._assets_pos": [
-            "pos_weight_by_amount/static/src/js/control_buttons_patch.js",
-            "pos_weight_by_amount/static/src/xml/control_buttons.xml",
+            "pos_weight_by_amount/static/src/js/product_screen_patch.js",
+            "pos_weight_by_amount/static/src/xml/numpad.xml",
         ],
         "web.assets_tests": [
             "pos_weight_by_amount/static/tests/tours/*.js",

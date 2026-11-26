@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
-import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
+import { ProductScreen } from "@point_of_sale/app/screens/product_screen/product_screen";
+import { buttonsType } from "@point_of_sale/app/generic_components/numpad/numpad";
 import { NumberPopup } from "@point_of_sale/app/utils/input_popups/number_popup";
 import { makeAwaitable } from "@point_of_sale/app/store/make_awaitable_dialog";
 import { parseFloat as parseLocalizedFloat } from "@web/views/fields/parsers";
@@ -45,7 +46,22 @@ function adjustPriceToAmount(line, amount) {
     line.set_unit_price((line.get_unit_price() * amount) / total);
 }
 
-patch(ControlButtons.prototype, {
+const BUTTON_VALUE = "weight_by_amount";
+
+// El Numpad valida la forma de cada tecla: se habilita la clave opcional subButton
+// (una segunda tecla dibujada dentro de la misma celda, ver numpad.xml).
+buttonsType.element[0].shape.subButton = {
+    type: Object,
+    optional: true,
+    shape: {
+        value: String,
+        text: String,
+        title: { type: String, optional: true },
+        disabled: { type: Boolean, optional: true },
+    },
+};
+
+patch(ProductScreen.prototype, {
     /**
      * Línea seleccionada si su producto no se vende por unidad (kg, litro, metro...).
      * Odoo marca como agrupable solo la categoría Unidad; Units tiene rounding 0,01,
@@ -61,6 +77,33 @@ patch(ControlButtons.prototype, {
     },
 
     /**
+     * Cuelga el botón "Por $" de la tecla Cant.: el template del Numpad lo dibuja
+     * dentro de la misma celda (ver numpad.xml).
+     */
+    getNumpadButtons() {
+        return super.getNumpadButtons().map((button) =>
+            button.value === "quantity"
+                ? {
+                      ...button,
+                      subButton: {
+                          value: BUTTON_VALUE,
+                          text: _t("Por $"),
+                          title: _t("Cargar la cantidad a partir del importe"),
+                          disabled: !this.weightByAmountLine,
+                      },
+                  }
+                : button
+        );
+    },
+
+    onNumpadClick(buttonValue) {
+        if (buttonValue === BUTTON_VALUE) {
+            return this.clickWeightByAmount();
+        }
+        return super.onNumpadClick(buttonValue);
+    },
+
+    /**
      * Pide el importe y fija la cantidad de la línea = importe / precio unitario.
      */
     async clickWeightByAmount() {
@@ -68,6 +111,8 @@ patch(ControlButtons.prototype, {
         if (!line) {
             return;
         }
+        this.numberBuffer.capture();
+        this.numberBuffer.reset();
         const unitPrice = line.get_unit_display_price();
         if (!(unitPrice > 0)) {
             this.notification.add(_t("El producto no tiene precio: no se puede calcular la cantidad."), {
